@@ -64,9 +64,9 @@ fi
 
 }
 
-function checkError() {
+function checkForError() {
 
-    checkErrorExitCode=$?
+    checkForErrorExitCode=$?
 
 }
 
