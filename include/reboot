@@ -7,5 +7,4 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Rebooting Server" | log
-reboot | log
+rebootSystem

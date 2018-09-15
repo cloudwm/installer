@@ -70,3 +70,10 @@ function checkError() {
 
 }
 
+
+function rebootSystem() {
+
+    echo "Rebooting System" | log
+    reboot | log
+
+}
