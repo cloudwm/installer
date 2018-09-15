@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Checking internet connectivity" | log
+
+success=0
+
+echo "Trying to fetch www.cloudwm.com" | log
+curl "http://www.cloudwm.com/"  --connect-timeout 10 > /dev/null
+errorCode=$?
+
+if [ $errorCode -gt 0 ]; then
+
+    echo "Failed." | log
+    
+
+else 
+    
+    echo "Succeed." | log
+    ((success++))
+
+fi
+
+
+echo "Trying to fetch www.google.com" | log
+curl "http://www.google.com/"  --connect-timeout 10 > /dev/null
+errorCode=$?
+
+if [ $errorCode -gt 0 ]; then
+
+    echo "Failed." | log
+    
+
+else 
+    
+    echo "Succeed." | log
+    ((success++))
+
+fi
+
+echo "Trying to fetch www.yahoo.com" | log
+curl "http://www.yahoo.com/"  --connect-timeout 10 > /dev/null
+errorCode=$?
+
+if [ $errorCode -gt 0 ]; then
+
+    echo "Failed." | log
+    
+
+else 
+    
+    echo "Succeed." | log
+    ((success++))
+
+fi
+
+if [ "$success" -gt 0 ]; then 
+
+    echo "Test passed $success times. Test Passed. (0)" | log
+    exit 0
+    
+else
+
+    echo "Test passed $success times. Test Failed. (1)" | log
+    exit 1
+
+fi

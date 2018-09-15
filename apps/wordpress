@@ -1,0 +1,7 @@
+#
+deps=mysqldb
+defaulttargetdir=
+
+# Downloading wordpress and installing
+
+exit 1
