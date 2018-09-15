@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Stopping and disabling lxcfs" | log
+systemctl stop var-lib-lxcfs.mount | log
+systemctl disable lxcfs.service | log
