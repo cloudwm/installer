@@ -66,7 +66,7 @@ fi
 
 function checkError() {
 
-    scriptExitCode=$?
+    checkErrorExitCode=$?
 
 }
 
@@ -83,7 +83,7 @@ function backupFile() {
     if [ -f "$1" ]; then
 
         rootDir=$(rootDir)
-        echo "Backuping file $1 to $rootDir"
+        echo "Backuping file $1 to $rootDir/temp/backup/"
 
         fileDirectory=`dirname $1`
 

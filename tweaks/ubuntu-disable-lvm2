@@ -9,7 +9,6 @@ fi
 
 echo "Stopping and disabling lvm2" | log
 systemctl stop lvm2-lvmetad.service | log
-systemctl stop lvm2-lvmetad.socket | log
 systemctl stop lvm2-lvmpolld.socket | log
 
 systemctl disable lvm2-lvmetad | log
