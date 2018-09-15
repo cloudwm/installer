@@ -8,6 +8,8 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Stopping and disabling snapd" | log
-systemctl stop snapd.socket | log
-systemctl stop snapd.service | log
+systemctl stop snapd* | log
 systemctl disable snapd | log
+
+apt remove snapd -y | log
+rm -Rfv /snap | log 
