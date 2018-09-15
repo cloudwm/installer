@@ -77,3 +77,29 @@ function rebootSystem() {
     reboot | log
 
 }
+
+function backupFile() {
+
+    if [ -f "$1" ]; then
+
+        rootDir=$(rootDir)
+        echo "Backuping file $1 to $rootDir"
+
+        fileDirectory=`dirname $1`
+
+        if [ ! -d "$rootDir/temp/backup/$fileDirectory" ]; then 
+
+    	mkdir -p $rootDir/temp/backup/$fileDirectory
+
+        fi
+
+	newFilename=`basename $1`.`date +%Y%m%d%H%M%S`
+        cp $1 $rootDir/temp/backup/$fileDirectory/$newFilename
+
+    else
+
+        echo "Backuping file $1 Failed. file doesn't exist."
+
+    fi
+
+}
