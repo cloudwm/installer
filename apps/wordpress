@@ -1,6 +1,6 @@
 #
-deps=mysqldb
-defaulttargetdir=
+deps=mysqldb,httpd,php
+checkDeps $deps
 
 # Downloading wordpress and installing
 
