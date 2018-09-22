@@ -27,7 +27,5 @@ Execute ./installer.sh
 
 
 
-Thanks and enjoy,
-
-CloudWM Team
+Thanks and enjoy
 
