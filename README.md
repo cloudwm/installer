@@ -30,6 +30,7 @@ git clone https://www.github.com/cloudwm/installer.git
 ./installer.sh
 ```
 
+
 <br />
 Thanks and enjoy,<br />
 CloudWM Team<br />
