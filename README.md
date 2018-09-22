@@ -27,3 +27,4 @@ edit installer.conf file to customize installer.sh execution method and your don
 Thanks and enjoy,
 
 CloudWM Team
+
