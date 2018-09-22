@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install sendmail for local mail delivery
+echo "Installing sendmail" | log
+apt install sendmail -y | log
+
