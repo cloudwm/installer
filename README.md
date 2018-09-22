@@ -21,7 +21,10 @@ tweaks/ - Operating system tweaks and tools to harden and optimize server's perf
 # How to Use
 git clone https://www.github.com/cloudwm/installer.git
 
-edit installer.conf file to customize installer.sh execution method and your done.
+edit installer.conf file and customize installer.sh 
+
+Execute ./installer.sh
+
 
 
 Thanks and enjoy,
