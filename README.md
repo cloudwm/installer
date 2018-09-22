@@ -25,7 +25,4 @@ edit installer.conf file and customize installer.sh
 
 Execute ./installer.sh
 
-
-
-Thanks and enjoy
-
+Thanks and enjoy,
