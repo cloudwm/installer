@@ -26,5 +26,7 @@ edit installer.conf file and customize installer.sh
 Execute ./installer.sh
 
 Thanks and enjoy,
+
 CloudWM Team
+
 CaaB.io
