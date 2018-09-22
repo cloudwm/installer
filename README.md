@@ -19,16 +19,19 @@ tweaks/ - Operating system tweaks and tools to harden and optimize server's perf
 
 
 # How to Use
+
+Clone Repository:
+```
 git clone https://www.github.com/cloudwm/installer.git
+```
 
-edit installer.conf file and customize installer.sh 
+Edit installer.conf file and customize installer.sh 
 
-Execute ./installer.sh
-
-
-
-Thanks and enjoy,
-
-CloudWM Team
-
-CaaB.io
+Execute:
+```
+./installer.sh
+```
+<br />
+Thanks and enjoy,<br />
+CloudWM Team<br />
+CaaB.io<br />
