@@ -2,14 +2,11 @@
 
 Installer is a set of scripts for installing and tweaking services, apps and operating system on Ubuntu servers.
 
-It is developed to help DevOps to simplify installation automation of servers.
+It is developed to help DevOps to simplify servers automated installation.
 
 Written in bash so it can be executed on any linux os without the need to preinstall 3rd party scripting language on the server.
 
-
 We'd love to see this grow. Feel free to add, improve, fix, comment your ideas to improve this set of tools.
-
-
 
 # What's included:
 
