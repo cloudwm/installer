@@ -7,5 +7,5 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Stopping and disabling network-dispatcherd" | log
-apt purge network-dispatcherd -y | log
+echo "Stopping and disabling networkd-dispatcher" | log
+apt purge networkd-dispatcher -y | log
