@@ -2,11 +2,14 @@
 
 Installer is a set of scripts for installing and tweaking services, apps and operating system on Ubuntu servers.
 
-It is being developed in order to help DevOps to simplify automation of server installation.
+It is developed to help DevOps to simplify installation automation of servers.
 
 Written in bash so it can be executed on any linux os without the need to preinstall 3rd party scripting language on the server.
 
-We'd love to this see developed and grow. Feel free to add, improve, fix, comment your ideas to improve this set of tools.
+
+We'd love to see this grow. Feel free to add, improve, fix, comment your ideas to improve this set of tools.
+
+
 
 # What's included:
 
@@ -23,7 +26,7 @@ tweaks/ - Operating system tweaks and tools to harden and optimize server's perf
 git clone https://www.github.com/cloudwm/installer.git
 ```
 
- - Edit installer.conf file and customize installer.sh 
+ - Edit installer.conf file and customize installation process.
 
  - Execute:
 ```
