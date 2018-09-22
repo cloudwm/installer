@@ -7,6 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+echo "Backuping file /etc/sysctl.conf" | log
+backupFile /etc/sysctl.conf | log
+
 echo "Adding to /etc/sysctl.conf tweak values" | log
 
 echo " ">> /etc/sysctl.conf
@@ -37,6 +40,7 @@ echo "net.ipv4.tcp_wmem = 4096 16384 16777216" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_syn_retries = 5" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_tw_reuse = 1" >> /etc/sysctl.conf
 
+# These values exist only if firewall/iptables conntrack module is loaded.
 echo "net.netfilter.nf_conntrack_max = 10485760" >> /etc/sysctl.conf
 echo "net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 30" >> /etc/sysctl.conf
 echo "net.netfilter.nf_conntrack_tcp_timeout_time_wait = 15" >> /etc/sysctl.conf

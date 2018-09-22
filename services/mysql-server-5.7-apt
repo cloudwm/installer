@@ -6,4 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+# install mysql from apt
 apt install mysql-server-5.7 -y | log
+
+# set mysql password to adminpassword:
