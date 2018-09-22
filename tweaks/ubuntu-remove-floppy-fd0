@@ -9,5 +9,5 @@ fi
 
 echo "Removing floppy module" | log
 rmmod floppy |  log
-echo "blacklist floppy" | sudo tee /etc/modprobe.d/blacklist-floppy.conf
+echo "blacklist floppy" | tee /etc/modprobe.d/blacklist-floppy.conf
 dpkg-reconfigure initramfs-tools | log
