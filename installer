@@ -30,6 +30,12 @@ do
 	continue;
 	;;
 
+	98)
+	echo "Exit Code 98. Script already executed, can run only once. Continuing. (98)" | log
+	continue;
+	;;
+
+
 	99)
 	echo "Exit Code 99. Continuing. (99)" | log
 	continue;
