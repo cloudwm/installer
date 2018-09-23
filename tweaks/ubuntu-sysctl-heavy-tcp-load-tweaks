@@ -46,3 +46,5 @@ echo "net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 30" >> /etc/sysctl.conf
 echo "net.netfilter.nf_conntrack_tcp_timeout_time_wait = 15" >> /etc/sysctl.conf
 
 sysctl -p
+
+exit 0
