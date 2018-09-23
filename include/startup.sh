@@ -78,6 +78,25 @@ function rebootSystem() {
 
 }
 
+function tagScript() {
+
+    rootDir=$(rootDir)
+    touch $rootDir/temp/`basename $0`.$1
+}
+
+function runOnceCheck() {
+
+    rootDir=$(rootDir)
+    if [ -f "$rootDir/temp/`basename $0`.success" ]; 
+    then
+
+	echo "runOnceCheck: $0 already executed, can run only once. execution stopped, exit code 98. " | log
+        exit 98;
+
+    fi
+
+}
+
 function backupFile() {
 
     if [ -f "$1" ]; then

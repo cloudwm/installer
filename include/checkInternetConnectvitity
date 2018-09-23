@@ -63,11 +63,15 @@ fi
 if [ "$success" -gt 0 ]; then 
 
     echo "Test passed $success times. Test Passed. (0)" | log
+    tagScript success    
     exit 0
     
 else
 
     echo "Test passed $success times. Test Failed. (1)" | log
+    tagScript failed
     exit 1
 
 fi
+
+
