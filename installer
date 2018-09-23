@@ -3,7 +3,16 @@
 installerDir=$(dirname "`readlink -f $0`")
 
 . include/startup.sh
-. ./installer.conf
+
+if [ -z "$1" ]; 
+then
+    . ./installer.conf
+
+else
+
+    . $1
+
+fi
 
 checkRootUser
 checkOs
