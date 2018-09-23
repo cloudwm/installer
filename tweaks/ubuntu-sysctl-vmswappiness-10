@@ -16,3 +16,5 @@ echo " ">> /etc/sysctl.conf
 echo "vm.swappiness = 10" >> /etc/sysctl.conf
 
 sysctl -p
+
+exit 0
