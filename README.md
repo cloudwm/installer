@@ -8,7 +8,7 @@ Written in bash so it can be executed on any linux os without the need to preins
 
 We'd love to see this grow. Feel free to add, improve, fix, comment your ideas to improve this set of tools.
 
-# What's included:
+# What's included
 
 apps/ - application installation scripts (such as wordpress, drupal, magento, owncloud, etc).
 
