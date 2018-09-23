@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+if [ -d "/var/www/html" ];
+
+then
+
+    echo "Adding context Install in Progress to /var/www/html/index.html" | log
+    echo "Install in progress, please refresh within a couple of min." > /var/www/html/index.html
+
+    tagScript success
+
+    exit 0
+
+
+then
+
+    echo "Web server directory doesn't exist, exiting." | log
+    exit 1
+
+fi
+
+
+
+
+
