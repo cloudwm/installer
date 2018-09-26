@@ -27,7 +27,7 @@ git clone https://www.github.com/cloudwm/installer.git
 
  - Execute:
 ```
-./installer
+./installer {installer conf file}
 ```
 
 
