@@ -8,5 +8,4 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Removing snapd" | log
-
 apt purge snapd -y | log

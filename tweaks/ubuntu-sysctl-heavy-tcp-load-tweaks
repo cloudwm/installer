@@ -7,6 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Backuping file /etc/sysctl.conf" | log
 backupFile /etc/sysctl.conf | log
 
@@ -46,5 +48,7 @@ echo "net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 30" >> /etc/sysctl.conf
 echo "net.netfilter.nf_conntrack_tcp_timeout_time_wait = 15" >> /etc/sysctl.conf
 
 sysctl -p
+
+tagScript success
 
 exit 0

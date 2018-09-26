@@ -6,7 +6,20 @@ installerDir=$(dirname "`readlink -f $0`")
 
 if [ -z "$1" ]; 
 then
-    . ./installer.conf
+
+    if [ -f "./installer.conf" ];
+    then 
+
+        . ./installer.conf
+
+    else
+
+	echo "installer.conf file not found." | log
+	echo "Usage: ./installer installer.config.file.conf"  | log
+
+	exit 1
+    
+    fi
 
 else
 
