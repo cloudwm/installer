@@ -14,4 +14,4 @@ systemctl disable dbus.socket | log
 systemctl disable dbus.service | log
 
 echo "Uninstalling dbus service" | log
-apt remove dbus -y | log
+apt purge dbus -y | log
