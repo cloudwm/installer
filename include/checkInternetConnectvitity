@@ -7,10 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Checking internet connectivity" | log
-
 success=0
-
+echo "Checking internet connectivity" | log
 echo "Trying to fetch www.cloudwm.com" | log
 curl "http://www.cloudwm.com/"  --connect-timeout 10 > /dev/null
 errorCode=$?
@@ -73,5 +71,3 @@ else
     exit 1
 
 fi
-
-
