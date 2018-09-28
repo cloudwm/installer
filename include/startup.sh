@@ -108,7 +108,7 @@ function backupFile() {
 
         if [ ! -d "$rootDir/temp/backup/$fileDirectory" ]; then 
 
-    	mkdir -p $rootDir/temp/backup/$fileDirectory
+	mkdir -p $rootDir/temp/backup/$fileDirectory
 
         fi
 
