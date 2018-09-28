@@ -10,3 +10,4 @@ fi
 echo "Reducing getty processes" | log
 backupFile /lib/systemd/system/getty-static.service
 sed -i 's/ExecStart=\/bin\/systemctl --no-block start getty@tty2.service getty@tty3.service getty@tty4.service getty@tty5.service getty@tty6.service/ExecStart=\/bin\/systemctl --no-block start getty@tty2.service/g' /lib/systemd/system/getty-static.service
+
