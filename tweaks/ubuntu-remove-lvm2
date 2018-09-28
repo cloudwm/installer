@@ -15,4 +15,4 @@ systemctl disable lvm2-lvmetad | log
 systemctl disable lvm2-metad | log
 systemctl disable lvm2-lvmpolld | log
 
-apt remove lvm2 -y | log
+apt purge lvm2 -y | log

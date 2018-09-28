@@ -10,4 +10,4 @@ fi
 echo "Stopping and disabling iscsid" | log
 systemctl stop iscsid | log
 systemctl disable iscsid.service | log
-apt remove open-iscsi -y | log
+apt purge open-iscsi -y | log
