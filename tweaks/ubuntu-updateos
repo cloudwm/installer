@@ -7,9 +7,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Updating/upgrading OS to latest packages" | log
+echo "Updating and upgrading OS to latest kernel and packages" | log
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
-apt-get -qy update
-apt-get -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade
-apt-get -qy autoclean
+apt-get -qy update | log
+apt-get -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade | log
+apt-get -qy autoclean | log
+apt upgrade -y | log
+apt autoremove -y | log
