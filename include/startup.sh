@@ -78,6 +78,19 @@ function rebootSystem() {
 
 }
 
+function useFiglet() {
+
+    if [ ! -f "/usr/bin/figlet-figlet" ]; 
+    then
+
+	echo "Figlet not found, installing figlet." | log
+        apt install figlet -y
+
+    fi
+
+}
+
+
 function tagScript() {
 
     rootDir=$(rootDir)
