@@ -55,6 +55,8 @@ echo "Downloading kamatera-k8s from github" | log
 git clone https://github.com/OriHoch/kamatera-k8s.git $KUBEDIR/firstProject | log
 waitOrStop 0
 
-cd $KUBEDIR/firstProject
+echo "Installation done on $KUBEDIR, read README.md for further instructions" | log
 
 tagScript success
+
+
