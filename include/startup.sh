@@ -41,7 +41,7 @@ function checkRootUser() {
 
     echo "Checking if user is root ... " | log
 
-    [ $(id -u) != '0' ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+    [ $(id -u) != '0' ] && { echo "Error: You must be root to run this script. exiting (1)."; exit 1; }
 
 
 }
@@ -52,23 +52,20 @@ function checkOs {
 
     if [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; 
     then
+
 	OS=Ubuntu
-	Ubuntu_ver=$(lsb_release -sr | awk -F. '{print $1}')
-
-	if [ "$Ubuntu_ver" != "18" ]; 
-	then
-	    echo "${CFAILURE}Does not support this OS, dying. ${CEND}" | log
-	    exit 1
-	
-	fi
-
-    else
-	echo "${CFAILURE}Does not support this OS, dying. ${CEND}" | log
-	exit 1
+	OSVersion=$(lsb_release -sr | awk -F. '{print $1}')
 
     fi
 
-    echo "Found $OS $Ubuntu_ver" | log
+    if [[ "$OS $OSVersion" != *"Ubuntu"*"18" ]];
+    then
+
+        echo "$OS$OSVersion is not support this OS, exiting. (1)" | log
+        exit 1
+    fi
+
+    echo "Found $OS $OSVersion" | log
 
 }
 
@@ -113,7 +110,7 @@ function runOnceCheck() {
     then
 
 	echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.success to execute again." | log
-	echo "execution stopped, exit code 98. " | log
+	echo "execution stopped, exiting (98). " | log
         exit 98;
 
     fi
@@ -154,7 +151,7 @@ function waitOrStop() {
     if [ "$waitExitCode" != "$exitCode" ];
     then
 
-	echo "Waiting for $waitExitCode. Execution return $exitCode. stopping execution (1)" | log
+	echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log
         exit 1;
 
     fi
