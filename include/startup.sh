@@ -140,16 +140,14 @@ function backupFile() {
 
 function waitOrStop() {
 
-    waitExitCode=$?
+    exitCode=$?
+    waitExitCode=$1
 
-    if [ "$waitExitCode" -eq "$1" ];
+    if [ "$waitExitCode" != "$exitCode" ];
     then
 
-	continue;
-
-    else
-
-	exit 1;
+	echo "Waiting for $waitExitCode. Execution return $exitCode. stopping execution (1)" | log
+        exit 1;
 
     fi
 
