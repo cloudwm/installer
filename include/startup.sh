@@ -61,7 +61,7 @@ function checkOs {
     if [[ "$OS $OSVersion" != *"Ubuntu"*"18" ]];
     then
 
-        echo "$OS $OSVersion is not support this OS, exiting. (1)" | log
+        echo "$OS $OSVersion is not support, exiting. (1)" | log
         exit 1
     fi
 
@@ -105,11 +105,20 @@ function tagScript() {
 
 function runOnceCheck() {
 
-    rootDir=$(rootDir)
-    if [ -f "$rootDir/temp/`basename $0`.success" ]; 
+    state=$1
+
+    if [ -z "$state" ]; 
     then
 
-	echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.success to execute again." | log
+	state="success"
+
+    fi
+
+    rootDir=$(rootDir)
+    if [ -f "$rootDir/temp/`basename $0`.$state" ]; 
+    then
+
+	echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.$state to execute again." | log
 	echo "execution stopped, exiting (98). " | log
         exit 98;
 
