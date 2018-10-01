@@ -50,20 +50,27 @@ function checkOs {
 
     echo "Checking if OS is supported ..." | log
 
-if [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; then
-  OS=Ubuntu
-  Ubuntu_ver=$(lsb_release -sr | awk -F. '{print $1}')
-  [ -n "$(grep 'Linux Mint 18' /etc/issue)" ] && Ubuntu_ver=16
-else
-  echo "${CFAILURE}Does not support this OS, dying. ${CEND}" | log
-  exit 1
+    if [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; 
+    then
+	OS=Ubuntu
+	Ubuntu_ver=$(lsb_release -sr | awk -F. '{print $1}')
 
-fi
+	if [ "$Ubuntu_ver" != "18" ]; 
+	then
+	    echo "${CFAILURE}Does not support this OS, dying. ${CEND}" | log
+	    exit 1
+	
+	fi
+
+    else
+	echo "${CFAILURE}Does not support this OS, dying. ${CEND}" | log
+	exit 1
+
+    fi
 
     echo "Found $OS $Ubuntu_ver" | log
 
 }
-
 
 
 function rebootSystem() {
