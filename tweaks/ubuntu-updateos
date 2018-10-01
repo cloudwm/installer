@@ -15,3 +15,5 @@ apt-get -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-con
 apt-get -qy autoclean | log
 apt upgrade -y | log
 apt autoremove -y | log
+
+tagScript success

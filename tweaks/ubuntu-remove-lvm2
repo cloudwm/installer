@@ -7,6 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Stopping and disabling lvm2" | log
 systemctl stop lvm2-lvmetad.service | log
 systemctl stop lvm2-lvmpolld.socket | log
@@ -16,3 +18,5 @@ systemctl disable lvm2-metad | log
 systemctl disable lvm2-lvmpolld | log
 
 apt purge lvm2 -y | log
+
+tagScript success

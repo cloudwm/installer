@@ -7,5 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Stopping and disabling networkd-dispatcher" | log
 apt purge networkd-dispatcher -y | log
+
+tagScript success
