@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt-get install curl gcc python-dev python-setuptools apt-transport-https apache2-utils lsb-release openssh-client git bash jq sshpass openssh-client bash-completion -y
+easy_install -U pip 
+pip install -U crcmod 'python-dotenv[cli]' pyyaml

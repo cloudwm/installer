@@ -64,11 +64,6 @@ fi
 
 }
 
-function checkForError() {
-
-    checkForErrorExitCode=$?
-
-}
 
 
 function rebootSystem() {
@@ -140,5 +135,23 @@ function backupFile() {
         echo "Backuping file $1 Failed. file doesn't exist."
 
     fi
+
+function waitOrStop() {
+
+    waitExitCode=$?
+
+    if [ "$waitExitCode" -eq "$1" ];
+
+	continue;
+
+    else
+
+	exit 1;
+
+    fi
+
+}
+
+
 
 }
