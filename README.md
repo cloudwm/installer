@@ -1,10 +1,10 @@
 # Installer
 
-Installer is a set of scripts for installing and tweaking services, apps and operating system on Ubuntu servers.
+Installer is a set of scripts for installing services, apps and tweaking operating system on Ubuntu 18.04 LTS server.
 
 It is developed to help DevOps to simplify servers automated installation.
 
-Written in bash so it can be executed on any linux os without the need to preinstall 3rd party scripting language on the server.
+Written in bash so it can be executed on os without the need to preinstall 3rd party scripting language on the server.
 
 We'd love to see this grow. Feel free to add, improve, fix, comment your ideas to improve this set of tools.
 
@@ -29,7 +29,6 @@ git clone https://www.github.com/cloudwm/installer.git
 ```
 ./installer {installer conf file}
 ```
-
 
 <br />
 Thanks and enjoy,<br />
