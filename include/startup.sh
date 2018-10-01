@@ -136,6 +136,8 @@ function backupFile() {
 
     fi
 
+}
+
 function waitOrStop() {
 
     waitExitCode=$?

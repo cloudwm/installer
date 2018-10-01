@@ -16,7 +16,7 @@ apt-get install curl gcc python-dev python-setuptools apt-transport-https apache
 waitOrStop 0
 
 apt-get python-pip -y | log
-waitforExit
+waitOrStop
 
 pip install -U crcmod 'python-dotenv[cli]' pyyaml | log
 waitOrStop 0
