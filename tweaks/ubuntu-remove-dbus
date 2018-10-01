@@ -7,6 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Stopping and disabling dbus service" | log
 systemctl stop dbus.socket | log
 systemctl stop dbus.service | log
@@ -15,3 +17,5 @@ systemctl disable dbus.service | log
 
 echo "Uninstalling dbus service" | log
 apt purge dbus -y | log
+
+tagScript success

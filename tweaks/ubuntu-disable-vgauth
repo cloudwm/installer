@@ -7,6 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Stopping and disabling vmware vgauth" | log
 systemctl stop vgauth | log
 systemctl disable vgauth | log
+
+tagScript success

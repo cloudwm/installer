@@ -7,5 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Removing snapd" | log
 apt purge snapd -y | log
+
+tagScript success

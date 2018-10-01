@@ -58,5 +58,3 @@ waitOrStop 0
 echo "Installation done on $KUBEDIR, read README.md for further instructions" | log
 
 tagScript success
-
-

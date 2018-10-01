@@ -10,6 +10,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Stopping and disabling lxcfs" | log
 systemctl stop var-lib-lxcfs.mount | log
 systemctl disable lxcfs.service | log
+
+tagScript success

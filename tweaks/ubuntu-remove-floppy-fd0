@@ -7,7 +7,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 echo "Removing floppy module" | log
 rmmod floppy |  log
 echo "blacklist floppy" | tee /etc/modprobe.d/blacklist-floppy.conf
 dpkg-reconfigure initramfs-tools | log
+
+tagScript success
