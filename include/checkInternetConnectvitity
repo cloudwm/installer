@@ -16,10 +16,10 @@ errorCode=$?
 if [ $errorCode -gt 0 ]; then
 
     echo "Failed." | log
-    
+
 
 else 
-    
+
     echo "Succeed." | log
     ((success++))
 
@@ -33,10 +33,10 @@ errorCode=$?
 if [ $errorCode -gt 0 ]; then
 
     echo "Failed." | log
-    
 
-else 
-    
+
+else
+
     echo "Succeed." | log
     ((success++))
 
@@ -49,10 +49,9 @@ errorCode=$?
 if [ $errorCode -gt 0 ]; then
 
     echo "Failed." | log
-    
 
-else 
-    
+else
+
     echo "Succeed." | log
     ((success++))
 
