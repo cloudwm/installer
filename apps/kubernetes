@@ -10,37 +10,37 @@ fi
 KUBEDIR=/opt/kubernetes
 
 apt-get update -y
-waitOrExit 0
+waitOrStop 0
 
 apt-get install curl gcc python-dev python-setuptools apt-transport-https apache2-utils lsb-release openssh-client git bash jq sshpass openssh-client bash-completion -y | log
-waitOrExit 0
+waitOrStop 0
 
 apt-get python-pip -y | log
 waitforExit
 
 pip install -U crcmod 'python-dotenv[cli]' pyyaml | log
-waitOrExit 0
+waitOrStop 0
 
 mkdir -p $KUBEDIR
 cd $KUBEDIR
 
 curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl | log
-waitOrExit 0
+waitOrStop 0
 
 chmod +x ./kubectl
-waitOrExit 0
+waitOrStop 0
 
 mv ./kubectl /usr/local/bin/kubectl
-waitOrExit 0
+waitOrStop 0
 
 curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get > get_helm.sh | log
-waitOrExit 0
+waitOrStop 0
 chmod 700 get_helm.sh
-waitOrExit 0
+waitOrStop 0
 ./get_helm.sh
-waitOrExit 0
+waitOrStop 0
 
 git clone https://github.com/OriHoch/kamatera-k8s.git $KUBEDIR/firstProject | log
-waitOrExit 0
+waitOrStop 0
 
 cd $KUBEDIR/firstProject
