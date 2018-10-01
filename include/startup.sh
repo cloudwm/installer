@@ -90,6 +90,13 @@ function useFiglet() {
 
 }
 
+function bannerFiglet() {
+
+    useFiglet
+    echo -e $1 | figlet -f big -c
+
+}
+
 
 function tagScript() {
 

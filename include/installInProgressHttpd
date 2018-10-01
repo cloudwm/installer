@@ -7,15 +7,13 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-useFiglet
-
 if [ -d "/var/www/html" ];
 then
 
     if [ ! -f "/var/www/html/index.html" ];
     then
         echo "Adding context Install in Progress to /var/www/html/index.html" | log
-	echo -e "Install in Progress\n Please Wait.\n" | figlet  -f big -c  > /var/www/html/index.html
+	bannerFiglet "Install in Progress\n Please Wait.\n" > /var/www/html/index.html
         echo "Please refresh within a couple of min." >> /var/www/html/index.html
 
         tagScript success
