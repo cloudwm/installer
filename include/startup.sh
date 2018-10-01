@@ -105,7 +105,8 @@ function runOnceCheck() {
     if [ -f "$rootDir/temp/`basename $0`.success" ]; 
     then
 
-	echo "runOnceCheck: $0 already executed, can run only once. execution stopped, exit code 98. " | log
+	echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.success to execute again." | log
+	echo "execution stopped, exit code 98. " | log
         exit 98;
 
     fi

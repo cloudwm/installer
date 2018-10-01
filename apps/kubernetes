@@ -7,40 +7,54 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck
+
 KUBEDIR=/opt/kubernetes
 
-apt-get update -y
+echo "Updating OS to the latest version" | log
+apt-get update -y | log
 waitOrStop 0
 
+echo "Installing service dependencies" | log
 apt-get install curl gcc python-dev python-setuptools apt-transport-https apache2-utils lsb-release openssh-client git bash jq sshpass openssh-client bash-completion -y | log
 waitOrStop 0
 
-apt-get python-pip -y | log
-waitOrStop
+echo "Installing python-pip" | log
+apt-get install python-pip -y | log
+waitOrStop 0
 
+echo "Installing pyyaml" | log
 pip install -U crcmod 'python-dotenv[cli]' pyyaml | log
 waitOrStop 0
 
+echo "Creating $KUBEDIR directory" | log
 mkdir -p $KUBEDIR
 cd $KUBEDIR
 
+echo "Downloading latest kubectl from Kubernetes repository" | log
 curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl | log
 waitOrStop 0
 
+echo "chmod kubectl" | log
 chmod +x ./kubectl
 waitOrStop 0
 
+echo "Moving kubectl to /usr/local/bin" | log
 mv ./kubectl /usr/local/bin/kubectl
 waitOrStop 0
 
+echo "Downloading latest helm" | log
 curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get > get_helm.sh | log
 waitOrStop 0
 chmod 700 get_helm.sh
 waitOrStop 0
-./get_helm.sh
+./get_helm.sh | log
 waitOrStop 0
 
+echo "Downloading kamatera-k8s from github" | log
 git clone https://github.com/OriHoch/kamatera-k8s.git $KUBEDIR/firstProject | log
 waitOrStop 0
 
 cd $KUBEDIR/firstProject
+
+tagScript success
