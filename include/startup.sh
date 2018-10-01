@@ -141,6 +141,7 @@ function waitOrStop() {
     waitExitCode=$?
 
     if [ "$waitExitCode" -eq "$1" ];
+    then
 
 	continue;
 
