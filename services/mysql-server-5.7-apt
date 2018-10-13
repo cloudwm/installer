@@ -21,3 +21,7 @@ checkPackageInstalled mysql-server-5.7
 # tagging mysqld installed successfully.
 tag mysql-server-5.7.success
 tag mysqld.success
+
+tagScript success
+
+exit 0

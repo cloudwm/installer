@@ -14,3 +14,6 @@ checkPackageInstalled nginx
 
 tag nginx.success
 tag httpd.success
+tagScript success
+
+exit 0

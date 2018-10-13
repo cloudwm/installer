@@ -15,4 +15,6 @@ checkPackageInstalled sendmail
 
 tag sendmail.success
 tag maild.success
+tagScript success
 
+exit 0
