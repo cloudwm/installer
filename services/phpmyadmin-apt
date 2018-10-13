@@ -13,5 +13,6 @@ waitOrStop 0
 checkPackageInstalled phpmyadmin
 
 tag phpmyadmin.success
+tagScript success
 
 exit 0

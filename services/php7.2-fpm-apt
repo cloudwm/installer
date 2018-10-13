@@ -16,4 +16,6 @@ tag php-fpm.success
 tag php7.2-fpm.success
 tag php.success
 
+tagScript success
+
 exit 0
