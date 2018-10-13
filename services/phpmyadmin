@@ -6,10 +6,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+
 echo "Installing phpMyAdmin" | log
-cd /var/www/html/
-mkdir phpMyAdmin
-cd phpMyAdmin
+mkdir -p /var/www/html/phpMyAdmin
+cd /var/www/html/phpMyAdmin
+
 tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz
 waitOrStop 0
 

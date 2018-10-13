@@ -22,7 +22,6 @@ echo $rootDir
 
 }
 
-
 function log() {
 
     rootDir=$(rootDir)
@@ -224,3 +223,4 @@ function checkPackageInstalled() {
     unset package
 
 }
+
