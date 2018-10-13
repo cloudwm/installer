@@ -6,12 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install mysql from apt
-apt install mysql-server-5.7 -y | log
+# install nginx from apt
+apt install mysql-nginx -y | log
 waitOrStop 0
 
-# setting mysqld root password.
+tag httpd.success
 
-
-tag mysqld.success
-
+# set mysql password to adminpassword:
