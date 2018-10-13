@@ -14,9 +14,9 @@ then
     then
         echo "Adding context Install in Progress to /var/www/html/index.html" | log
 	useFiglet
-	echo "<pre>" > /var/www/html/index.html
+	printf "<pre>" > /var/www/html/index.html
 	bannerFiglet "Install in Progress\n Please Wait.\n" >> /var/www/html/index.html
-        echo "Application and services installation is in progress, process will take a couple of minutes to complete \n Thank you for your patience.\n\n\n Refresh page within a couple of minutes for updated status." >> /var/www/html/index.html
+        printf "Application and services installation is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\n\nRefresh page within a couple of minutes for updated status." >> /var/www/html/index.html
 
         tagScript success
 
