@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing php7.2-fpm" | log
+apt install php7.2-fpm -y | log
+waitOrStop 0
+
+checkPackageInstalled php7.2-fpm
+
+tag php-fpm.success
+tag php7.2-fpm.success
+tag php.success
+
+exit 0

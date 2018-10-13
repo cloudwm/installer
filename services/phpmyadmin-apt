@@ -6,11 +6,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install nginx from apt
-apt install nginx -y | log
+echo "Installing phpMyAdmin" | log
+apt install phpmyadmin -y | log
 waitOrStop 0
 
-checkPackageInstalled nginx
+checkPackageInstalled phpmyadmin
 
-tag nginx.success
-tag httpd.success
+tag phpmyadmin.success
+
+exit 0

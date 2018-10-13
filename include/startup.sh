@@ -204,22 +204,21 @@ function waitOrStop() {
 
 function checkPackageInstalled() {
 
-    if [ ! -z "$1"]; 
+    if [ ! -z "$1" ];
     then
 
-	package=`dpkg -l $1 | grep $1`
+	package=`dpkg -l $1 | grep "ii.*$1 "`
 
 	if [ -z "$package" ];
 	then
-	    
-	    echo "Package $1 is not installed. existing (1)." | log
+	
+	    echo "Package $1 is not installed. exiting (1)." | log
 	    exit 1;
 
 	fi
 
     fi
 
-    unset $package
+    unset package
 
 }
-
