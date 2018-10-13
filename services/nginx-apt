@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 # install nginx from apt
-apt install mysql-nginx -y | log
+apt install nginx -y | log
 waitOrStop 0
 
 tag httpd.success
