@@ -10,9 +10,10 @@ echo "Installing phpMyAdmin" | log
 cd /var/www/html/
 mkdir phpMyAdmin
 cd phpMyAdmin
-tar -xzvf $rootdir/src/
-
+tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz
 waitOrStop 0
+
+
 
 tag phpmyadmin.success
 tagScript success
