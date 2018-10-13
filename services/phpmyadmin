@@ -9,10 +9,8 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing phpMyAdmin" | log
-mkdir -p /var/www/html/phpMyAdmin
-cd /var/www/html/phpMyAdmin
-
-tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz
+mkdir -p /var/www/html/phpmyadmin
+tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz -C /var/www/html/phpmyadmin/ --strip-components=1
 waitOrStop 0
 
 
