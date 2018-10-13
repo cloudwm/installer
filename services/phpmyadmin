@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing phpMyAdmin" | log
+cd /var/www/html/
+mkdir phpMyAdmin
+cd phpMyAdmin
+tar -xzvf $rootdir/src/
+
+waitOrStop 0
+
+tag phpmyadmin.success
+tagScript success
+
+exit 0
