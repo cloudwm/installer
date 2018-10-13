@@ -13,7 +13,9 @@ then
     if [ ! -f "/var/www/html/index.html" ];
     then
         echo "Adding context Install in Progress to /var/www/html/index.html" | log
-	bannerFiglet "Install in Progress\n Please Wait.\n" > /var/www/html/index.html
+	useFiglet
+	echo "<pre>" > /var/www/html/index.html
+	bannerFiglet "Install in Progress\n Please Wait.\n" >> /var/www/html/index.html
         echo "Please refresh within a couple of min." >> /var/www/html/index.html
 
         tagScript success
