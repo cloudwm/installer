@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist php
+checkTagExist php.success
 
 rootDir=$(rootDir)
 

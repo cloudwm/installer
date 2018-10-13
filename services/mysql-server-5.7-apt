@@ -17,7 +17,6 @@ checkPackageInstalled mysql-server-5.7
 
 # setting mysqld root password.
 
-
 # tagging mysqld installed successfully.
 tag mysql-server-5.7.success
 tag mysqld.success
