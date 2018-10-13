@@ -7,9 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkOs
+checkRootUser
 runOnceCheck
-
-KUBEDIR=/opt/kubernetes
 
 echo "Updating OS to the latest version" | log
 apt-get update -y | log

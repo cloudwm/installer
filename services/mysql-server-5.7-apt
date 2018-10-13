@@ -8,5 +8,8 @@ fi
 
 # install mysql from apt
 apt install mysql-server-5.7 -y | log
+WaitOtStop 0
+
+tag mysqld.success
 
 # set mysql password to adminpassword:
