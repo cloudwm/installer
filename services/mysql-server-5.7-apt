@@ -12,8 +12,9 @@ checkTagExist ubuntu-updateos.success
 apt install mysql-server-5.7 -y | log
 waitOrStop 0
 
-# setting mysqld root password.
+checkPackageInstalled mysql-server-5.7
 
+# setting mysqld root password.
 
 tag mysqld.success
 
