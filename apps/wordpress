@@ -1,10 +1,7 @@
 #
 
-runOnceCheck mysqldb
-runOnceCheck 
-
-deps=mysqldb,httpd,php
-checkDeps $deps
+checkTagExists mysqld.success
+checkTagExists mysqld.success
 
 # Downloading wordpress and installing
 
