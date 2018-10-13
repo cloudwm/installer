@@ -100,7 +100,7 @@ function bannerFiglet() {
 
     if [ -f "/usr/bin/figlet" ];
     then
-        echo -e $1 | figlet -f big -c
+        echo -e $1 | figlet -f big
     fi
 
 }
