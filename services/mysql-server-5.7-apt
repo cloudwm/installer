@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+runOnceCheck ubuntu-updateos
+
 # install mysql from apt
 apt install mysql-server-5.7 -y | log
 waitOrStop 0
