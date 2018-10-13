@@ -1,7 +1,7 @@
 #
 
-checkTagExists mysqld.success
-checkTagExists mysqld.success
+checkTagExist mysqld.success
+checkTagExist mysqld.success
 
 # Downloading wordpress and installing
 
