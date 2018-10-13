@@ -1,4 +1,8 @@
 #
+
+runOnceCheck mysqldb
+runOnceCheck 
+
 deps=mysqldb,httpd,php
 checkDeps $deps
 

@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ -f "./installer.conf" ]; then
+    . installer.conf
+elif [ -f "../installer.conf" ]; then
+    . ../installer.conf
+fi
+
 function rootDir() {
 
     if [ -f "installer" ]; then
@@ -43,6 +49,8 @@ function checkRootUser() {
 
     [ $(id -u) != '0' ] && { echo "Error: You must be root to run this script. exiting (1)."; exit 1; }
 
+    echo "Found user $(id -u)." | log
+
 
 }
 
@@ -65,7 +73,7 @@ function checkOs {
         exit 1
     fi
 
-    echo "Found $OS $OSVersion" | log
+    echo "Found Supported OS: $OS $OSVersion" | log
 
 }
 
@@ -103,6 +111,7 @@ function tagScript() {
     touch $rootDir/temp/`basename $0`.$1
 }
 
+
 function runOnceCheck() {
 
     state=$1
@@ -119,6 +128,26 @@ function runOnceCheck() {
     then
 
 	echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.$state to execute again." | log
+	echo "execution stopped, exiting (98). " | log
+        exit 98;
+
+    fi
+
+}
+
+function tag() {
+
+    rootDir=$(rootDir)
+    touch $rootDir/temp/$1
+}
+
+function checkTagExists() {
+
+    rootDir=$(rootDir)
+    if [ ! -f "$rootDir/temp/$1" ];
+    then
+
+	echo "checkTagExists: Tag temp/$1 doesn't exist." | log
 	echo "execution stopped, exiting (98). " | log
         exit 98;
 
@@ -166,3 +195,5 @@ function waitOrStop() {
     fi
 
 }
+
+
