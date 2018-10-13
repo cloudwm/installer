@@ -143,19 +143,19 @@ function tag() {
 
 }
 
-function checkTagExists() {
+function checkTagExist() {
 
     rootDir=$(rootDir)
     if [ ! -f "$rootDir/temp/$1" ];
     then
 
-	echo "checkTagExists: Tag temp/$1 doesn't exist." | log
+	echo "checkTagExist: Tag temp/$1 doesn't exist." | log
 	echo "execution stopped, exiting (98). " | log
         exit 98;
 
     else
 
-	echo "checkTagExists: Tag temp/$1 exists. continuing." | log
+	echo "checkTagExist: Tag temp/$1 exist. continuing." | log
 
     fi
 
