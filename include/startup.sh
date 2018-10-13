@@ -137,8 +137,10 @@ function runOnceCheck() {
 
 function tag() {
 
+    echo "Tagging temp/$1" | log
     rootDir=$(rootDir)
     touch $rootDir/temp/$1
+
 }
 
 function checkTagExists() {
@@ -150,6 +152,10 @@ function checkTagExists() {
 	echo "checkTagExists: Tag temp/$1 doesn't exist." | log
 	echo "execution stopped, exiting (98). " | log
         exit 98;
+
+    else
+
+	echo "checkTagExists: Tag temp/$1 exists. continuing." | log
 
     fi
 
