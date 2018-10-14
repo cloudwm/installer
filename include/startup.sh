@@ -1,9 +1,9 @@
 #!/bin/bash
 
-if [ -f "./installer.conf" ]; then
-    . installer.conf
-elif [ -f "../installer.conf" ]; then
-    . ../installer.conf
+if [ -f "./installer-startup.conf" ]; then
+    . installer-startup.conf
+elif [ -f "../installer-startup.conf" ]; then
+    . ../installer-startup.conf
 fi
 
 function rootDir() {
