@@ -10,9 +10,9 @@ fi
 if [ -f "/var/www/html/index.html" ]; 
 then
 
-    indexString=`cat /var/www/html/index.html | grep Application`
+    indexString=`cat /var/www/html/index.html`
 
-    if [ "$indexString" == 'Application and services installation is in progress, process will take a couple of minutes to complete' ]; 
+    if [ "$indexString" == 'Install in progress, please refresh within a couple of min.' ]; 
     then
 
         echo "Removing /var/www/html/index.html In Progress file." | log
