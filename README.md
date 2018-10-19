@@ -1,3 +1,5 @@
+# Staging Test
+
 # Installer
 
 Installer is a set of scripts for installing services, apps and tweaking operating system on Ubuntu 18.04 LTS server.
