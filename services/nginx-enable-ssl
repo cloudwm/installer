@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+
+# TODO: enable ssl in nginx
+
+tag nginx.success
+tag httpd.success
+tagScript success
+
+exit 0
