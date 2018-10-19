@@ -14,10 +14,20 @@ runOnceCheck
 # checking app has all services dependencies
 checkTagExist httpd.success
 checkTagExist mysqld.success
-checkTagExist maild.success
+# checkTagExist maild.success
 
 # Downloading wordpress and installing
+wget https://wordpress.org/latest.tar.gz -P /var/www/html
+cd /var/www/html && tar xf latest.tar.gz --strip-components=1
+rm /var/www/html/latest.tar.gz
 
+# mv wp-config-sample.php wp-config.php
+# sed -i s/database_name_here/$WP_DB_NAME/ wp-config.php
+# sed -i s/username_here/$WP_DB_USERNAME/ wp-config.php
+# sed -i s/password_here/$WP_DB_PASSWORD/ wp-config.php
+# echo "define('FS_METHOD', 'direct');" >> wp-config.php
+
+sudo chown -R www-data:www-data /var/www/html
 
 tagScript success
 
