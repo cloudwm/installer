@@ -14,7 +14,7 @@ runOnceCheck
 # checking app has all services dependencies
 checkTagExist httpd.success
 checkTagExist mysqld.success
-checkTagExist maild.success
+# checkTagExist maild.success
 
 # Downloading wordpress and installing
 wget https://wordpress.org/latest.tar.gz -P /var/www/html
