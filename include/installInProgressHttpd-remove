@@ -12,7 +12,7 @@ then
 
     indexString=`cat /var/www/html/index.html | grep Application`
 
-    if [ "$indexString" == 'Application and services installation is in progress, process will take a couple of minutes to complete' ]; 
+    if [ "$indexString" == 'Application*' ]; 
     then
 
         echo "Removing /var/www/html/index.html In Progress file." | log
