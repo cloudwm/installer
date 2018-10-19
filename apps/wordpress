@@ -18,7 +18,7 @@ checkTagExist mysqld.success
 
 # Downloading wordpress and installing
 wget https://wordpress.org/latest.tar.gz -P /var/www/html
-tar xf latest.tar.gz --strip-components=1
+cd /var/www/html && tar xf latest.tar.gz --strip-components=1
 rm /var/www/html/latest.tar.gz
 
 # mv wp-config-sample.php wp-config.php
