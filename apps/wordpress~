@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkOs
+checkRootUser
+runOnceCheck
+
+# checking app has all services dependencies
+checkTagExist httpd.success
+checkTagExist mysqld.success
+checkTagExist maild.success
+
+# Downloading wordpress and installing
+
+
+tagScript success
+
+exit 0
