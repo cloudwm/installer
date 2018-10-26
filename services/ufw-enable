@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install sendmail for local mail delivery
+echo "Installing ufw" | log
+apt install ufw expect -y | log
+waitOrStop 0
+
+checkPackageInstalled ufw
+
+/usr/bin/expect << EOF
+
+spawn ufw enable
+
+expect "Command may disrupt existing ssh connections. Proceed with operation (y|n)?"
+send "y\r"
+
+EOF
+
+ufw allow 22 | log
+ufw status | log
+
+
+tag ufw.success
+tagScript success
+
+exit 0
