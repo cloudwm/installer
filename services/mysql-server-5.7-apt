@@ -9,38 +9,27 @@ fi
 checkTagExist ubuntu-updateos.success
 
 # install mysql from apt.
-apt install mysql-server-5.7 -y | log
+apt install mysql-server-5.7 expect -y | log
 waitOrStop 0
 
 # check if package installed successfully.
 checkPackageInstalled mysql-server-5.7
+checkPackageInstalled expect
 
-# Kill the anonymous users
-# mysql -e "DROP USER ''@'localhost'" | log
-# Because our hostname varies we'll use some Bash magic here.
-# mysql -e "DROP USER ''@'$(hostname)'" | log
-# Kill off the demo database
-# mysql -e "DROP DATABASE test" | log
-# Make our changes take effect
-# mysql -e "FLUSH PRIVILEGES" | log
+/usr/bin/expect << EOF
 
-# Set Password for root, using echo for string manipulation
-# echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '`cat /root/adminpassword`';\"" |sh |log
-
+set mysqlpasswd [open "/root/adminpasswd"]
 
 spawn $(which mysql_secure_installation)
 
-expect "Enter password for user root:"
-send "`cat /root/adminpassword`\r"
-
 expect "Press y|Y for Yes, any other key for No:"
-send "y\r"
-
-expect "Please enter 0 = LOW, 1 = MEDIUM and 2 = STRONG:"
-send "2\r"
-
-expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
 send "n\r"
+
+expect "New password:"
+send "$mysqlpasswd\r"
+
+expect "Re-enter new password:"
+send "$mysqlpasswd\r"
 
 expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
 send "y\r"
@@ -54,6 +43,7 @@ send "y\r"
 expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
 send "y\r"
 
+EOF
 
 # tagging mysqld installed successfully.
 tag mysql-server-5.7.success
