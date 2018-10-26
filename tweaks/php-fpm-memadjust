@@ -1,8 +1,41 @@
 #!/bin/bash
 
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+### check existing startup scripts folder ###
+
+MY_PATH="`dirname \"$0\"`"
+
 if [ ! -d "/scripts" ]; then
 	mkdir /scripts
 fi
+
+if [ ! -f "/scripts/php.ini" ]; then
+	cp $MY_PATH/php.ini /scripts/
+fi
+
+if [ ! -f "/scripts/php-fpm-memadjust" ]; then
+	cp $0 /scripts/php-fpm-memadjust
+	chmod +x /scripts/php-fpm-memadjust
+fi
+
+if [[ `crontab -l | grep -o memadjust` == 'memadjust' ]];then
+
+	echo Cron exists
+else
+
+	echo "@reboot bash /scripts/php-fpm-memadjust" >> newcron
+	crontab newcron | log
+	rm newcron
+
+fi	
+
 
 ### provision.sh variables
 ramreserve=1024
@@ -111,3 +144,5 @@ else
         echo setting memory_limit to $overridemem
         sed -i "s/$currentmem/$overridemem/g" $ini
 fi
+
+
