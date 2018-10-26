@@ -13,15 +13,8 @@ waitOrStop 0
 
 checkPackageInstalled ufw
 
-/usr/bin/expect << EOF
-
-spawn ufw enable
-
-expect "Command may disrupt existing ssh connections. Proceed with operation (y|n)?"
-send "y\r"
-
-EOF
-
+checkPackageInstalled ufw
+ufw --force enable | log
 ufw allow 22 | log
 ufw status | log
 
