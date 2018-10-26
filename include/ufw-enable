@@ -8,7 +8,7 @@ fi
 
 # install sendmail for local mail delivery
 echo "Installing ufw" | log
-apt install ufw expect -y | log
+apt install ufw -y | log
 waitOrStop 0
 
 checkPackageInstalled ufw
