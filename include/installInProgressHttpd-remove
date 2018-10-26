@@ -10,9 +10,7 @@ fi
 if [ -f "/var/www/html/index.html" ]; 
 then
 
-    indexString=`cat /var/www/html/index.html | grep Application`
-
-    if [ "$indexString" == 'Application*' ]; 
+    if grep -q "in progress" /var/www/html/index.html; 
     then
 
         echo "Removing /var/www/html/index.html In Progress file." | log
