@@ -18,7 +18,7 @@ checkPackageInstalled expect
 
 /usr/bin/expect << EOF
 
-set mysqlpasswd [open "/root/adminpasswd"]
+set mysqlpasswd [open "/root/adminpassword"]
 
 spawn $(which mysql_secure_installation)
 
