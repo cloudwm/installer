@@ -15,9 +15,6 @@ waitOrStop 0
 # check if package installed successfully.
 checkPackageInstalled mysql-server-5.7
 
-# Set Password for root, using echo for string manipulation
-echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '`echo $adminpassword`';\"" |sh |log
-
 # Kill the anonymous users
 mysql -e "DROP USER ''@'localhost'" | log
 # Because our hostname varies we'll use some Bash magic here.
@@ -26,6 +23,9 @@ mysql -e "DROP USER ''@'$(hostname)'" | log
 mysql -e "DROP DATABASE test" | log
 # Make our changes take effect
 mysql -e "FLUSH PRIVILEGES" | log
+
+# Set Password for root, using echo for string manipulation
+echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '`cat /root/adminpassword`';\"" |sh |log
 
 
 # tagging mysqld installed successfully.
