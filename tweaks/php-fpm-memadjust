@@ -8,6 +8,13 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 
+service=$(systemctl | grep fpm | awk '{print $1}')
+
+if [ -z $service ];then
+	echo php-fpm is not installed
+	exit 1
+fi
+
 ### check existing startup scripts folder ###
 
 MY_PATH="`dirname \"$0\"`"
@@ -46,7 +53,6 @@ minphpfpm=6
 
 ini=$(find /etc -type f -name "php.ini" | grep fpm)
 fpmini=$(find /etc -type f -name "www.conf")
-service=$(systemctl | grep fpm | awk '{print $1}')
 
 ### read system resources ###
 
@@ -145,4 +151,4 @@ else
         sed -i "s/$currentmem/$overridemem/g" $ini
 fi
 
-
+exit 0
