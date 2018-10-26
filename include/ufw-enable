@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install sendmail for local mail delivery
+echo "Installing ufw" | log
+apt install ufw -y | log
+waitOrStop 0
+
+checkPackageInstalled ufw
+
+checkPackageInstalled ufw
+ufw --force enable | log
+ufw allow 22 | log
+ufw status | log
+
+
+tag ufw.success
+tagScript success
+
+exit 0
