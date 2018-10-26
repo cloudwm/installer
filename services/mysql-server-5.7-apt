@@ -18,18 +18,14 @@ checkPackageInstalled expect
 
 /usr/bin/expect << EOF
 
-set mysqlpasswd [open "/root/adminpassword"]
-
-spawn $(which mysql_secure_installation)
-
 expect "Press y|Y for Yes, any other key for No:"
 send "n\r"
 
 expect "New password:"
-send "$mysqlpasswd\r"
+send "TempPassword\r"
 
 expect "Re-enter new password:"
-send "$mysqlpasswd\r"
+send "TempPassword\r"
 
 expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
 send "y\r"
