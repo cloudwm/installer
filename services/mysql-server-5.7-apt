@@ -45,6 +45,11 @@ send "y\r"
 
 EOF
 
+# Set Password for root, using echo for string manipulation
+# mysql_secure will not set it for mysql 5.7
+echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '`cat /root/adminpassword`';\"" |sh
+
+
 # tagging mysqld installed successfully.
 tag mysql-server-5.7.success
 tag mysqld.success
