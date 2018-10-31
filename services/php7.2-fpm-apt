@@ -12,7 +12,7 @@ waitOrStop 0
 
 checkPackageInstalled php7.2-fpm
 
-apt install php-pear php-php-gettext php-phpseclib php-tcpdf php7.2-bz2 php7.2-common php7.2-curl php7.2-gd php7.2-json php7.2-mbstring php7.2-mysql php7.2-readline php7.2-xml php7.2-zip -y | log
+apt install php-pear php-php-gettext php-phpseclib php-tcpdf php7.2-bz2 php7.2-common php7.2-curl php7.2-gd php7.2-json php7.2-mbstring php7.2-mysql php7.2-readline php7.2-xml php7.2-zip php7.2-mysqlnd -y | log
 waitOrStop 0
 
 tag php-fpm.success
