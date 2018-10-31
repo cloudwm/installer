@@ -9,27 +9,43 @@ fi
 checkTagExist ubuntu-updateos.success
 
 # install mysql from apt.
-apt install mysql-server-5.7 -y | log
+apt install mysql-server-5.7 expect -y | log
 waitOrStop 0
 
 # check if package installed successfully.
 checkPackageInstalled mysql-server-5.7
+checkPackageInstalled expect
 
-# No log in this section due to possible password leakage
+/usr/bin/expect << EOF
 
-# Generate mysqld root password.
-tr -dc A-Za-z0-9_ < /dev/urandom | head -c 16 > /root/mysqlpasswd
+spawn $(which mysql_secure_installation)
+
+expect "Press y|Y for Yes, any other key for No:"
+send "n\r"
+
+expect "New password:"
+send "TempPassword\r"
+
+expect "Re-enter new password:"
+send "TempPassword\r"
+
+expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
+expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
+expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
+expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
+EOF
+
 # Set Password for root, using echo for string manipulation
-echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '`cat /root/mysqlpasswd`';\"" |sh
-
-# Kill the anonymous users
-mysql -e "DROP USER ''@'localhost'"
-# Because our hostname varies we'll use some Bash magic here.
-mysql -e "DROP USER ''@'$(hostname)'"
-# Kill off the demo database
-mysql -e "DROP DATABASE test"
-# Make our changes take effect
-mysql -e "FLUSH PRIVILEGES"
+# mysql_secure will not set it for mysql 5.7
+echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '`cat /root/adminpassword`';\"" |sh
 
 
 # tagging mysqld installed successfully.
