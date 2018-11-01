@@ -13,11 +13,9 @@ waitOrStop 0
 
 checkPackageInstalled ufw
 
-checkPackageInstalled ufw
 ufw --force enable | log
 ufw allow 22 | log
 ufw status | log
-
 
 tag ufw.success
 tagScript success
