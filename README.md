@@ -12,7 +12,7 @@ We'd love to see this grow. Feel free to add, improve, fix, comment your ideas t
 
 apps/ - application installation scripts (such as wordpress, drupal, magento, owncloud, etc).
 
-services/ - services installations scripts (such as mySQL, MariaDB, NGIiNX, php, php-fpm, etc.).
+services/ - services installations scripts (such as mySQL, MariaDB, NGiNX, php, php-fpm, etc.).
 
 tweaks/ - Operating system tweaks and tools to harden and optimize server's performance and security (such as removing unnecessary repository, enabling firewall, etc.)
 
