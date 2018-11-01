@@ -1,0 +1,13 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ufw.success
+
+ufw allow 21 | log
+ufw status | log
+
+tagScript success
