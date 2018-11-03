@@ -43,6 +43,7 @@ send "y\r"
 
 EOF
 
+
 # Set Password for root, using echo for string manipulation
 # mysql_secure will not set it for mysql 5.7
 echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" |sh
@@ -52,10 +53,25 @@ if [ ! -f ~/my.cnf ];
 then
     
     echo "[client]" > ~/.my.cnf
-    echo "user=root" >> ~/my.cnf
-    echo "password=$ADMINPASSWORD" >> ~/my.cnf
+    echo "user=root" >> ~/.my.cnf
+    echo "password=$ADMINPASSWORD" >> ~/.my.cnf
 
 fi
+
+# Set some defaults to /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
+then
+    
+    echo "[mysqld]" > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+    echo "skip-name-resolve=1" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+
+fi
+
+# Allow connecting to mySQL with user root from anywhere.
+echo "mysql -e \"use mysql; UPDATE user set Host = '%' where User = 'root';\"" |sh
+
+# Allow connecting to mySQL with user root from anywhere.
+echo "mysql -e \" flush privileges;\"" |sh
 
 # tagging mysqld installed successfully.
 tag mysql-server-5.7.success
