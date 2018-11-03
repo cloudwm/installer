@@ -151,8 +151,8 @@ function checkTagExist() {
     then
 
 	echo "checkTagExist: Tag temp/$1 doesn't exist." | log
-	echo "execution stopped, exiting (98). " | log
-        exit 98;
+	echo "execution stopped, exiting (1). " | log
+        exit 1;
 
     else
 
