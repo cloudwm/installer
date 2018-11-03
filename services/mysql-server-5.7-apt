@@ -67,12 +67,6 @@ then
 
 fi
 
-# Allow connecting to mySQL with user root from anywhere.
-echo "mysql -e \"use mysql; UPDATE user set Host = '%' where User = 'root';\"" |sh
-
-# Allow connecting to mySQL with user root from anywhere.
-echo "mysql -e \" flush privileges;\"" |sh
-
 # tagging mysqld installed successfully.
 tag mysql-server-5.7.success
 tag mysqld.success
