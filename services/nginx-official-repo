@@ -10,7 +10,7 @@ cat << EOF >> /etc/apt/sources.list.d/nginx.list
 deb http://nginx.org/packages/ubuntu/ bionic nginx
 deb-src http://nginx.org/packages/ubuntu/ bionic nginx
 EOF
-
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ABF5BD827BD9BF62
 apt update
 # install nginx from apt
 apt install nginx -y | log
