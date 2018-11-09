@@ -6,10 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rm -rf /usr/src/csf.tgz
-wget https://download.configserver.com/csf.tgz -P /usr/src
-cd /usr/src && tar -xzf csf.tgz
-cd /usr/src/csf/ && sh install.sh
+rm -rf /usr/src/csf.tgz | log
+wget https://download.configserver.com/csf.tgz -P /usr/src | log
+cd /usr/src && tar -xvzf csf.tgz | log
+cd /usr/src/csf/ && sh install.sh | log
 
 tagScript success
 exit 0
