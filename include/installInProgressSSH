@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+cat << EOF >> /etc/update-motd.d/05-install-in-progress
+#!/bin/sh
+printf "\n"
+printf "  Install in Progress\n  Please Wait.\n\n"
+printf "  Application and services installation is in progress, process will take a couple of minutes to complete \n"
+printf "  Thank you for your patience.\n"
+EOF
+
+chmod +x /etc/update-motd.d/05-install-in-progress
+tagScript success
+exit 0
