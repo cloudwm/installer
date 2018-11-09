@@ -19,7 +19,7 @@ checkPackageInstalled python-certbot-nginx
 ### install certificate on a wordpress domain ###
 
 domain=$(wp option get siteurl --allow-root --path /var/www/html/)
-certbot --nginx --quiet --redirect -d $domain
+certbot --nginx --quiet --redirect -d $domain | log
 
 tag certbot-nginx-wordpress.success
 tagScript success
