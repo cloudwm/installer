@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+
+add-apt-repository ppa:certbot/certbot -y | log
+apt install python-certbot-nginx
+
+# TODO Change User's Email and domain, depends on input
+certbot --nginx --agree-tos --text -n -m somemail@somewhere.com -d www.localhost.com -d localhost.co
+
+tagScript success
+
+exit 0
