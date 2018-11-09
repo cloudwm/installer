@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install sendmail for local mail delivery
+# install ufw 
 echo "Installing ufw" | log
 apt install ufw -y | log
 waitOrStop 0
