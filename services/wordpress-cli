@@ -1,0 +1,34 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+### pre requirements check ###
+
+checkPackageInstalled php-cli
+
+### install wp cli for wordpress ###
+
+echo "Installing wp cli" | log
+
+curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp | log
+
+waitOrStop 0
+
+### check binary existence ###
+
+if [ -f "/usr/local/bin/wp" ]; then
+
+	tag wp-cli.success
+	tagScript success
+	exit 0
+
+else 
+
+	echo Failed installing wp-cli
+	exit 1
+
+fi
