@@ -9,11 +9,8 @@ fi
 
 runOnceCheck
 
-# Allow connecting to mySQL with user root from anywhere.
-echo "mysql -e \"use mysql; UPDATE user set Host = '%' where User = 'root';\"" |sh
-
-# Allow connecting to mySQL with user root from anywhere.
-echo "mysql -e \" flush privileges;\"" |sh
+# Allow binding of mysql from all IP Addresses
+sed -i '/bind-address.*/c\bind-address = 0.0.0.0' /etc/mysql/mysql.conf.d/mysqld.cnf
 
 # Restaring mysql daemon
 systemctl restart mysql.service | log
