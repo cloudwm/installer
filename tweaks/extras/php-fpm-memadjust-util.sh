@@ -1,3 +1,7 @@
+### base path config ###
+
+INSTALLER_PATH="/opt/cloudwm/installer"
+
 ### basic check php-fpm existence
 
 service=$(systemctl | grep fpm | awk '{print $1}')
@@ -29,11 +33,11 @@ currentmem=`awk '/memory_limit/' $ini`
 
 ### override settings of this script ###
 
-overridemem=`awk '!/#/' /scripts/php.ini | awk '/memory/'`
-overridemaxchild=`awk '!/#/' /scripts/php.ini | awk '/pm.max_children/'`
-overridestartsrv=`awk '!/#/' /scripts/php.ini | awk '/pm.start_servers/'`
-overrideminsparesrv=`awk '!/#/' /scripts/php.ini | awk '/pm.min_spare_servers/'`
-overridemaxsparesrv=`awk '!/#/' /scripts/php.ini | awk '/pm.max_spare_servers/'`
+overridemem=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/memory/'`
+overridemaxchild=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.max_children/'`
+overridestartsrv=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.start_servers/'`
+overrideminsparesrv=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.min_spare_servers/'`
+overridemaxsparesrv=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.max_spare_servers/'`
 
 ### read fpm settings ###
 
