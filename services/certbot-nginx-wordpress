@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist wp-cli.success
+
+# install cert-bot-nginx from apt
+
+add-apt-repository ppa:certbot/certbot -y && apt-get install python-certbot-nginx -y | log
+
+waitOrStop 0
+
+checkPackageInstalled python-certbot-nginx
+
+### install certificate on a wordpress domain ###
+
+domain=$(wp option get siteurl --allow-root --path /var/www/html/)
+certbot --nginx --quiet --redirect -d $domain
+
+tag certbot-nginx-wordpress.success
+tagScript success
