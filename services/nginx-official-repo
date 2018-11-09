@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+cat << EOF >> /etc/apt/sources.list.d/nginx.list
+deb http://nginx.org/packages/ubuntu/ bionic nginx
+deb-src http://nginx.org/packages/ubuntu/ bionic nginx
+EOF
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ABF5BD827BD9BF62
+apt update
+# install nginx from apt
+apt install nginx -y | log
+waitOrStop 0
+
+checkPackageInstalled nginx
+
+tag nginx.success
+tag httpd.success
+tagScript success
+
+exit 0
