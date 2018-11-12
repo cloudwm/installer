@@ -3,6 +3,26 @@
 if [ -f "$CWMCONFIGFILE" ];
 then
 
-ADMINPASSWORD=`cat $CWMCONFIGFILE  | grep password | cut -d= -f 2 | tr -d '[:space:]'`
+CONFIG=`cat $CWMCONFIGFILE`
+
+IFS=$'\n'
+
+for d in $CONFIG; 
+do
+
+    key=`echo $d | cut -f 1 -d"="`
+    value="`echo $d | cut -f 2 -d"="`"
+    $key=$value
+
+done
+
+ADMINPASSWORD=$password
+ADMINEMAIL=$email
+ZONE=$zone
+VMNAME=$name
+
+WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
 
 fi
+
