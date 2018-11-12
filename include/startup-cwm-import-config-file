@@ -10,9 +10,7 @@ IFS=$'\n'
 for d in $CONFIG; 
 do
 
-    key=`echo $d | cut -f 1 -d"="`
-    value="`echo $d | cut -f 2 -d"="`"
-    $key=$value
+    export `echo $d | cut -f 1 -d"="`="`echo $d | cut -f 2 -d"="`"
 
 done
 
@@ -23,6 +21,7 @@ VMNAME=$name
 
 WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
 LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
 
 fi
 
