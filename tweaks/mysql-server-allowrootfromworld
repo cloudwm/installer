@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+# Allow connecting to mySQL with user root from anywhere.
+echo "mysql -e \"use mysql; UPDATE user set Host = '%' where User = 'root';\"" |sh
+
+# Allow connecting to mySQL with user root from anywhere.
+echo "mysql -e \" flush privileges;\"" |sh
+
+# Restaring mysql daemon
+systemctl restart mysql.service | log
+
+tagScript success
+
+exit 0

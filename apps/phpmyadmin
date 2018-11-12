@@ -16,6 +16,13 @@ mkdir -p /var/www/html/phpmyadmin
 tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz -C /var/www/html/phpmyadmin/ --strip-components=1
 waitOrStop 0
 
+cd /var/www/html/phpmyadmin
+mv config.sample.inc.php config.inc.php
+
+echo "Generating blowfish_secret string and replacing it in config.inc.php" | log
+blowfish_secret=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 ; echo ''`
+sed -i "/$cfg\['blowfish_secret.*/c\$cfg['blowfish_secret'] = '"$blowfish_secret"';" config.inc.php
+
 tag phpmyadmin.success
 tagScript success
 

@@ -30,7 +30,11 @@ git clone https://www.github.com/cloudwm/installer.git
 ./installer {installer conf file}
 ```
 
+# License
+
+This application is allowed to be used, modified and forked by any CWM Cloud Platform, CWM brands and their users. Any use of this application out of CWM Cloud Platform servers is forbidden.
+
 <br />
 Thanks and enjoy,<br />
-CloudWM Team<br />
+CWM Team<br />
 CaaB.io<br />

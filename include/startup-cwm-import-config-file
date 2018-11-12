@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ -f "$CWMCONFIGFILE" ];
+then
+
+ADMINPASSWORD=`cat $CWMCONFIGFILE  | grep password | cut -d= -f 2 | tr -d '[:space:]'`
+
+fi

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+if [ -f "/etc/update-motd.d/05-install-in-progress" ]; 
+then
+    rm -rf /etc/update-motd.d/05-install-in-progress
+    tagScript success
+    exit 0
+fi
