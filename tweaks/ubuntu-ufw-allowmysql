@@ -13,10 +13,18 @@ checkTagExist ufw.success
 if [ ! -z "$LANNICIDS" ]; 
 then
 
+    for ip in $LANNICIDS;
+    do
 
-    
-    ufw allow from 172.16.0.0/255.255.255.0 port 3306
+	ipvar="ip$ip"
+	subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
 
+        ufw allow in to $subnet port 3306
+
+	unset ipvar
+	unset subnet
+
+    done
 
 else
 
