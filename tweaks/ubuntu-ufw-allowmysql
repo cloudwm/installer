@@ -7,7 +7,23 @@ fi
 
 checkTagExist ufw.success
 
-ufw allow 3306 | log
+# Check if LAN VLAN exists, if yes, open it's subnets in the firewall.
+# if not, open 3306 to all subnets.
+
+if [ ! -z "$LANNICIDS" ]; 
+then
+
+
+    
+    ufw allow from 172.16.0.0/255.255.255.0 port 3306
+
+
+else
+
+    ufw allow 3306 | log
+
+fi
+
 ufw status | log
 
 tagScript success
