@@ -7,7 +7,31 @@ fi
 
 checkTagExist ufw.success
 
-ufw allow 3306 | log
+# Check if LAN VLAN exists, if yes, open it's subnets in the firewall.
+# if not, open 3306 to all subnets.
+
+if [ ! -z "$LANNICIDS" ]; 
+then
+
+    for ip in $LANNICIDS;
+    do
+
+	ipvar="ip$ip"
+	subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
+
+        ufw allow in to $subnet port 3306
+
+	unset ipvar
+	unset subnet
+
+    done
+
+else
+
+    ufw allow 3306 | log
+
+fi
+
 ufw status | log
 
 tagScript success
