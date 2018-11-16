@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install pure-ftpd for local mail delivery
+# install pure-ftpd
 echo "Installing pure-ftpd" | log
 apt install pure-ftpd -y | log
 waitOrStop 0
@@ -18,8 +18,8 @@ checkPackageInstalled pure-ftpd
 pure-pw mkdb
 
 # Enabling Virtual Users and MinUID for www-data
-echo "/usr/sbin/nologin" >> /etc/shells
-echo "33" > /etc/pure-ftpd/auth/MinUID
+echo "/usr/sbin/nologin\r" >> /etc/shells
+echo "33" > /etc/pure-ftpd/conf/MinUID
 ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
 systemctl restart pure-ftpd.service
 
