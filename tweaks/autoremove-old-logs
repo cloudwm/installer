@@ -7,8 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-EXTRAS_DIR = /opt/installer/tweaks/extras/
+EXTRAS_DIR = "/opt/installer/tweaks/extras/"
 
-cp $EXTRAS_DIR/autoremove-old-logs/cwm-logcleaner /etc/cron.daily/
+cp "$EXTRAS_DIR/autoremove-old-logs/cwm-logcleaner" /etc/cron.daily/
 
 tagScript success
