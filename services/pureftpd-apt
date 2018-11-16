@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install pure-ftpd for local mail delivery
+echo "Installing pure-ftpd" | log
+apt install pure-ftpd expect -y | log
+waitOrStop 0
+
+checkPackageInstalled pure-ftpd
+checkPackageInstalled expect
+
+/usr/bin/expect << EOF
+
+spawn $(pure-pw useradd admin  -u www-data -d /var/www/html)
+expect "Password:"
+send "TempPassword\r"
+
+expect "Enter it again:"
+send "TempPassword\r"
+EOF
+
+tag pure-ftpd.success
+tagScript success
+
+exit 0
