@@ -27,11 +27,11 @@ if [ ! -d "$INSTALLER_PATH" ]; then
 fi
 
 if [ ! -f "$INSTALLER_PATH/php.ini" ]; then
-	cp $MY_PATH/extras/php.ini $INSTALLER_PATH/
+	cp $MY_PATH/extras/php-fpm-memadjust-utils/php.ini $INSTALLER_PATH/
 fi
 
 if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
-	cp $MY_PATH/extras/php-fpm-memadjust-util.sh $INSTALLER_PATH/php-fpm-memadjust
+	cp $MY_PATH/extras/php-fpm-memadjust-utils/php-fpm-memadjust-util.sh $INSTALLER_PATH/php-fpm-memadjust
 	chmod +x $INSTALLER_PATH/php-fpm-memadjust
 fi
 
