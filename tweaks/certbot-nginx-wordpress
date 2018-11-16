@@ -7,17 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist wp-cli.success
-
-# install cert-bot-nginx from apt
-
-add-apt-repository ppa:certbot/certbot -y && apt-get install python-certbot-nginx -y | log
-
-waitOrStop 0
-
-checkPackageInstalled python-certbot-nginx
+checkTagExist nginx-certbot.success
 
 ### install certificate on a wordpress domain ###
-
 domain=$(wp option get siteurl --allow-root --path /var/www/html/)
 certbot --nginx --quiet --redirect -d $domain | log
 

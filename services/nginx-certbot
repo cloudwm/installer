@@ -10,9 +10,9 @@ checkTagExist nginx.success
 
 add-apt-repository ppa:certbot/certbot -y | log
 apt install python-certbot-nginx
+waitOrStop 0
 
-# TODO Change User's Email and domain, depends on input
-certbot --nginx --agree-tos --text -n -m somemail@somewhere.com -d www.localhost.com -d localhost.co
+checkPackageInstalled python-certbot-nginx
 
 tagScript success
 
