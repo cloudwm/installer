@@ -13,6 +13,9 @@ waitOrStop 0
 
 checkPackageInstalled pure-ftpd
 
+# Creating home folder, incase that it wasn't created by web server
+mkdir -p  /var/www/html
+
 # Creating admin user
 (echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d /var/www/html
 pure-pw mkdb
@@ -21,10 +24,7 @@ pure-pw mkdb
 echo "/usr/sbin/nologin\r" >> /etc/shells
 echo "33" > /etc/pure-ftpd/conf/MinUID
 ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
-systemctl restart pure-ftpd.service
-
-# Creating home folder, incase that it wasn't created by web server
-mkdir -p  /var/www/html
+systemctl restart pure-ftpd.service | log
 
 tag pure-ftpd.success
 tagScript success

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+# Allow binding of mysql from all IP Addresses
+sed -i '/bind-address.*/c\bind-address = 0.0.0.0' /etc/mysql/mysql.conf.d/mysqld.cnf
+
+# Restaring mysql daemon
+systemctl restart mysql.service | log
+
+tagScript success
+
+exit 0
