@@ -9,12 +9,36 @@ fi
 
 runOnceCheck
 
-# Allow binding of Redis from all IP Addresses
-sed -i 's/127.0.0.1/0.0.0.0/g' /etc/redis/redis.conf 
+if [ -z $REDISAUTOCONFIG_DIR ]; 
+then
+    REDISAUTOCONFIG_DIR=/opt/redis-server-autoconfig
+fi
 
-# Restaring redis daemon
-systemctl restart redis.service | log
-systemctl restart redis-server.service | log
+if [ ! -d $REDISAUTOCONFIG_DIR ];
+then
+
+    mkdir -p $REDISAUTOCONFIG_DIR
+fi
+
+rootDir=$(rootDir)
+
+cp -f $rootDir/tweaks/extra/redis-server-autoconfig/* $REDISAUTCONFIG_DIR
+
+if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];then
+
+    # remove "exit 0" set by default in /etc/rc.local/
+    sed -i -e '/exit 0/s/.*//' /etc/rc.local
+
+    echo "$REDISAUTOCONFIG_DIR/redis-server-autoconfig" >> /etc/rc.local
+
+    # return exit 0 to /etc/rc.local
+    echo "exit 0" >> /etc/rc.local
+
+else
+
+    echo "$0 is already installed in /etc/rc.local" | log
+
+fi
 
 tagScript success
 
