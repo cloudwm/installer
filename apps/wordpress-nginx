@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkOs
+checkRootUser
+runOnceCheck
+
+# checking app has all services dependencies
+checkTagExist nginx.success
+checkTagExist mysqld.success
+
+# checkTagExist maild.success
+
+MY_PATH="`dirname \"$0\"`"
+
+cp ../$MY_PATH/tweaks/extras/worpdress-nginx/nginx-wordpress-config /etc/nginx/sites-available/default && service nginx restart
+
+# Downloading wordpress and installing
+wget https://wordpress.org/latest.tar.gz -P /var/www/html
+cd /var/www/html && tar xf latest.tar.gz --strip-components=1
+rm /var/www/html/latest.tar.gz
+
+## fix permissions
+sudo chown -R www-data:www-data /var/www/html
+
+tagScript success
+
+exit 0
