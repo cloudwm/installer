@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install Redis for local mail delivery
+echo "Installing redis" | log
+apt install redis -y | log
+waitOrStop 0
+
+checkPackageInstalled redis
+
+tag redis.success
+tagScript success
+
+exit 0
