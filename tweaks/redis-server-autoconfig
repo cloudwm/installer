@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+# Allow binding of Redis from all IP Addresses
+sed -i 's/127.0.0.1/0.0.0.0/g' /etc/redis/redis.conf 
+
+# Restaring redis daemon
+systemctl restart redis.service | log
+systemctl restart redis-server.service | log
+
+tagScript success
+
+exit 0
