@@ -9,11 +9,12 @@ fi
 
 runOnceCheck
 
-# Allow binding of mysql from all IP Addresses
-sed -i '/bind-address.*/c\bind-address = 0.0.0.0' /etc/mysql/mysql.conf.d/mysqld.cnf
+# Allow binding of Redis from all IP Addresses
+sed -i 's/127.0.0.1/0.0.0.0/g' /etc/redis/redis.conf 
 
-# Restaring mysql daemon
-systemctl restart mysql.service | log
+# Restaring redis daemon
+systemctl restart redis.service | log
+systemctl restart redis-server.service | log
 
 tagScript success
 
