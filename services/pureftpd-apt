@@ -8,21 +8,24 @@ fi
 
 # install pure-ftpd for local mail delivery
 echo "Installing pure-ftpd" | log
-apt install pure-ftpd expect -y | log
+apt install pure-ftpd -y | log
 waitOrStop 0
 
 checkPackageInstalled pure-ftpd
-checkPackageInstalled expect
 
-/usr/bin/expect << EOF
+# Enabling Virtual Users and MiUID for www-data
+echo "/usr/sbin/nologin" >> /etc/shells
+echo "33" > /etc/pure-ftpd/auth/MinUID
+ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
+systemctl restart pure-ftpd.service
 
-spawn $(pure-pw useradd admin  -u www-data -d /var/www/html)
-expect "Password:"
-send "TempPassword\r"
+# Creating home folder, incase that it wasn't created by web server
+mkdir -p  /var/www/html
 
-expect "Enter it again:"
-send "TempPassword\r"
-EOF
+# Creating admin user
+(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d /var/www/html
+pure-pw mkdb
+
 
 tag pure-ftpd.success
 tagScript success
