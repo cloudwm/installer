@@ -26,13 +26,16 @@ server {
 
 	server_name _;
 	location / {
-		try_files $uri $uri/ =404;
+		# Default Location
 	}
 }
 EOF
 
 # Symlink to sites-enabled 
 ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/default-ssl
+
+# Restart NGINX service
+systemctl restart nginx.service
 
 tag nginx.success
 tag httpd.success
