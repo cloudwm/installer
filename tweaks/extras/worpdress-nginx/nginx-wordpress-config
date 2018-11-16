@@ -20,11 +20,9 @@ server {
         }
 
         location ~ \.php$ {
-		include snippets/fastcgi-php.conf;
-                try_files $uri =404;
+                include snippets/fastcgi-php.conf;
                 fastcgi_split_path_info ^(.+\.php)(/.+)$;
                 fastcgi_pass 127.0.0.1:9000;
-                fastcgi_index index.php;
                 include fastcgi_params;
         }
 }
