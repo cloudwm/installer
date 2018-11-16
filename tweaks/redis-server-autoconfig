@@ -22,7 +22,7 @@ fi
 
 rootDir=$(rootDir)
 
-cp -f $rootDir/tweaks/extra/redis-server-autoconfig/* $REDISAUTCONFIG_DIR
+cp -f $rootDir/tweaks/extras/redis-server-autoconfig/* $REDISAUTOCONFIG_DIR
 
 if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];then
 
