@@ -8,34 +8,7 @@ fi
 
 checkTagExist nginx.success
 
-# Generate self-signed certificate
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.key -out /etc/ssl/certs/server.crt -days 1024 -nodes -subj '/CN=localhost'
-
-# Create an SSL vhost
-cat << EOF >> /etc/nginx/sites-available/default-ssl
-server {
-	listen 443 ssl default_server;
-	listen [::]:443 ssl default_server;
-
-    ssl_certificate      /etc/ssl/certs/server.crt;
-    ssl_certificate_key  /etc/ssl/private/server.key;
-
-	root /var/www/html;
-
-	index index.html index.htm index.nginx-debian.html;
-
-	server_name _;
-	location / {
-		# Default Location
-	}
-}
-EOF
-
-# Symlink to sites-enabled 
-ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/default-ssl
-
-# Restart NGINX service
-systemctl restart nginx.service
+# TODO: enable ssl in nginx
 
 tag nginx.success
 tag httpd.success
