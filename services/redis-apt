@@ -6,14 +6,14 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist nginx.success
-
-add-apt-repository ppa:certbot/certbot -y | log
-apt install python-certbot-nginx
+# install Redis for local mail delivery
+echo "Installing redis" | log
+apt install redis -y | log
 waitOrStop 0
 
-checkPackageInstalled python-certbot-nginx
+checkPackageInstalled redis
 
+tag redis.success
 tagScript success
 
 exit 0

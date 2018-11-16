@@ -10,6 +10,7 @@ fi
 if [ -f "/etc/update-motd.d/05-install-in-progress" ]; 
 then
     rm -rf /etc/update-motd.d/05-install-in-progress
+    wall "Installation in now Complete!"
     tagScript success
     exit 0
 fi
