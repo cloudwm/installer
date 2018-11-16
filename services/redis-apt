@@ -8,6 +8,7 @@ fi
 
 # install Redis for local mail delivery
 echo "Installing redis" | log
+
 apt install redis -y | log
 waitOrStop 0
 
