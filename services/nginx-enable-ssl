@@ -37,8 +37,6 @@ ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/default-ss
 # Restart NGINX service
 systemctl restart nginx.service
 
-tag nginx.success
-tag httpd.success
 tagScript success
 
 exit 0

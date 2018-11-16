@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install pure-ftpd
+echo "Installing pure-ftpd" | log
+apt install pure-ftpd -y | log
+waitOrStop 0
+
+checkPackageInstalled pure-ftpd
+
+# Creating admin user
+(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d /var/www/html
+pure-pw mkdb
+
+# Enabling Virtual Users and MinUID for www-data
+echo "/usr/sbin/nologin\r" >> /etc/shells
+echo "33" > /etc/pure-ftpd/conf/MinUID
+ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
+systemctl restart pure-ftpd.service
+
+# Creating home folder, incase that it wasn't created by web server
+mkdir -p  /var/www/html
+
+tag pure-ftpd.success
+tagScript success
+
+exit 0
