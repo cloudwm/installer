@@ -13,7 +13,7 @@ waitOrStop 0
 
 checkPackageInstalled pure-ftpd
 
-# Enabling Virtual Users and MiUID for www-data
+# Enabling Virtual Users and MinUID for www-data
 echo "/usr/sbin/nologin" >> /etc/shells
 echo "33" > /etc/pure-ftpd/auth/MinUID
 ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
