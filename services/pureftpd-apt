@@ -13,6 +13,10 @@ waitOrStop 0
 
 checkPackageInstalled pure-ftpd
 
+# Creating admin user
+(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d /var/www/html
+pure-pw mkdb
+
 # Enabling Virtual Users and MinUID for www-data
 echo "/usr/sbin/nologin" >> /etc/shells
 echo "33" > /etc/pure-ftpd/auth/MinUID
@@ -21,11 +25,6 @@ systemctl restart pure-ftpd.service
 
 # Creating home folder, incase that it wasn't created by web server
 mkdir -p  /var/www/html
-
-# Creating admin user
-(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d /var/www/html
-pure-pw mkdb
-
 
 tag pure-ftpd.success
 tagScript success
