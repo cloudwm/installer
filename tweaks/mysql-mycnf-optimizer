@@ -1,0 +1,80 @@
+#!/bin/bash
+
+## Defaults ##
+mysql_dir="/var/lib/mysql"
+log_error="/var/log/mysqld.log"
+slow_query_log_file="/var/log/mysqld-slow.log"
+pid_file="/var/run/mysqld/mysqld.pid"
+mysql_ram_gb=1
+query_cache_type=0
+query_cache_size=0
+long_query_time=2
+max_connections=500
+server_id=`shuf -i 100000-999999 -n 1`
+
+mycnf="
+   [mysql]\n
+    # CLIENT #\n
+    port                           = 3306\n
+    socket                         = ${mysql_dir}/mysql.sock\n
+\n
+    [mysqld]\n
+\n
+    # GENERAL #\n
+    user                           = mysql\n
+    default-storage-engine         = InnoDB\n
+    socket                         = ${mysql_dir}/mysql.sock\n
+    pid-file                       = ${pid_file}\n
+\n
+    # MyISAM #\n
+    # key-buffer-size                = 32M\n
+    # myisam-recover                 = FORCE,BACKUP\n
+\n
+    # SAFETY #\n
+    max-allowed-packet             = 16M\n
+    max-connect-errors             = 1000000\n
+    skip-name-resolve\n
+    sql-mode                       = NO_ENGINE_SUBSTITUTION,NO_AUTO_CREATE_USER\n
+    sysdate-is-now                 = 1\n
+    innodb-strict-mode             = 1\n
+\n
+    # DATA STORAGE #\n
+    datadir                        = ${mysql_dir}\n
+\n
+    # SERVER ID #\n
+    server-id                      = ${server_id}\n
+\n
+    # BINARY LOGGING #\n
+    log-bin\n
+\n
+    # CACHES AND LIMITS #\n
+    max-connections                = ${max_connections}\n
+    tmp-table-size                 = 32M\n
+    max-heap-table-size            = 32M\n
+    query-cache-type               = ${query_cache_type}\n
+    query-cache-size               = ${query_cache_size}\n
+    thread-cache-size              = 50\n
+    open-files-limit               = 65535\n
+    table-definition-cache         = 1024\n
+    table-open-cache               = 2048\n
+\n
+    # INNODB #\n
+    innodb-flush-method            = O_DIRECT\n
+    innodb-log-files-in-group      = 2\n
+    innodb-log-file-size           = ${innodb_log_file_size}\n
+    innodb-flush-log-at-trx-commit = 1\n
+    innodb-file-per-table          = 1\n
+    innodb-buffer-pool-size        = ${innodb_buffer_pool_size}\n
+\n
+    # LOGGING #\n
+    log-error                      = ${log_error}\n
+    slow-query-log                 = 1\n
+    slow-query-log-file            = ${slow_query_log_file}\n
+    log-queries-not-using-indexes  = OFF\n
+    long_query_time                = 30\n
+\n
+    [mysqldump]\n
+    max-allowed-packet             = 16M\n
+"
+
+echo -e $mycnf
