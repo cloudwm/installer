@@ -9,7 +9,7 @@ fi
 
 runOnceCheck
 
-if [ -z $REDISAUTOCONFIG_DIR ]; 
+if [ -z "$REDISAUTOCONFIG_DIR" ];
 then
     REDISAUTOCONFIG_DIR=/opt/redis-server-autoconfig
 fi
