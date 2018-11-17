@@ -21,10 +21,12 @@ then
 fi
 
 rootDir=$(rootDir)
-
+echo "Copying redis-server-autoconfig to $REDISAUTOCONFIG_DIR" | log
 cp -f $rootDir/tweaks/extras/redis-server-autoconfig/* $REDISAUTOCONFIG_DIR
 
 if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];then
+
+    echo "Installing redis-server-autoconfig in /etc/rc.local" | log
 
     # remove "exit 0" set by default in /etc/rc.local/
     sed -i -e '/exit 0/s/.*//' /etc/rc.local
