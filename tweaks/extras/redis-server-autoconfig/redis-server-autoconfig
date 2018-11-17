@@ -19,7 +19,7 @@ physicalRam=$(i=$(awk 'NR==1{print $2}' /proc/meminfo) && expr $i / 1024)
 physicalCpu=`nproc`
 
 serviceRamConsume=`echo "scale=0; ($physicalRam - $reserveRam) *  $serviceRamUsage/100" | bc`
-serviceRamConsumeBytes=`echo "$serviceRamConsume * 1024 | bc`
+serviceRamConsumeBytes=`echo "$serviceRamConsume * 1024" | bc`
 
 serviceCpuConsume=`echo "scale=0; ($physicalCpu - $reserveCpu) *  $serviceCpuUsage/100" | bc`
 
