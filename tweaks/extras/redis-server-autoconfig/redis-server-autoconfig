@@ -26,7 +26,9 @@ serviceCpuConsume=`echo "scale=0; ($physicalCpu - $reserveCpu) *  $serviceCpuUsa
 if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];
 then
 
-    INSTALLDIR=`dirname $0`
+    FULLFILENAME=`realpath $0`
+    INSALLDIR=`dirname $FULLFILENAME`
+
     echo "Installing redis-server-autoconfig in /etc/rc.local" | logger -s
 
     # remove "exit 0" set by default in /etc/rc.local/
