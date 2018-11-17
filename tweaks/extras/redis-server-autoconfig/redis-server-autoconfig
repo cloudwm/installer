@@ -28,6 +28,6 @@ then
     serviceCpuConsume=1
 fi
 
-echo "/opt/redis-server-autoconfig/redis-server-autoconfig: settings redis.conf/maxmemory to $serviceRamConsume"
+echo "/opt/redis-server-autoconfig/redis-server-autoconfig: settings redis.conf/maxmemory to $serviceRamConsumeBytes bytes" | logger -s
 sed -i -e '/^# maxmemory <bytes>/s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
 sed -i -e '/^maxmemory /s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
