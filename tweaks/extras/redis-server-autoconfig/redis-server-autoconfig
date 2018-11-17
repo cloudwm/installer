@@ -4,7 +4,7 @@
 REDISCONF=/etc/redis/redis.conf
 
 # Configure the amount of RAM the service will ignore and reserve to OS or other applications (in MB).
-reserveRam=200
+reserveRam=300
 
 # Configure the amount of RAM the service will use (in percentage).
 serviceRamUsage=100                  
