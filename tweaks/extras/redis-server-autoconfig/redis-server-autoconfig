@@ -23,6 +23,25 @@ serviceRamConsumeBytes=`echo "$serviceRamConsume * 1024" | bc`
 
 serviceCpuConsume=`echo "scale=0; ($physicalCpu - $reserveCpu) *  $serviceCpuUsage/100" | bc`
 
+if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];
+then
+
+    INSTALLDIR=`dirname $0`
+    echo "Installing redis-server-autoconfig in /etc/rc.local" | logger -s
+
+    # remove "exit 0" set by default in /etc/rc.local/
+    sed -i -e '/exit 0/s/.*//' /etc/rc.local
+    echo "$INSTALLDIR/redis-server-autoconfig" >> /etc/rc.local
+
+    # return exit 0 to /etc/rc.local
+    echo "exit 0" >> /etc/rc.local
+
+else
+
+    echo "$0 is installed in /etc/rc.local" | logger -s
+
+fi
+
 if [ "$serviceCpuConsume" -lt "1" ];
 then 
     serviceCpuConsume=1
@@ -31,3 +50,5 @@ fi
 echo "/opt/redis-server-autoconfig/redis-server-autoconfig: settings redis.conf/maxmemory to $serviceRamConsumeBytes bytes" | logger -s
 sed -i -e '/^# maxmemory <bytes>/s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
 sed -i -e '/^maxmemory /s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
+
+
