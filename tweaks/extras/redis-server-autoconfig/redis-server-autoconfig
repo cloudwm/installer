@@ -7,7 +7,7 @@ REDISCONF=/etc/redis/redis.conf
 reserveRam=300
 
 # Configure the amount of RAM the service will use (in percentage).
-serviceRamUsage=100                  
+serviceRamUsage=100
 
 # Configure the amount of CPUs the service will ignore and reserve to OS or other applications.
 reserveCpu=0
@@ -31,5 +31,3 @@ fi
 echo "/opt/redis-server-autoconfig/redis-server-autoconfig: settings redis.conf/maxmemory to $serviceRamConsumeBytes bytes" | logger -s
 sed -i -e '/^# maxmemory <bytes>/s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
 sed -i -e '/^maxmemory /s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
-
-
