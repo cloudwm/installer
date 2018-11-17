@@ -24,6 +24,34 @@ rootDir=$(rootDir)
 echo "Copying redis-server-autoconfig to $REDISAUTOCONFIG_DIR" | log
 cp -f $rootDir/tweaks/extras/redis-server-autoconfig/* $REDISAUTOCONFIG_DIR
 
+# If installer is running in a provisioning process, set rc.local file to the renamed file.
+
+if [ -f /etc/rc.local.tmp ]; 
+then
+    RCLOCALFILE=/etc/rc.local.tmp
+else
+    RCLOCALFILE=/etc/rc.local
+fi
+
+# install in rc.local file
+if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];then
+
+
+    echo "Installing redis-server-autoconfig in /etc/rc.local" | log
+
+    # remove "exit 0" set by default in /etc/rc.local/
+    sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
+    echo "$REDISAUTOCONFIG_DIR/redis-server-autoconfig" >> $RCLOCALFILE
+
+    # return exit 0 to /etc/rc.local
+    echo "exit 0" >> $RCLOCALFILE
+
+else
+
+    echo "$0 is already installed in /etc/rc.local" | log
+
+fi
+
 tagScript success
 
 exit 0
