@@ -17,15 +17,24 @@ checkTagExist mysqld.success
 checkTagExist maild.success
 
 MY_PATH="`dirname \"$0\"`"
+WP_PATH="/var/www/html"
+WPID=`shuf -i 100000-999999 -n 1`
+USEREMAIL=$(cat /root/guest.conf | grep email= | cut -d'=' -f2)
+USERPASS=$(cat /root/guest.conf | grep password= | cut -d'=' -f2)
 
 cp $MY_PATH/../tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default 
 service nginx restart
 
 # Downloading wordpress and installing
-wget https://wordpress.org/latest.tar.gz -P /var/www/html
-cd /var/www/html 
-tar xf latest.tar.gz --strip-components=1
-rm /var/www/html/latest.tar.gz
+mysql -e "create database cloudwm_${WPID};"
+mysql -e "grant all privileges on cloudwm_${WPID}.* to wp_${WPID}@'localhost' identified by '"${USERPASS}"';"
+mysql -e "flush privileges;"
+
+wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
+
+wp config create --dbname=cloudwm_${WPID} --dbuser=wp_${WPID} --dbpass=securepswd --locale=en_US --allow-root | log
+
+wp core multisite-install --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${USERPASS}" --admin_email="${USEREMAIL}" --path=${WP_PATH} --allow-root | log
 
 ## fix permissions
 sudo chown -R www-data:www-data /var/www/html
