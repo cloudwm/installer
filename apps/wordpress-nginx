@@ -18,7 +18,7 @@ checkTagExist maild.success
 
 MY_PATH="`dirname \"$0\"`"
 
-cp ../$MY_PATH/tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default 
+cp $MY_PATH/../tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default 
 service nginx restart
 
 # Downloading wordpress and installing
