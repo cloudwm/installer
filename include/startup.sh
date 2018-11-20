@@ -28,6 +28,20 @@ echo $rootDir
 
 }
 
+# Check tempDir exists and create if not create.
+
+function checkTempDir() {
+
+    rootDir=$(rootDir)
+
+    if [ ! -d "$rootDir/temp" ]; then
+
+	mkdir $rootDir/temp
+
+    fi
+
+}
+
 function log() {
 
     rootDir=$(rootDir)
@@ -230,3 +244,5 @@ function checkPackageInstalled() {
 
 }
 
+# Run Startup Functions
+checkTempDir

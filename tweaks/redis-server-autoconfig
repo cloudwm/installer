@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+if [ -z "$REDISAUTOCONFIG_DIR" ];
+then
+    REDISAUTOCONFIG_DIR=/opt/redis-server-autoconfig
+fi
+
+if [ ! -d $REDISAUTOCONFIG_DIR ];
+then
+
+    mkdir -p $REDISAUTOCONFIG_DIR
+fi
+
+rootDir=$(rootDir)
+echo "Copying redis-server-autoconfig to $REDISAUTOCONFIG_DIR" | log
+cp -f $rootDir/tweaks/extras/redis-server-autoconfig/* $REDISAUTOCONFIG_DIR
+
+# If installer is running in a provisioning process, set rc.local file to the renamed file.
+
+if [ -f /etc/rc.local.bck ];
+then
+    RCLOCALFILE=/etc/rc.local.bck
+else
+    RCLOCALFILE=/etc/rc.local
+fi
+
+# install in rc.local file
+
+if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];then
+
+
+    echo "Installing redis-server-autoconfig in /etc/rc.local" | log
+
+    # remove "exit 0" set by default in /etc/rc.local/
+    sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
+    echo "$REDISAUTOCONFIG_DIR/redis-server-autoconfig" >> $RCLOCALFILE
+
+    # return exit 0 to /etc/rc.local
+    echo "exit 0" >> $RCLOCALFILE
+
+else
+
+    echo "$0 is already installed in /etc/rc.local" | log
+
+fi
+
+tagScript success
+
+exit 0

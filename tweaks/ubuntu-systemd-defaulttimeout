@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Changing /etc/systemd/system.conf DefaultTimeoutStartSec and DefaultTimeoutStopSec to 300sec." | log
+
+sed -i -e '/DefaultTimeoutStartSec/s/.*/DefaultTimeoutStartSec=300s/' /etc/systemd/system.conf
+sed -i -e '/DefaultTimeoutStopSec/s/.*/DefaultTimeoutStopSec=300s/' /etc/systemd/system.conf
+
+tagScript success

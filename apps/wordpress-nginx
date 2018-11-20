@@ -14,16 +14,17 @@ runOnceCheck
 # checking app has all services dependencies
 checkTagExist nginx.success
 checkTagExist mysqld.success
-
-# checkTagExist maild.success
+checkTagExist maild.success
 
 MY_PATH="`dirname \"$0\"`"
 
-cp ../$MY_PATH/tweaks/extras/worpdress-nginx/nginx-wordpress-config /etc/nginx/sites-available/default && service nginx restart
+cp ../$MY_PATH/tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default 
+service nginx restart
 
 # Downloading wordpress and installing
 wget https://wordpress.org/latest.tar.gz -P /var/www/html
-cd /var/www/html && tar xf latest.tar.gz --strip-components=1
+cd /var/www/html 
+tar xf latest.tar.gz --strip-components=1
 rm /var/www/html/latest.tar.gz
 
 ## fix permissions

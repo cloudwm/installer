@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Configure redis.conf file location.
+REDISCONF=/etc/redis/redis.conf
+
+# Configure the amount of RAM the service will ignore and reserve to OS or other applications (in MB).
+reserveRam=300
+
+# Configure the amount of RAM the service will use (in percentage).
+serviceRamUsage=100
+
+# Configure the amount of CPUs the service will ignore and reserve to OS or other applications.
+reserveCpu=0
+
+# Configure the amount of CPU Cores the service will use (in percentage).
+serviceCpuUsage=100
+
+physicalRam=$(i=$(awk 'NR==1{print $2}' /proc/meminfo) && expr $i / 1024)
+physicalCpu=`nproc`
+
+serviceRamConsume=`echo "scale=0; ($physicalRam - $reserveRam) *  $serviceRamUsage/100" | bc`
+serviceRamConsumeBytes=`echo "$serviceRamConsume * 1024" | bc`
+
+serviceCpuConsume=`echo "scale=0; ($physicalCpu - $reserveCpu) *  $serviceCpuUsage/100" | bc`
+
+if [ "$serviceCpuConsume" -lt "1" ];
+then
+    serviceCpuConsume=1
+fi
+
+echo "/opt/redis-server-autoconfig/redis-server-autoconfig: settings redis.conf/maxmemory to $serviceRamConsumeBytes bytes" | logger -s
+sed -i -e '/^# maxmemory <bytes>/s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
+sed -i -e '/^maxmemory /s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
