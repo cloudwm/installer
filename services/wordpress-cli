@@ -8,7 +8,7 @@ fi
 
 ### pre requirements check ###
 
-checkPackageInstalled php-cli
+checkPackageInstalled php7.2-cli
 
 ### install wp cli for wordpress ###
 
