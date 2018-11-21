@@ -12,29 +12,39 @@ checkRootUser
 runOnceCheck
 
 # checking app has all services dependencies
+
 checkTagExist nginx.success
 checkTagExist mysqld.success
+checkTagExist php.success
 checkTagExist maild.success
+checkTagExist wp-cli.success
+
+## set variables and get guest.conf details
 
 MY_PATH="`dirname \"$0\"`"
 WP_PATH="/var/www/html"
 WPID=`shuf -i 100000-999999 -n 1`
 USEREMAIL=$(cat /root/guest.conf | grep email= | cut -d'=' -f2)
 USERPASS=$(cat /root/guest.conf | grep password= | cut -d'=' -f2)
+IPADDR=$(cat /root/guest.conf | grep ip0= | cut -d'=' -f2)
 
-cp $MY_PATH/../tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default 
-service nginx restart
+# set nginx config
+
+cp $MY_PATH/../tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default | log
+service nginx restart | log
+
+# create mysql user and permissions
+mysql -e "create database cloudwm_${WPID};" | log
+mysql -e "grant all privileges on cloudwm_${WPID}.* to wp_${WPID}@'localhost' identified by '"${USERPASS}"';" | log
+mysql -e "flush privileges;" | log
 
 # Downloading wordpress and installing
-mysql -e "create database cloudwm_${WPID};"
-mysql -e "grant all privileges on cloudwm_${WPID}.* to wp_${WPID}@'localhost' identified by '"${USERPASS}"';"
-mysql -e "flush privileges;"
 
 wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 
-wp config create --dbname=cloudwm_${WPID} --dbuser=wp_${WPID} --dbpass=securepswd --locale=en_US --allow-root | log
+wp config create --dbname=cloudwm_${WPID} --dbuser=wp_${WPID} --dbpass=${USERPASS} --locale=en_US --path=${WP_PATH} --allow-root | log
 
-wp core multisite-install --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${USERPASS}" --admin_email="${USEREMAIL}" --path=${WP_PATH} --allow-root | log
+wp core multisite-install --url=http://${IPADDR} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${USERPASS}" --admin_email="${USEREMAIL}" --path=${WP_PATH} --allow-root | log
 
 ## fix permissions
 sudo chown -R www-data:www-data /var/www/html
