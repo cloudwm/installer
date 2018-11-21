@@ -1,5 +1,4 @@
 #!/bin/bash
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -7,12 +6,25 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist nginx.success
-
+checkTagExist php-fpm.success
+checkTagExist php7.2-fpm.success
 # TODO: enable php in nginx
 
+sed -i 's/listen = \/run\/php\/php7.2-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/7.2/fpm/pool.d/www.conf && service php7.2-fpm restart
 
-tag nginx.success
-tag httpd.success
+waitOrStop 0
+
+phpfpmconfig="\        location ~ \\.php$ {\n                include snippets\/fastcgi-php.conf\;\n                fastcgi_pass 127.0.0.1:9000\;\n        }\n"
+
+sed -i '/\/var\/www\/html\;/a '"${phpfpmconfig}"'' /etc/nginx/sites-available/default
+
+waitOrStop 0
+
+service nginx restart
+
+waitOrStop 0
+
+tag nginx-enable-php.success
 tagScript success
 
 exit 0
