@@ -33,20 +33,32 @@ IPADDR=$(cat /root/guest.conf | grep ip0= | cut -d'=' -f2)
 cp $MY_PATH/../tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default | log
 service nginx restart | log
 
+waitOrStop 0
+
 # create mysql user and permissions
-mysql -e "create database cloudwm_${WPID};" | log
-mysql -e "grant all privileges on cloudwm_${WPID}.* to wp_${WPID}@'localhost' identified by '"${USERPASS}"';" | log
-mysql -e "flush privileges;" | log
+
+mysql -e "create database cloudwm_${WPID};"
+mysql -e "grant all privileges on cloudwm_${WPID}.* to wp_${WPID}@'localhost' identified by '"${USERPASS}"';"
+mysql -e "flush privileges;"
+
+waitOrStop 0
 
 # Downloading wordpress and installing
 
 wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 
+waitOrStop 0
+
 wp config create --dbname=cloudwm_${WPID} --dbuser=wp_${WPID} --dbpass=${USERPASS} --locale=en_US --path=${WP_PATH} --allow-root | log
+
+waitOrStop 0
 
 wp core multisite-install --url=http://${IPADDR} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${USERPASS}" --admin_email="${USEREMAIL}" --path=${WP_PATH} --allow-root | log
 
+waitOrStop 0
+
 ## fix permissions
+
 sudo chown -R www-data:www-data /var/www/html
 
 tagScript success
