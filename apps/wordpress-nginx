@@ -37,9 +37,9 @@ waitOrStop 0
 
 # create mysql user and permissions
 
-mysql -e "create database cloudwm_${WPID};"
-mysql -e "grant all privileges on cloudwm_${WPID}.* to wp_${WPID}@'localhost' identified by '"${USERPASS}"';"
-mysql -e "flush privileges;"
+mysql -u root -p"${USERPASS}" -e "create database cloudwm_${WPID};"
+mysql -u root -p"${USERPASS}" -e "grant all privileges on cloudwm_${WPID}.* to wp_${WPID}@'localhost' identified by '"${USERPASS}"';"
+mysql -u root -p"${USERPASS}" -e "flush privileges;"
 
 waitOrStop 0
 
