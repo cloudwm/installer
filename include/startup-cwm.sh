@@ -25,7 +25,6 @@ DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
 
 UUID=`cat /sys/class/dmi/id/product_uuid | tr '[:upper:]' '[:lower:]'`
 
-
 fi
 
 # Function: updateServerDescription
