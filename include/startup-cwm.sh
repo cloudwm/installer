@@ -29,7 +29,7 @@ UUID=`cat /sys/class/dmi/id/product_uuid | tr '[:upper:]' '[:lower:]'`
 fi
 
 # Function: updateServerDescription
-# Purpose: Update CWM Server's description
+# Purpose: Update CWM Server's Overview->Descriptoin text field.
 # Usage: updateServerDescription "Some kind of description"
 
 function updateServerDescription() {
