@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+checkTagExist nginx.success
+
+echo "Enabling PHP in default-ssl config file" | log
+
+sed -i -e 's/server_name _;/server_name _;\nlocation ~ .php$ {\n                include snippets\/fastcgi-php.conf;\n                fastcgi_pass 127.0.0.1:9000;\n        \n}\n/'  /etc/nginx/sites-available/default-ssl
+sed -i -e 's/index index.html/index index.php index.html/' /etc/nginx/sites-available/default-ssl
+
+# Restart NGINX service
+systemctl restart nginx.service
+
+tagScript success
+
+exit 0

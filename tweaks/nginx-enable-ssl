@@ -17,8 +17,8 @@ server {
 	listen 443 ssl default_server;
 	listen [::]:443 ssl default_server;
 
-    ssl_certificate      /etc/ssl/certs/server.crt;
-    ssl_certificate_key  /etc/ssl/private/server.key;
+	ssl_certificate      /etc/ssl/certs/server.crt;
+	ssl_certificate_key  /etc/ssl/private/server.key;
 
 	root /var/www/html;
 
