@@ -27,3 +27,23 @@ UUID=`cat /sys/class/dmi/id/product_uuid | tr '[:upper:]' '[:lower:]'`
 
 
 fi
+
+function updateServerDescription() {
+
+    if [ ! -z $cwmSite ]; 
+    then
+
+	CWMSITE=$cwmSite
+
+    fi
+
+    curl -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" -d $'description='"$1"
+    errorCode=$?
+
+    if [ $errorCode != '0' ]; 
+    then
+	echo "Erorr updating server description" | log
+
+    fi
+
+}
