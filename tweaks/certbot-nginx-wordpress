@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist wp-cli.success
-checkTagExist nginx-certbot.success
+checkTagExist certbot-nginx.success
 
 ### install certificate on a wordpress domain ###
 domain=$(wp option get siteurl --allow-root --path /var/www/html/)
