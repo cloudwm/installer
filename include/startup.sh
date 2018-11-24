@@ -6,10 +6,10 @@ elif [ -f "../installer-startup.conf" ]; then
     . ../installer-startup.conf
 fi
 
-if [ -f "./include/startup-cwm-import-config-file" ]; then
-    . ./include/startup-cwm-import-config-file
-elif [ -f "../include/startup-cwm-import-config-file" ]; then
-    . ../include/startup-cwm-import-config-file
+if [ -f "./include/startup-cwm.sh" ]; then
+    . ./include/startup-cwm.sh
+elif [ -f "../include/startup-cwm.sh" ]; then
+    . ../include/startup-cwm.sh
 fi
 
 function rootDir() {

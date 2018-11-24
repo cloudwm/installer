@@ -34,19 +34,28 @@ fi
 
 function updateServerDescription() {
 
-    if [ ! -z $cwmSite ]; 
+    if [ ! -z "$cwmSite" ];
     then
 
 	CWMSITE=$cwmSite
 
     fi
 
-    curl -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" -d $'description='"$1"
-    errorCode=$?
-
-    if [ $errorCode != '0' ]; 
+    if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]];
     then
-	echo "Erorr updating server description" | log
+
+        curl -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" -d $'description='"$1"
+        errorCode=$?
+
+        if [ $errorCode != '0' ]; 
+        then
+		echo "Erorr updating server description" | log
+
+        fi
+
+    else
+
+	echo "No API Client ID or Secret is set, description not set" | log
 
     fi
 
