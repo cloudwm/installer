@@ -9,7 +9,7 @@ fi
 checkTagExist nginx.success
 
 add-apt-repository ppa:certbot/certbot -y | log
-apt install python-certbot-nginx
+apt install python-certbot-nginx -y | log
 waitOrStop 0
 
 checkPackageInstalled python-certbot-nginx
