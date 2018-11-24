@@ -51,6 +51,9 @@ function updateServerDescription() {
         then
 		echo "Erorr updating server description" | log
 
+	else 
+
+	    echo "Updated Overview->Description data for $UUID" | log
         fi
 
     else
