@@ -32,7 +32,7 @@ git clone https://www.github.com/cloudwm/installer.git
 
 # License
 
-This application is allowed to be used, modified or forked by any CWM Cloud Platform User, CWM brand and their users. Any use of this application not for CWM Cloud Platform servers for commerical use is forbidden. You may use this freely for personal usage.
+This application is allowed to be used, modified or forked by any CWM Cloud Platform User, CWM brand and their users. Any use of this application not for CWM Cloud Platform servers for commerical use is forbidden. You may use this freely for personal use.
 
 <br />
 Thanks and enjoy,<br />

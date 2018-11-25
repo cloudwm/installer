@@ -5,12 +5,14 @@ mysql_dir="/var/lib/mysql"
 log_error="/var/log/mysqld.log"
 slow_query_log_file="/var/log/mysqld-slow.log"
 pid_file="/var/run/mysqld/mysqld.pid"
-mysql_ram_gb=1
+mysql_ram_gb=`cat /proc/meminfo | grep MemTotal | awk {'print int($2/1024/1024*0.8)'}`
 query_cache_type=0
 query_cache_size=0
 long_query_time=2
-max_connections=500
+max_connections=`nproc | awk '{print $1*500}'`
 server_id=`shuf -i 100000-999999 -n 1`
+innodb_log_file_size=`mysql -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{ print int($1*60)"M"}'`
+innodb_buffer_pool_size=`cat /proc/meminfo | grep MemTotal | awk {'print int($2/1024/1024*0.8*0.8)'}`
 
 mycnf="
    [mysql]\n
