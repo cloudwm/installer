@@ -5,10 +5,12 @@ CNFCONFD="/etc/mysql/mysql.conf.d"
 
 
 # INNODB Settings 
+totalram=`cat /proc/meminfo | grep MemTotal | awk '{print int($2/1024)}'`
+
 
 # Calculate recommended values for InnoDB
 innodb_log_file_size=`mysql -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{ print int($1*60)"M"}'`
-innodb_buffer_pool_size=`cat /proc/meminfo | grep MemTotal | awk {'print int($2/1024/1024*0.8*0.8)'}`
+innodb_buffer_pool_size=$(($totalram / 2))
 
 # If not yet configured, cunifgure it
 if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
@@ -18,16 +20,22 @@ if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
     echo "innodb-log-file-size           = ${innodb_log_file_size}" >> $CNFCONFD/installer.innodb.cnf
     echo "innodb-flush-log-at-trx-commit = 1" >> $CNFCONFD/installer.innodb.cnf
     echo "innodb-file-per-table          = 1" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb-buffer-pool-size        = ${innodb_buffer_pool_size}" >> $CNFCONFD/installer.innodb.cnf
+    echo "innodb-buffer-pool-size        = ${innodb_buffer_pool_size}M" >> $CNFCONFD/installer.innodb.cnf
 fi
 
 # Fine tuning
 
-max_connections=`nproc | awk '{print $1*100}'`
+
+max_connections=$((($totalram - ($totalram / 2) - 128) / 4))
 thread_concurrency=`nproc`
 
-if [ ! -f $CNFCONFD/installer.tuning.cnf ]; then
-    echo "[mysqld]" > $CNFCONFD/installer.tuning.cnf
-    echo "max_connections              = ${max_connections}" >> $CNFCONFD/installer.tuning.cnf
-    echo "thread_concurrency           = ${thread_concurrency}" >> $CNFCONFD/installer.tuning.cnf
+if [ -f $CNFCONFD/installer.tuning.cnf ]; then
+    rm -rf $CNFCONFD/installer.tuning.cnf
 fi
+echo "[mysqld]" > $CNFCONFD/installer.tuning.cnf
+echo "max_connections              = ${max_connections}" >> $CNFCONFD/installer.tuning.cnf
+echo "thread_concurrency           = ${thread_concurrency}" >> $CNFCONFD/installer.tuning.cnf
+# Default is recommended for those two, should not exceed 200M
+echo "query_cache_size           = 64M" >> $CNFCONFD/installer.tuning.cnf  
+echo "key_buffer_size           = 64M" >> $CNFCONFD/installer.tuning.cnf 
+
