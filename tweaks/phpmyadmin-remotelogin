@@ -10,7 +10,7 @@ checkTagExist phpmyadmin.success
 
 echo "Adding to config file request for remote server feature" | log
 echo ""  >> /var/www/html/phpmyadmin/config.inc.php
-echo "$cfg['AllowArbitraryServer'] = true;" >> /var/www/html/phpmyadmin/config.inc.php
+echo "\$cfg['AllowArbitraryServer'] = true;" >> /var/www/html/phpmyadmin/config.inc.php
 
 echo "Disabling specific server login form" | log
 sed -i "/\$cfg\['Servers']\[\$i]\['host'].*/c\/\/ \$cfg['Servers'][\$i]['host'].= '';" /var/www/html/phpmyadmin/config.inc.php
