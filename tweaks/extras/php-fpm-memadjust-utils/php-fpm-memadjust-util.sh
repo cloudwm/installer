@@ -1,6 +1,6 @@
 ### base path config ###
 
-INSTALLER_PATH="/opt/cloudwm/installer"
+INSTALLER_PATH="/opt/php-fpm-autoconfig"
 
 ### basic check php-fpm existence
 

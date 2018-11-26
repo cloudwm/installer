@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+### basic check of php-fpm existence ###
+
+service=$(systemctl | grep fpm | awk '{print $1}')
+
+if [[ -z "$service" ]];then
+	echo php-fpm is not installed | log
+	exit 1
+fi
+
+### check existing startup scripts folder ###
+
+MY_PATH="`dirname \"$0\"`"
+
+INSTALLER_PATH="/opt/php-fpm-autoconfig"
+
+if [ ! -d "$INSTALLER_PATH" ]; then
+	mkdir -p $INSTALLER_PATH
+fi
+
+if [ ! -f "$INSTALLER_PATH/php.ini" ]; then
+	cp $MY_PATH/extras/php-fpm-memadjust-utils/php.ini $INSTALLER_PATH/
+fi
+
+if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
+	cp $MY_PATH/extras/php-fpm-memadjust-utils/php-fpm-memadjust-util.sh $INSTALLER_PATH/php-fpm-memadjust
+	chmod +x $INSTALLER_PATH/php-fpm-memadjust
+fi
+
+if [[ `cat /etc/rc.local | grep -o memadjust` == 'memadjust' ]];then
+
+	echo Startup script exists | log
+else
+
+	sed -i '/nothing\./a bash '"$INSTALLER_PATH"'/php-fpm-memadjust' /etc/rc.local
+	bash $INSTALLER_PATH/php-fpm-memadjust | log
+	exit 0
+fi	
+
+exit 0
