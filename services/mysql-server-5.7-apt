@@ -52,7 +52,7 @@ systemctl restart mysql.service
 # Set ~/.my.cnf root password for quick cli work
 if [ ! -f ~/my.cnf ];
 then
-    
+
     echo "[client]" > ~/.my.cnf
     echo "user=root" >> ~/.my.cnf
     echo "password=$ADMINPASSWORD" >> ~/.my.cnf
@@ -62,7 +62,7 @@ fi
 # Set some defaults to /etc/mysql/mysql.conf.d/mysqld-installer.cnf
 if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
 then
-    
+
     echo "[mysqld]" > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
     echo "skip-name-resolve=1" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
 
