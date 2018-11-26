@@ -27,12 +27,12 @@ if [ ! -d "$INSTALLER_PATH" ]; then
 fi
 
 if [ ! -f "$INSTALLER_PATH/php.ini" ]; then
-	cp $MY_PATH/extras/php-fpm-memadjust-utils/php.ini $INSTALLER_PATH/
+	cp $MY_PATH/extras/php-fpm-autoconfig/php.ini $INSTALLER_PATH/
 fi
 
 if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
-	cp $MY_PATH/extras/php-fpm-memadjust-utils/php-fpm-memadjust-util.sh $INSTALLER_PATH/php-fpm-memadjust
-	chmod +x $INSTALLER_PATH/php-fpm-memadjust
+	cp $MY_PATH/extras/php-fpm-autoconfig/php-fpm-autoconfig.sh $INSTALLER_PATH/php-fpm-autoconfig
+	chmod +x $INSTALLER_PATH/php-fpm-autoconfig
 fi
 
 if [[ `cat /etc/rc.local | grep -o memadjust` == 'memadjust' ]];then
@@ -40,8 +40,8 @@ if [[ `cat /etc/rc.local | grep -o memadjust` == 'memadjust' ]];then
 	echo Startup script exists | log
 else
 
-	sed -i '/nothing\./a bash '"$INSTALLER_PATH"'/php-fpm-memadjust' /etc/rc.local
-	bash $INSTALLER_PATH/php-fpm-memadjust | log
+	sed -i '/nothing\./a bash '"$INSTALLER_PATH"'/php-fpm-autoconfig' /etc/rc.local
+	bash $INSTALLER_PATH/php-fpm-autoconfig | log
 	exit 0
 fi	
 
