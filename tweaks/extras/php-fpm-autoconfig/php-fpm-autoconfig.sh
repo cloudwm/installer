@@ -1,9 +1,21 @@
-### base path config ###
+#!/bin/bash
 
+# php-fpm-autocnfig path
 INSTALLER_PATH="/opt/php-fpm-autoconfig"
 
-### basic check php-fpm existence
+# Configure the amount of RAM the service will ignore and reserve to OS or other applications (in MB).
+reserveRam=300
 
+# Configure the amount of RAM the service will use (in percentage).
+serviceRamUsage=100
+
+# Configure the amount of RAM to reserve to each php-fpm process will consume (in MB)
+ramphpfpm=85
+
+# Configure the minimum processes the php-fpm will wait in memory.
+minphpfpm=6
+
+### basic check php-fpm existence
 service=$(systemctl | grep fpm | awk '{print $1}')
 
 if [[ -z "$service" ]];then
@@ -11,14 +23,7 @@ if [[ -z "$service" ]];then
         exit 1
 fi
 
-
-### provision.sh variables
-ramreserve=1024
-ramphpfpm=85
-minphpfpm=6
-
 ### Configuring php-fpm file ###
-
 ini=$(find /etc -type f -name "php.ini" | grep fpm)
 fpmini=$(find /etc -type f -name "www.conf")
 
@@ -47,12 +52,11 @@ minsparesrv=`awk '/pm.min_spare_servers =/' $fpmini`
 maxsparesrv=`awk '/pm.max_spare_servers =/' $fpmini`
 
 ### Calculate fpm settings ###
-
-if [ $ram -ge 2048 ]
+if [ $ram -ge 1024 ]
 
 then
 
-        calc=$(expr $ram - $ramreserve)
+        calc=$(expr $ram - $reserveRam)
         recommended=$(expr $calc / $ramphpfpm)
 
 else
@@ -120,4 +124,3 @@ else
 fi
 
 exit 0
-

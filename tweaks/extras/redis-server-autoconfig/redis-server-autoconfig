@@ -9,7 +9,7 @@ reserveRam=300
 # Configure the amount of RAM the service will use (in percentage).
 serviceRamUsage=100
 
-# Configure the amount of CPUs the service will ignore and reserve to OS or other applications.
+# Configure the amount of CPUs the service will reserve to OS or other applications.
 reserveCpu=0
 
 # Configure the amount of CPU Cores the service will use (in percentage).
