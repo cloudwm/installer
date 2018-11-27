@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkRunOnce
+checkTagExist phpmyadmin.success
+
+echo "Adding to nginx redirect http to https of /phpmyadmin/ " | log
+sed -i -e 's/listen 80 default_server;/listen 80 default_server;\n        location \/phpmyadmin\/ \n{\n        try_files $uri $uri\/ =418;\n        return 301 https:\/\/\$host\$request_uri;\n    }\n/' /etc/nginx/sites-available/default
+
+tagScript success
+
+exit 0
