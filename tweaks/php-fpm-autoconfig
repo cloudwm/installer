@@ -35,14 +35,30 @@ if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
 	chmod +x $INSTALLER_PATH/php-fpm-autoconfig
 fi
 
-if [[ `cat /etc/rc.local | grep -o memadjust` == 'memadjust' ]];then
+# If installer is running in a provisioning process, set rc.local file to the renamed file.
+if [ -f /etc/rc.local.bck ];
+then
+    RCLOCALFILE=/etc/rc.local.bck
+else
+    RCLOCALFILE=/etc/rc.local
+fi
 
-	echo Startup script exists | log
+
+if [[ -z `cat /etc/rc.local | grep php-fpm-autoconfig` ]];then
+
+    echo "Installing php-fpm-autoconfig in /etc/rc.local" | log
+
+    # remove "exit 0" set by default in /etc/rc.local/
+    sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
+    echo "$INSTALLER_PATH/php-fpm-autoconfig" >> $RCLOCALFILE
+
+    # return exit 0 to /etc/rc.local
+    echo "exit 0" >> $RCLOCALFILE
+
 else
 
-	sed -i '/nothing\./a bash '"$INSTALLER_PATH"'/php-fpm-autoconfig' /etc/rc.local
-	bash $INSTALLER_PATH/php-fpm-autoconfig | log
-	exit 0
-fi	
+    echo "$0 is already installed in /etc/rc.local" | log
+
+fi
 
 exit 0
