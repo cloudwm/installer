@@ -9,7 +9,7 @@ reserveRam=300
 # Configure the amount of RAM the service will use (in percentage).
 serviceRamUsage=100
 
-# Configure the amount of RAM to reserve to each php-fpm process will consume (in MB)
+# Configure the amount of RAM to calculate to each php-fpm process will consume, based on this value script will calculate how many php-fpm processes to allow (in MB).
 ramphpfpm=85
 
 # Configure the minimum processes the php-fpm will wait in memory.
