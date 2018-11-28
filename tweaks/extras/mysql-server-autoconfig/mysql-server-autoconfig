@@ -3,14 +3,28 @@
 # Configure default conf.d location
 CNFCONFD="/etc/mysql/mysql.conf.d"
 
+# Configure the amount of RAM the service will ignore and reserve to OS or other applications (in MB).
+reserveRam=300
+
+# Configure the amount of RAM the service will use (in percentage).
+serviceRamUsage=100
+
+# Configure the amount of CPUs the service will ignore and reserve to OS or other applications.
+reserveCpu=0
+
+# Configure the amount of CPU Cores the service will use (in percentage).
+serviceCpuUsage=100
+
 # Get Current Available RAM
 totalram=`cat /proc/meminfo | grep MemTotal | awk '{print int($2/1024)}'`
+
+adjustedram=$((($totalram/100) * $serviceRamUsage - $reserveRam))
 
 # If not yet configured, configure it
 if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
     # Calculate recommended values for InnoDB
     innodb_log_file_size=`mysql -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{print int($1*60)"M"}'`
-    innodb_buffer_pool_size=$(($totalram / 2))
+    innodb_buffer_pool_size=$(($adjustedram / 2))
 
     # Remove current log files
     rm -rf /var/lib/mysql/ibdata1
@@ -30,8 +44,9 @@ fi
 
 # Fine tuning
 
-max_connections=$((($totalram - ($totalram / 2) - 128) / 4))
-thread_concurrency=`nproc`
+max_connections=$((($adjustedram - ($adjustedram / 2) - 128) / 4))
+totalcpu=`nproc`
+thread_concurrency=$((($totalcpu * $serviceCpuUsage) / 100 - $reserveCpu))
 
 if [ -f $CNFCONFD/installer.tuning.cnf ]; then
     rm -rf $CNFCONFD/installer.tuning.cnf
