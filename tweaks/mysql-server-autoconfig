@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+if [ -z "$MYSQLAUTOCONFIG_DIR" ];
+then
+    MYSQLAUTOCONFIG_DIR=/opt/mysql-server-autoconfig
+fi
+
+if [ ! -d $MYSQLAUTOCONFIG_DIR ];
+then
+    mkdir -p $MYSQLAUTOCONFIG_DIR
+fi
+
+rootDir=$(rootDir)
+echo "Copying mysql-server-autoconfig to $MYSQLAUTOCONFIG_DIR" | log
+cp -f $rootDir/tweaks/extras/mysql-server-autoconfig/* $MYSQLAUTOCONFIG_DIR
+
+# If installer is running in a provisioning process, set rc.local file to the renamed file.
+
+if [ -f /etc/rc.local.bck ];
+then
+    RCLOCALFILE=/etc/rc.local.bck
+else
+    RCLOCALFILE=/etc/rc.local
+fi
+
+# install in rc.local file
+
+if [[ -z `cat /etc/rc.local | grep mysql-server-autoconfig` ]];then
+
+
+    echo "Installing mysql-server-autoconfig in /etc/rc.local" | log
+
+    # remove "exit 0" set by default in /etc/rc.local/
+    sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
+    echo "$MYSQLAUTOCONFIG_DIR/redis-server-autoconfig" >> $RCLOCALFILE
+
+    # return exit 0 to /etc/rc.local
+    echo "exit 0" >> $RCLOCALFILE
+
+else
+
+    echo "$0 is already installed in /etc/rc.local" | log
+
+fi
+
+tagScript success
+
+exit 0
