@@ -3,20 +3,23 @@
 # Configure default conf.d location
 CNFCONFD="/etc/mysql/mysql.conf.d"
 
-
-# INNODB Settings 
+# Get Current Available RAM
 totalram=`cat /proc/meminfo | grep MemTotal | awk '{print int($2/1024)}'`
 
 # If not yet configured, configure it
 if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
     # Calculate recommended values for InnoDB
-    innodb_log_file_size=`mysql -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{ print int($1*60)"M"}'`
+    innodb_log_file_size=`mysql -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{print int($1*60)"M"}'`
     innodb_buffer_pool_size=$(($totalram / 2))
 
     # Remove current log files
-    
+    rm -rf /var/lib/mysql/ibdata1
+    rm -rf /var/lib/mysql/ib_logfile0
+    rm -rf /var/lib/mysql/ib_logfile1
 
+    # Write calculated values to config
     echo "[mysqld]" > $CNFCONFD/installer.innodb.cnf
+    echo "default-storage-engine         = INNODB" >> $CNFCONFD/installer.innodb.cnf
     echo "innodb-flush-method            = O_DIRECT" >> $CNFCONFD/installer.innodb.cnf 
     echo "innodb-log-files-in-group      = 2" >> $CNFCONFD/installer.innodb.cnf
     echo "innodb-log-file-size           = ${innodb_log_file_size}" >> $CNFCONFD/installer.innodb.cnf
@@ -35,11 +38,10 @@ if [ -f $CNFCONFD/installer.tuning.cnf ]; then
 fi
 echo "[mysqld]" > $CNFCONFD/installer.tuning.cnf
 echo "max_connections              = ${max_connections}" >> $CNFCONFD/installer.tuning.cnf
-echo "innodb_thread_concurrency           = ${thread_concurrency}" >> $CNFCONFD/installer.tuning.cnf
-# Default is recommended for those two, should not exceed 200M
+echo "innodb_thread_concurrency    = ${thread_concurrency}" >> $CNFCONFD/installer.tuning.cnf
+# Default is recommended for those two
 # echo "query_cache_size           = 64M" >> $CNFCONFD/installer.tuning.cnf
 # echo "key_buffer_size           = 64M" >> $CNFCONFD/installer.tuning.cnf 
-
 
 # Restart mysql
 systemctl restart mysql
