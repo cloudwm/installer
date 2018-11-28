@@ -46,7 +46,7 @@ fi
 
 max_connections=$((($adjustedram - ($adjustedram / 2) - 128) / 4))
 totalcpu=`nproc`
-thread_concurrency=$((($totalcpu/100) * $serviceCpuUsage - $reserveCpu))
+thread_concurrency=$((($totalcpu * $serviceCpuUsage) / 100 - $reserveCpu))
 
 if [ -f $CNFCONFD/installer.tuning.cnf ]; then
     rm -rf $CNFCONFD/installer.tuning.cnf
