@@ -23,23 +23,23 @@ adjustedram=$((($totalram/100) * $serviceRamUsage - $reserveRam))
 # If not yet configured, configure it
 if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
     # Calculate recommended values for InnoDB
-    innodb_log_file_size=`mysql --defaults-file=/root/.my.cnf -h localhost -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{print int($1*60)"M"}'`
-    innodb_buffer_pool_size=$(($adjustedram / 2))
+    # innodb_log_file_size=`mysql --defaults-file=/root/.my.cnf -h localhost -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{print int($1*60)"M"}'`
+    # innodb_buffer_pool_size=$(($adjustedram / 2))
 
     # Remove current log files
-    rm -rf /var/lib/mysql/ibdata1
-    rm -rf /var/lib/mysql/ib_logfile0
-    rm -rf /var/lib/mysql/ib_logfile1
+    # rm -rf /var/lib/mysql/ibdata1
+    # rm -rf /var/lib/mysql/ib_logfile0
+    # rm -rf /var/lib/mysql/logfile1_ib
 
     # Write calculated values to config
     echo "[mysqld]" > $CNFCONFD/installer.innodb.cnf
     echo "default-storage-engine         = INNODB" >> $CNFCONFD/installer.innodb.cnf
     echo "innodb-flush-method            = O_DIRECT" >> $CNFCONFD/installer.innodb.cnf 
     echo "innodb-log-files-in-group      = 2" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb-log-file-size           = ${innodb_log_file_size}" >> $CNFCONFD/installer.innodb.cnf
+    # echo "innodb-log-file-size           = ${innodb_log_file_size}" >> $CNFCONFD/installer.innodb.cnf
     echo "innodb-flush-log-at-trx-commit = 1" >> $CNFCONFD/installer.innodb.cnf
     echo "innodb-file-per-table          = 1" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb-buffer-pool-size        = ${innodb_buffer_pool_size}M" >> $CNFCONFD/installer.innodb.cnf
+    # echo "innodb-buffer-pool-size        = ${innodb_buffer_pool_size}M" >> $CNFCONFD/installer.innodb.cnf
 fi
 
 # Fine tuning
