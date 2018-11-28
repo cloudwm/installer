@@ -126,10 +126,10 @@ function bannerFiglet() {
 }
 
 
-function cwmDescriptionAppend() {
+function descriptionAppend() {
 
     rootDir=$(rootDir)
-    echo $1 >> $rootDir/CWM_DESCRIPTION.TXT
+    echo $1 >> $rootDir/DESCRIPTION.TXT
 
 }
 
