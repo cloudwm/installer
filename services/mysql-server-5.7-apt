@@ -62,6 +62,7 @@ then
 
     echo "[mysqld]" > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
     echo "skip-name-resolve=1" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+    echo "max_allowed_packet=256M" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
 
 fi
 
