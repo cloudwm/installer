@@ -51,7 +51,7 @@ function log() {
 	logDir="$rootDir/temp"
 
     fi
-    
+
     if [ ! -d "$logDir" ]; then 
 
 	mkdir $logDir
@@ -125,6 +125,13 @@ function bannerFiglet() {
 
 }
 
+
+function cwmDescriptionAppend() {
+
+    rootDir=$(rootDir)
+    echo $1 >> $rootDir/CWM_DESCRIPTION.TXT
+
+}
 
 function tagScript() {
 
