@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install NTP from apt
+apt install ntp ntpdate -y | log
+waitOrStop 0
+
+checkPackageInstalled ntp
+checkPackageInstalled ntpdate
+
+# Enable NTP Service
+systemctl enable ntp
+systemctl start ntp
+
+# Update the time via local daemon
+timedatectl set-ntp off
+bash -c "echo server localhost prefer iburst >> /etc/ntp.conf"
+systemctl restart ntp
+ntpdate  -u localhost
+
+tagScript success
+exit 0
