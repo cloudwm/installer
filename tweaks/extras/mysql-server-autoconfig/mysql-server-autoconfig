@@ -27,7 +27,7 @@ thread_concurrency=$((($totalcpu * $serviceCpuUsage) / 100 - $reserveCpu))
 if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
     # Calculate recommended values for InnoDB
     # innodb_log_file_size=`mysql --defaults-file=/root/.my.cnf -h localhost -e 'select (3838334638 - 3836410803) / 1024 / 1024 as MB_per_min;' | awk 'NR==2{print int($1*60)"M"}'`
-    innodb_buffer_pool_size=$(($adjustedram / 4 / $thread_concurrency))
+    innodb_buffer_pool_size=$(($adjustedram / 2))
     innodb_buffer_pool_instances=$(($thread_concurrency * 2))
 
     # Remove current log files
