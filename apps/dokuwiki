@@ -41,7 +41,7 @@ server {
 
     index doku.php;
  
-    # Remember to comment the below out when you're installing, and uncomment it when done.
+    # Remember to add installer.php the below after you finished the install
     location ~ /(data/|conf/|bin/|inc) { deny all; }
  
     location ~ ^/lib.*\.(js|css|gif|png|ico|jpg|jpeg)$ {
@@ -82,7 +82,7 @@ server {
 
     index doku.php;
  
-    # Remember to comment the below out when you're installing, and uncomment it when done.
+    # Remember to add installer.php the below after you finished the install
     location ~ /(data/|conf/|bin/|inc) { deny all; }
  
     location ~ ^/lib.*\.(js|css|gif|png|ico|jpg|jpeg)$ {
@@ -106,6 +106,13 @@ server {
     }
 }
 EOF
+
+server_ip=`109.207.79.239`
+# Create Welcome Message
+echo  "====== You are almost done ======" > /var/www/html/data/pages/start.txt
+echo  "" >> /var/www/html/data/pages/start.txt
+echo  "" >> /var/www/html/data/pages/start.txt
+echo  "Please proceed to [[http://${server_ip}/install.php|this link]] for additional configuration" >> /var/www/html/data/pages/start.txt
 
 # Symlink dokuwiki vhost
 ln -s /etc/nginx/sites-available/dokuwiki /etc/nginx/sites-enabled/dokuwiki
