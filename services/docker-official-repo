@@ -6,12 +6,17 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# Add docker repository and key
+echo "Installer docker-apt" | log
+echo "Downloading docker repository and key" | log
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
+waitOrStop 0
 
-# Install Docker 
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
+waitOrStop 0
+
+echo "Install docker-ce" | log
 apt-get install -y docker-ce
+waitOrStop 0
 
 # Enable Service
 systemctl enable docker

@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist nginx.success
+checkTagExist php.success
 checkTagExist nginx-enable-php-ssl.success
 
 rootDir=$(rootDir)
@@ -43,7 +45,7 @@ server {
 	root /var/www/html;
 
     index doku.php;
- 
+
     # Remember to add installer.php the below after you finished the install
     location ~ /(data/|conf/|bin/|inc) { deny all; }
  
@@ -127,7 +129,6 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
 
-tag dokuwiki.success
 tagScript success
 
 exit 0
