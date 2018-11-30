@@ -50,6 +50,10 @@ fi
 # Fine tuning
 
 max_connections=$((($adjustedram - ($adjustedram / 2) - 128) / 4))
+if [ "$max_connections" -lt "20" ]; then
+    # For low RAM installations
+    max_connections=20
+fi
 
 if [ -f $CNFCONFD/installer.tuning.cnf ]; then
     rm -rf $CNFCONFD/installer.tuning.cnf
