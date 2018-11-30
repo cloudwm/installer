@@ -1,0 +1,31 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist httpd.success
+
+rootDir=$(rootDir)
+
+echo "Installing dokuwiki" | log
+wget  https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz -P /var/www/html
+tar -xzvf /var/www/html/dokuwiki-stable.tgz -C /var/www/html/ --strip 1
+rm -f /var/www/html/dokuwiki-stable.tgz
+waitOrStop 0
+
+# Set directory permissions
+chown -R www-data.www-data data/
+chown -R www-data.www-data conf/
+chown -R www-data.www-data inc/
+chmod 0700  data/
+chmod 0700  conf/
+chmod 0700  inc/
+
+tag dokuwiki.success
+tagScript success
+
+exit 0
