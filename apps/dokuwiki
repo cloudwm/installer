@@ -18,14 +18,77 @@ rm -f /var/www/html/dokuwiki-stable.tgz
 waitOrStop 0
 
 # Set directory permissions
-chown -R www-data.www-data data/
-chown -R www-data.www-data conf/
-chown -R www-data.www-data inc/
-chmod 0700  data/
-chmod 0700  conf/
-chmod 0700  inc/
+chown -R www-data.www-data /var/www/html/data/
+chown -R www-data.www-data /var/www/html/conf/
+chown -R www-data.www-data /var/www/html/inc/
+chmod 0700  /var/www/html/data/
+chmod 0700  /var/www/html/conf/
+chmod 0700  /var/www/html/inc/
+
+# Create config file
+
+cat <<'EOF' > /etc/nginx/sites-available/dokuwiki
+server {
+    listen               80;
+    listen          [::]:80;
+    server_name          _;
+    return 301 https://$server_name$request_uri;
+}
+ 
+server {
+    listen [::]:443 ssl;
+    listen      443 ssl;
+ 
+    server_name _;
+ 
+    # Maximum file upload size is 4MB - change accordingly if needed
+    client_max_body_size 4M;
+    client_body_buffer_size 128k;
+
+	ssl_certificate      /etc/ssl/certs/server.crt;
+	ssl_certificate_key  /etc/ssl/private/server.key;
+
+	root /var/www/html;
+
+    index doku.php;
+ 
+    # Remember to comment the below out when you're installing, and uncomment it when done.
+    location ~ /(data/|conf/|bin/|inc) { deny all; }
+ 
+    location ~ ^/lib.*\.(js|css|gif|png|ico|jpg|jpeg)$ {
+        expires 365d;
+    }
+ 
+    location / { try_files $uri $uri/ @dokuwiki; }
+ 
+    location @dokuwiki {
+        # rewrites "doku.php/" out of the URLs if you set the userwrite setting to .htaccess in dokuwiki config page
+        rewrite ^/_media/(.*) /lib/exe/fetch.php?media=$1 last;
+        rewrite ^/_detail/(.*) /lib/exe/detail.php?media=$1 last;
+        rewrite ^/_export/([^/]+)/(.*) /doku.php?do=export_$1&id=$2 last;
+        rewrite ^/(.*) /doku.php?id=$1&$args last;
+    }
+ 
+    location ~ \.php$ {
+        try_files $uri $uri/ /doku.php;
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass 127.0.0.1:9000;
+
+    }
+}
+EOF
+
+# Symlink dokuwiki vhost
+ln -s /etc/nginx/sites-available/dokuwiki /etc/nginx/sites-enable/dokuwiki
+# Remove default vhosts
+rm -f /etc/nginx/sites-available/default
+rm -f /etc/nginx/sites-available/default-ssl
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default-ssl
 
 tag dokuwiki.success
 tagScript success
 
 exit 0
+
+
