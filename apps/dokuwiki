@@ -28,15 +28,15 @@ chmod 0700  /var/www/html/inc/
 
 cat <<'EOF' > /etc/nginx/sites-available/dokuwiki
 server {
-    listen               80;
-    listen          [::]:80;
+	listen 80 default_server;
+	listen [::]:80 default_server;
     server_name          _;
     return 301 https://$server_name$request_uri;
 }
  
 server {
-    listen [::]:443 ssl;
-    listen      443 ssl;
+	listen 443 ssl default_server;
+	listen [::]:443 ssl default_server;
  
     server_name _;
  
