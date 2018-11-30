@@ -6,8 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist php.success
-checkTagExist httpd.success
+checkTagExist nginx-enable-php-ssl.success
 
 rootDir=$(rootDir)
 
