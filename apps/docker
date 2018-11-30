@@ -15,6 +15,7 @@ apt-get install -y docker-ce
 
 # Enable Service
 systemctl enable docker
+systemctl enable containerd
 
 tagScript success
 
