@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# Add docker repository and key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
+
+# Install Docker 
+apt-get install -y docker-ce
+
+# Enable Service
+systemctl enable docker
+
+tagScript success
+
+exit 0
