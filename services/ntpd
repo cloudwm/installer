@@ -21,6 +21,7 @@ systemctl start ntp
 timedatectl set-ntp off
 bash -c "echo server localhost prefer iburst >> /etc/ntp.conf"
 systemctl restart ntp
+sleep 5 # Waiting for daemon to start
 ntpdate  -u localhost
 
 tagScript success
