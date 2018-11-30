@@ -45,6 +45,7 @@ function checkTempDir() {
 function log() {
 
     rootDir=$(rootDir)
+    logScriptName=`basename $0`
 
     if [ -z "$logDir" ]; then
 
@@ -58,7 +59,7 @@ function log() {
 
     fi
 
-    while IFS= read -r line; do printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$line"; done | tee -a $logDir/$(date '+%Y-%m-%d').log
+    while IFS= read -r line; do printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"; done | tee -a $logDir/$(date '+%Y-%m-%d').log
 
 }
 
