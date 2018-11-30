@@ -20,7 +20,7 @@ if [ "$availablespace" -lt "2097152" ]; then
         # Find text files and empty them
         find /var/log -type f  | xargs file | grep "ASCII text" | tr ':' ' ' | awk '{ print "echo > "$1}' | sh
         # Find gzipped log files and remove them
-        find /var/log -type f  | xargs file | grep "gzip compressed data" | tr ':' ' ' | awk '{ print "rm -rf "$1}' | sh
+        find /var/log -type f  | xargs file | grep "gzip compressed data" | tr ':' ' ' | awk '{ print "rm -f "$1}' | sh
 fi
 EOF
 chmod +x $cronFilename
