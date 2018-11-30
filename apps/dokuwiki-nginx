@@ -11,8 +11,12 @@ checkTagExist nginx-enable-php-ssl.success
 rootDir=$(rootDir)
 
 echo "Installing dokuwiki" | log
+echo "Downloading dokuwiki from original repo" | log
 wget  https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz -P /var/www/html
+waitOrStop 0
+echo "Extracting dokuwiki to /var/www/html/" | log
 tar -xzvf /var/www/html/dokuwiki-stable.tgz -C /var/www/html/ --strip 1
+waitOrStop 0
 rm -f /var/www/html/dokuwiki-stable.tgz
 waitOrStop 0
 
@@ -25,7 +29,6 @@ chmod 0700  /var/www/html/conf/
 chmod 0700  /var/www/html/inc/
 
 # Create config file
-
 cat <<'EOF' > /etc/nginx/sites-available/dokuwiki
 server {
 	listen 80 default_server;
@@ -128,5 +131,3 @@ tag dokuwiki.success
 tagScript success
 
 exit 0
-
-
