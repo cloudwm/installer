@@ -1,0 +1,46 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# Add Minio user
+useradd --system minio-user --shell /sbin/nologi
+
+# Download Minio Binary
+curl -O https://dl.minio.io/server/minio/release/linux-amd64/minio
+mv minio /usr/local/bin
+chmod +x /usr/local/bin/minio
+chown minio-user:minio-user /usr/local/bin/minio
+
+# Create Configs
+mkdir /usr/local/share/minio
+mkdir /etc/minio
+chown minio-user:minio-user /usr/local/share/minio
+chown minio-user:minio-user /etc/minio
+echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" > /etc/default/minio
+server_ip=`hostname -I | xargs`
+echo  "MINIO_OPTS=\"-C /etc/minio --address ${server_ip}:443\""  >> /etc/default/minio
+setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
+
+# Add Systemd Service
+curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
+mv minio.service /etc/systemd/system
+
+# Generate self-signed certificate
+mkdir -p /etc/minio/certs/
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/minio/certs/private.key -out /etc/minio/certs/public.crt -days 1024 -nodes -subj '/CN=localhost'
+chown minio-user:minio-user /etc/minio/certs
+
+# Start Minio
+systemctl start minio
+
+access_data=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep "accessKey\|secretKey"| tr -d ':,\"' | xargs`
+
+descriptionAppend "$access_data"
+
+tagScript success
+
+exit 0
