@@ -1,0 +1,30 @@
+printf "Welcome to %s (%s %s %s)\n" "$DISTRIB_DESCRIPTION" "$(uname -o)" "$(uname -r)" "$(uname -m)"
+
+UPTIME_DAYS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 / 86400)
+UPTIME_HOURS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 / 3600)
+UPTIME_MINUTES=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 % 3600 / 60)
+
+
+cat << EOF
+
+     %+++++++++++++++++++++++++++++++ SERVER INFO ++++++++++++++++++++++++++++++++%
+
+          OS: `lsb_release -s -d`
+          Uptime: $UPTIME_DAYS days, $UPTIME_HOURS hours, $UPTIME_MINUTES minutes
+
+          CPU: `grep -c ^processor /proc/cpuinfo` Cores of`cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d':' -f2`
+          CPU Load: `cat /proc/loadavg | awk '{print $1 ", " $2 ", " $3}'`
+          RAM:  `free -m | head -n 2 | tail -n 1 | awk {'print $2'}`M   Free RAM:  `free -m | head -n 2 | tail -n 1 | awk {'print $4'}`M
+          Swap: `free -m | tail -n 1 | awk {'print $2'}`M       Free Swap: `free -m | tail -n 1 | awk {'print $4'}`M
+          Disk: `df -h / | awk '{ a = $2 } END { print a }'`    Free Disk: `df -h / | awk '{ a = $4 } END { print a }'`
+
+
+          Public IP Address: `ifconfig eth0 | grep "inet " | awk '{print $2}'`
+
+          Web Server URL: http://`ifconfig eth0 | grep "inet " | awk '{print $2}'`/
+          Web Server root directory: /var/www/html/
+
+      %++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++%
+
+EOF
+
