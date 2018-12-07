@@ -1,0 +1,98 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist httpd.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+rootDir=$(rootDir)
+USERPASS=$(cat /root/guest.conf | grep password= | cut -d'=' -f2)
+
+echo "Creating Magento Database" | log
+
+mysql -e "create database magentodb;"
+mysql -e "create user magentouser@localhost identified by '${USERPASS}';"
+mysql -e "grant all privileges on magentodb.* to magentouser@localhost identified by '${USERPASS}';"
+mysql -e "flush privileges;"
+
+echo "Installing Composer" | log
+
+apt install composer php7.2-bcmath php7.2-intl php7.2-soap  -y | log
+waitOrStop 0
+checkPackageInstalled composer
+
+echo "Downloading Magento 2.3.0 from github repo" | log
+wget  https://github.com/magento/magento2/archive/2.3.0.tar.gz -P /var/www/html
+waitOrStop 0
+echo "Extracting Magento to /var/www/html/" | log
+tar -xzvf /var/www/html/2.3.0.tar.gz -C /var/www/html/ --strip 1
+waitOrStop 0
+
+echo "Setting permissions for Magento" | log
+cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
+cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
+cd /var/www/html/ && chown -R www-data:www-data .
+cd /var/www/html/ && chmod u+x bin/magento
+
+echo "Installing Magento" | log
+cd /var/www/html/ && composer install -v | log
+waitOrStop 0
+server_ip=`hostname -I | xargs`
+/var/www/html/bin/magento setup:install --base-url=http://${server_ip}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${USERPASS} --admin-firstname=admin --admin-lastname=admin --admin-email=admin@admin.com --admin-user=admin --admin-password=${USERPASS} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
+
+ADMIN_URI=`grep "Admin URI:" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
+
+echo "Verifying permissions for Magento" | log
+cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
+cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
+cd /var/www/html/ && chown -R www-data:www-data .
+cd /var/www/html/ && chmod u+x bin/magento
+
+cat <<'EOF' > /etc/nginx/sites-available/magento
+upstream fastcgi_backend {
+                server 127.0.0.1:9000;
+}
+
+server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        index index.php;
+        server_name _;
+        set $MAGE_ROOT /var/www/html;
+        include /var/www/html/nginx.conf.sample;
+}
+server {
+    	listen 443 ssl default_server;
+    	listen [::]:443 ssl default_server;
+        index index.php;
+        server_name _;
+        # Maximum file upload size is 4MB - change accordingly if needed
+        client_max_body_size 4M;
+        client_body_buffer_size 128k;
+    	ssl_certificate      /etc/ssl/certs/server.crt;
+    	ssl_certificate_key  /etc/ssl/private/server.key;
+        set $MAGE_ROOT /var/www/html;
+        include /var/www/html/nginx.conf.sample;
+}
+EOF
+# Symlink dokuwiki vhost
+ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
+# Remove default vhosts
+rm -f /etc/nginx/sites-available/default
+rm -f /etc/nginx/sites-available/default-ssl
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default-ssl
+
+systemctl restart nginx
+
+descriptionAppend "Magento Admin URI: $ADMIN_URI"
+
+tagScript success
+
+exit 0
