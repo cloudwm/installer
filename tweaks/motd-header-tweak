@@ -1,11 +1,24 @@
-printf "Welcome to %s (%s %s %s)\n" "$DISTRIB_DESCRIPTION" "$(uname -o)" "$(uname -r)" "$(uname -m)"
+#!/bin/bash
 
-UPTIME_DAYS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 / 86400)
-UPTIME_HOURS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 / 3600)
-UPTIME_MINUTES=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 % 3600 / 60)
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
 
+apt install -y update-motd
 
-cat << EOF
+waitOrStop 0
+
+echo 'printf "Welcome to %s (%s %s %s)\n" "$DISTRIB_DESCRIPTION" "$(uname -o)" "$(uname -r)" "$(uname -m)"' >> /etc/update-motd.d/00-header
+echo 'UPTIME_DAYS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 / 86400)' >> /etc/update-motd.d/00-header
+echo 'UPTIME_HOURS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 / 3600)' >> /etc/update-motd.d/00-header
+echo 'UPTIME_MINUTES=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 % 3600 / 60)' >> /etc/update-motd.d/00-header
+
+echo "cat << EOF " >> /etc/update-motd.d/00-header
+
+cat << EOF >> /etc/update-motd.d/00-header
 
      %+++++++++++++++++++++++++++++++ SERVER INFO ++++++++++++++++++++++++++++++++%
 
@@ -27,4 +40,14 @@ cat << EOF
       %++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++%
 
 EOF
+
+echo "EOF" >> /etc/update-motd.d/00-header
+
+update-motd
+
+waitOrStop 0
+
+tagScript success
+
+exit 0
 
