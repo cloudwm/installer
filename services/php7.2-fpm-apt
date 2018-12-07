@@ -12,7 +12,7 @@ waitOrStop 0
 
 checkPackageInstalled php7.2-fpm
 
-apt install php7.2-cli php-pear php-php-gettext php-phpseclib php-tcpdf php7.2-bz2 php7.2-common php7.2-curl php7.2-gd php7.2-json php7.2-mbstring php7.2-mysql php7.2-readline php7.2-xml php7.2-zip php7.2-mysqlnd -y | log
+apt install php7.2-cli php-pear php-php-gettext php-phpseclib php-tcpdf php7.2-bz2 php7.2-common php7.2-curl php7.2-gd php7.2-json php7.2-mbstring php7.2-mysql php7.2-readline php7.2-xml php7.2-zip php7.2-mysqlnd php7.2-bcmath php7.2-intl php7.2-soap  -y | log
 
 sed -i 's/listen = \/run\/php\/php7.2-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/7.2/fpm/pool.d/www.conf && service php7.2-fpm restart
 
