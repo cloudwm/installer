@@ -22,8 +22,7 @@ mysql -e "grant all privileges on magentodb.* to magentouser@localhost identifie
 mysql -e "flush privileges;"
 
 echo "Installing Composer" | log
-
-apt install composer php7.2-bcmath php7.2-intl php7.2-soap  -y | log
+apt install composer -y | log
 waitOrStop 0
 checkPackageInstalled composer
 
@@ -32,6 +31,7 @@ wget  https://github.com/magento/magento2/archive/2.3.0.tar.gz -P /var/www/html
 waitOrStop 0
 echo "Extracting Magento to /var/www/html/" | log
 tar -xzvf /var/www/html/2.3.0.tar.gz -C /var/www/html/ --strip 1
+rm -f /var/www/html/2.3.0.tar.gz
 waitOrStop 0
 
 echo "Setting permissions for Magento" | log
@@ -81,7 +81,7 @@ server {
         include /var/www/html/nginx.conf.sample;
 }
 EOF
-# Symlink dokuwiki vhost
+# Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 # Remove default vhosts
 rm -f /etc/nginx/sites-available/default
