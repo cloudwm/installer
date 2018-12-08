@@ -31,7 +31,7 @@ if [ ! -f "$INSTALLER_PATH/php.ini" ]; then
 fi
 
 if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
-	cp $MY_PATH/extras/php-fpm-autoconfig/php-fpm-autoconfig.sh $INSTALLER_PATH/php-fpm-autoconfig
+	cp $MY_PATH/extras/php-fpm-autoconfig/php-fpm-autoconfig $INSTALLER_PATH/php-fpm-autoconfig
 	chmod +x $INSTALLER_PATH/php-fpm-autoconfig
 fi
 
