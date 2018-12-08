@@ -7,8 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-### basic check of php-fpm existence ###
-
+### Check of php-fpm existence ###
 service=$(systemctl | grep fpm | awk '{print $1}')
 
 if [[ -z "$service" ]];then
@@ -26,7 +25,10 @@ echo "Increasing max upload file size to 100M" | log
 sed -i -e 's/upload_max_filesize = 2M/upload_max_filesize = 100M/' /etc/php/7.2/fpm/php.ini
 
 echo "Enabling error log file" | log
-sed -i -e 's/;error_log = php_errors.log/error_log = php_errors/' /etc/php/7.2/fpm/php.ini
+sed -i -e 's/;error_log = php_errors.log/error_log = /var/log/nginx/php_errors.log/' /etc/php/7.2/fpm/php.ini
 
+systemctl restart php7.2-fpm
+
+tagScript success
 
 exit 0
