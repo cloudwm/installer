@@ -24,6 +24,30 @@ LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 
 DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
 UUID=`cat /sys/class/dmi/id/product_uuid | tr '[:upper:]' '[:lower:]'`
 
+var=0
+
+for nicid in $WANNICIDS;
+do
+
+    var=$((var+1))
+    nicvar=ip${nicid}
+    export `echo WANIP$var`=`echo ${!nicvar}`
+    unset nicvar
+
+done
+
+var=0
+
+for nicid in $LANNICIDS;
+do
+
+    var=$((var+1))
+    nicvar=ip${nicid}
+    export `echo LANIP$var`=`echo ${!nicvar}`
+    unset nicvar
+
+done
+
 fi
 
 # Function: updateServerDescription

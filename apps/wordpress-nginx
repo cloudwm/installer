@@ -23,7 +23,7 @@ rootDir=$(rootDir)
 WP_PATH="/var/www/html"
 WPID=`shuf -i 100000-999999 -n 1`
 
-IPADDR=$(cat /root/guest.conf | grep ip0= | cut -d'=' -f2)
+IPADDR=$WANIP1
 
 # set nginx config
 cp $rootdir/tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/default | log
