@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 # Add Minio user
-useradd --system minio-user --shell /sbin/nologi
+useradd --system minio-user --shell /sbin/nologin
 
 # Download Minio Binary
 curl -O https://dl.minio.io/server/minio/release/linux-amd64/minio
