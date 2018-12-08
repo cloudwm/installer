@@ -14,15 +14,14 @@ do
 
 done
 
-ADMINPASSWORD=$password
+CWMSITE=$url
 ADMINEMAIL=$email
+ADMINPASSWORD=$password
 ZONE=$zone
 VMNAME=$name
-
 WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
 LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
 DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
-
 UUID=`cat /sys/class/dmi/id/product_uuid | tr '[:upper:]' '[:lower:]'`
 
 fi
