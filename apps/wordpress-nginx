@@ -42,7 +42,7 @@ waitOrStop 0
 wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 waitOrStop 0
 
-wp config create --dbname=cloudwm_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
+wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
 waitOrStop 0
 
 wp core multisite-install --url=http://${IPADDR} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
