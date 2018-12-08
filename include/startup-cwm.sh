@@ -54,3 +54,69 @@ function updateServerDescription() {
     fi
 
 }
+
+
+function getServerDescription() {
+
+    if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]];
+    then
+
+        description=`curl -f -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}" "https://$CWMSITE/svc/server/$UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
+        errorCode=$?
+
+        if [ $errorCode != '0' ]; 
+        then
+                echo "Erorr retrieving server overview"
+
+        else 
+
+            echo -e $description
+        fi
+
+    else
+
+        echo "No API Client ID or Secret is set, unable to retrieve server overview"
+
+    fi
+
+}
+
+function appendServerDescription() {
+
+    description=`getServerDescription`
+    updateServerDescription "$description $1"
+
+}
+
+function appendServerDescriptionTXT() {
+
+   rootDir=$(rootDir)
+   file=$rootDir/DESCRIPTION.TXT
+
+    if [ -f "$file" ];
+    then
+
+        fileContent=`cat $file`
+
+    fi
+
+    description=`getServerDescription`
+    updateServerDescription "$description $fileContent"
+
+}
+
+function setServerDescriptionTXT() {
+
+   rootDir=$(rootDir)
+   file=$rootDir/DESCRIPTION.TXT
+
+    if [ -f "$file" ];
+    then
+
+        fileContent=`cat $file`
+
+    fi
+
+    updateServerDescription "$fileContent"
+
+}
