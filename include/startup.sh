@@ -131,6 +131,7 @@ function descriptionAppend() {
 
     rootDir=$(rootDir)
     echo $1 >> $rootDir/DESCRIPTION.TXT
+    echo "Adding to description file: $1" | log
 
 }
 

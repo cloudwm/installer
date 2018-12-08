@@ -32,13 +32,6 @@ fi
 
 function updateServerDescription() {
 
-    if [ ! -z "$cwmSite" ];
-    then
-
-	CWMSITE=$cwmSite
-
-    fi
-
     if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]];
     then
 
