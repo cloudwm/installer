@@ -11,7 +11,7 @@ checkTagExist httpd.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
-rootDir=$(rootDir)
+rootDir="$(rootDir)"
 
 echo "Creating Magento Database" | log
 
