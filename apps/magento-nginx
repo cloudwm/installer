@@ -54,7 +54,7 @@ cd /var/www/html/ && chown -R www-data:www-data .
 cd /var/www/html/ && chmod u+x bin/magento
 
 # set nginx config
-cp -f $rootdir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento | log
+cp -f $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento | log
 # Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 # Remove default vhosts
