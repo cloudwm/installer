@@ -24,7 +24,7 @@ function rootDir() {
 
     fi
 
-echo $rootDir
+    echo $rootDir
 
 }
 
@@ -252,6 +252,41 @@ function checkPackageInstalled() {
     unset package
 
 }
+
+function getServerIP() {
+    
+    IPS=`cat $1 | grep ^ip.*=* | cut -f 2 -d"=" | cut -f 2 -d"n"`
+    if [ ! -z "$IPS" ]
+    then
+        # echo $IPS
+        echo $IPS | cut -f 1 -d " "
+    else
+        hostname -I
+        # exit
+    fi
+
+    # WANNICIDS=`cat $1 | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+    # if [ ! -z "$WANNICIDS" ]
+    # then
+    #     wans=`echo $IPS | cut -f 1 -d " " `
+    #     echo "wans="$wans
+    #     # echo "wans="$IPS[$WANNICIDS]
+    #     exit
+    # else
+    #     echo "wan is empty"
+    # fi
+
+    # LANNICIDS=`cat $1 | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+    # if [ ! -z "$LANNICIDS" ]
+    # then
+    #     lans=`echo $IPS | cut -f 1 -d " " `
+    #     echo "lans="$lans
+    # else
+    #     echo "lan is empty"
+    # fi
+}
+
+SERVERIP=getServerIP $CWMCONFIGFILE
 
 # Run Startup Functions
 checkTempDir
