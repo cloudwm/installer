@@ -254,7 +254,7 @@ function checkPackageInstalled() {
 }
 
 function getServerIP() {
-    
+
     IPS=`cat $1 | grep ^ip.*=* | cut -f 2 -d"=" | cut -f 2 -d"n"`
     if [ ! -z "$IPS" ]
     then
@@ -286,7 +286,7 @@ function getServerIP() {
     # fi
 }
 
-SERVERIP=getServerIP $CWMCONFIGFILE
+SERVERIP="$(getServerIP $CWMCONFIGFILE)"
 
 # Run Startup Functions
 checkTempDir
