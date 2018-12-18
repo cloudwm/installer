@@ -19,7 +19,7 @@ mysql -e "create database magentodb;"
 mysql -e "create user magentouser@localhost identified by '${ADMINPASSWORD}';"
 mysql -e "grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';"
 mysql -e "flush privileges;"
-# TODO: add fix for https?
+# TODO: add fix for magento https?
 
 echo "Installing Composer" | log
 apt install composer -y | log
@@ -44,7 +44,7 @@ chmod u+x bin/magento
 
 echo "Installing Composer" | log
 cd /var/www/html/ 
-composer install -v
+composer install -v | log
 waitOrStop 0
 
 echo "Installing Magento" | log
