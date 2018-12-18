@@ -19,7 +19,6 @@ mysql -e "create database magentodb;"
 mysql -e "create user magentouser@localhost identified by '${ADMINPASSWORD}';"
 mysql -e "grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';"
 mysql -e "flush privileges;"
-# TODO: add fix for magento https?
 
 echo "Installing Composer for machine" | log
 apt install composer -y | log
@@ -73,8 +72,6 @@ rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
-
-#TODO: certbot certificates (requires domain)
 
 descriptionAppend "Magento Base URI: ${SERVERIP}"
 descriptionAppend "Magento Admin URI: $ADMIN_URI"
