@@ -48,7 +48,7 @@ composer install -v | log
 waitOrStop 0
 
 echo "Installing Magento" | log
-/var/www/html/bin/magento setup:install --base-url=http://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=admin@admin.com --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
+/var/www/html/bin/magento setup:install --base-url=http://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
 
 ADMIN_URI=`grep "Admin URI:" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 
@@ -74,10 +74,13 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
 
+#TODO: certbot certificates (requires domain)
+
+descriptionAppend "Magento Base URI: ${SERVERIP}"
 descriptionAppend "Magento Admin URI: $ADMIN_URI"
-#TODO: admin_name admin
-#TODO: admin_pass ${ADMINPASSWORD}
-#TODO: frontend uri
+descriptionAppend "Magento Admin Email: ${ADMINEMAIL}"
+descriptionAppend "Magento Admin User: admin"
+descriptionAppend "Magento Admin Password: ${ADMINPASSWORD}" 
 
 tagScript success
 
