@@ -24,7 +24,7 @@ function rootDir() {
 
     fi
 
-echo $rootDir
+    echo $rootDir
 
 }
 

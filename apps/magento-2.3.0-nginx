@@ -20,7 +20,7 @@ mysql -e "create user magentouser@localhost identified by '${ADMINPASSWORD}';"
 mysql -e "grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';"
 mysql -e "flush privileges;"
 
-echo "Installing Composer" | log
+echo "Installing Composer for machine" | log
 apt install composer -y | log
 waitOrStop 0
 checkPackageInstalled composer
@@ -28,33 +28,41 @@ checkPackageInstalled composer
 echo "Downloading Magento 2.3.0 from github repo" | log
 wget  https://github.com/magento/magento2/archive/2.3.0.tar.gz -P /var/www/html
 waitOrStop 0
+
 echo "Extracting Magento to /var/www/html/" | log
 tar -xzvf /var/www/html/2.3.0.tar.gz -C /var/www/html/ --strip 1
 rm -f /var/www/html/2.3.0.tar.gz
 waitOrStop 0
 
 echo "Setting permissions for Magento" | log
-cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
-cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
-cd /var/www/html/ && chown -R www-data:www-data .
-cd /var/www/html/ && chmod u+x bin/magento
+cd /var/www/html/ 
+find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
+find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
+chown -R www-data:www-data .
+chmod u+x bin/magento
+
+echo "Installing Composer dependencies for Magento" | log
+cd /var/www/html/ 
+composer install -v | log
+waitOrStop 0
 
 echo "Installing Magento" | log
-cd /var/www/html/ && composer install -v | log
-waitOrStop 0
-server_ip=`hostname -I | xargs`
-/var/www/html/bin/magento setup:install --base-url=http://${server_ip}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=admin@admin.com --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
+/var/www/html/bin/magento setup:install --base-url=http://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
 
 ADMIN_URI=`grep "Admin URI:" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 
 echo "Verifying permissions for Magento" | log
-cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
-cd /var/www/html/ && find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
-cd /var/www/html/ && chown -R www-data:www-data .
-cd /var/www/html/ && chmod u+x bin/magento
+cd /var/www/html/ 
+find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
+find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
+chown -R www-data:www-data .
+chmod u+x bin/magento
 
-# set nginx config
-cp $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento | log
+echo "setting nginx config" | log
+# main magento config
+cp $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento
+# specific configs supplied by magento install, included by main magento config
+cp /var/www/html/nginx.conf.sample /etc/nginx/conf.d/magento.conf.sample
 # Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 # Remove default vhosts
@@ -65,7 +73,11 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
 
+descriptionAppend "Magento Base URI: ${SERVERIP}"
 descriptionAppend "Magento Admin URI: $ADMIN_URI"
+descriptionAppend "Magento Admin Email: ${ADMINEMAIL}"
+descriptionAppend "Magento Admin User: admin"
+descriptionAppend "Magento Admin Password: ${ADMINPASSWORD}" 
 
 tagScript success
 

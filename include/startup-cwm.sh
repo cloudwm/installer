@@ -144,3 +144,33 @@ function setServerDescriptionTXT() {
     updateServerDescription "$fileContent"
 
 }
+
+function getServerIP() {
+
+    IPS=`cat $1 | grep ^ip.*=* | cut -f 2 -d"i" | cut -f 2 -d"p"`
+
+    if [ -z "$IPS" ]
+    then
+        hostname -I
+        return 1
+    fi
+
+    if [ ! -z "$WANNICIDS" ]
+    then
+        index=`echo $WANNICIDS | awk '{print $1;}'`
+        index=$((index+1))
+        echo $IPS | awk -v a="$index" '{print $a;}' | cut -f 2 -d"="
+        return 1
+    fi
+
+    if [ ! -z "$LANNICIDS" ]
+    then
+        index=`echo $LANNICIDS | awk '{print $1;}'`
+        index=$((index+1))
+        echo $IPS | awk -v a="$index" '{print $a;}' | cut -f 2 -d"="
+        return 1
+    fi
+
+}
+
+SERVERIP="$(getServerIP $CWMCONFIGFILE)"

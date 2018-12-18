@@ -8,7 +8,7 @@ server {
     index index.php;
     server_name _;
     set $MAGE_ROOT /var/www/html;
-    include /var/www/html/nginx.conf.sample;
+    include /etc/nginx/conf.d/magento.conf.sample;
 }
 server {
     listen 443 ssl default_server;
@@ -21,5 +21,5 @@ server {
     ssl_certificate      /etc/ssl/certs/server.crt;
     ssl_certificate_key  /etc/ssl/private/server.key;
     set $MAGE_ROOT /var/www/html;
-    include /var/www/html/nginx.conf.sample;
+    include /etc/nginx/conf.d/magento.conf.sample;
 }

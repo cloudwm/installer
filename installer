@@ -34,7 +34,6 @@ for run in "${execute[@]}"
 do
 
     echo "Executing ${run}" | log
-	chmod +x ${run}
     ${run}
     scriptExitCode=$?
 
