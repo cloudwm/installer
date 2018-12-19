@@ -15,10 +15,10 @@ rootDir=$(rootDir)
 
 echo "Creating Magento Database" | log
 
-echo "mysql --user=root --password=${ADMINPASSWORD} -e \"create database magentodb;\"" | sh
-echo "mysql --user=root --password=${ADMINPASSWORD} -e \"create user magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
-echo "mysql --user=root --password=${ADMINPASSWORD} -e \"grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
-echo "mysql --user=root --password=${ADMINPASSWORD} -e \"flush privileges;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"create database magentodb;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"create user magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 
 echo "Installing Composer for machine" | log
 apt install composer -y | log
