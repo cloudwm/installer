@@ -20,11 +20,6 @@ echo "mysql -e \"create user magentouser@localhost identified by '${ADMINPASSWOR
 echo "mysql -e \"grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
 echo "mysql -e \"flush privileges;\"" | sh
 
-# mysql -e "create database magentodb;"
-# mysql -e "create user magentouser@localhost identified by '${ADMINPASSWORD}';"
-# mysql -e "grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';"
-# mysql -e "flush privileges;"
-
 echo "Installing Composer for machine" | log
 apt install composer -y | log
 waitOrStop 0
