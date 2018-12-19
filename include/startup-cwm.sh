@@ -152,7 +152,7 @@ function getServerIP() {
     if [ -z "$IPS" ]
     then
         hostname -I
-        return 1
+        return 0
     fi
 
     if [ ! -z "$WANNICIDS" ]
@@ -160,7 +160,7 @@ function getServerIP() {
         index=`echo $WANNICIDS | awk '{print $1;}'`
         index=$((index+1))
         echo $IPS | awk -v a="$index" '{print $a;}' | cut -f 2 -d"="
-        return 1
+        return 0
     fi
 
     if [ ! -z "$LANNICIDS" ]
@@ -168,7 +168,7 @@ function getServerIP() {
         index=`echo $LANNICIDS | awk '{print $1;}'`
         index=$((index+1))
         echo $IPS | awk -v a="$index" '{print $a;}' | cut -f 2 -d"="
-        return 1
+        return 0
     fi
 
 }
