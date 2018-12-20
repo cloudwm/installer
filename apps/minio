@@ -21,8 +21,7 @@ mkdir /etc/minio
 chown minio-user:minio-user /usr/local/share/minio
 chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" > /etc/default/minio
-server_ip=`hostname -I | xargs`
-echo  "MINIO_OPTS=\"-C /etc/minio --address ${server_ip}:443\""  >> /etc/default/minio
+echo  "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 # Add Systemd Service
@@ -39,7 +38,8 @@ systemctl start minio
 
 access_data=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep "accessKey\|secretKey"| tr -d ':,\"' | xargs`
 
-descriptionAppend "$access_data"
+descriptionAppend "Web interface URL: https://${SERVERIP}"
+descriptionAppend "Credentials: $access_data"
 
 tagScript success
 
