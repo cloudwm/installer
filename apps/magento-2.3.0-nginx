@@ -74,8 +74,7 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
 
-descriptionAppend "Magento Base URI: ${SERVERIP}"
-descriptionAppend "Magento Admin URI: $ADMIN_URI"
+descriptionAppend "Magento Admin URI: http://${SERVERIP}${ADMIN_URI}"
 descriptionAppend "Magento Admin Email: ${ADMINEMAIL}"
 descriptionAppend "Magento Admin User: admin"
 descriptionAppend "Magento Admin Password: ${ADMINPASSWORD}" 
