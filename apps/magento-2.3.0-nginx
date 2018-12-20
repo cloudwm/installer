@@ -43,6 +43,7 @@ chmod u+x bin/magento
 
 echo "Installing Composer dependencies for Magento" | log
 cd /var/www/html/ 
+export COMPOSER_HOME=/root
 composer install -v | log
 waitOrStop 0
 
