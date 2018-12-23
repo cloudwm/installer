@@ -40,6 +40,15 @@ cp default.services.yml services.yml
 mkdir files/
 chmod a+w *
 
+echo "Add temp swap for composer processes" | log
+mkdir -p /opt/installer/_swap
+cd /opt/installer/_swap
+dd if=/dev/zero of=swapfile bs=1M count=1024
+mkswap swapfile
+swapon swapfile
+chmod 600 swapfile
+waitOrStop 0
+
 echo "Installing Drush" | log
 cd /var/www/html
 export COMPOSER_HOME=/root
@@ -48,10 +57,17 @@ composer require drush/drush -v | log
 # composer install --no-dev -o -v | log 
 waitOrStop 0
 
+echo "Remove temp swap" | log
+cd /opt/installer/_swap
+swapoff -v /swapfile
+rm /swapfile
+waitOrStop 0
+
 echo "Creating Website" | log
 cd /var/www/html
 echo yes | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
 vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
+
 
 echo "Setting nginx config" | log
 #main drupal config
