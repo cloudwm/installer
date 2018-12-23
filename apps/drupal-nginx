@@ -59,8 +59,8 @@ waitOrStop 0
 
 echo "Remove temp swap" | log
 cd /opt/installer/_swap
-swapoff -v /swapfile
-rm /swapfile
+swapoff -v swapfile
+rm swapfile
 waitOrStop 0
 
 echo "Creating Website" | log
