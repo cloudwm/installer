@@ -1,0 +1,37 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ufw.success
+
+# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for MongoDB.
+# if not, open 27017 to WAN.
+
+if [ ! -z "$LANNICIDS" ]; 
+then
+
+    for ip in $LANNICIDS;
+    do
+
+	ipvar="ip$ip"
+	subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
+
+        ufw allow in to $subnet port 3306
+
+	unset ipvar
+	unset subnet
+
+    done
+
+else
+
+    ufw allow 27017 | log
+
+fi
+
+ufw status | log
+
+tagScript success

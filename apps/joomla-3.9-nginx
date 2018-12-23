@@ -1,0 +1,57 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist php.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+rootDir=$(rootDir)
+currentDate=`date +"%Y-%m-%d %H:%M:%S"`
+
+echo "Installing Joomla" | log
+echo "Downloading Joomla from original repo" | log
+wget  https://downloads.joomla.org/cms/joomla3/3-9-1/joomla_3-9-1-stable-full_package-tar-gz?format=gz -O /var/www/html/joomla.tgz | log
+waitOrStop 0
+echo "Extracting Joomla to /var/www/html/" | log
+tar -xzvf /var/www/html/joomla.tgz -C /var/www/html/ | log
+waitOrStop 0
+rm -f /var/www/html/joomla.tgz
+waitOrStop 0
+
+echo "Creating Joomla Database" | log
+mysql -e "CREATE DATABASE joomla CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON joomla.* TO 'joomla'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';"
+mysql -e "flush privileges;"
+
+echo "Configuring Joomla for first use" | log
+cp $rootDir/tweaks/extras/joomla-nginx/configuration.php /var/www/html/configuration.php
+sed -i "s/Password/${ADMINPASSWORD}/g" /var/www/html/configuration.php
+sed -i "s/some@mail.com/${ADMINEMAIL}/g" /var/www/html/configuration.php
+mysql joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
+mysql -e "INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);"
+rm -rf /var/www/html/installation/
+
+chown -R www-data.www-data /var/www/html
+
+# Copy Joomla vhost from extras
+cp $rootDir/tweaks/extras/joomla-nginx/joomla-vhost /etc/nginx/sites-available/joomla
+# Symlink magento vhost
+ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
+# Remove default vhosts
+rm -f /etc/nginx/sites-available/default
+rm -f /etc/nginx/sites-available/default-ssl
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default-ssl
+
+
+systemctl restart nginx
+
+tagScript success
+
+exit 0

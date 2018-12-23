@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+cat << EOF >> /etc/apt/sources.list.d/mongodb.list
+deb [ arch=amd64,arm64 ] http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.4 multiverse
+EOF
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 0C49F3730359A14518585931BC711F9BA15703C6
+apt update
+
+# install mongodb from apt
+apt-get install -y mongodb-org | log
+waitOrStop 0
+
+checkPackageInstalled mongodb-org
+
+systemctl enable mongod.service
+systemctl start mongod.service 
+
+tag mongodb.success
+tagScript success
+
+exit 0
