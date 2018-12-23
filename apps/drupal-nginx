@@ -12,211 +12,51 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 rootDir=$(rootDir)
-USERPASS=$(cat /root/guest.conf | grep password= | cut -d'=' -f2)
 
 echo "Creating Drupal Database" | log
 
-mysql -e "CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
-mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON drupal.* TO 'drupaluser'@'localhost' IDENTIFIED BY '${USERPASS}';"
-mysql -e "flush privileges;"
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON drupal.* TO 'drupaluser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+
+echo "Installing Composer for machine" | log
+apt install composer  -y | log
+waitOrStop 0
+checkPackageInstalled composer
 
 echo "Downloading latest Drupal" | log
 wget  https://www.drupal.org/download-latest/tar.gz -P /var/www/html
 waitOrStop 0
+
 echo "Extracting Drupal to /var/www/html/" | log
 tar -xzvf /var/www/html/tar.gz -C /var/www/html/ --strip 1
 rm -f /var/www/html/tar.gz
 waitOrStop 0
 
-cd /var/www/html/sites/default && cp default.settings.php settings.php
-cd /var/www/html/sites/default && cp default.services.yml services.yml
-cd /var/www/html/sites/default && mkdir files/
-cd /var/www/html/sites/default && chmod a+w *
-
-
-echo "Installing Composer" | log
-apt install composer  -y | log
-waitOrStop 0
-checkPackageInstalled composer
+echo "Setting misc definitions & permissions for Drupal" | log
+cd /var/www/html/sites/default
+cp default.settings.php settings.php
+cp default.services.yml services.yml
+mkdir files/
+chmod a+w *
 
 echo "Installing Drush" | log
-cd /var/www/html && echo y | composer require drush/drush
+cd /var/www/html
+export COMPOSER_HOME=/root
+echo y | composer require drush/drush
+# why not? composer install --no-dev -o -v | log
+waitOrStop 0
 
 echo "Creating Website" | log
-cd /var/www/html && echo yes | vendor/bin/drush site-install --db-url=mysql://drupaluser:${USERPASS}@localhost/drupal | log
-cd /var/www/html && vendor/bin/drush upwd admin ${USERPASS} | log
+cd /var/www/html
+echo yes | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
+vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
 
-cat <<'EOF' > /etc/nginx/sites-available/drupal
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-
-    root /var/www/html;
-    server_name _;
-
-    location = /favicon.ico {
-        log_not_found off;
-        access_log off;
-    }
-
-    location = /robots.txt {
-        allow all;
-        log_not_found off;
-        access_log off;
-    }
-
-    location ~* \.(txt|log)$ {
-        allow 192.168.0.0/16;
-        deny all;
-    }
-
-    location ~ \..*/.*\.php$ {
-        return 403;
-    }
-
-    location ~ ^/sites/.*/private/ {
-        return 403;
-    }
-
-    location ~ ^/sites/[^/]+/files/.*\.php$ {
-        deny all;
-    }
-
-    location ~* ^/.well-known/ {
-        allow all;
-    }
-
-    location ~ (^|/)\. {
-        return 403;
-    }
-
-    location / {
-        # try_files $uri @rewrite; # For Drupal <= 6
-        try_files $uri /index.php?$query_string; # For Drupal >= 7
-    }
-
-    location @rewrite {
-        rewrite ^/(.*)$ /index.php?q=$1;
-    }
-
-    location ~ /vendor/.*\.php$ {
-        deny all;
-        return 404;
-    }
-
-    location ~ '\.php$|^/update.php' {
-        include fastcgi_params;
-        fastcgi_param HTTP_PROXY "";
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param PATH_INFO $fastcgi_path_info;
-        fastcgi_param QUERY_STRING $query_string;
-        fastcgi_intercept_errors on;
-        fastcgi_pass 127.0.0.1:9000;
-    }
-
-    location ~ ^/sites/.*/files/styles/ { # For Drupal >= 7
-        try_files $uri @rewrite;
-    }
-
-    location ~ ^(/[a-z\-]+)?/system/files/ { # For Drupal >= 7
-        try_files $uri /index.php?$query_string;
-    }
-
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        try_files $uri @rewrite;
-        expires max;
-        log_not_found off;
-    }
-}
-server {
-   	listen 443 ssl default_server;
-  	listen [::]:443 ssl default_server;
-    index index.php;
-    root /var/www/html;
-    server_name _;
-
-    # Maximum file upload size is 4MB - change accordingly if needed
-    client_max_body_size 4M;
-    client_body_buffer_size 128k;
-   	ssl_certificate      /etc/ssl/certs/server.crt;
-   	ssl_certificate_key  /etc/ssl/private/server.key;
-
-    location = /favicon.ico {
-        log_not_found off;
-        access_log off;
-    }
-
-    location = /robots.txt {
-        allow all;
-        log_not_found off;
-        access_log off;
-    }
-
-    location ~* \.(txt|log)$ {
-        allow 192.168.0.0/16;
-        deny all;
-    }
-
-    location ~ \..*/.*\.php$ {
-        return 403;
-    }
-
-    location ~ ^/sites/.*/private/ {
-        return 403;
-    }
-
-    location ~ ^/sites/[^/]+/files/.*\.php$ {
-        deny all;
-    }
-
-    location ~* ^/.well-known/ {
-        allow all;
-    }
-
-    location ~ (^|/)\. {
-        return 403;
-    }
-
-    location / {
-        # try_files $uri @rewrite; # For Drupal <= 6
-        try_files $uri /index.php?$query_string; # For Drupal >= 7
-    }
-
-    location @rewrite {
-        rewrite ^/(.*)$ /index.php?q=$1;
-    }
-
-    location ~ /vendor/.*\.php$ {
-        deny all;
-        return 404;
-    }
-
-    location ~ '\.php$|^/update.php' {
-        include fastcgi_params;
-        fastcgi_param HTTP_PROXY "";
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param PATH_INFO $fastcgi_path_info;
-        fastcgi_param QUERY_STRING $query_string;
-        fastcgi_intercept_errors on;
-        fastcgi_pass 127.0.0.1:9000;
-    }
-
-    location ~ ^/sites/.*/files/styles/ { # For Drupal >= 7
-        try_files $uri @rewrite;
-    }
-
-    location ~ ^(/[a-z\-]+)?/system/files/ { # For Drupal >= 7
-        try_files $uri /index.php?$query_string;
-    }
-
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        try_files $uri @rewrite;
-        expires max;
-        log_not_found off;
-    }
-}
-EOF
-
+echo "Setting nginx config" | log
+#main drupal config
+cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
+# specific configs supplied by nginx for drupal
+cp $rootDir/tweaks/extras/drupal-nginx/drupal.conf.sample /etc/nginx/conf.d/drupal.conf.sample
 # Symlink drupal vhost
 ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
 # Remove default vhosts
@@ -226,6 +66,10 @@ rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
+
+descriptionAppend "Drupal Admin URI: http://${SERVERIP}/admin"
+descriptionAppend "Drupal Admin User: admin"
+descriptionAppend "Drupal Admin Password: ${ADMINPASSWORD}"
 
 tagScript success
 
