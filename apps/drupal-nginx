@@ -61,6 +61,7 @@ echo "Creating Website" | log
 cd /var/www/html
 echo yes | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
 vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
+waitOrStop 0
 
 echo "Remove temp swap" | log
 cd /opt/installer/_swap
