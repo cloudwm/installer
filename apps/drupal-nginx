@@ -43,8 +43,9 @@ chmod a+w *
 echo "Installing Drush" | log
 cd /var/www/html
 export COMPOSER_HOME=/root
-echo y | composer require drush/drush
-# why not? composer install --no-dev -o -v | log
+composer require drush/drush -v | log
+# echo y | composer require drush/drush
+# composer install --no-dev -o -v | log 
 waitOrStop 0
 
 echo "Creating Website" | log
