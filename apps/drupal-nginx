@@ -40,7 +40,10 @@ cp default.services.yml services.yml
 mkdir files/
 chmod a+w *
 
-echo "Add temp swap for composer processes" | log
+echo "Create temp swap for composer processes" | log
+#increase vm swappiness to allow swap to dominate process
+sysctl vm.swappiness=80
+# create swap file and moint as partition
 mkdir -p /opt/installer/_swap
 cd /opt/installer/_swap
 dd if=/dev/zero of=swapfile bs=1M count=1024
@@ -63,12 +66,6 @@ echo yes | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASS
 vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
 waitOrStop 0
 
-echo "Remove temp swap" | log
-cd /opt/installer/_swap
-swapoff -v swapfile
-rm swapfile
-waitOrStop 0
-
 echo "Setting nginx config" | log
 #main drupal config
 cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
@@ -83,6 +80,15 @@ rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
+
+echo "Remove temp swap" | log
+# set vm swappiness to recommended optimal case
+sysctl vm.swappiness=10
+# mount off and remove swap file 
+cd /opt/installer/_swap
+swapoff -v swapfile
+rm swapfile
+waitOrStop 0
 
 descriptionAppend "Drupal Admin URI: http://${SERVERIP}/admin"
 descriptionAppend "Drupal Admin User: admin"
