@@ -1,0 +1,29 @@
+server {
+
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    root /var/www/html;
+    server_name _;
+
+    include /etc/nginx/conf.d/drupal.conf.sample;
+
+}
+
+server {
+    
+   	listen 443 ssl default_server;
+  	listen [::]:443 ssl default_server;
+    index index.php;
+    root /var/www/html;
+    server_name _;
+
+    # Maximum file upload size is 4MB - change accordingly if needed
+    client_max_body_size 4M;
+    client_body_buffer_size 128k;
+   	ssl_certificate      /etc/ssl/certs/server.crt;
+   	ssl_certificate_key  /etc/ssl/private/server.key;
+
+    include /etc/nginx/conf.d/drupal.conf.sample;   
+
+}
