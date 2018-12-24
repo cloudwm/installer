@@ -20,9 +20,10 @@ mkdir /usr/local/share/minio
 mkdir /etc/minio
 chown minio-user:minio-user /usr/local/share/minio
 chown minio-user:minio-user /etc/minio
-echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" > /etc/default/minio
+echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" >> /etc/default/minio
 echo  "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
+ufw allow 443 | log
 
 # Add Systemd Service
 curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
@@ -31,7 +32,7 @@ mv minio.service /etc/systemd/system
 # Generate self-signed certificate
 mkdir -p /etc/minio/certs/
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/minio/certs/private.key -out /etc/minio/certs/public.crt -days 1024 -nodes -subj '/CN=localhost'
-chown minio-user:minio-user /etc/minio/certs
+chown -R minio-user:minio-user /etc/minio/certs
 
 # Start Minio
 systemctl start minio
