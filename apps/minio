@@ -39,6 +39,7 @@ systemctl enable minio
 systemctl start minio
 waitOrStop 0
 
+sleep 5
 access_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep accessKey | tr -d 'accessKey:,\"' | awk '{$1=$1};1'`
 secret_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep secretKey | tr -d 'secretKey:,\"' | awk '{$1=$1};1'`
 
