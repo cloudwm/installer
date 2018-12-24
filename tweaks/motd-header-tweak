@@ -31,12 +31,6 @@ cat << EOF >> /etc/update-motd.d/00-header
           Swap: `free -m | tail -n 1 | awk {'print $2'}`M       Free Swap: `free -m | tail -n 1 | awk {'print $4'}`M
           Disk: `df -h / | awk '{ a = $2 } END { print a }'`    Free Disk: `df -h / | awk '{ a = $4 } END { print a }'`
 
-
-          Public IP Address: `ifconfig eth0 | grep "inet " | awk '{print $2}'`
-
-          Web Server URL: http://`ifconfig eth0 | grep "inet " | awk '{print $2}'`/
-          Web Server root directory: /var/www/html/
-
       %++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++%
 
 EOF
