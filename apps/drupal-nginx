@@ -39,7 +39,7 @@ cp default.settings.php settings.php
 cp default.services.yml services.yml
 mkdir files/
 chmod a+w *
-chown -R www-data files
+chown -R www-data:www-data files
 
 echo "Create temp swap for composer processes" | log
 #increase vm swappiness to allow swap to dominate process
