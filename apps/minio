@@ -35,6 +35,7 @@ openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/minio/certs/private.key 
 chown -R minio-user:minio-user /etc/minio/certs
 
 # Start Minio
+systemctl enable minio
 systemctl start minio
 
 access_data=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep "accessKey\|secretKey"| tr -d ':,\"' | xargs`
