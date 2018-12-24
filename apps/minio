@@ -37,13 +37,12 @@ chown -R minio-user:minio-user /etc/minio/certs
 # Start Minio
 systemctl enable minio
 systemctl start minio
+waitOrStop 0
 
-# access_data=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep "accessKey\|secretKey"| tr -d ':,\"' | xargs`
-access_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep accessKey | tr -d ':,\"'`
-secret_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep secretKey | tr -d ':,\"'`
+access_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep accessKey | tr -d 'accessKey:,\"' | awk '{$1=$1};1'`
+secret_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep secretKey | tr -d 'secretKey:,\"' | awk '{$1=$1};1'`
 
 descriptionAppend "Web interface URL: https://${SERVERIP}"
-# descriptionAppend "Credentials: $access_data"
 descriptionAppend "Access key: $access_key"
 descriptionAppend "Secret key: $secret_key"
 
