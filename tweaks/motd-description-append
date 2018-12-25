@@ -6,12 +6,22 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-apt install -y update-motd
-
+apt install -y update-motd | log
 waitOrStop 0
 
 rootDir=$(rootDir)
 
-echo "cat $rootDir/DESCRIPTION.TXT" >> /etc/update-motd.d/00-header
+echo "Adding $rootDir/DESCRIPTION.TXT to /etc/update-motd.d/99-DESCRIPTION file" | log
+
+if [ -f "$rootDir/DESCRIPTION.TXT" ];
+then
+
+    echo "cat $rootDir/DESCRIPTION.TXT" >> /etc/update-motd.d/99-DESCRIPTION
+
+fi
 
 update-motd
+
+exit 0
+
+tagScript success

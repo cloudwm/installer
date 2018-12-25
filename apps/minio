@@ -21,7 +21,7 @@ mkdir /etc/minio
 chown minio-user:minio-user /usr/local/share/minio
 chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" >> /etc/default/minio
-echo  "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
+echo "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 ufw allow 443 | log
 
