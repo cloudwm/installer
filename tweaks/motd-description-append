@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt install -y update-motd
+
+waitOrStop 0
+
+rootDir=$(rootDir)
+
+echo "cat $rootDir/DESCRIPTION.TXT" >> /etc/update-motd.d/00-header
+
+update-motd

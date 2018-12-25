@@ -173,4 +173,105 @@ function getServerIP() {
 
 }
 
+function createSwapFile() {
+    # 1:filename, 2:megabytes, 3:path
+
+    # if path is given, know how to handle it when creating swap
+    if [ ! -z $3 ];
+    then
+        if [ -d $3 ];
+        then
+            # path exists
+            createDir=0
+        else
+            # new path
+            createDir=1
+        fi
+    else
+        # path not given
+        createDir=2
+    fi
+
+    if [ -z $1 ];
+    then
+        # (>&2 echo "error: no filename given to swap file")
+        echo "error: no filename given to swap file" | log
+        return 1
+    fi
+
+    if [[ $createDir -eq 2 && -e $1 ]] || [[ $createDir -eq 0 && -e "$3/$1" ]];
+    then
+        echo "error: a file with this name already exists" | log
+        return 1
+    fi
+
+    if [ -z $2 ];
+    then
+        echo "error: swap size (in MB) must be provided" | log
+        return 1
+    fi
+
+    if [[ $2 =~ '^[0-9]+$' ]] || [[ $2 -le 0 ]];
+    then
+        echo "error: swap size must be a number greater than 0" | log
+        return 1
+    fi
+
+    diskSizeMb=`df --output=avail -m "$PWD" | sed '1d;s/[^0-9]//g'`
+    swapSizeAllowed=$((diskSizeMb/2))
+
+    if [ $2 -gt $swapSizeAllowed ];
+    then
+        echo "error: maximum swap size (in MB) can be $swapSizeAllowed" | log
+        return 1
+    fi
+
+    # create swap in existing directory
+    if [ $createDir -eq 0 ];
+    then
+        swapFile="$3/$1"
+    fi
+
+    # create new directory for swap
+    if [ $createDir -eq 1 ];
+    then
+        mkdir -p $3
+        swapFile="$3/$1"
+    fi
+
+    # create swap in current path
+    if [ $createDir -eq 2 ];
+    then
+        swapFile="$1"
+    fi
+
+    # generate swap file and mount it
+    dd if=/dev/zero of=$swapFile bs=1M count=$2
+    mkswap $swapFile >/dev/null || { echo 'mkswap failed' ; return 1; }
+    swapon $swapFile >/dev/null || { echo 'swapon failed' ; return 1; }
+    chmod 600 $swapFile >/dev/null || { echo 'chmod swapfile failed' ; return 1; }
+
+    if [ ! -e $swapFile ]; 
+    then
+        echo "error: did not complete swap creation properly"
+        return 1
+    fi
+    echo "$swapFile"
+    return 0
+}
+
+function removeSwapFile() {
+    # 1: filename given when created swap with createSwapFile()
+    if [ ! -e $1 ];
+    then
+        echo "error: a swapfile with this name was not found. did nothing" | log
+        return 1
+    fi
+
+    swapoff $1
+    rm -f $1
+
+    return 0
+}
+
 SERVERIP="$(getServerIP $CWMCONFIGFILE)"
