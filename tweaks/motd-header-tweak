@@ -15,7 +15,7 @@ echo "cat << EOF " >> /etc/update-motd.d/00-header
 
 cat << EOF >> /etc/update-motd.d/00-header
 
-=== Server Info ==============================================================
+=== System Info ==============================================================
 
   CPU: \`grep -c ^processor /proc/cpuinfo\` Cores of\`cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d':' -f2\`
   RAM: \`free -m | head -n 2 | tail -n 1 | awk {'print \$3'}\`MiB / \`free -m | head -n 2 | tail -n 1 | awk {'print \$2'}\`MiB
