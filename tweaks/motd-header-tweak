@@ -11,7 +11,7 @@ apt install -y update-motd
 
 waitOrStop 0
 
-echo 'printf "Welcome to %s (%s %s %s)\n" "$DISTRIB_DESCRIPTION" "$(uname -o)" "$(uname -r)" "$(uname -m)"' >> /etc/update-motd.d/00-header
+# echo 'printf "Welcome to %s (%s %s %s)\n" "$DISTRIB_DESCRIPTION" "$(uname -o)" "$(uname -r)" "$(uname -m)"' >> /etc/update-motd.d/00-header
 echo 'UPTIME_DAYS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 / 86400)' >> /etc/update-motd.d/00-header
 echo 'UPTIME_HOURS=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 / 3600)' >> /etc/update-motd.d/00-header
 echo 'UPTIME_MINUTES=$(expr `cat /proc/uptime | cut -d '.' -f1` % 31556926 % 86400 % 3600 / 60)' >> /etc/update-motd.d/00-header
