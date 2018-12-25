@@ -37,6 +37,9 @@ rm -f /etc/update-motd.d/10-help-text
 echo "Removing 50-motd-news" | log
 rm -f /etc/update-motd.d/50-motd-news
 
+echo "Removing 50-landscape-sysinfo" | log
+rm -f /etc/update-motd.d/50-landscape-sysinfo
+
 update-motd
 waitOrStop 0
 
