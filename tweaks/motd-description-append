@@ -12,5 +12,6 @@ waitOrStop 0
 
 rootDir=$(rootDir)
 
-# cat $rootDir/DESCRIPTION.TXT >> /etc/update-motd.d/00-header
-echo 'echo "$rootDir/DESCRIPTION.TXT"' >> /etc/update-motd.d/00-header
+echo "cat $rootDir/DESCRIPTION.TXT" >> /etc/update-motd.d/00-header
+
+update-motd
