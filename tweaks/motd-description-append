@@ -6,6 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+apt install -y update-motd
+
+waitOrStop 0
+
 rootDir=$(rootDir)
 
 cat $rootDir/DESCRIPTION.TXT >> /etc/update-motd.d/00-header
