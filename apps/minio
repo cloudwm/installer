@@ -20,9 +20,10 @@ mkdir /usr/local/share/minio
 mkdir /etc/minio
 chown minio-user:minio-user /usr/local/share/minio
 chown minio-user:minio-user /etc/minio
-echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" > /etc/default/minio
+echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" >> /etc/default/minio
 echo  "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
+ufw allow 443 | log
 
 # Add Systemd Service
 curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
@@ -31,15 +32,20 @@ mv minio.service /etc/systemd/system
 # Generate self-signed certificate
 mkdir -p /etc/minio/certs/
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/minio/certs/private.key -out /etc/minio/certs/public.crt -days 1024 -nodes -subj '/CN=localhost'
-chown minio-user:minio-user /etc/minio/certs
+chown -R minio-user:minio-user /etc/minio/certs
 
 # Start Minio
+systemctl enable minio
 systemctl start minio
+waitOrStop 0
 
-access_data=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep "accessKey\|secretKey"| tr -d ':,\"' | xargs`
+sleep 5
+access_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep accessKey | tr -d 'accessKey:,\"' | awk '{$1=$1};1'`
+secret_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep secretKey | tr -d 'secretKey:,\"' | awk '{$1=$1};1'`
 
 descriptionAppend "Web interface URL: https://${SERVERIP}"
-descriptionAppend "Credentials: $access_data"
+descriptionAppend "Access key: $access_key"
+descriptionAppend "Secret key: $secret_key"
 
 tagScript success
 
