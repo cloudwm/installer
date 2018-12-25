@@ -24,7 +24,7 @@ cat << EOF >> /etc/update-motd.d/00-header
 
     \`uptime -p\` since \`uptime -s\`
     System load: \`cat /proc/loadavg | awk '{print \$1 ", " \$2 ", " \$3}'\`
-    Running Processes: \`expr \`ps aux --no-heading | wc -l\` - 2\`
+    Running Processes: \`ps aux --no-heading | wc -l\`
 
 EOF
 
