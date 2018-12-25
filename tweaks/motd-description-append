@@ -17,7 +17,8 @@ if [ -f "$rootDir/DESCRIPTION.TXT" ];
 then
 
     echo "#!/bin/sh" >> /etc/update-motd.d/50-description
-    echo "echo \"=== Installer Description ====================================================\"" >> /etc/update-motd.d/50-description
+    echo "echo \"=== System Description =======================================================\"" >> /etc/update-motd.d/50-description
+    echo "echo \" \""  >> /etc/update-motd.d/50-description
     echo "cat $rootDir/DESCRIPTION.TXT" >> /etc/update-motd.d/50-description
     echo "echo \" \""  >> /etc/update-motd.d/50-description
     
