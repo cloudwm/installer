@@ -39,8 +39,8 @@ systemctl start minio
 waitOrStop 0
 
 sleep 5
-access_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep accessKey | sed -e 's/"accessKey"://g' | awk '{$1=$1};1'`
-secret_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep secretKey | sed -e 's/"secretKey"://g' | awk '{$1=$1};1'`
+access_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep accessKey | sed -e 's/"accessKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
+secret_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep secretKey | sed -e 's/"secretKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
 
 descriptionAppend "Web interface URL: https://${SERVERIP}"
 descriptionAppend "Access key: $access_key"
