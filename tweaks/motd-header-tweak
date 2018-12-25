@@ -23,8 +23,7 @@ cat << EOF >> /etc/update-motd.d/00-header
     Disk Usage of /: \`df -h / | awk '{ a = \$3 } END { print a }'\`iB / \`df -h / | awk '{ a = \$2 } END { print a }'\`iB
 
     \`uptime -p\` since \`uptime -s\`
-    System load: \`cat /proc/loadavg | awk '{print \$1 ", " \$2 ", " \$3}'\`
-    Running Processes: \`ps aux --no-heading | wc -l\`
+    System load: \`cat /proc/loadavg | awk '{print \$1 ", " \$2 ", " \$3}'\`, \`ps aux --no-heading | wc -l\` running processes
 
 EOF
 
