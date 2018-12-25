@@ -195,25 +195,25 @@ function createSwapFile() {
     if [ -z $1 ];
     then
         # (>&2 echo "error: no filename given to swap file")
-        echo "error: no filename given to swap file"
+        echo "error: no filename given to swap file" | log
         return 1
     fi
 
     if [[ $createDir -eq 2 && -e $1 ]] || [[ $createDir -eq 0 && -e "$3/$1" ]];
     then
-        echo "error: a file with this name already exists"
+        echo "error: a file with this name already exists" | log
         return 1
     fi
 
     if [ -z $2 ];
     then
-        echo "error: swap size (in MB) must be provided"
+        echo "error: swap size (in MB) must be provided" | log
         return 1
     fi
 
     if [[ $2 =~ '^[0-9]+$' ]] || [[ $2 -le 0 ]];
     then
-        echo "error: swap size must be a number greater than 0"
+        echo "error: swap size must be a number greater than 0" | log
         return 1
     fi
 
@@ -222,7 +222,7 @@ function createSwapFile() {
 
     if [ $2 -gt $swapSizeAllowed ];
     then
-        echo "error: maximum swap size (in MB) can be $swapSizeAllowed"
+        echo "error: maximum swap size (in MB) can be $swapSizeAllowed" | log
         return 1
     fi
 
@@ -259,7 +259,7 @@ function removeSwapFile() {
     # 1: filename given when created swap with createSwapFile()
     if [ ! -e $1 ];
     then
-        echo "error: a swapfile with this name does not exist. did nothing"
+        echo "error: a swapfile with this name does not exist. did nothing" | log
         return 1
     fi
 

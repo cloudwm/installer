@@ -45,7 +45,7 @@ echo "Create temp swap for composer processes" | log
 #increase vm swappiness to allow swap to dominate process
 sysctl vm.swappiness=80
 # create swap file and moint as partition
-swapFilename=`createSwapFile swapfile 1024 $(rootDir)/_swap`
+swapFilename=`createSwapFile swapfile 1024 $(rootDir)/_swap` | log
 waitOrStop 0
 
 echo "Installing Drush" | log
