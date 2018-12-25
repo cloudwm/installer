@@ -247,10 +247,15 @@ function createSwapFile() {
 
     # generate swap file and mount it
     dd if=/dev/zero of=$swapFile bs=1M count=$2
-    mkswap $swapFile
-    swapon $swapFile
-    chmod 600 $swapFile
+    mkswap $swapFile >/dev/null || { echo 'mkswap failed' ; return 1; }
+    swapon $swapFile >/dev/null || { echo 'swapon failed' ; return 1; }
+    chmod 600 $swapFile >/dev/null || { echo 'chmod swapfile failed' ; return 1; }
 
+    if [ ! -e $swapFile ]; 
+    then
+        echo "error: did not complete swap creation properly"
+        return 1
+    fi
     echo "$swapFile"
     return 0
 }
@@ -259,11 +264,11 @@ function removeSwapFile() {
     # 1: filename given when created swap with createSwapFile()
     if [ ! -e $1 ];
     then
-        echo "error: a swapfile with this name does not exist. did nothing" | log
+        echo "error: a swapfile with this name was not found. did nothing" | log
         return 1
     fi
 
-    swapoff -v $1 | log
+    swapoff $1
     rm -f $1
 
     return 0
