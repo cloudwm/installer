@@ -22,7 +22,8 @@ cat << EOF >> /etc/update-motd.d/00-header
     Swap Usage: \`free -m | tail -n 1 | awk {'print \$3'}\`MiB / \`free -m | tail -n 1 | awk {'print \$2'}\`MiB
     Disk Usage of /: \`df -h / | awk '{ a = \$3 } END { print a }'\`iB / \`df -h / | awk '{ a = \$2 } END { print a }'\`iB
 
-    \`uptime -p\` since \`uptime -s\`, \`ps aux --no-heading | wc -l\` running processes
+    \`uptime -p\` since \`uptime -s\`
+    \`ps aux --no-heading | wc -l\` running processes
     System load: \`cat /proc/loadavg | awk '{print \$1 ", " \$2 ", " \$3}'\`
 
 EOF
