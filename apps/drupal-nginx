@@ -45,12 +45,7 @@ echo "Create temp swap for composer processes" | log
 #increase vm swappiness to allow swap to dominate process
 sysctl vm.swappiness=80
 # create swap file and moint as partition
-mkdir -p /opt/installer/_swap
-cd /opt/installer/_swap
-dd if=/dev/zero of=swapfile bs=1M count=1024
-mkswap swapfile
-swapon swapfile
-chmod 600 swapfile
+swapFilename=`createSwapFile swapfile 1024 $(rootDir)/_swap`
 waitOrStop 0
 
 echo "Installing Drush" | log
@@ -64,13 +59,15 @@ export HOME=/var/www/html
 cd /var/www/html
 vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
 vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
+rm index.nginx-debian.html
+chown -R www-data:www-data .
 waitOrStop 0
 
 echo "Setting nginx config" | log
 #main drupal config
 cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
 # specific configs supplied by nginx for drupal
-cp $rootDir/tweaks/extras/drupal-nginx/drupal.conf.sample /etc/nginx/conf.d/drupal.conf.sample
+cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/conf.d/drupal-locations.conf
 # Symlink drupal vhost
 ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
 # Remove default vhosts
@@ -85,9 +82,7 @@ echo "Remove temp swap" | log
 # set vm swappiness to recommended optimal case
 sysctl vm.swappiness=10
 # mount off and remove swap file 
-cd /opt/installer/_swap
-swapoff -v swapfile
-rm swapfile
+removeSwapFile $swapFilename
 waitOrStop 0
 
 descriptionAppend "Drupal Admin URI: http://${SERVERIP}/admin"
