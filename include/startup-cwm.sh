@@ -263,8 +263,8 @@ function removeSwapFile() {
         return 1
     fi
 
-    swapoff -v $1
-    rm $1
+    swapoff -v $1 | log
+    rm -f $1
 
     return 0
 }
