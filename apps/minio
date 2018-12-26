@@ -42,6 +42,8 @@ sleep 5
 access_key=`cat /minio/.minio.sys/config/config.json | grep accessKey | sed -e 's/"accessKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
 secret_key=`cat /minio/.minio.sys/config/config.json | grep secretKey | sed -e 's/"secretKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
 
+descriptionAppend "Admin User: root"
+descriptionAppend "Admin Password: ${ADMINPASSWORD}" 
 descriptionAppend "Web interface URL: https://${SERVERIP}"
 descriptionAppend "Access key: $access_key"
 descriptionAppend "Secret key: $secret_key"
