@@ -16,11 +16,11 @@ chmod +x /usr/local/bin/minio
 chown minio-user:minio-user /usr/local/bin/minio
 
 # Create Configs
-mkdir /usr/local/share/minio
+mkdir /minio
 mkdir /etc/minio
-chown minio-user:minio-user /usr/local/share/minio
+chown minio-user:minio-user /minio
 chown minio-user:minio-user /etc/minio
-echo "MINIO_VOLUMES=\"/usr/local/share/minio/\"" >> /etc/default/minio
+echo "MINIO_VOLUMES=\"/minio/\"" >> /etc/default/minio
 echo "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
@@ -39,8 +39,8 @@ systemctl start minio
 waitOrStop 0
 
 sleep 5
-access_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep accessKey | sed -e 's/"accessKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
-secret_key=`cat /usr/local/share/minio/.minio.sys/config/config.json | grep secretKey | sed -e 's/"secretKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
+access_key=`cat /minio/.minio.sys/config/config.json | grep accessKey | sed -e 's/"accessKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
+secret_key=`cat /minio/.minio.sys/config/config.json | grep secretKey | sed -e 's/"secretKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
 
 descriptionAppend "Web interface URL: https://${SERVERIP}"
 descriptionAppend "Access key: $access_key"
