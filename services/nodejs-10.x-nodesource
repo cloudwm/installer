@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading Node.js repository" | log
+curl -sL https://deb.nodesource.com/setup_10.x | sudo bash - | log
+waitOrStop 0
+
+echo "Install Node.js" | log
+apt-get install -y nodejs gcc g++ make | log
+waitOrStop 0
+
+tagScript success
+
+exit 0
