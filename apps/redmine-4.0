@@ -1,0 +1,70 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist mysqld.success
+
+# Installing Dependencies
+apt install ruby ruby-dev build-essential zlib1g-dev libmysqlclient-dev -y | log
+
+# Cloning from stable repository
+mkdir -p /var/www  
+cd /var/www/  && git clone https://github.com/redmine/redmine.git -b 4.0-stable | log
+
+# Creating Database and user
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE redmine CHARACTER SET utf8mb4;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"FLUSH PRIVILEGES;\"" | sh
+
+# Pushing database config
+echo "production:" > /var/www/redmine/config/database.yml
+echo "  adapter: mysql2" >> /var/www/redmine/config/database.yml
+echo "  database: redmine" >> /var/www/redmine/config/database.yml
+echo "  host: localhost" >> /var/www/redmine/config/database.yml
+echo "  username: redmine" >> /var/www/redmine/config/database.yml
+echo "  password: \"${ADMINPASSWORD}\"" >> /var/www/redmine/config/database.yml
+
+# Installing Bundle
+gem install bundler
+cd /var/www/redmine && bundle install --without development test rmagick
+cd /var/www/redmine && bundle exec rake generate_secret_token
+cd /var/www/redmine && RAILS_ENV=production bundle exec rake db:migrate
+cd /var/www/redmine && echo "en" | RAILS_ENV=production bundle exec rake redmine:load_default_data
+
+# Creating Redmine user and setting permissions
+useradd redmine
+cd /var/www/redmine && mkdir -p tmp tmp/pdf public/plugin_assets
+cd /var/www/redmine && chown -R redmine:redmine files log tmp public/plugin_assets
+cd /var/www/redmine && chmod -R 755 files log tmp public/plugin_assets
+cd /var/www/redmine && find files log tmp public/plugin_assets -type f -exec chmod -x {} +
+
+# Creating SystemD service
+cat <<'EOF' > /lib/systemd/system/redmine.service
+[Unit]
+Description=Redmine supervisor
+
+[Service]
+WorkingDirectory=/var/www/redmine
+ExecStart= /usr/bin/ruby2.5 -C/var/www/redmine bin/rails server webrick -e production -p 80
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enabling service 
+systemctl daemon-reload
+systemctl enable redmine
+systemctl start redmine
+
+# Add Description 
+descriptionAppend "Redmine URI: http://${SERVERIP}"
+descriptionAppend "First time credentials: admin/admin"
+
+tagScript success
+
+exit 0
