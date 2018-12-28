@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# Add repository
+apt-key adv --keyserver "hkps.pool.sks-keyservers.net" --recv-keys "0x6B73A36E6026DFCA" | log
+echo "deb https://dl.bintray.com/rabbitmq/debian bionic main" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list | log
+apt update
+# Install Rabbitmq
+install rabbitmq-server -y
+waitOrStop 0
+
+systemctl enable rabbitmq-server
+systemctl start rabbitmq-server
+
+tagScript success
+
+exit 0
