@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ntpd.success
+checkTagExist cwm-settimezone.success
+
+wget http://swupdate.openvpn.org/as/openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
+dpkg -i openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
+
+echo "openvpn:$ADMINPASSWORD" | chpasswd
+
+admin_ui=`grep "Admin" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
+client_ui=`grep "Client" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
+
+descriptionAppend "Admin Interface URL: ${admin_ui}"
+descriptionAppend "Default Username: openvpn"
+descriptionAppend "Client Interface URL: https://$client_ui}"
+
+tagScript success
+
+exit 0
