@@ -11,9 +11,12 @@ waitOrStop 0
 
 rootDir=$(rootDir)
 
+echo "#!/bin/sh" > /etc/update-motd.d/97-sysinfo
+
 echo "cat << EOF " >> /etc/update-motd.d/97-sysinfo
 
 cat << EOF >> /etc/update-motd.d/97-sysinfo
+
 
 === System Info ==============================================================
 
@@ -28,6 +31,8 @@ cat << EOF >> /etc/update-motd.d/97-sysinfo
 
 EOF
 echo "EOF" >> /etc/update-motd.d/97-sysinfo
+
+chmod +x /etc/update-motd.d/97-sysinfo
 
 echo "Adding $rootDir/DESCRIPTION.TXT to /etc/update-motd.d/98-description file" | log
 
