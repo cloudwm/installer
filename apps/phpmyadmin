@@ -23,11 +23,9 @@ echo "Generating blowfish_secret string and replacing it in config.inc.php" | lo
 blowfish_secret=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 ; echo ''`
 sed -i "/$cfg\['blowfish_secret.*/c\$cfg['blowfish_secret'] = '"$blowfish_secret"';" config.inc.php
 
-descriptionAppend "Connect to phpMyAdmin using a browser:"
-descriptionAppend "phpMyAdmin URI: http://${SERVERIP}/phpmyadmin"
-descriptionAppend "Admin Email: ${ADMINEMAIL}"
-descriptionAppend "Admin User: root"
-descriptionAppend "Admin Password: ${ADMINPASSWORD}" 
+descriptionAppend "phpMyAdmin URL: http://${SERVERIP}/phpmyadmin"
+descriptionAppend "Username: root"
+descriptionAppend "Password: ${ADMINPASSWORD}" 
 
 tag phpmyadmin.success
 tagScript success
