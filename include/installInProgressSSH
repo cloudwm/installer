@@ -7,6 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+echo "Adding Install in Progress SSH banner" | log
+
 cat << EOF >> /etc/update-motd.d/98-install-in-progress
 #!/bin/sh
 printf "\n"
