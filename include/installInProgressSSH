@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-cat << EOF >> /etc/update-motd.d/05-install-in-progress
+cat << EOF >> /etc/update-motd.d/98-install-in-progress
 #!/bin/sh
 printf "\n"
 printf "  Install in Progress, Please wait.\n"
@@ -18,6 +18,6 @@ printf "  Thank you for your patience.\n"
 printf "\n"
 EOF
 
-chmod +x /etc/update-motd.d/05-install-in-progress
+chmod +x /etc/update-motd.d/98-install-in-progress
 tagScript success
 exit 0
