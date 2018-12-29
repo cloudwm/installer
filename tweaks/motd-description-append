@@ -21,7 +21,10 @@ then
     echo "echo \" \""  >> /etc/update-motd.d/50-description
     echo "cat $rootDir/DESCRIPTION.TXT" >> /etc/update-motd.d/50-description
     echo "echo \" \""  >> /etc/update-motd.d/50-description
-    
+    echo "echo \"==============================================================================\""  >> /etc/update-motd.d/50-description
+    echo "echo \" \""  >> /etc/update-motd.d/50-description
+    echo "echo \"To delete this message of the day: rm -rf /etc/update-motd.d/50-description  \""  >> /etc/update-motd.d/50-description
+
     chmod +x /etc/update-motd.d/50-description
 
 fi
