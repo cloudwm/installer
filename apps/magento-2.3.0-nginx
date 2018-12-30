@@ -29,7 +29,7 @@ echo "Downloading Magento 2.3.0 from github repo" | log
 mkdir -p /var/www/html
 mkdir -p temp
 cd temp
-curl -O https://github.com/magento/magento2/archive/2.3.0.tar.gz
+curl -O https://codeload.github.com/magento/magento2/tar.gz/2.3.0
 mv 2.3.0.tar.gz /var/www/html
 waitOrStop 0
 
