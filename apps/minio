@@ -21,7 +21,8 @@ mkdir /etc/minio
 chown minio-user:minio-user /minio
 chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/minio/\"" >> /etc/default/minio
-echo "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
+# echo "MINIO_OPTS=\"-C /etc/minio --address ${SERVERIP}:443\""  >> /etc/default/minio
+echo "MINIO_OPTS=\"-C /etc/minio --address :443 $(join_by , $(getServerIPAll))\"" >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 # Add Systemd Service
