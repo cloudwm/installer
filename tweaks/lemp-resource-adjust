@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+installerPathPhp="/opt/php-fpm-autoconfig"
+installerPathMysql="/opt/mysql-server-autoconfig"
+sed -i "s/^serviceRamUsage=[0-9]\+$/serviceRamUsage=50/" $installerPathPhp/php-fpm-autoconfig
+sed -i "s/^serviceRamUsage=[0-9]\+$/serviceRamUsage=50/" $installerPathMysql/mysql-server-autoconfig
+sed -i "s/^serviceCpuUsage=[0-9]\+$/serviceCpuUsage=50/" $installerPathMysql/mysql-server-autoconfig
