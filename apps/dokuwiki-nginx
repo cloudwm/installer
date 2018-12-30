@@ -27,7 +27,7 @@ waitOrStop 0
 rm -f /var/www/html/dokuwiki-stable.tgz
 waitOrStop 0
 
-# Set directory permissions
+echo "Setting directory permissions" | log
 chown -R www-data.www-data /var/www/html/data/
 chown -R www-data.www-data /var/www/html/conf/
 chown -R www-data.www-data /var/www/html/inc/
@@ -35,15 +35,9 @@ chmod 0700  /var/www/html/data/
 chmod 0700  /var/www/html/conf/
 chmod 0700  /var/www/html/inc/
 
-# Create config file
+echo "Creating nginx configuration" | log
+#copy configs to nginx folder
 cp $rootDir/tweaks/extras/dokuwiki-nginx/dokuwiki-nginx-config /etc/nginx/sites-available/dokuwiki
-
-# Create Welcome Message
-echo  "====== You are almost done ======" > /var/www/html/data/pages/start.txt
-echo  "" >> /var/www/html/data/pages/start.txt
-echo  "" >> /var/www/html/data/pages/start.txt
-echo  "Please proceed to [[http://${SERVERIP}/install.php|this link]] for additional configuration" >> /var/www/html/data/pages/start.txt
-
 # Symlink dokuwiki vhost
 ln -s /etc/nginx/sites-available/dokuwiki /etc/nginx/sites-enabled/dokuwiki
 # Remove default vhosts
@@ -53,6 +47,15 @@ rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
+
+# Create Welcome Message
+cat << EOF > /var/www/html/data/pages/start.txt
+"====== You are almost done ======" >
+""
+""
+"Please proceed to [[http://${SERVERIP}/install.php|this link]] for additional configuration"
+EOF
+chown www-data:www-data /var/www/html/data/pages/start.txt
 
 tagScript success
 
