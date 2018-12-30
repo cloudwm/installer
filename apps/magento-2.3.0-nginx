@@ -26,7 +26,9 @@ waitOrStop 0
 checkPackageInstalled composer
 
 echo "Downloading Magento 2.3.0 from github repo" | log
-curl -O https://github.com/magento/magento2/archive/2.3.0.tar.gz -P /var/www/html
+mkdir -p /var/www/html
+cd /var/www/html
+curl -O https://github.com/magento/magento2/archive/2.3.0.tar.gz
 waitOrStop 0
 
 echo "Extracting Magento to /var/www/html/" | log
