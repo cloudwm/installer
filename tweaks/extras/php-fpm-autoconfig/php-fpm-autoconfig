@@ -29,7 +29,8 @@ fpmini=$(find /etc -type f -name "www.conf")
 
 ### read system resources ###
 
-ram=$(i=$(awk 'NR==1{print $2}' /proc/meminfo) && expr $i / 1000)
+totalram=`cat /proc/meminfo | grep MemTotal | awk '{print int($2/1024)}'`
+
 #cpu=`nproc`
 
 ### read current settings in php.ini
@@ -52,11 +53,11 @@ minsparesrv=`awk '/pm.min_spare_servers =/' $fpmini`
 maxsparesrv=`awk '/pm.max_spare_servers =/' $fpmini`
 
 ### Calculate fpm settings ###
-if [ $ram -ge 1024 ]
+if [ $totalram -ge 1024 ]
 
 then
 
-        calc=$(expr $ram - $reserveRam)
+        calc=$((($totalram/100) * $serviceRamUsage - $reserveRam))
         recommended=$(expr $calc / $ramphpfpm)
 
 else
@@ -107,12 +108,12 @@ systemctl restart $service
 
 ### Auto set Memory limit ###
 
-recommendedlimit=$(expr $ram / 8 )M
+recommendedlimit=$(expr $totalram / 8 )M
 
 if [ -z "$overridemem" ];
 then
 
-        echo You have ${ram} of RAM
+        echo You have ${totalram} of RAM
         echo settings memory_limit to ${recommendedlimit}
         sed -i "s/$currentmem/memory_limit = $recommendedlimit/g" $ini
         systemctl restart $service
