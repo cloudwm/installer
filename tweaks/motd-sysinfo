@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt install -y update-motd | log
+waitOrStop 0
+
+rootDir=$(rootDir)
+
+echo "#!/bin/sh" > /etc/update-motd.d/97-sysinfo
+echo "cat << EOF " >> /etc/update-motd.d/97-sysinfo
+cat << EOF >> /etc/update-motd.d/97-sysinfo
+
+=== System Info ==============================================================
+
+  CPU: \`grep -c ^processor /proc/cpuinfo\` Cores of\`cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d':' -f2\`
+  RAM: \`free -m | head -n 2 | tail -n 1 | awk {'print \$3'}\`MiB / \`free -m | head -n 2 | tail -n 1 | awk {'print \$2'}\`MiB
+  Swap Usage: \`free -m | tail -n 1 | awk {'print \$3'}\`MiB / \`free -m | tail -n 1 | awk {'print \$2'}\`MiB
+  Disk Usage of /: \`df -h / | awk '{ a = \$3 } END { print a }'\`iB / \`df -h / | awk '{ a = \$2 } END { print a }'\`iB
+
+  \`uptime -p\` since \`uptime -s\`
+  \`ps aux --no-heading | wc -l\` running processes
+  System load: \`cat /proc/loadavg | awk '{print \$1 ", " \$2 ", " \$3}'\`
+
+EOF
+echo "EOF" >> /etc/update-motd.d/97-sysinfo
+
+chmod +x /etc/update-motd.d/97-sysinfo
+
+update-motd
+
+exit 0
+
+tagScript success

@@ -6,7 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Installer docker-apt" | log
 echo "Downloading docker repository and key" | log
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 waitOrStop 0

@@ -1,0 +1,23 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ufw.success
+
+ufw allow 4369 | log 
+ufw allow 5671:5672/tcp | log
+ufw allow 25672 | log
+ufw allow 35672:35862/tcp | log
+ufw allow 15672 | log
+ufw allow 61613:61614/tcp | log
+ufw allow 1883 | log
+ufw allow 8883 | log
+ufw allow 15674 | log
+ufw allow 15675 | log
+
+ufw status | log
+
+tagScript success
