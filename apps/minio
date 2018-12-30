@@ -22,7 +22,7 @@ chown minio-user:minio-user /minio
 chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/minio/\"" >> /etc/default/minio
 modips=`getServerIPAll | awk 'NF{print $0 ":443"}'`
-finalips=$(join_by " " $MODIPS)
+finalips=$(join_by " " $modips)
 echo "MINIO_OPTS=\"-C /etc/minio --address $finalips\"" >> /etc/default/minio
 
 
