@@ -173,6 +173,10 @@ function getServerIP() {
 
 }
 
+function getServerIPAll() {
+    echo `cat $CWMCONFIGFILE | grep ^ip.*=* | cut -f 2 -d"="`
+}
+
 function createSwapFile() {
     # 1:filename, 2:megabytes, 3:path
 
