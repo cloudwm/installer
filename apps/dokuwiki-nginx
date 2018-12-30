@@ -50,10 +50,10 @@ systemctl restart nginx
 
 # Create Welcome Message
 cat << EOF > /var/www/html/data/pages/start.txt
-"====== You are almost done ======" >
-""
-""
-"Please proceed to [[http://${SERVERIP}/install.php|this link]] for additional configuration"
+====== You are almost done ======
+
+
+Please proceed to [[http://${SERVERIP}/install.php|this link]] for additional configuration
 EOF
 chown www-data:www-data /var/www/html/data/pages/start.txt
 
