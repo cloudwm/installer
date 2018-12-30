@@ -18,8 +18,8 @@ admin_ui=`grep "Admin" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 client_ui=`grep "Client" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 
 descriptionAppend "OpenVPN Management Interface URL: ${admin_ui}"
-descriptionAppend "Username: openvpn"
-descriptionAppend "Password: $ADMINPASSWORD"
+descriptionAppend "OpenVPN Username: openvpn"
+descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
 descriptionAppend "OpenVPN Client Interface URL: $client_ui"
 descriptionAppend " "
