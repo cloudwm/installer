@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist php7.2-fpm.success
+checkTagExist php-fpm.success
 checkTagExist mysqld.success
 
 installerPathPhp="/opt/php-fpm-autoconfig"
