@@ -88,6 +88,7 @@ waitOrStop 0
 descriptionAppend "Drupal Admin URI: http://${SERVERIP}/admin"
 descriptionAppend "Drupal Admin User: admin"
 descriptionAppend "Drupal Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
 
 tagScript success
 

@@ -9,8 +9,19 @@ fi
 runOnceCheck
 checkTagExist phpmyadmin.success
 
+rootDir=$(rootDir)
+
 echo "Adding to nginx redirect http to https of /phpmyadmin/ " | log
-sed -i -e 's/listen 80 default_server;/listen 80 default_server;\n\n        location \/phpmyadmin\/ {\n        try_files $uri $uri\/ =418;\n        return 301 https:\/\/\$host\$request_uri;\n        }\n/' /etc/nginx/sites-available/default
+if [ -f "/etc/nginx/sites-available/default" ];
+then
+    sed -i -e 's/listen 80 default_server;/listen 80 default_server;\n\n        location \/phpmyadmin\/ {\n        try_files $uri $uri\/ =418;\n        return 301 https:\/\/\$host\$request_uri;\n        }\n/' /etc/nginx/sites-available/default
+fi
+
+echo "change description to include https URL" | log
+if [ -f "$rootDir/DESCRIPTION.TXT" ];
+then
+    sed -i -e 's/phpMyAdmin URL: http:/phpMyAdmin URL: https:/' $rootDir/DESCRIPTION.TXT
+fi
 
 tagScript success
 

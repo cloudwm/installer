@@ -17,6 +17,7 @@ chown -R www-data:www-data /var/www/html
 
 descriptionAppend "NGINX configuration location: /etc/nginx/"
 descriptionAppend "NGINX root Directory: /var/www/html/"
+descriptionAppend " "
 
 tag nginx.success
 tag httpd.success

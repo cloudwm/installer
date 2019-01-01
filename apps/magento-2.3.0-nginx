@@ -85,6 +85,7 @@ descriptionAppend "Magento Admin URI: http://${SERVERIP}${ADMIN_URI}"
 descriptionAppend "Magento Admin Email: ${ADMINEMAIL}"
 descriptionAppend "Magento Admin User: admin"
 descriptionAppend "Magento Admin Password: ${ADMINPASSWORD}" 
+descriptionAppend " "
 
 tagScript success
 

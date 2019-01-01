@@ -38,7 +38,7 @@ ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/default-ss
 systemctl restart nginx.service
 
 descriptionAppend "SSL certificates location: /etc/ssl/"
-
+descriptionAppend " "
 tagScript success
 
 exit 0

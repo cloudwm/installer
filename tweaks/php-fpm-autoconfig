@@ -62,6 +62,7 @@ else
 fi
 
 descriptionAppend "php-fpm-autoconfig script: /opt/php-fpm-autoconfig/php-fpm-autoconfig"
+descriptionAppend " "
 
 tagScript success
 

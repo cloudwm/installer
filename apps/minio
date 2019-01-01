@@ -49,6 +49,7 @@ secret_key=`cat /minio/.minio.sys/config/config.json | grep secretKey | sed -e '
 descriptionAppend "Web interface URL: https://${SERVERIP}"
 descriptionAppend "Access key: $access_key"
 descriptionAppend "Secret key: $secret_key"
+descriptionAppend " "
 
 tagScript success
 
