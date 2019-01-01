@@ -49,3 +49,16 @@ offirepo - Officeial Vendor Repository
 offisrc - Official Vendor Souurce
 localsrc - Local file uploaded to this repository
 
+
+Development Guidelines
+======================
+
+- Use only curl to download files (do not use wget).
+
+- Scripts ends with an exit code based on the success or failure of the script.
+
+- Scripts must includes the startup.sh file.
+
+- Make sure you add dependencies tags and tagging at the end of the script for depedencies.
+
+- System envrionment varialbes are always CAPITAL LETTERS.
