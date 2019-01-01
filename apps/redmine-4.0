@@ -64,7 +64,7 @@ systemctl start redmine
 # Add Description 
 descriptionAppend "Redmine URI: http://${SERVERIP}"
 descriptionAppend "First time credentials: admin/admin"
-
+descriptionAppend " "
 tagScript success
 
 exit 0

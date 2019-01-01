@@ -53,6 +53,7 @@ else
 fi
 
 descriptionAppend "mysql-server-autoconfig script: /opt/mysql-auto-config/mysql-autoconfig"
+descriptionAppend " "
 
 tagScript success
 

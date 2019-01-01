@@ -15,6 +15,7 @@ waitOrStop 0
 checkPackageInstalled redis
 
 descriptionAppend "Redis IP Address: ${SERVERIP}"
+descriptionAppend " "
 
 tag redis.success
 tagScript success

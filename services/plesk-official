@@ -16,6 +16,7 @@ first_login=`grep "${serverip}:8443" $(rootDir)/temp/*.log | rev | cut -d ' ' -f
 
 descriptionAppend "To complete the configuration process, browse this URL:"
 descriptionAppend "${first_login}"
+descriptionAppend " "
 
 tagScript success
 
