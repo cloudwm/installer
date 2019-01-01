@@ -1,4 +1,4 @@
-GUIDELINES.TXT
+GUIDELINES.TXT: Defines the development guidelines of this repository.
 
 File names guidelines
 =====================
