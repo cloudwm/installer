@@ -26,3 +26,40 @@ server {
                 include fastcgi_params;
         }
 }
+
+server {
+    
+   	listen 443 ssl default_server;
+  	listen [::]:443 ssl default_server;
+
+        root /var/www/html;
+        index index.php index.html index.htm;
+
+        server_name _;
+
+        # Maximum file upload size is 4MB - change accordingly if needed
+        client_max_body_size 4M;
+        client_body_buffer_size 128k;
+   	ssl_certificate      /etc/ssl/certs/server.crt;
+   	ssl_certificate_key  /etc/ssl/private/server.key;
+
+        location / {
+                # try_files $uri $uri/ =404;
+                try_files $uri $uri/ /index.php?q=$uri&$args;
+        }
+
+        error_page 404 /404.html;
+
+        error_page 500 502 503 504 /50x.html;
+        location = /50x.html {
+                root /usr/share/nginx/html;
+        }
+
+        location ~ \.php$ {
+                include snippets/fastcgi-php.conf;
+                fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                fastcgi_pass 127.0.0.1:9000;
+                include fastcgi_params;
+        }
+
+}
