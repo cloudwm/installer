@@ -15,6 +15,9 @@ checkPackageInstalled nginx
 echo "Changing ownership of /var/www/html to www-data user" | log
 chown -R www-data:www-data /var/www/html
 
+descriptionAppend "NGINX configuration location: /etc/nginx/"
+descriptionAppend "NGINX root Directory: /var/www/html/"
+
 tag nginx.success
 tag httpd.success
 tagScript success
