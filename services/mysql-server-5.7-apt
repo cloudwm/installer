@@ -69,6 +69,10 @@ fi
 echo "Restarting mysql.service" | log
 systemctl restart mysql.service
 
+descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
+descriptionAppend "mySQL Server Username: root"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+
 # tagging mysqld installed successfully.
 tag mysql-server-5.7.success
 tag mysqld.success
