@@ -1,5 +1,6 @@
 GUIDELINES.TXT: Defines the development guidelines of this repository.
 
+
 File names guidelines
 =====================
 
@@ -34,7 +35,7 @@ Variables Explained:
 ----------------------
 
 +:
-must be included in the file name
+must be included variable
 
 name: 
 Official name of the service, no dash
@@ -44,9 +45,9 @@ version:
 latest
 
 repoType:
-osrepo - Operating System Built-in repository
-offirepo - Officeial Vendor Repository
-offisrc - Official Vendor Souurce
+osrepo - Operating System built-in repository
+offirepo - Officeial Vendor repository
+offisrc - Official Vendor source
 localsrc - Local file uploaded to this repository
 
 
