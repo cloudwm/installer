@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-ZONE=`grep "zone=" /root/guest.conf | cut -c 6-`
+ZONE=`grep "zone=" $CWMCONFIGFILE | cut -c 6-`
 
 case  $ZONE  in
     IL| IL-JR|IL-TA|IL-RH|IL-PT)
@@ -50,3 +50,5 @@ esac
 
 
 tagScript success
+
+exit 0
