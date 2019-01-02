@@ -1,7 +1,7 @@
 GUIDELINES.TXT: Defines the development guidelines of this repository.
 
 
-File names guidelines
+Filenames Guidelines
 =====================
 
 Contrib File Format:
@@ -29,7 +29,7 @@ Example:
 mongodb-3.2-offirepo
 docker-latest-offirepo
 docker-1.3-offirepo
-pureftpd-offirepo
+pureftpd-latest-osrepo
 
 Variables Explained:
 ----------------------
