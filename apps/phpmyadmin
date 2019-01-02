@@ -12,11 +12,12 @@ checkTagExist httpd.success
 rootDir=$(rootDir)
 
 echo "Installing phpMyAdmin" | log
-mkdir -p /var/www/html/phpmyadmin
-tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz -C /var/www/html/phpmyadmin/ --strip-components=1
+myadminPath=/var/www/html/phpmyadmin
+mkdir -p $myadminPath
+tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz -C $myadminPath/ --strip-components=1
 waitOrStop 0
 
-cd /var/www/html/phpmyadmin
+cd $myadminPath
 mv config.sample.inc.php config.inc.php
 
 echo "Generating blowfish_secret string and replacing it in config.inc.php" | log
@@ -25,6 +26,7 @@ sed -i "/$cfg\['blowfish_secret.*/c\$cfg['blowfish_secret'] = '"$blowfish_secret
 
 descriptionAppend "phpMyAdmin URL: http://${SERVERIP}/phpmyadmin"
 descriptionAppend " "
+
 tag phpmyadmin.success
 tagScript success
 
