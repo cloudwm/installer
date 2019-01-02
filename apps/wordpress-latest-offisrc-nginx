@@ -36,12 +36,14 @@ service nginx restart
 waitOrStop 0
 
 echo "create mysql user and permissions" | log
+
 echo "mysql --defaults-file=/root/.my.cnf -e \"create database wordpress_${WPID};\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -e \"grant all privileges on wordpress_${WPID}.* to wp_${WPID}@'localhost' identified by '"${ADMINPASSWORD}"';\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -e \"flush privileges;\"" | sh
 waitOrStop 0
 
 echo "Downloading wordpress and installing" | log
+
 wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 waitOrStop 0
 
@@ -52,9 +54,11 @@ wp core multisite-install --url=http://${SERVERIP} --title="Welcome to the WordP
 waitOrStop 0
 
 echo "fixing permissions" | log
+
 chown -R www-data:www-data ${WP_PATH}
 
 echo "cleanups" | log
+
 rm $WP_PATH/index.nginx-debian.html
 
 descriptionAppend "Wordpress Login: http://${SERVERIP}/wp-login.php"
