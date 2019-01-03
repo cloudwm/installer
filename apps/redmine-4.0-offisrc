@@ -37,7 +37,7 @@ echo "  password: \"${ADMINPASSWORD}\"" >> $appPath/config/database.yml
 
 echo "Installing Bundle" | log
 
-gem install bundler
+gem install bundler -v 1.17.3
 cd $appPath
 bundle install --without development test rmagick
 bundle exec rake generate_secret_token
