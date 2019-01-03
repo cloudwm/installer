@@ -16,6 +16,8 @@ echo "Install Node.js" | log
 apt-get install -y nodejs build-essential | log
 waitOrStop 0
 
+checkPackageInstalled nodejs
+
 tagScript success
 
 exit 0
