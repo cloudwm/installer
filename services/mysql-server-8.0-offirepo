@@ -30,17 +30,17 @@ checkPackageInstalled expect
 SECURE_MYSQL=$(expect -c "
 set timeout 10
 spawn $(which mysql_secure_installation)
-expect \"Enter current password for root (enter for none):\"
+expect \"Enter password for user root:\"
 send \"${ADMINPASSWORD}\r\"
-expect \"Change the root password?\"
+expect \"Press y|Y for Yes, any other key for No:\"
 send \"n\r\"
-expect \"Remove anonymous users?\"
+expect \"Change the password for root ? ((Press y|Y for Yes, any other key for No) :\"
+send \"n\r\"
+expect \"Remove anonymous users? (Press y|Y for Yes, any other key for No) :\"
 send \"y\r\"
-expect \"Disallow root login remotely?\"
+expect \"Disallow root login remotely? (Press y|Y for Yes, any other key for No) :\"
 send \"y\r\"
-expect \"Remove test database and access to it?\"
-send \"y\r\"
-expect \"Reload privilege tables now?\"
+expect \"Remove test database and access to it? (Press y|Y for Yes, any other key for No) : \"
 send \"y\r\"
 expect eof
 ")
