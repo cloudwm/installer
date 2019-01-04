@@ -19,6 +19,7 @@ apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8C718D3B5072E1F5
 export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
+apt update
 apt install -y mysql-community-server expect | log
 waitOrStop 0
 
