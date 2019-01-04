@@ -1,0 +1,81 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ubuntu-updateos.success
+
+cat << EOF > /etc/apt/sources.list.d/mysql.list
+deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-apt-config
+deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-8.0
+deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-tools
+EOF
+
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8C718D3B5072E1F5
+
+export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
+apt install -y mysql-community-server expect | log
+waitOrStop 0
+
+# check if package installed successfully.
+checkPackageInstalled mysql-community-server
+checkPackageInstalled expect
+
+SECURE_MYSQL=$(expect -c "
+set timeout 10
+spawn $(which mysql_secure_installation)
+expect \"Enter current password for root (enter for none):\"
+send \"$ADMINPASSWORD\r\"
+expect \"Change the root password?\"
+send \"n\r\"
+expect \"Remove anonymous users?\"
+send \"y\r\"
+expect \"Disallow root login remotely?\"
+send \"y\r\"
+expect \"Remove test database and access to it?\"
+send \"y\r\"
+expect \"Reload privilege tables now?\"
+send \"y\r\"
+expect eof
+")
+echo "$SECURE_MYSQL"
+
+echo "Set ~/.my.cnf root password for quick cli work" | log
+if [ ! -f ~/my.cnf ];
+then
+
+    echo "[client]" > ~/.my.cnf
+    echo "user=root" >> ~/.my.cnf
+    echo "password=$ADMINPASSWORD" >> ~/.my.cnf
+
+fi
+
+echo "Setting some defaults to /etc/mysql/mysql.conf.d/mysqld-installer.cnf" | log
+if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
+then
+
+    echo "[mysqld]" > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+    echo "skip-name-resolve=1" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+    echo "max_allowed_packet=256M" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+
+fi
+
+echo "Restarting mysql.service" | log
+systemctl restart mysql.service
+
+descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
+descriptionAppend "mySQL Server Username: root"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+# tagging mysqld installed successfully.
+tag mysql-server-8.0.success
+tag mysqld.success
+
+tagScript success
+
+exit 0
