@@ -1,0 +1,38 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ufw.success
+
+# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for mySQL.
+# if not, open 3306 to WAN.
+
+if [ ! -z "$LANNICIDS" ]; 
+then
+
+    for ip in $LANNICIDS;
+    do
+
+	ipvar="ip$ip"
+	subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
+
+        ufw allow in to $subnet port 111
+        ufw allow in to $subnet port 2049
+
+	unset ipvar
+	unset subnet
+
+    done
+
+else
+
+    echo "Firewall rules for NFS over the WAN are disabled, Please configure it manually" | log
+
+fi
+
+ufw status | log
+
+tagScript success

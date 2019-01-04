@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install NFS server from apt
+apt install nfs-kernel-server -y | log
+waitOrStop 0
+
+checkPackageInstalled nfs-kernel-server
+
+echo "Create Default Storage directory" | log
+mkdir -p /storage
+chown nobody:nogroup /storage
+
+echo "Adding default export rule" | log
+echo "/storage    *(rw,sync,no_subtree_check)" >> /etc/exports
+
+echo "Restarting services" | log
+systemctl enable nfs-kernel-server.service nfs-server.service
+systemctl restart nfs-kernel-server.service nfs-server.service
+
+tagScript success
+exit 0
