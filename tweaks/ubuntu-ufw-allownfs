@@ -7,8 +7,7 @@ fi
 
 checkTagExist ufw.success
 
-# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for mySQL.
-# if not, open 3306 to WAN.
+# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall.
 
 if [ ! -z "$LANNICIDS" ]; 
 then
