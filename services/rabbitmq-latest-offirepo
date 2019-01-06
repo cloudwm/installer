@@ -15,7 +15,7 @@ apt update
 
 echo "Install Erlang & Rabbitmq" | log
 
-apt install erlang-nox
+apt install erlang-nox -y
 apt install rabbitmq-server -y
 waitOrStop 0
 
