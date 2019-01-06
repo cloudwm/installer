@@ -76,6 +76,9 @@ send "y\r"
 expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
 send "y\r"
 
+expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
 expect eof
 
 EOF
