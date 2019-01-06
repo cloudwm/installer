@@ -17,7 +17,7 @@ echo "Install Rabbitmq" | log
 apt install rabbitmq-server -y
 waitOrStop 0
 
-echo "starting Rabbitmq service"
+echo "starting Rabbitmq service" | log
 
 systemctl enable rabbitmq-server
 systemctl start rabbitmq-server
