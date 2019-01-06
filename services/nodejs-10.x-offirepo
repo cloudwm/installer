@@ -7,12 +7,16 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Downloading Node.js repository" | log
+
 curl -sL https://deb.nodesource.com/setup_10.x | sudo bash - | log
 waitOrStop 0
 
 echo "Install Node.js" | log
-apt-get install -y nodejs gcc g++ make | log
+
+apt-get install -y nodejs build-essential | log
 waitOrStop 0
+
+checkPackageInstalled nodejs
 
 tagScript success
 
