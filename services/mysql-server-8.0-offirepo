@@ -8,6 +8,8 @@ fi
 
 checkTagExist ubuntu-updateos.success
 
+echo "add official repository packages to apt" | log
+
 cat << EOF > /etc/apt/sources.list.d/mysql.list
 deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-apt-config
 deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-8.0
@@ -19,34 +21,52 @@ apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8C718D3B5072E1F5
 export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
+
+echo "install mysql from apt" | log
+
 apt update
 apt install -y mysql-community-server expect | log
 waitOrStop 0
 
-# check if package installed successfully.
 checkPackageInstalled mysql-community-server
+
+echo "run insallation process" | log
+
 checkPackageInstalled expect
 
-SECURE_MYSQL=$(expect -c "
+/usr/bin/expect << EOF
+
 set timeout 10
 spawn $(which mysql_secure_installation)
-expect \"Enter password for user root:\"
-send \"${ADMINPASSWORD}\r\"
-expect \"Press y|Y for Yes, any other key for No:\"
-send \"n\r\"
-expect \"Change the password for root ? ((Press y|Y for Yes, any other key for No) :\"
-send \"n\r\"
-expect \"Remove anonymous users? (Press y|Y for Yes, any other key for No) :\"
-send \"y\r\"
-expect \"Disallow root login remotely? (Press y|Y for Yes, any other key for No) :\"
-send \"y\r\"
-expect \"Remove test database and access to it? (Press y|Y for Yes, any other key for No) : \"
-send \"y\r\"
+
+expect "Enter password for user root:"
+send "${ADMINPASSWORD}\r"
+
+expect "Press y|Y for Yes, any other key for No:"
+send "n\r"
+
+expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
+send "n\r"
+
+expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
+expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
+expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
+send "y\r"
+
+expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+send "y\r"
+
 expect eof
-")
-echo "$SECURE_MYSQL"
+
+EOF
+
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
+
 if [ ! -f ~/my.cnf ];
 then
 
@@ -57,6 +77,7 @@ then
 fi
 
 echo "Setting some defaults to /etc/mysql/mysql.conf.d/mysqld-installer.cnf" | log
+
 if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
 then
 
@@ -67,13 +88,18 @@ then
 fi
 
 echo "Restarting mysql.service" | log
+
 systemctl restart mysql.service
+
+echo "adding descriptions" | log
 
 descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-# tagging mysqld installed successfully.
+
+echo "adding dependency tags" | log
+
 tag mysql-server-8.0.success
 tag mysqld.success
 

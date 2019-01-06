@@ -8,12 +8,15 @@ fi
 
 checkTagExist ubuntu-updateos.success
 
-# install mysql from apt.
+echo "install mysql from apt" | log
+
 apt install mysql-server-5.7 expect -y | log
 waitOrStop 0
 
-# check if package installed successfully.
 checkPackageInstalled mysql-server-5.7
+
+echo "run insallation process" | log
+
 checkPackageInstalled expect
 
 /usr/bin/expect << EOF
@@ -44,9 +47,11 @@ send "n\r"
 EOF
 
 echo "Set Password for root, using echo for string manipulation, mysql_secure will not set it for mysql 5.7" | log
+
 echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" |sh
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
+
 if [ ! -f ~/my.cnf ];
 then
 
@@ -57,6 +62,7 @@ then
 fi
 
 echo "Setting some defaults to /etc/mysql/mysql.conf.d/mysqld-installer.cnf" | log
+
 if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
 then
 
@@ -67,13 +73,18 @@ then
 fi
 
 echo "Restarting mysql.service" | log
+
 systemctl restart mysql.service
+
+echo "adding descriptions" | log
 
 descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-# tagging mysqld installed successfully.
+
+echo "adding dependency tags" | log
+
 tag mysql-server-5.7.success
 tag mysqld.success
 
