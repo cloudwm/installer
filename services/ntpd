@@ -6,20 +6,23 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install NTP from apt
+echo "install NTP from apt" | log
+
 apt install ntp ntpdate -y | log
 waitOrStop 0
 
 checkPackageInstalled ntp
 checkPackageInstalled ntpdate
 
-# Enable NTP Service
+echo "Enable NTP Service" | log
+
 systemctl enable ntp
 systemctl start ntp
 
-# Update the time via local daemon
+echo "Update the time via local daemon" | log
+
 timedatectl set-ntp off
-bash -c "echo server localhost prefer iburst >> /etc/ntp.conf"
+echo "server localhost iburst prefer" >> /etc/ntp.conf
 systemctl restart ntp
 sleep 5 # Waiting for daemon to start
 ntpdate  -u localhost

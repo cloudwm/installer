@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist ntpd.success
+
 # install Redis for local mail delivery
 echo "Installing redis" | log
 
