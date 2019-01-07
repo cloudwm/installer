@@ -7,7 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist ubuntu-updateos.success
-checkTagExist ntpd.success
 
 echo "install mysql from apt" | log
 
