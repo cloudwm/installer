@@ -1,0 +1,80 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist php.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+rootDir=$(rootDir)
+currentDate=`date +"%Y-%m-%d %H:%M:%S"`
+appPath=/var/www/html
+
+echo "Installing Joomla" | log
+
+echo "Downloading Joomla from original repo" | log
+
+cd $rootDir/temp
+curl -Lo joomla.tgz https://downloads.joomla.org/cms/joomla3/3-9-1/joomla_3-9-1-stable-full_package-tar-gz?format=gz | log
+waitOrStop 0
+
+echo "Extracting Joomla to ${appPath}/" | log
+
+mkdir -p $appPath/
+tar -xzvf joomla.tgz -C $appPath/ | log
+waitOrStop 0
+rm -f joomla.tgz
+waitOrStop 0
+
+echo "Creating Joomla Database" | log
+
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE joomla CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON joomla.* TO 'joomla'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+
+
+echo "Configuring Joomla for first use" | log
+
+cp $rootDir/tweaks/extras/joomla-nginx/configuration.php $appPath/configuration.php
+sed -i "s/Password/${ADMINPASSWORD}/g" $appPath/configuration.php
+sed -i "s/some@mail.com/${ADMINEMAIL}/g" $appPath/configuration.php
+mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
+waitOrStop 0
+
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);\"" | sh
+
+echo "Setting permissions and cleanup" | log
+
+rm -rf $appPath/installation/
+rm $appPath/index.nginx-debian.html
+chown -R www-data:www-data $appPath
+
+echo "Setting nginx config" | log
+
+# Copy Joomla vhost from extras
+cp $rootDir/tweaks/extras/joomla-nginx/joomla-vhost /etc/nginx/sites-available/joomla
+# Symlink magento vhost
+ln -s /etc/nginx/sites-available/joomla /etc/nginx/sites-enabled/joomla
+# Remove default vhosts
+rm -f /etc/nginx/sites-available/default
+rm -f /etc/nginx/sites-available/default-ssl
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default-ssl
+
+systemctl restart nginx
+
+echo "adding descriptions" | log
+
+descriptionAppend "Joomla Admin Web Interface: http://${SERVERIP}/administrator"
+descriptionAppend "Joomla Admin Username: admin"
+descriptionAppend "Joomla Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
