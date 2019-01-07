@@ -46,7 +46,7 @@ sed -i "s/some@mail.com/${ADMINEMAIL}/g" $appPath/configuration.php
 mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
 waitOrStop 0
 
-echo "mysql -e \"INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);\"" | sh
 
 echo "Setting permissions and cleanup" | log
 
