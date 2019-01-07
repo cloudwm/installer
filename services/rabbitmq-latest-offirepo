@@ -10,7 +10,8 @@ echo "Add repository" | log
 
 apt-key adv --keyserver "hkps.pool.sks-keyservers.net" --recv-keys "0x6B73A36E6026DFCA" | log
 echo "deb https://dl.bintray.com/rabbitmq-erlang/debian bionic erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list | log
-echo "deb https://dl.bintray.com/rabbitmq/debian bionic main" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list | log
+echo "deb https://dl.bintray.com/rabbitmq/debian bionic main" >> /etc/apt/sources.list.d/bintray.rabbitmq.list | log
+
 apt update
 
 echo "Install Erlang & Rabbitmq" | log
