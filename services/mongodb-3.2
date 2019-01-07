@@ -6,8 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist ntpd.success
-
 cat << EOF >> /etc/apt/sources.list.d/mongodb.list
 deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse
 EOF
