@@ -43,10 +43,12 @@ echo "Configuring Joomla for first use" | log
 cp $rootDir/tweaks/extras/joomla-nginx/configuration.php $appPath/configuration.php
 sed -i "s/Password/${ADMINPASSWORD}/g" $appPath/configuration.php
 sed -i "s/some@mail.com/${ADMINEMAIL}/g" $appPath/configuration.php
-mysql joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql | log
+mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
+waitOrStop 0
+
 echo "mysql -e \"INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);\"" | sh
 
-echo "permissions and cleanup" | log
+echo "Setting permissions and cleanup" | log
 
 rm -rf $appPath/installation/
 rm $appPath/index.nginx-debian.html
