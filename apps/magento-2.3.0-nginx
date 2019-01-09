@@ -55,6 +55,8 @@ echo "Installing Magento" | log
 /var/www/html/bin/magento setup:install --base-url=http://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
 
 ADMIN_URI=`grep "Admin URI:" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
+# ADMIN_URI=`php /var/www/html/bin/magento info:adminuri | rev | cut -d ' ' -f 1 | rev`
+
 
 echo "Verifying permissions for Magento" | log
 cd /var/www/html/ 
@@ -66,17 +68,13 @@ chmod u+x bin/magento
 echo "disable sign static files and clean cache" | log
 bin/magento config:set dev/static/sign 0
 bin/magento cache:clean
-# magento cache function not enough, manually erasing leftovers
-rm -Rf /var/www/html/var/cache/mage-*
-rm -Rf /var/www/html/var/page_cache/mage-*
+bin/magento setup:static-content:deploy -f
 
 echo "setting nginx config" | log
 # main magento config
 cp $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento
 # specific configs supplied by magento install, included by main magento config
 cp /var/www/html/nginx.conf.sample /etc/nginx/conf.d/magento.conf.sample
-# tweak cache control 
-sed -i "s/# expires max;/expires max;/g" /etc/nginx/conf.d/magento.conf.sample
 # tweak locations in magento config to allow for user themes and folders
 tweakFilePath=$rootDir/tweaks/extras/magento-nginx/magento-locations-allow-custom
 perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/conf.d/magento.conf.sample "$tweakFilePath"
