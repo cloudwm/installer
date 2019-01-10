@@ -70,9 +70,7 @@ cd /var/www/html/
 bin/magento config:set dev/static/sign 0
 curl ${SERVERIP} > /dev/null
 bin/magento setup:static-content:deploy -f
-bin/magento indexer:reindex
-bin/magento cache:flush
-
+bin/magento cache:clean
 waitOrStop 0
 
 echo "setting nginx config" | log
