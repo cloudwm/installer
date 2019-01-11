@@ -28,7 +28,7 @@ echo "Adding CWM/Kamatera to auto-complete" | log
 sed -i 's/amazonec2/kamatera\namazonec2/' /etc/bash_completion.d/docker-machine.bash
 waitOrStop 0
 
-echo "PS1='[\u@\h \W$(__docker_machine_ps1)]\$ '" >> /root/.bashrc
+echo "PS1='[\u@\h \W\$(__docker_machine_ps1)]\$ '" >> /root/.bashrc
 
 echo "Downloading CWM/Kamatera docker-machine-driver" |log
 base=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v0.0.3/docker-machine-driver-kamatera_v0.0.3_linux_amd64.tar.gz 
@@ -38,20 +38,19 @@ tar -xvf /tmp/docker-machine-driver-kamatera.tar.gz -C /tmp/
 chmod +x /tmp/docker-machine-driver-kamatera
 mv /tmp/docker-machine-driver-kamatera /usr/local/bin/
 
-descriptionAppend "Usage: docker-machine create {machine_name} \
---driver kamatera \
---kamatera-api-client-id {API ClientId} \
---kamatera-api-secret {API secretId}
-
-Optional:
---kamatera-datacenter {datacenter Code, default: EU}
---kamatera-billing {billing cycle, default: hourly}
---kamatera-cpu {cpu type, default: 1B}
---kamatera-ram {ram in MB, default: 512}
---kamatera-disk-size {disk size in GB, default: 10}
---kamatera-image {server OS Image, default: ubuntu_server_16.04_64-bit}
-"
-
+descriptionAppend "Usage: docker-machine create {machine_name} \\"
+descriptionAppend "--driver kamatera \\"
+descriptionAppend "--kamatera-api-client-id {API ClientId} \\"
+descriptionAppend "--kamatera-api-secret {API secretId}"
+descriptionAppend " "
+descriptionAppend "Optional:"
+descriptionAppend "--kamatera-datacenter {datacenter Code, default: EU}"
+descriptionAppend "--kamatera-billing {billing cycle, default: hourly}"
+descriptionAppend "--kamatera-cpu {cpu type, default: 1B}"
+descriptionAppend "--kamatera-ram {ram in MB, default: 512}"
+descriptionAppend "--kamatera-disk-size {disk size in GB, default: 10}"
+descriptionAppend "--kamatera-image {server OS Image, default: ubuntu_server_16.04_64-bit}"
+descriptionAppend " "
 descriptionAppend "You can also set API ClientID/Secret:"
 descriptionAppend "export KAMATERA_API_CLIENT_ID="
 descriptionAppend "export KAMATERA_API_SECRET="
