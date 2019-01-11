@@ -38,10 +38,10 @@ tar -xvf /tmp/docker-machine-driver-kamatera.tar.gz -C /tmp/
 chmod +x /tmp/docker-machine-driver-kamatera
 mv /tmp/docker-machine-driver-kamatera /usr/local/bin/
 
-descriptionAdd "export KAMATERA_API_CLIENT_ID="
-descriptionAdd "export KAMATERA_API_SECRET="
-descriptionAdd " "
-descriptionAdd "Example: docker-machine create --driver kamatera {machine_name}"
+descriptionAppend "export KAMATERA_API_CLIENT_ID="
+descriptionAppend "export KAMATERA_API_SECRET="
+descriptionAppend " "
+descriptionAppend "Example: docker-machine create --driver kamatera {machine_name}"
 
 tagScript success
 
