@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading docker-machine from source repository" | log
+base=https://github.com/docker/machine/releases/download/v0.16.0
+curl -L $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine
+waitOrStop 0
+
+echo "Installing docker-machine in /usr/local/bin/docker-machine" | log
+install /tmp/docker-machine /usr/local/bin/docker-machine
+waitOrStop 0
+
+echo "Downloading docker-machine bash auto-complete strings" | log
+base=https://raw.githubusercontent.com/docker/machine/v0.16.0
+
+for i in docker-machine-prompt.bash docker-machine-wrapper.bash docker-machine.bash
+do
+    wget "$base/contrib/completion/bash/${i}" -P /etc/bash_completion.d
+    waitOrStop 0
+done
+
+echo "Adding CWM/Kamatera to auto-complete" | log
+sed -i 's/amazonec2/kamatera\namazonec2/' /etc/bash_completion.d/docker-machine.bash
+waitOrStop 0
+
+echo "PS1='[\u@\h \W$(__docker_machine_ps1)]\$ '" >> /root/.bashrc
+
+echo "Downloading CWM/Kamatera docker-machine-driver" |log
+base=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v0.0.3/docker-machine-driver-kamatera_v0.0.3_linux_amd64.tar.gz 
+curl -o /tmp/docker-machine-driver-kamatera.tar.gz $base -L
+
+tar -xvf /tmp/docker-machine-driver-kamatera.tar.gz -C /tmp/
+chmod +x /tmp/docker-machine-driver-kamatera
+mv /tmp/docker-machine-driver-kamatera /usr/local/bin/
+
+descriptionAdd "export KAMATERA_API_CLIENT_ID="
+descriptionAdd "export KAMATERA_API_SECRET="
+descriptionAdd " "
+descriptionAdd "Example: docker-machine create --driver kamatera {machine_name}"
+
+tagScript success
+
+exit 0
