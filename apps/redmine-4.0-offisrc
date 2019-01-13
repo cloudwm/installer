@@ -9,14 +9,16 @@ fi
 checkTagExist mysqld.success
 
 echo "Installing Dependencies" | log
-
 apt install ruby ruby-dev build-essential zlib1g-dev libmysqlclient-dev -y | log
+waitOrStop 0
 
 echo "Cloning from stable repository" | log
 
 mkdir -p /var/www  
 cd /var/www/
 git clone https://github.com/redmine/redmine.git -b 4.0-stable | log
+waitOrStop 0
+
 appPath=/var/www/redmine
 
 echo "Creating Database and user" | log
