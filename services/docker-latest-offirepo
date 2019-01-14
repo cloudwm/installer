@@ -14,8 +14,16 @@ add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(
 waitOrStop 0
 
 echo "Install docker-ce" | log
+cat > /usr/sbin/policy-rc.d <<EOF
+#!/bin/sh
+exit 101
+EOF
+chmod a+x /usr/sbin/policy-rc.d
+
 apt-get install -y docker-ce
 waitOrStop 0
+
+rm -f /usr/sbin/policy-rc.d
 
 # Enable Service
 systemctl enable docker
