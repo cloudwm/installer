@@ -1,10 +1,13 @@
 #!/bin/bash
 
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
+
+rootDir=$(rootDir)
 
 echo "deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-3.2.list
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv D68FA50FEA312927
@@ -23,12 +26,12 @@ sed -i '/\s\/\s/ s/defaults/defaults,noatime/' /etc/fstab
 
 # echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
 # echo 'never' > /sys/kernel/mm/transparent_hugepage/defrag
-cp /tweaks/extras/mongodb/disable-transparent-hugepages /etc/init.d/
+cp $rootDir/tweaks/extras/mongodb/disable-transparent-hugepages /etc/init.d/
 chmod 755 /etc/init.d/disable-transparent-hugepages
 update-rc.d disable-transparent-hugepages defaults
 
 # blockdev --setra 0 /dev/sda
-cp /tweaks/extras/mongodb/zero-readahead /etc/init.d/
+cp $rootDir/tweaks/extras/mongodb/zero-readahead /etc/init.d/
 chmod 755 /etc/init.d/zero-readahead
 update-rc.d zero-readahead defaults
 
