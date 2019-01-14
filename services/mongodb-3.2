@@ -18,16 +18,19 @@ waitOrStop 0
 checkPackageInstalled mongodb-org
 
 # stabilize and optimize system for mongodb
-mount / -o remount,defaults,noatime
+# mount / -o remount,defaults,noatime
 sed -i '/\s\/\s/ s/defaults/defaults,noatime/' /etc/fstab
 
-echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
-echo 'never' > /sys/kernel/mm/transparent_hugepage/defrag
+# echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
+# echo 'never' > /sys/kernel/mm/transparent_hugepage/defrag
 cp /tweaks/extras/mongodb/disable-transparent-hugepages /etc/init.d/
 chmod 755 /etc/init.d/disable-transparent-hugepages
 update-rc.d disable-transparent-hugepages defaults
 
-blockdev --setra 0 /dev/sda
+# blockdev --setra 0 /dev/sda
+cp /tweaks/extras/mongodb/zero-readahead /etc/init.d/
+chmod 755 /etc/init.d/zero-readahead
+update-rc.d zero-readahead defaults
 
 systemctl enable mongod.service
 systemctl start mongod.service 
