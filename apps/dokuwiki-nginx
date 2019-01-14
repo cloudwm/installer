@@ -17,9 +17,10 @@ echo "Downloading dokuwiki from original repo" | log
 mkdir -p temp
 cd temp
 curl -O https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz
+waitOrStop 0
+
 mkdir -p /var/www/html
 mv dokuwiki-stable.tgz /var/www/html 
-waitOrStop 0
 
 echo "Extracting dokuwiki to /var/www/html/" | log
 tar -xzvf /var/www/html/dokuwiki-stable.tgz -C /var/www/html/ --strip 1
