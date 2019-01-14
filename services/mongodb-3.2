@@ -9,36 +9,28 @@ fi
 
 rootDir=$(rootDir)
 
+echo "Adding repo to OS" | log
+
 echo "deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-3.2.list
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv D68FA50FEA312927
 apt update
 
-# install mongodb from apt
-apt install glibc-source -y
-apt-get install -y mongodb-org | log
-waitOrStop 0
+echo "Install mongodb from apt" | log
 
+apt-get install -y glibc-source mongodb-org | log
+waitOrStop 0
 checkPackageInstalled mongodb-org
 
-# stabilize and optimize system for mongodb
-# mount / -o remount,defaults,noatime
-sed -i '/\s\/\s/ s/defaults/defaults,noatime/' /etc/fstab
-
-# echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
-# echo 'never' > /sys/kernel/mm/transparent_hugepage/defrag
-cp $rootDir/tweaks/extras/mongodb/disable-transparent-hugepages /etc/init.d/
-chmod 755 /etc/init.d/disable-transparent-hugepages
-update-rc.d disable-transparent-hugepages defaults
-
-# blockdev --setra 0 /dev/sda
-cp $rootDir/tweaks/extras/mongodb/zero-readahead /etc/init.d/
-chmod 755 /etc/init.d/zero-readahead
-update-rc.d zero-readahead defaults
+echo "Activating service" | log
 
 systemctl enable mongod.service
 systemctl start mongod.service 
 
-#mongodb config: /etc/mongod.conf
+echo "Adding descriptions" | log
+
+descriptionAppend "MongoDB config: /etc/mongod.conf"
+
+echo "Adding dependency tags" | log
 
 tag mongodb.success
 tagScript success
