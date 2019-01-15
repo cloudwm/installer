@@ -21,16 +21,18 @@ apt-get install -y glibc-source mongodb-org | log
 waitOrStop 0
 checkPackageInstalled mongodb-org
 
+echo "Enabling authorization and adding admin user" | log
+
+sed -i "s/#security/security/g" /etc/mongod.conf
+sed -i "/security:/ a \  authorization: enabled" /etc/mongod.conf
+command="db.adminCommand({ createUser: \"admin\", pwd: \"$ADMINPASSWORD\", roles: [\"userAdminAnyDatabase\", \"dbAdminAnyDatabase\", \"readWriteAnyDatabase\"]});"
+mongo --eval "${command}" | log
+
 echo "Activating service" | log
 
 systemctl enable mongod.service
 systemctl start mongod.service 
 sleep 5
-
-echo "Adding admin user" | log
-
-command="db.adminCommand({ createUser: \"admin\", pwd: \"$ADMINPASSWORD\", roles: [\"userAdminAnyDatabase\", \"dbAdminAnyDatabase\", \"readWriteAnyDatabase\"]});"
-mongo --eval "${command}" | log
 
 echo "Adding descriptions" | log
 
