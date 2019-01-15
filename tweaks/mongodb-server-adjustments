@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+echo "stabilize and optimize system for mongodb" | log
+
+# manual:
+# mount / -o remount,defaults,noatime
+sed -i '/\s\/\s/ s/defaults/defaults,noatime/' /etc/fstab
+
+# manual:
+# echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
+# echo 'never' > /sys/kernel/mm/transparent_hugepage/defrag
+cp $rootDir/tweaks/extras/mongodb/disable-transparent-hugepages /etc/init.d/
+chmod 755 /etc/init.d/disable-transparent-hugepages
+update-rc.d disable-transparent-hugepages defaults
+
+# manual:
+# blockdev --setra 0 /dev/sda
+cp $rootDir/tweaks/extras/mongodb/zero-readahead /etc/init.d/
+chmod 755 /etc/init.d/zero-readahead
+update-rc.d zero-readahead defaults
+
+echo "Restaring service" | log
+
+systemctl restart mongod.service
+
+tagScript success
+
+exit 0

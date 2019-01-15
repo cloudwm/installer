@@ -9,11 +9,13 @@ fi
 
 runOnceCheck
 
-# Allow binding of Redis from all IP Addresses
+echo "Allow binding of MongoDB from all IP Addresses" | log
+
 sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mongod.conf
 
-# Restaring redis daemon
-systemctl restart mongod.service | log
+echo "Restaring service" | log
+
+systemctl restart mongod.service
 
 tagScript success
 

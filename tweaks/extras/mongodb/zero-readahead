@@ -1,0 +1,23 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          zero-readahead
+# Required-Start:    $local_fs
+# Required-Stop:
+# X-Start-Before:    mongod mongodb-mms-automation-agent
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Set device readahead to 0
+# Description:       Set device readahead to 0, to improve
+#                    MongoDB database performance.
+### END INIT INFO
+
+case $1 in
+  start)
+    if [ -e /sys/block/sda/queue/read_ahead_kb ]; then
+      echo 0 > /sys/block/sda/queue/read_ahead_kb
+    else
+      return 0
+    fi
+
+    ;;
+esac
