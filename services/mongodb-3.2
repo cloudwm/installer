@@ -33,6 +33,7 @@ systemctl start mongod.service
 sleep 5
 
 echo "Adding admin user" | log
+
 command="db.adminCommand({ createUser: \"admin\", pwd: \"$ADMINPASSWORD\", roles: [\"userAdminAnyDatabase\", \"dbAdminAnyDatabase\", \"readWriteAnyDatabase\"]});"
 mongo --eval "${command}" | log
 
