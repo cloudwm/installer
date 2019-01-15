@@ -1,25 +1,49 @@
 #!/bin/bash
 
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-cat << EOF >> /etc/apt/sources.list.d/mongodb.list
-deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse
-EOF
+rootDir=$(rootDir)
+
+echo "Adding repo to OS" | log
+
+echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-4.0.list
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4
 apt update
 
-# install mongodb from apt
-apt-get install -y mongodb-org | log
-waitOrStop 0
+echo "Install mongodb from apt" | log
 
+apt-get install -y glibc-source mongodb-org | log
+waitOrStop 0
 checkPackageInstalled mongodb-org
+
+echo "Enabling authorization" | log
+
+sed -i "s/#security/security/g" /etc/mongod.conf
+sed -i "/security:/ a \  authorization: enabled" /etc/mongod.conf
+
+echo "Activating service" | log
 
 systemctl enable mongod.service
 systemctl start mongod.service 
+sleep 5
+
+echo "Adding admin user" | log
+
+command="db.adminCommand({ createUser: \"admin\", pwd: \"$ADMINPASSWORD\", roles: [\"userAdminAnyDatabase\", \"dbAdminAnyDatabase\", \"readWriteAnyDatabase\"]});"
+mongo --eval "${command}" | log
+
+echo "Adding descriptions" | log
+
+descriptionAppend "MongoDB config: /etc/mongod.conf"
+descriptionAppend "MongoDB admin user: admin"
+descriptionAppend "MongoDB admin password: ${ADMINPASSWORD}"
+
+echo "Adding dependency tags" | log
 
 tag mongodb.success
 tagScript success
