@@ -30,7 +30,7 @@ else
 
     lanText="Firewall rules for NFS over WAN are disabled for security reasons. Take care when configuring it manually."
     echo "$lanText" | log
-    descriptionAppend "$lanText"
+    descriptionAppend "NOTICE: $lanText"
     descriptionAppend " "
 fi
 
