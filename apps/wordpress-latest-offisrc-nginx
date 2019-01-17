@@ -65,6 +65,7 @@ descriptionAppend "Wordpress Login: http://${SERVERIP}/wp-login.php"
 descriptionAppend "Wordpress Admin Username: admin"
 descriptionAppend "Wordpress Admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
+
 tagScript success
 
 exit 0
