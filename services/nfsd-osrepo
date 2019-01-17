@@ -30,7 +30,12 @@ systemctl restart nfs-kernel-server.service nfs-server.service
 echo "Adding descriptions" | log
 
 descriptionAppend "Network storage location: /storage"
-descriptionAppend "To connect with storage, run from client: mount ${SERVERIP}:/storage MY_ASSIGNED_FOLDER"
+descriptionAppend "To allow storage access from a client, add it to firewall:"
+descriptionAppend "# sudo allow from MY_CLIENT_ADDRESS to any port nfs"
+descriptionAppend "On client, install basic NFS support:"
+descriptionAppend "# sudo install nfs-common"
+descriptionAppend "On client, connect assigned folder to NFS folder:"
+descriptionAppend "# sudo mount ${SERVERIP}:/storage MY_ASSIGNED_FOLDER"
 descriptionAppend " "
 
 tagScript success
