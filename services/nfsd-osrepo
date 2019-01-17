@@ -6,14 +6,14 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "install NFS server from apt" | log
+echo "Install NFS server from apt" | log
 
 apt install nfs-kernel-server -y | log
 waitOrStop 0
 
 checkPackageInstalled nfs-kernel-server
 
-echo "Create Default Storage directory" | log
+echo "Create default Storage directory" | log
 
 mkdir -p /storage
 chown nobody:nogroup /storage
@@ -27,6 +27,19 @@ echo "Restarting services" | log
 systemctl enable nfs-kernel-server.service nfs-server.service
 systemctl restart nfs-kernel-server.service nfs-server.service
 
+echo "Adding descriptions" | log
+
+descriptionAppend "Network storage location: /storage"
+descriptionAppend " "
+descriptionAppend "To allow storage access from a client, add it to firewall:"
+descriptionAppend "# sudo ufw allow from MY_CLIENT_ADDRESS to any port nfs"
+descriptionAppend " "
+descriptionAppend "On client, install basic NFS support:"
+descriptionAppend "# sudo apt install nfs-common"
+descriptionAppend " "
+descriptionAppend "On client, connect assigned folder to NFS folder:"
+descriptionAppend "# sudo mount ${SERVERIP}:/storage MY_ASSIGNED_FOLDER"
+descriptionAppend " "
 
 tagScript success
 exit 0
