@@ -42,7 +42,7 @@ echo "Adding descriptions" | log
 descriptionAppend "MongoDB config: /etc/mongod.conf"
 descriptionAppend "MongoDB admin user: admin"
 descriptionAppend "MongoDB admin password: ${ADMINPASSWORD}"
-
+descriptionAppend " "
 echo "Adding dependency tags" | log
 
 tag mongodb.success
