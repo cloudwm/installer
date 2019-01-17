@@ -7,7 +7,7 @@ fi
 
 checkTagExist ufw.success
 
-# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall.
+echo "Check if LAN VLAN exists, open only LAN VLAN subnets in the firewall." | log
 
 if [ ! -z "$LANNICIDS" ]; 
 then
@@ -28,8 +28,10 @@ then
 
 else
 
-    echo "Firewall rules for NFS over the WAN are disabled, Please configure it manually" | log
-
+    lanText="Firewall rules for NFS over WAN are disabled for security reasons. Take care when configuring it manually."
+    echo "$lanText" | log
+    descriptionAppend "$lanText"
+    descriptionAppend " "
 fi
 
 ufw status | log
