@@ -30,6 +30,7 @@ systemctl restart nfs-kernel-server.service nfs-server.service
 echo "Adding descriptions" | log
 
 descriptionAppend "Network storage location: /storage"
+descriptionAppend "To connect with storage, run from client: mount ${SERVERIP}:/storage MY_ASSIGNED_FOLDER"
 descriptionAppend " "
 
 tagScript success
