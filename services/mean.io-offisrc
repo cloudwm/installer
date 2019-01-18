@@ -16,11 +16,7 @@ cd /opt/mean && npm install | log
 descriptionAppend "To test mean.io stack functionality, go to mean folder"
 descriptionAppend "# cd /opt/mean"
 descriptionAppend "Start mean.io app with"
-descriptionAppend "# npm start &"
-descriptionAppend " "
-descriptionAppend "Access server with curl to see a respone"
-descriptionAppend "# curl http://localhost:4040"
-descriptionAppend " "
+descriptionAppend "# npm start"
 
 tagScript success
 
