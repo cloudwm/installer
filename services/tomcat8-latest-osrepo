@@ -22,7 +22,8 @@ cp $rootDir/tweaks/extras/tomcat8/tomcat-users.xml /etc/tomcat8/
 cp $rootDir/tweaks/extras/tomcat8/manager.xml /etc/tomcat8/Catalina/localhost/
 cp $rootDir/tweaks/extras/tomcat8/host-manager.xml /etc/tomcat8/Catalina/localhost/
 
-sed -i "s/s3cret/${ADMINPASSWORD}/" tomcat-users.xml
+echo "<user username=\"tomcat\" password=\"${ADMINPASSWORD}\" roles=\"admin-gui,manager-gui\"/>" >> /etc/tomcat8/tomcat-users.xml
+echo "</tomcat-users>"  >> /etc/tomcat8/tomcat-users.xml
 
 systemctl restart tomcat8.service
 
