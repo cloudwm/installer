@@ -11,7 +11,7 @@ checkTagExist nodejs-11-offirepo.success
 
 cd /opt/ && git clone https://github.com/linnovate/mean
 cp /opt/mean/.env.example /opt/mean/.env
-cd /opt/mean && npm install
+cd /opt/mean && npm install | log
 
 descriptionAppend "To test mean.io stack functionality, go to mean folder"
 descriptionAppend "# cd /opt/mean"
