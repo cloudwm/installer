@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+# Allow binding of memcached from all IP Addresses
+sed -i 's/-l 127.0.0.1/-l 0.0.0.0/' /etc/memcached.conf
+
+# Restaring memcached daemon
+systemctl restart memcached.service | log
+
+tagScript success
+
+exit 0

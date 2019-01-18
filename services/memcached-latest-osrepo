@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt-get install -y memcached | log
+waitOrStop 0
+
+# Enable Service
+systemctl enable memcached
+
+tagScript success
+
+exit 0
