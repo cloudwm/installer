@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt-get install -y tomcat8 tomcat8-admin | log
+waitOrStop 0
+
+# Enable Service
+systemctl enable tomcat8
+
+# Remove default configs
+rm -f /etc/tomcat8/tomcat-users.xml
+rm -f /etc/tomcat8/Catalina/localhost/manager.xml
+rm -f /etc/tomcat8/Catalina/localhost/host-manager.xml
+
+# Copy prebuilt configs
+cp $rootDir/tweaks/extras/tomcat8/tomcat-users.xml /etc/tomcat8/
+cp $rootDir/tweaks/extras/tomcat8/manager.xml /etc/tomcat8/Catalina/localhost/
+cp $rootDir/tweaks/extras/tomcat8/host-manager.xml /etc/tomcat8/Catalina/localhost/
+
+sed -i "s/s3cret/${ADMINPASSWORD}/" tomcat-users.xml
+
+tagScript success
+
+exit 0
