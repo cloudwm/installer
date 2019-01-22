@@ -1,0 +1,88 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist httpd.success
+
+echo "Downloading PhpBB3" | log
+mkdir -p /var/www/html
+mkdir -p temp
+cd temp
+curl -O https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
+tar -xjvf phpBB-3.2.5.tar.bz2  -C /var/www/html/ --strip 1
+waitOrStop 0
+rm -f phpBB-3.2.5.tar.bz2
+chown -R www-data:www-data /var/www/html
+
+echo "Installing PhpBB3" | log
+
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE phpbb3 CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON phpbb3.* TO 'phpbb3'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+
+cat << EOF > /var/www/html/config.yml
+installer:
+    admin:
+        name: admin
+        password: ${ADMINPASSWORD}    
+        email: admin@example.org
+
+    board:
+        lang: en
+        name: My Board
+        description: My amazing new phpBB board
+
+    database:
+        dbms: mysqli 
+        dbhost: localhost         
+        dbport: ~
+        dbuser: phpbb3
+        dbpasswd: ${ADMINPASSWORD}
+        dbname: phpbb3
+        table_prefix: phpbb_
+
+    email:
+        enabled: false
+        smtp_delivery : ~
+        smtp_host: ~
+        smtp_port: ~
+        smtp_auth: ~
+        smtp_user: ~
+        smtp_pass: ~
+
+    server:
+        cookie_secure: false
+        server_protocol: http://
+        force_server_vars: false
+        server_name: localhost
+        server_port: 80
+        script_path: /
+
+    extensions: ['phpbb/viglink']
+EOF
+
+php /var/www/html/install/phpbbcli.php install /var/www/html/config.yml 
+
+echo "Removing Install Files" | log
+
+rm -f /var/www/html/config.yml 
+rm -rf /var/www/html/install
+rm -rf /var/www/html/docs
+chmod 640 /var/www/html/config.php
+chown -R www-data:www-data /var/www/html
+
+
+descriptionAppend "phpBB3 URL: https://${SERVERIP}/"
+descriptionAppend "phpBB3 Admin URL: https://${SERVERIP}/"
+descriptionAppend " "
+descriptionAppend "phpBB3 Username: admin "
+descriptionAppend "phpBB3 Password: ${ADMINPASSWORD} "
+
+tagScript success
+
+exit 0
