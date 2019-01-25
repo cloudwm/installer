@@ -19,7 +19,7 @@ apt install -y jenkins
 
 unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
 
-descriptionAppend "Web interface URL: https://${SERVERIP}:8080"
+descriptionAppend "Web interface URL: http://${SERVERIP}:8080"
 descriptionAppend "Unlock key: $unlockkey"
 descriptionAppend " "
 
