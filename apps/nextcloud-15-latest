@@ -10,6 +10,7 @@ checkTagExist php.success
 checkTagExist httpd.success
 
 echo "Downloading NextCloud 15" | log
+
 mkdir -p /var/www/html
 mkdir -p temp
 cd temp
@@ -19,11 +20,19 @@ waitOrStop 0
 rm -f platest-15.tar.bz2 
 chown -R www-data:www-data /var/www/html
 
+echo "Preparing database" | log
+
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE nextcloud CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON nextcloud.* TO 'nextcloud'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 
-cd /var/www/html && sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
+echo "Installing application" | log
+
+cd /var/www/html
+sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
+sudo -u www-data php occ db:convert-filecache-bigint --no-interaction
+
+echo "Configuring nginx" | log
 
 # Copy Virtual Host
 cp $rootDir/tweaks/extras/nextcloud15-nginx/nextcloud15-nginx-config /etc/nginx/sites-available/nextcloud15
@@ -37,13 +46,31 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx.service
 
+echo "Tweaking app and runtime settings" | log
+
+# installing image preview functionality
+apt install php-imagick -y
+# modify php.ini opcache settings
+sed -i '/opcache.enable=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.memory_consumption=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.interned_strings_buffer=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.max_accelerated_files=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.save_comments=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i "s/;opcache.enable_cli=0/opcache.enable_cli=1/g" /etc/php/7.2/fpm/php.ini
+sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" /etc/php/7.2/fpm/php.ini
+# modify www.conf settings
+sed -i '/env\[PATH\]/s/^;//g' /etc/php/7.2/fpm/pool.d/www.conf
 # Add Server IP to Trusted Servers
 sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${SERVERIP}',/" /var/www/html/config/config.php
 
+systemctl restart php7.2-fpm.service
+
+echo "Adding descriptions" | log
+
 descriptionAppend "Nextcloud URL: https://${SERVERIP}/"
-descriptionAppend " "
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
+descriptionAppend " "
 
 tagScript success
 
