@@ -1,0 +1,23 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist mongodb.success
+checkTagExist nodejs-11-offirepo.success
+
+cd /opt/ && git clone https://github.com/linnovate/mean
+cp /opt/mean/.env.example /opt/mean/.env
+cd /opt/mean && npm install | log
+
+descriptionAppend "To test mean.io stack functionality, go to mean folder"
+descriptionAppend "# cd /opt/mean"
+descriptionAppend "Start mean.io app with"
+descriptionAppend "# npm start"
+
+tagScript success
+
+exit 0

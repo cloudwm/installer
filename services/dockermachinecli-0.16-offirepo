@@ -29,7 +29,7 @@ sed -i 's/amazonec2/kamatera\namazonec2/' /etc/bash_completion.d/docker-machine.
 waitOrStop 0
 
 echo "Downloading CWM/Kamatera docker-machine-driver" |log
-base=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v0.0.3/docker-machine-driver-kamatera_v0.0.3_linux_amd64.tar.gz 
+base=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.0-RC1/docker-machine-driver-kamatera_v1.0.0-RC1_linux_amd64.tar.gz
 curl -o /tmp/docker-machine-driver-kamatera.tar.gz $base -L
 
 tar -xvf /tmp/docker-machine-driver-kamatera.tar.gz -C /tmp/

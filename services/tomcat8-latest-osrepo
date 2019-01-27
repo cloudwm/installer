@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt-get install -y tomcat8 tomcat8-admin | log
+waitOrStop 0
+
+# Enable Service
+systemctl enable tomcat8
+
+# Remove default configs
+rm -f /etc/tomcat8/tomcat-users.xml
+rm -f /etc/tomcat8/Catalina/localhost/manager.xml
+rm -f /etc/tomcat8/Catalina/localhost/host-manager.xml
+
+# Copy prebuilt configs
+cp $rootDir/tweaks/extras/tomcat8/tomcat-users.xml /etc/tomcat8/
+cp $rootDir/tweaks/extras/tomcat8/manager.xml /etc/tomcat8/Catalina/localhost/
+cp $rootDir/tweaks/extras/tomcat8/host-manager.xml /etc/tomcat8/Catalina/localhost/
+
+echo "<user username=\"tomcat\" password=\"${ADMINPASSWORD}\" roles=\"admin-gui,manager-gui\"/>" >> /etc/tomcat8/tomcat-users.xml
+echo "</tomcat-users>"  >> /etc/tomcat8/tomcat-users.xml
+
+systemctl restart tomcat8.service
+
+descriptionAppend "Apache Tomcat8 Front Page: ${SERVERIP}:8080"
+descriptionAppend "Apache Tomcat8 Manager App: ${SERVERIP}:8080/manager/html"
+descriptionAppend "Apache Tomcat8 Host Manager App: ${SERVERIP}:8080/host-manager/html"
+descriptionAppend "Apache Tomcat8 Username: tomcat"
+descriptionAppend "Apache Tomcat8 Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading jenkins repository and key" | log
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+waitOrStop 0
+
+echo "deb https://pkg.jenkins.io/debian-stable binary/" >> /etc/apt/sources.list
+waitOrStop 0
+
+apt update 
+apt install -y openjdk-8-jre-headless
+apt install -y jenkins
+
+unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
+
+descriptionAppend "Web interface URL: http://${SERVERIP}:8080"
+descriptionAppend "Unlock key: $unlockkey"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
