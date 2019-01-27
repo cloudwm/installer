@@ -50,11 +50,11 @@ echo "Tweaking app and runtime settings" | log
 # installing image preview functionality
 apt install php-imagick -y
 # modify php.ini opcache settings
-sed -i '/opcache.enable/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.memory_consumption/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.interned_strings_buffer/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.max_accelerated_files/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.save_comments/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.enable=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.memory_consumption=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.interned_strings_buffer=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.max_accelerated_files=/s/^;//g' /etc/php/7.2/fpm/php.ini
+sed -i '/opcache.save_comments=/s/^;//g' /etc/php/7.2/fpm/php.ini
 sed -i "s/;opcache.enable_cli=0/opcache.enable_cli=1/g" /etc/php/7.2/fpm/php.ini
 sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" /etc/php/7.2/fpm/php.ini
 # modify www.conf settings
