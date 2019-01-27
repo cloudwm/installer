@@ -47,6 +47,7 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
 
 echo "Tweaking app and runtime settings" | log
+
 # installing image preview functionality
 apt install php-imagick -y
 # modify php.ini opcache settings
@@ -67,9 +68,9 @@ systemctl restart php7.2-fpm.service
 echo "Adding descriptions" | log
 
 descriptionAppend "Nextcloud URL: https://${SERVERIP}/"
-descriptionAppend " "
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
+descriptionAppend " "
 
 tagScript success
 
