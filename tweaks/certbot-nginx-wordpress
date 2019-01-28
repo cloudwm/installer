@@ -10,7 +10,7 @@ checkTagExist wp-cli.success
 checkTagExist certbot-nginx.success
 
 ### install certificate on a wordpress domain ###
-domain=$(wp option get siteurl --allow-root --path /var/www/html/)
+domain=$(wp option get siteurl --allow-root --path=/var/www/html/ | awk -F[/:] '{print $4}')
 certbot --nginx --quiet --redirect -d $domain | log
 
 tag certbot-nginx-wordpress.success
