@@ -19,11 +19,13 @@ waitOrStop 0
 rm -f phpBB-3.2.5.tar.bz2
 chown -R www-data:www-data /var/www/html
 
-echo "Installing PhpBB3" | log
+echo "Preparing database" | log
 
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE phpbb3 CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON phpbb3.* TO 'phpbb3'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+
+echo "Installing PhpBB3" | log
 
 cat << EOF > /var/www/html/config.yml
 installer:
@@ -76,11 +78,12 @@ rm -rf /var/www/html/docs
 chmod 640 /var/www/html/config.php
 chown -R www-data:www-data /var/www/html
 
+echo "Adding descriptions" | log
 
 descriptionAppend "phpBB3 URL: https://${SERVERIP}/"
-descriptionAppend " "
 descriptionAppend "phpBB3 Username: admin "
 descriptionAppend "phpBB3 Password: ${ADMINPASSWORD} "
+descriptionAppend " "
 
 tagScript success
 
