@@ -9,15 +9,23 @@ fi
 checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
+echo "Downloading binary" | log
+
 mkdir -p temp
 cd temp
 curl -O http://swupdate.openvpn.org/as/openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
 waitOrStop 0
 
+echo "Installing application" | log
+
 dpkg -i openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
 rm -f openvpn-as-2.6.1-Ubuntu18.amd_64.deb
 
+echo "Configuring first user" | log
+
 echo "openvpn:$ADMINPASSWORD" | chpasswd
+
+echo "Adding descriptions" | log
 
 admin_ui=`grep "Admin" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 client_ui=`grep "Client" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
@@ -27,6 +35,9 @@ descriptionAppend "OpenVPN Username: openvpn"
 descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
 descriptionAppend "OpenVPN Client Interface URL: $client_ui"
+descriptionAppend " "
+descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
+descriptionAppend "OpenVPN Commandline tools: /usr/local/openvpn_as/scripts"
 descriptionAppend " "
 
 tagScript success
