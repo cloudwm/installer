@@ -6,11 +6,45 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-apt-get install -y memcached | log
+echo "Installing from repo" | log
+
+apt-get install -y memcached libmemcached-tools sasl2-bin | log
 waitOrStop 0
 
-# Enable Service
-systemctl enable memcached
+echo "Hardening security with SASL user" | log
+
+# enable SASL in memcached
+cat << EOF >> /etc/memcached.conf
+# Enable SASL
+-S
+EOF
+
+# create SASL configuration file
+mkdir /etc/sasl2
+cat << EOF > /etc/sasl2/memcached.conf
+mech_list: plain
+log_level: 5
+sasldb_path: /etc/sasl2/memcached-sasldb2
+EOF
+
+# generate password for user
+echo "$ADMINPASSWORD" | saslpasswd2 -p -c -a memcached -f /etc/sasl2/memcached-sasldb2 admin
+
+# let memcache use SASL user database
+chown memcache:memcache /etc/sasl2/memcached-sasldb2
+
+echo "Enabling Service" | log
+
+systemctl start memcached.service
+
+echo "Adding descriptions" | log
+
+descriptionAppend "Memcached config file: /etc/memcached.conf"
+descriptionAppend " "
+descriptionAppend "Memcached SASL config file: /etc/sasl2/memcached.conf"
+descriptionAppend "Memcached SASL username: admin"
+descriptionAppend "Memcached SASL password: ${ADMINPASSWORD}"
+descriptionAppend " "
 
 tagScript success
 
