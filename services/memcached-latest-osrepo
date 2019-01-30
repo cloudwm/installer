@@ -28,7 +28,7 @@ sasldb_path: /etc/sasl2/memcached-sasldb2
 EOF
 
 # generate password for user
-(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | saslpasswd2 -a memcached -c -f /etc/sasl2/memcached-sasldb2 admin
+echo "$ADMINPASSWORD" | saslpasswd2 -p -c -a memcached -f /etc/sasl2/memcached-sasldb2 admin
 
 # let memcache use SASL user database
 chown memcache:memcache /etc/sasl2/memcached-sasldb2
