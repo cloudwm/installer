@@ -29,7 +29,7 @@ EOF
 
 # generate password for user
 echo "$ADMINPASSWORD" | saslpasswd2 -p -c -a memcached -f /etc/sasl2/memcached-sasldb2 admin
-host=`hostname -s`
+host=`hostname -s | awk '{print tolower($0)}'`
 fullname="admin@$host"
 
 # let memcache use SASL user database
