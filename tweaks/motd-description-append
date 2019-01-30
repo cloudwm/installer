@@ -21,6 +21,14 @@ then
     echo "echo \" \""  >> /etc/update-motd.d/98-description
     echo "cat $rootDir/DESCRIPTION.TXT" >> /etc/update-motd.d/98-description
     echo "echo \" \""  >> /etc/update-motd.d/98-description
+
+    if [ -f "$CWMCONFIGFILE" ];
+    then
+        domainname=`cat $CWMCONFIGFILE | grep url= | awk -F . '{print $2"."$3}'`
+        echo "echo \"If you found any issue with this installation or have an idea how to improve this, please email us to: devteam@$domainname, thanks!\"" >> /etc/update-motd.d/98-description
+    fi
+
+    echo "echo \" \""  >> /etc/update-motd.d/98-description
     echo "echo \"==============================================================================\""  >> /etc/update-motd.d/98-description
     echo "echo \" \""  >> /etc/update-motd.d/98-description
     echo "echo \"To delete this message of the day: rm -rf /etc/update-motd.d/98-description  \""  >> /etc/update-motd.d/98-description
