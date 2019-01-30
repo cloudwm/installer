@@ -29,6 +29,8 @@ EOF
 
 # generate password for user
 echo "$ADMINPASSWORD" | saslpasswd2 -p -c -a memcached -f /etc/sasl2/memcached-sasldb2 admin
+host=`hostname -s`
+fullname="admin@$host"
 
 # let memcache use SASL user database
 chown memcache:memcache /etc/sasl2/memcached-sasldb2
@@ -42,7 +44,7 @@ echo "Adding descriptions" | log
 descriptionAppend "Memcached config file: /etc/memcached.conf"
 descriptionAppend " "
 descriptionAppend "Memcached SASL config file: /etc/sasl2/memcached.conf"
-descriptionAppend "Memcached SASL username: admin"
+descriptionAppend "Memcached SASL username: ${fullname}"
 descriptionAppend "Memcached SASL password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
