@@ -67,30 +67,16 @@ waitOrStop 0
 
 echo "Creating Website" | log
 
-apt install -y expect 
-waitOrStop 0 
-checkPackageInstalled expect
-
-export HOME=$appPath
 cd $appPath
-
-/usr/bin/expect << EOF
-
-set timeout 10
-spawn vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal
-
-expect "You are about to DROP all tables in your 'drupal' database. Do you want to continue? (yes/no) :"
-send "yes\r"
-
-expect eof
-
-EOF
-
-# vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
+# site install
+export HOME=$appPath
+echo "yes" | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
+sleep 5
+# update admin password
 vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
+# permissions and cleanup
 rm index.nginx-debian.html
 chown -R www-data:www-data .
-waitOrStop 0
 
 echo "Setting nginx config" | log
 
