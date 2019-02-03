@@ -12,6 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 rootDir=$(rootDir)
+appPath=/var/www/html
 
 echo "Creating Drupal Database" | log
 
@@ -20,21 +21,28 @@ echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT SELECT, INSERT
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 
 echo "Installing Composer for machine" | log
+
 apt install composer  -y | log
 waitOrStop 0
 checkPackageInstalled composer
 
 echo "Downloading latest Drupal" | log
-wget  https://www.drupal.org/download-latest/tar.gz -P /var/www/html
+
+mkdir -p $appPath
+mkdir -p temp
+cd temp
+curl -o drupal.tar.gz https://www.drupal.org/download-latest/tar.gz -L
 waitOrStop 0
 
-echo "Extracting Drupal to /var/www/html/" | log
-tar -xzvf /var/www/html/tar.gz -C /var/www/html/ --strip 1
-rm -f /var/www/html/tar.gz
+echo "Extracting Drupal to $appPath" | log
+
+tar -xzvf drupal.tar.gz -C $appPath/ --strip 1
+rm -f drupal.tar.gz
 waitOrStop 0
 
 echo "Setting misc definitions & permissions for Drupal" | log
-cd /var/www/html/sites/default
+
+cd $appPath/sites/default
 cp default.settings.php settings.php
 cp default.services.yml services.yml
 mkdir files/
@@ -42,32 +50,41 @@ chmod a+w *
 chown -R www-data:www-data files
 
 echo "Create temp swap for composer processes" | log
+
 #increase vm swappiness to allow swap to dominate process
 sysctl vm.swappiness=80
 # create swap file and moint as partition
 swapFilename=$(createSwapFile swapfile 900 $rootDir/_swap)
+sleep 5
 waitOrStop 0
 
 echo "Installing Drush" | log
-cd /var/www/html
+
+cd $appPath
 export COMPOSER_HOME=/root
 composer require drush/drush -v | log
 waitOrStop 0
 
 echo "Creating Website" | log
-export HOME=/var/www/html
-cd /var/www/html
-vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
+
+cd $appPath
+# site install
+export HOME=$appPath
+echo "yes" | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
+sleep 5
+# update admin password
 vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
+# permissions and cleanup
 rm index.nginx-debian.html
 chown -R www-data:www-data .
-waitOrStop 0
 
 echo "Setting nginx config" | log
+
 #main drupal config
 cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
 # specific configs supplied by nginx for drupal
-cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/conf.d/drupal-locations.conf
+mkdir -p /etc/nginx/config
+cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/drupal-locations.conf
 # Symlink drupal vhost
 ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
 # Remove default vhosts
@@ -76,16 +93,18 @@ rm -f /etc/nginx/sites-available/default-ssl
 rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-enabled/default-ssl
 
-systemctl restart nginx
+systemctl restart nginx.service
 
 echo "Remove temp swap" | log
+
 # set vm swappiness to recommended optimal case
 sysctl vm.swappiness=10
 # mount off and remove swap file 
 removeSwapFile $swapFilename
+sleep 5
 waitOrStop 0
 
-descriptionAppend "Drupal Admin URI: http://${SERVERIP}/admin"
+descriptionAppend "Drupal Admin URI: https://${SERVERIP}/user/login"
 descriptionAppend "Drupal Admin User: admin"
 descriptionAppend "Drupal Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "
