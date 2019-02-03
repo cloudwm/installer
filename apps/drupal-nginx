@@ -104,7 +104,7 @@ removeSwapFile $swapFilename
 sleep 5
 waitOrStop 0
 
-descriptionAppend "Drupal Admin URI: http://${SERVERIP}/admin"
+descriptionAppend "Drupal Admin URI: https://${SERVERIP}/user/login"
 descriptionAppend "Drupal Admin User: admin"
 descriptionAppend "Drupal Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "
