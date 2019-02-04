@@ -10,18 +10,10 @@ fi
 echo "Updating and upgrading OS to latest kernel and packages" | log
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
-
-bash -c "$(curl -sL https://git.io/vokNn)"
-
-# apt-get -qy update | log
-# apt-get -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade | log
-# apt-get -qy autoclean | log
-# apt upgrade -y | log
-# apt autoremove -y | log
-apt-fast -qy update | log
-apt-fast -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade | log
-apt-fast -qy autoclean | log
-apt-fast upgrade -y | log
-apt-fast autoremove -y | log
+apt-get -qy update | log
+apt-get -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade | log
+apt-get -qy autoclean | log
+apt upgrade -y | log
+apt autoremove -y | log
 
 tagScript success
