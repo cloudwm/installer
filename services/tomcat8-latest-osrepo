@@ -8,7 +8,7 @@ fi
 
 rootDir=$(rootDir)
 appPath=/etc/tomcat8
-bash -c "$(curl -sL https://git.io/vokNn)"
+# bash -c "$(curl -sL https://git.io/vokNn)"
 apt-fast install -y tomcat8 tomcat8-admin | log
 waitOrStop 0
 
