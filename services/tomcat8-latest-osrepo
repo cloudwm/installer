@@ -25,7 +25,7 @@ echo "Setting prebuilt configs" | log
 cp $rootDir/tweaks/extras/tomcat8/tomcat-users.xml $appPath/
 cp $rootDir/tweaks/extras/tomcat8/manager.xml $appPath/Catalina/localhost/
 cp $rootDir/tweaks/extras/tomcat8/host-manager.xml $appPath/Catalina/localhost/
-sed -i 's/password="password"/password="${ADMINPASSWORD}"/g' $appPath/tomcat-users.xml 
+sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/tomcat-users.xml 
 sed -i 's/Connector port="8080"/Connector port="9090"/g' $appPath/server.xml 
 
 echo "Restarting service" | log
