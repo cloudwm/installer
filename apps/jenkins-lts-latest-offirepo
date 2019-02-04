@@ -7,15 +7,15 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Downloading jenkins repository and key" | log
-curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | apt-key add -
 waitOrStop 0
 
-echo "deb https://pkg.jenkins.io/debian-stable binary/" >> /etc/apt/sources.list
+echo "deb https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list
 waitOrStop 0
 
 apt update 
-apt install -y openjdk-8-jre-headless
-apt install -y jenkins
+apt install -y openjdk-8-jre-headless jenkins
+waitOrStop 0
 
 unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
 
