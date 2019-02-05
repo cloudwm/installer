@@ -24,12 +24,12 @@ waitOrStop 0
 echo "Tweaking server settings" | log
 sed -i 's/HTTP_PORT=8080/HTTP_PORT=9090/g' /etc/default/jenkins
 sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenkins
+unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
 
 echo "Restarting service" | log
 systemctl restart jenkins
 
 echo "Adding descriptions" | log
-unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
 descriptionAppend "Initial setup URL: http://${SERVERIP}:9090"
 descriptionAppend "Unlock key: $unlockkey"
 descriptionAppend " "
