@@ -6,32 +6,38 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-apt-get install -y tomcat8 tomcat8-admin | log
+rootDir=$(rootDir)
+appPath=/etc/tomcat8
+
+echo "Installing main application" | log
+apt install -y tomcat8 tomcat8-admin tomcat8-docs tomcat8-examples
 waitOrStop 0
 
-# Enable Service
+echo "Enabling service" | log
 systemctl enable tomcat8
 
-# Remove default configs
-rm -f /etc/tomcat8/tomcat-users.xml
-rm -f /etc/tomcat8/Catalina/localhost/manager.xml
-rm -f /etc/tomcat8/Catalina/localhost/host-manager.xml
+echo "Removing default configs" | log 
+rm -f $appPath/tomcat-users.xml
+rm -f $appPath/Catalina/localhost/manager.xml
+rm -f $appPath/Catalina/localhost/host-manager.xml
 
-# Copy prebuilt configs
-cp $rootDir/tweaks/extras/tomcat8/tomcat-users.xml /etc/tomcat8/
-cp $rootDir/tweaks/extras/tomcat8/manager.xml /etc/tomcat8/Catalina/localhost/
-cp $rootDir/tweaks/extras/tomcat8/host-manager.xml /etc/tomcat8/Catalina/localhost/
+echo "Setting prebuilt configs" | log
+cp $rootDir/tweaks/extras/tomcat8/tomcat-users.xml $appPath/
+cp $rootDir/tweaks/extras/tomcat8/manager.xml $appPath/Catalina/localhost/
+cp $rootDir/tweaks/extras/tomcat8/host-manager.xml $appPath/Catalina/localhost/
+sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/tomcat-users.xml 
+sed -i 's/Connector port="8080"/Connector port="9090"/g' $appPath/server.xml 
 
-echo "<user username=\"tomcat\" password=\"${ADMINPASSWORD}\" roles=\"admin-gui,manager-gui\"/>" >> /etc/tomcat8/tomcat-users.xml
-echo "</tomcat-users>"  >> /etc/tomcat8/tomcat-users.xml
+echo "Restarting service" | log
+systemctl restart tomcat8
 
-systemctl restart tomcat8.service
-
-descriptionAppend "Apache Tomcat8 Front Page: ${SERVERIP}:8080"
-descriptionAppend "Apache Tomcat8 Manager App: ${SERVERIP}:8080/manager/html"
-descriptionAppend "Apache Tomcat8 Host Manager App: ${SERVERIP}:8080/host-manager/html"
-descriptionAppend "Apache Tomcat8 Username: tomcat"
-descriptionAppend "Apache Tomcat8 Password: ${ADMINPASSWORD}"
+echo "Adding descriptions" | log
+descriptionAppend "Apache Tomcat8 front page: ${SERVERIP}:9090"
+descriptionAppend "Apache Tomcat8 manager app: ${SERVERIP}:9090/manager/html"
+descriptionAppend "Apache Tomcat8 host manager app: ${SERVERIP}:9090/host-manager/html"
+descriptionAppend "Apache Tomcat8 admin username: admin"
+descriptionAppend "Apache Tomcat8 admin password: ${ADMINPASSWORD}"
+descriptionAppend "Apache Tomcat8 config files: ${appPath}"
 descriptionAppend " "
 
 tagScript success
