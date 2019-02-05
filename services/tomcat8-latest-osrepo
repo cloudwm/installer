@@ -10,7 +10,7 @@ rootDir=$(rootDir)
 appPath=/etc/tomcat8
 
 echo "Installing main application" | log
-apt install -y tomcat8 tomcat8-admin
+apt install -y tomcat8 tomcat8-admin tomcat8-docs tomcat8-examples
 waitOrStop 0
 
 echo "Enabling service" | log
@@ -29,7 +29,7 @@ sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/tomcat
 sed -i 's/Connector port="8080"/Connector port="9090"/g' $appPath/server.xml 
 
 echo "Restarting service" | log
-systemctl restart tomcat8.service
+systemctl restart tomcat8
 
 echo "Adding descriptions" | log
 descriptionAppend "Apache Tomcat8 front page: ${SERVERIP}:9090"
