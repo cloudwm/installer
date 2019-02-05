@@ -27,10 +27,10 @@ sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenki
 
 echo "Restarting service" | log
 systemctl restart jenkins
+sleep 5
 
 echo "Adding descriptions" | log
-sleep 5
-unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
+unlockkey="$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
 descriptionAppend "Initial setup URL: http://${SERVERIP}:9090"
 descriptionAppend "Unlock key: $unlockkey"
 descriptionAppend " "
