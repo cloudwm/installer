@@ -25,8 +25,9 @@ apt-fast update
 apt-fast install -y jenkins
 waitOrStop 0
 
-echo "Changing default port to 9090" | log
+echo "Tweaking server settings" | log
 sed -i 's/HTTP_PORT=8080/HTTP_PORT=9090/g' /etc/default/jenkins
+sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenkins
 
 echo "Adding descriptions" | log
 unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
