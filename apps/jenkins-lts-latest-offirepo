@@ -27,7 +27,7 @@ sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenki
 
 echo "Restarting service" | log
 systemctl restart jenkins
-sleep 5
+sleep 10
 
 echo "Adding descriptions" | log
 unlockkey="$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
