@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Downloading jenkins repository and key" | log
+echo "Setting jenkins repository and key" | log
 curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | apt-key add -
 waitOrStop 0
 
@@ -15,17 +15,22 @@ waitOrStop 0
 
 bash -c "$(curl -sL https://git.io/vokNn)" 
 
+echo "Installing openjdk" | log
 apt-fast update
 apt-fast install -y openjdk-8-jre-headless
 waitOrStop 0
 
+echo "Installing jenkins" | log
 apt-fast update
 apt-fast install -y jenkins
 waitOrStop 0
 
-unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
+echo "Changing default port to 9090" | log
+sed -i 's/HTTP_PORT=8080/HTTP_PORT=9090/g' /etc/default/jenkins
 
-descriptionAppend "Web interface URL: http://${SERVERIP}:8080"
+echo "Adding descriptions" | log
+unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
+descriptionAppend "Web interface URL: http://${SERVERIP}:9090"
 descriptionAppend "Unlock key: $unlockkey"
 descriptionAppend " "
 
