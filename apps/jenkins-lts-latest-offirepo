@@ -30,8 +30,11 @@ systemctl restart jenkins
 
 echo "Adding descriptions" | log
 unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
-descriptionAppend "Web interface URL: http://${SERVERIP}:9090"
+descriptionAppend "Initial setup URL: http://${SERVERIP}:9090"
 descriptionAppend "Unlock key: $unlockkey"
+descriptionAppend " "
+descriptionAppend "If dashboard stays blank after initial setup, restart the server:"
+descriptionAppend "# systemctl restart jenkins"
 descriptionAppend " "
 
 tagScript success
