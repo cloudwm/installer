@@ -7,7 +7,7 @@ fi
 
 checkTagExist ufw.success
 
-ufw allow 8080 | log
+ufw allow 9090 | log
 
 ufw status | log
 
