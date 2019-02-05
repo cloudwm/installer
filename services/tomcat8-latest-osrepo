@@ -32,11 +32,12 @@ echo "Restarting service" | log
 systemctl restart tomcat8.service
 
 echo "Adding descriptions" | log
-descriptionAppend "Apache Tomcat8 Front Page: ${SERVERIP}:9090"
-descriptionAppend "Apache Tomcat8 Manager App: ${SERVERIP}:9090/manager/html"
-descriptionAppend "Apache Tomcat8 Host Manager App: ${SERVERIP}:9090/host-manager/html"
-descriptionAppend "Apache Tomcat8 Username: admin"
-descriptionAppend "Apache Tomcat8 Password: ${ADMINPASSWORD}"
+descriptionAppend "Apache Tomcat8 front page: ${SERVERIP}:9090"
+descriptionAppend "Apache Tomcat8 manager app: ${SERVERIP}:9090/manager/html"
+descriptionAppend "Apache Tomcat8 host manager app: ${SERVERIP}:9090/host-manager/html"
+descriptionAppend "Apache Tomcat8 admin username: admin"
+descriptionAppend "Apache Tomcat8 admin password: ${ADMINPASSWORD}"
+descriptionAppend "Apache Tomcat8 config files: ${appPath}"
 descriptionAppend " "
 
 tagScript success
