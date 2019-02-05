@@ -13,9 +13,14 @@ waitOrStop 0
 echo "deb https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list
 waitOrStop 0
 
-apt update
 bash -c "$(curl -sL https://git.io/vokNn)" 
-apt-fast install -y openjdk-8-jre-headless jenkins
+
+apt-fast update
+apt-fast install -y openjdk-8-jre-headless
+waitOrStop 0
+
+apt-fast update
+apt-fast install -y jenkins
 waitOrStop 0
 
 unlockkey=`cat /var/lib/jenkins/secrets/initialAdminPassword`
