@@ -11,7 +11,6 @@ if [ -f "/etc/update-motd.d/98-install-in-progress" ];
 then
     echo "Removing Install in Progress SSH banner" | log
     rm -rf /etc/update-motd.d/98-install-in-progress
-    sleep 30
     tagScript success
     exit 0
 fi
