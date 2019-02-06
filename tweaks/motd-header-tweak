@@ -17,8 +17,10 @@ rm -f /etc/update-motd.d/10-help-text
 echo "Removing 50-motd-news" | log
 rm -f /etc/update-motd.d/50-motd-news
 
+echo "Updating list of packages to upate" | log
+echo -e "\n$(/usr/lib/update-notifier/apt-check --human-readable)\n" > /var/lib/update-notifier/updates-available
+
 update-motd
-waitOrStop 0
 
 tagScript success
 
