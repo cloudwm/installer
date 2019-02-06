@@ -26,7 +26,6 @@ sed -i 's/HTTP_PORT=8080/HTTP_PORT=9090/g' /etc/default/jenkins
 sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenkins
 sleep 30
 unlockkey="$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
-# unlockkey="$(grep -A 2 'following password' /var/log/jenkins/jenkins.log | tail -1)"
 
 echo "Restarting service" | log
 systemctl restart jenkins
