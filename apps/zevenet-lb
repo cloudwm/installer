@@ -33,7 +33,7 @@ waitOrStop 0
 
 ### install zevenet gui and core ###
 
-apt install -y zevenet-gui-ce zevenet | log
+apt install -y zevenet-gui-ce zevenet nftables | log
 
 waitOrStop 0
 
