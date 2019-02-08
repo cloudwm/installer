@@ -6,10 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-
-add-apt-repository ppa:cherokee-webserver
-
-apt-get install software-properties-common
+vps_ip=$(cat /root/guest.conf | grep ip0 | cut -d'=' -f2)
+mkdir /root/tmp
+cp /etc/network/interfaces /root/tmp/interfaces
+apt-get install software-properties-common -y
 apt install libev4 libjansson4 -y
 wget -O - http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
 echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
@@ -17,6 +17,6 @@ apt-get update
 wget -O nftlll.deb  http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb && dpkg -i nftlll.deb && rm -rf nftlll.deb
 wget -O libnftables.deb http://ftp.debian.org/debian/pool/main/n/nftables/libnftables0_0.9.0-2_amd64.deb && dpkg -i libnftables.deb && rm -rf libnftables.deb
 wget -O nftlb.deb http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/nftlb_0.2-1_amd64.deb && dpkg -i nftlb.deb && rm -rf nftlb.deb
-apt install -y zevenet
-
-
+apt install -y zevenet-gui-ce zevenet
+cp /root/tmp/interfaces /etc/network/interfaces
+sed -i 's/\;\;/\;'"${vps_ip}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
