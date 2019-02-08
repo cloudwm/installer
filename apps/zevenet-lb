@@ -39,7 +39,7 @@ waitOrStop 0
 
 ### copy backed up network config ###
 
-cp /root/tmp/interfaces /etc/network/interfaces
+cp $(rootDir)/tmp/interfaces /etc/network/interfaces
 
 ### configre zevenet virtual ip ###
 sed -i 's/\;\;/\;'"${vps_ip}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
