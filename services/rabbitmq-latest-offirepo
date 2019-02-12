@@ -17,9 +17,11 @@ echo "Install Erlang & Rabbitmq" | log
 
 apt install erlang-nox -y
 waitOrStop 0
+checkPackageInstalled erlang-nox
 
 apt install rabbitmq-server -y
 waitOrStop 0
+checkPackageInstalled rabbitmq-server
 
 # echo "tweak file desc limit to use machine" | log
 # run ulimit -S -n 4096?

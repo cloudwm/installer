@@ -15,11 +15,13 @@ echo "Installing openjdk" | log
 apt update
 apt install -y openjdk-8-jre-headless
 waitOrStop 0
+checkPackageInstalled openjdk-8-jre-headless
 
 echo "Installing jenkins" | log
 apt update
 apt install -y jenkins
 waitOrStop 0
+checkPackageInstalled jenkins
 
 echo "Tweaking server settings" | log
 sed -i 's/HTTP_PORT=8080/HTTP_PORT=9090/g' /etc/default/jenkins

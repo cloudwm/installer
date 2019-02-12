@@ -27,5 +27,6 @@ systemctl restart ntp
 sleep 5 # Waiting for daemon to start
 ntpdate  -u localhost
 
+tag ntpd.success
 tagScript success
 exit 0

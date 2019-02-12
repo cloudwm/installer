@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist php.success
-checkTagExist httpd.success
+checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 

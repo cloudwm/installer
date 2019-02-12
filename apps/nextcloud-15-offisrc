@@ -7,7 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist php.success
-checkTagExist httpd.success
+checkTagExist nginx.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
 
 echo "Downloading NextCloud 15" | log
 
@@ -50,6 +53,9 @@ echo "Tweaking app and runtime settings" | log
 
 # installing image preview functionality
 apt install php-imagick -y
+waitOrStop 0
+checkPackageInstalled php-imagick
+
 # modify php.ini opcache settings
 sed -i '/opcache.enable=/s/^;//g' /etc/php/7.2/fpm/php.ini
 sed -i '/opcache.memory_consumption=/s/^;//g' /etc/php/7.2/fpm/php.ini
