@@ -37,6 +37,7 @@ descriptionAppend "Access server with curl to see a respone"
 descriptionAppend "# curl http://localhost:3000"
 descriptionAppend " "
 
+tag nodejs.success
 tagScript success
 
 exit 0

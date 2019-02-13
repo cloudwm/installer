@@ -16,6 +16,7 @@ apt update
 # install nginx from apt
 apt install nginx -y | log
 waitOrStop 0
+checkPackageInstalled nginx
 
 echo "Changing ownership of /var/www/html to www-data user" | log
 chown -R www-data:www-data /var/www/html

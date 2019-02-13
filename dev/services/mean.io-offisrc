@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist mongodb.success
-checkTagExist nodejs-11-offirepo.success
+checkTagExist nodejs.success
 
 cd /opt/ && git clone https://github.com/linnovate/mean
 cp /opt/mean/.env.example /opt/mean/.env
