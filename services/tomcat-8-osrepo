@@ -12,6 +12,7 @@ appPath=/etc/tomcat8
 echo "Installing main application" | log
 apt install -y tomcat8 tomcat8-admin tomcat8-docs tomcat8-examples
 waitOrStop 0
+checkPackageInstalled tomcat8
 
 echo "Enabling service" | log
 systemctl enable tomcat8
