@@ -17,7 +17,8 @@ waitOrStop 0
 
 echo "Add zevenet repository" | log
 curl -fsSL http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
-echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
+# echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
+echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list
 apt-fast update
 waitOrStop 0
 
