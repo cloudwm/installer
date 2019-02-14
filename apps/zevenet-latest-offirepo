@@ -8,12 +8,10 @@ fi
 
 rootDir=$(rootDir)
 # vps_ip=$(cat /root/guest.conf | grep ip0 | cut -d'=' -f2)
-mkdir $(rootDir)/tmp
+mkdir -p $(rootDir)/temp
 
-echo "Backup ip settings and install deps" | log
-cp /etc/network/interfaces $(rootDir)/tmp/interfaces
-apt-fast install software-properties-common libev4 libjansson4 -y
-waitOrStop 0
+echo "Backup ip settings" | log
+cp /etc/network/interfaces $(rootDir)/temp/interfaces
 
 echo "Add zevenet repository" | log
 curl -fsSL http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
@@ -22,7 +20,14 @@ echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list
 apt-fast update
 waitOrStop 0
 
+echo "Install dependencies" | log
+apt-fast install software-properties-common libev4 libjansson4 -y
+waitOrStop 0
+
 echo "Install dependencies manually" | log
+
+cd $(rootDir)/temp
+
 curl -Lo nftlll.deb  http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb  | log
 waitOrStop 0
 dpkg -i nftlll.deb 
@@ -39,17 +44,21 @@ dpkg -i nftlb.deb
 rm -rf nftlb.deb
 
 echo "Install zevenet gui and core" | log
-apt-fast install -y nftables | log
+apt-fast install -y nftables zevenet zevenet-gui-ce | log
 waitOrStop 0
 sleep 5
-apt-fast install -y zevenet | log
-waitOrStop 0
-sleep 5
-apt-fast install -y zevenet-gui-ce | log
-waitOrStop 0
+
+# apt-fast install -y nftables | log
+# waitOrStop 0
+# sleep 5
+# apt-fast install -y zevenet | log
+# waitOrStop 0
+# sleep 5
+# apt-fast install -y zevenet-gui-ce | log
+# waitOrStop 0
 
 echo "Copy backed up network config" | log
-cp $(rootDir)/tmp/interfaces /etc/network/interfaces
+cp $(rootDir)/temp/interfaces /etc/network/interfaces
 
 echo "Configre zevenet virtual ip" | log
 # sed -i 's/\;\;/\;'"${vps_ip}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
