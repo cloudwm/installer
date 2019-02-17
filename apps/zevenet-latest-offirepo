@@ -7,7 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-# vps_ip=$(cat /root/guest.conf | grep ip0 | cut -d'=' -f2)
 mkdir -p $(rootDir)/temp
 
 echo "Backup ip settings" | log
@@ -48,20 +47,10 @@ apt-fast install -y nftables zevenet zevenet-gui-ce | log
 waitOrStop 0
 sleep 5
 
-# apt-fast install -y nftables | log
-# waitOrStop 0
-# sleep 5
-# apt-fast install -y zevenet | log
-# waitOrStop 0
-# sleep 5
-# apt-fast install -y zevenet-gui-ce | log
-# waitOrStop 0
-
 echo "Copy backed up network config" | log
 cp $(rootDir)/temp/interfaces /etc/network/interfaces
 
 echo "Configre zevenet virtual ip" | log
-# sed -i 's/\;\;/\;'"${vps_ip}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
 sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
 
 # echo "Adding descriptions" | log
