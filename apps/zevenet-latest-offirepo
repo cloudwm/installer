@@ -53,6 +53,9 @@ cp $(rootDir)/temp/interfaces /etc/network/interfaces
 echo "Configre zevenet virtual ip" | log
 sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
 
+echo "Configure port 4444 not blocked by system" | log
+sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = 4444/" /usr/local/zevenet/app/cherokee/etc/cherokee/cherokee.conf
+
 # echo "Adding descriptions" | log
 
 tagScript success
