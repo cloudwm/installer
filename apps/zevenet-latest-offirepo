@@ -7,15 +7,15 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-mkdir -p $(rootDir)/temp
+mkdir -p $rootDir/temp
+appPath=/usr/local/zevenet
 
 echo "Backup ip settings" | log
-cp /etc/network/interfaces $(rootDir)/temp/interfaces
+cp /etc/network/interfaces $rootDir/temp/interfaces
 
 echo "Add zevenet repository" | log
 curl -fsSL http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
 echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
-# echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list
 apt-fast update
 waitOrStop 0
 
@@ -25,7 +25,7 @@ waitOrStop 0
 
 echo "Install dependencies manually" | log
 
-cd $(rootDir)/temp
+cd $rootDir/temp
 
 curl -Lo nftlll.deb  http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb  | log
 waitOrStop 0
@@ -47,19 +47,17 @@ apt-fast install -y nftables zevenet zevenet-gui-ce | log
 waitOrStop 0
 sleep 5
 
-echo "Copy backed up network config" | log
-cp $(rootDir)/temp/interfaces /etc/network/interfaces
-
-echo "Configre zevenet virtual ip" | log
-sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
-
-echo "Configure port 4444 not blocked by system" | log
-sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = 4444/" /usr/local/zevenet/app/cherokee/etc/cherokee/cherokee.conf
-
-echo "Generating random zapi key" | log
+echo "Tweaking configurations" | log
+# Overwrite with backed up network config
+cp $rootDir/temp/interfaces /etc/network/interfaces
+# Configre zevenet virtual ip
+sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' $appPath/config/if_eth0_conf
+# Configure port 4444 not blocked by system
+sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = 4444/" $appPath/app/cherokee/etc/cherokee/cherokee.conf
+# Generate and apply random zapi key
 zapi_key=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 ; echo ''`
-sed -i "s/\$zapikey=\"\"\;/\$zapikey=\"${zapi_key}\"\;/" /usr/local/zevenet/config/global.conf
-
+sed -i "s/\$zapikey=\"\"\;/\$zapikey=\"${zapi_key}\"\;/" $appPath/config/global.conf
+# Restart server to apply changes
 /etc/init.d/cherokee restart
 sleep 5
 
@@ -70,6 +68,9 @@ descriptionAppend "Zevenet Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Zevenet API Key: ${zapi_key}"
 descriptionAppend "Zevenet API Reference: https://www.zevenet.com/zapidoc_ce_v4.0/"
+descriptionAppend " "
+descriptionAppend "Zevenet Configuration Directory: ${appPath}/config/"
+descriptionAppend "Cherokee Server Configuration: ${appPath}/app/cherokee/etc/cherokee/cherokee.conf"
 descriptionAppend " "
 
 tagScript success
