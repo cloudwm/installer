@@ -9,6 +9,7 @@ fi
 rootDir=$(rootDir)
 mkdir -p $rootDir/temp
 appPath=/usr/local/zevenet
+freePort="4444"
 
 echo "Backup ip settings" | log
 cp /etc/network/interfaces $rootDir/temp/interfaces
@@ -16,11 +17,11 @@ cp /etc/network/interfaces $rootDir/temp/interfaces
 echo "Add zevenet repository" | log
 curl -fsSL http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
 echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
-apt-fast update
+apt update
 waitOrStop 0
 
 echo "Install dependencies" | log
-apt-fast install software-properties-common libev4 libjansson4 -y
+apt install software-properties-common libev4 libjansson4 -y
 waitOrStop 0
 
 echo "Install dependencies manually" | log
@@ -43,7 +44,7 @@ dpkg -i nftlb.deb
 rm -rf nftlb.deb
 
 echo "Install zevenet gui and core" | log
-apt-fast install -y nftables zevenet zevenet-gui-ce | log
+apt install -y nftables zevenet zevenet-gui-ce | log
 waitOrStop 0
 sleep 5
 
@@ -52,8 +53,8 @@ echo "Tweaking configurations" | log
 cp $rootDir/temp/interfaces /etc/network/interfaces
 # Configre zevenet virtual ip
 sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' $appPath/config/if_eth0_conf
-# Configure port 4444 not blocked by system
-sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = 4444/" $appPath/app/cherokee/etc/cherokee/cherokee.conf
+# Configure free port not blocked by system
+sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = ${freePort}/" $appPath/app/cherokee/etc/cherokee/cherokee.conf
 # Generate and apply random zapi key
 zapi_key=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 ; echo ''`
 sed -i "s/\$zapikey=\"\"\;/\$zapikey=\"${zapi_key}\"\;/" $appPath/config/global.conf
@@ -62,7 +63,7 @@ sed -i "s/\$zapikey=\"\"\;/\$zapikey=\"${zapi_key}\"\;/" $appPath/config/global.
 sleep 5
 
 echo "Adding descriptions" | log
-descriptionAppend "Zevenet Admin URI: https://${SERVERIP}:4444"
+descriptionAppend "Zevenet Admin URI: https://${SERVERIP}:${freePort}"
 descriptionAppend "Zevenet Admin User: root"
 descriptionAppend "Zevenet Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "
