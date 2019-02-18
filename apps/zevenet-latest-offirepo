@@ -14,8 +14,8 @@ cp /etc/network/interfaces $(rootDir)/temp/interfaces
 
 echo "Add zevenet repository" | log
 curl -fsSL http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
-# echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
-echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list
+echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
+# echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list
 apt-fast update
 waitOrStop 0
 
@@ -56,7 +56,21 @@ sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
 echo "Configure port 4444 not blocked by system" | log
 sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = 4444/" /usr/local/zevenet/app/cherokee/etc/cherokee/cherokee.conf
 
-# echo "Adding descriptions" | log
+echo "Generating random zapi key" | log
+zapi_key=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 ; echo ''`
+sed -i "s/\$zapikey=\"\"\;/\$zapikey=\"${zapi_key}\"\;/" /usr/local/zevenet/config/global.conf
+
+/etc/init.d/cherokee restart
+sleep 5
+
+echo "Adding descriptions" | log
+descriptionAppend "Zevenet Admin URI: https://${SERVERIP}:4444"
+descriptionAppend "Zevenet Admin User: root"
+descriptionAppend "Zevenet Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Zevenet API Key: ${zapi_key}"
+descriptionAppend "Zevenet API Reference: https://www.zevenet.com/zapidoc_ce_v4.0/"
+descriptionAppend " "
 
 tagScript success
 
