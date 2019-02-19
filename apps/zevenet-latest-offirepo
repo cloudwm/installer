@@ -7,43 +7,72 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
+mkdir -p $rootDir/temp
+appPath=/usr/local/zevenet
+freePort="4444"
 
-vps_ip=$(cat /root/guest.conf | grep ip0 | cut -d'=' -f2)
+echo "Backup ip settings" | log
+cp /etc/network/interfaces $rootDir/temp/interfaces
 
-mkdir $(rootDir)/tmp
-
-### backup ip settings and install deps ###
-cp /etc/network/interfaces $(rootDir)/tmp/interfaces
-apt-get install software-properties-common libev4 libjansson4 -y
-waitOrStop 0
-
-### add zevenet repository ###
-wget -O - http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
+echo "Add zevenet repository" | log
+curl -fsSL http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
 echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
-apt-get update
+apt update
 waitOrStop 0
 
-### install deps manually ###
-wget -O nftlll.deb  http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb && dpkg -i nftlll.deb && rm -rf nftlll.deb | log
-waitOrStop 0
-wget -O libnftables.deb http://ftp.debian.org/debian/pool/main/n/nftables/libnftables0_0.9.0-2_amd64.deb && dpkg -i libnftables.deb && rm -rf libnftables.deb | log
-waitOrStop 0
-wget -O nftlb.deb http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/nftlb_0.2-1_amd64.deb && dpkg -i nftlb.deb && rm -rf nftlb.deb | log
+echo "Install dependencies" | log
+apt install software-properties-common libev4 libjansson4 -y
 waitOrStop 0
 
-### install zevenet gui and core ###
+echo "Install dependencies manually" | log
 
-apt install -y zevenet-gui-ce zevenet nftables | log
+cd $rootDir/temp
 
+curl -Lo nftlll.deb  http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb  | log
 waitOrStop 0
+dpkg -i nftlll.deb 
+rm -rf nftlll.deb
 
-### copy backed up network config ###
-
-cp $(rootDir)/tmp/interfaces /etc/network/interfaces
-
-### configre zevenet virtual ip ###
-sed -i 's/\;\;/\;'"${vps_ip}"\;'/g' /usr/local/zevenet/config/if_eth0_conf
+curl -Lo libnftables.deb http://ftp.debian.org/debian/pool/main/n/nftables/libnftables0_0.9.0-2_amd64.deb | log
 waitOrStop 0
+dpkg -i libnftables.deb 
+rm -rf libnftables.deb
+
+curl -Lo nftlb.deb http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/nftlb_0.2-1_amd64.deb | log 
+waitOrStop 0
+dpkg -i nftlb.deb 
+rm -rf nftlb.deb
+
+echo "Install zevenet gui and core" | log
+apt install -y nftables zevenet zevenet-gui-ce | log
+waitOrStop 0
+sleep 5
+
+echo "Tweaking configurations" | log
+# Overwrite with backed up network config
+cp $rootDir/temp/interfaces /etc/network/interfaces
+# Configre zevenet virtual ip
+sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' $appPath/config/if_eth0_conf
+# Configure free port not blocked by system
+sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = ${freePort}/" $appPath/app/cherokee/etc/cherokee/cherokee.conf
+# Generate and apply random zapi key
+zapi_key=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 ; echo ''`
+sed -i "s/\$zapikey=\"\"\;/\$zapikey=\"${zapi_key}\"\;/" $appPath/config/global.conf
+# Restart server to apply changes
+/etc/init.d/cherokee restart
+sleep 5
+
+echo "Adding descriptions" | log
+descriptionAppend "Zevenet Admin URI: https://${SERVERIP}:${freePort}"
+descriptionAppend "Zevenet Admin User: root"
+descriptionAppend "Zevenet Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Zevenet API Key: ${zapi_key}"
+descriptionAppend "Zevenet API Reference: https://www.zevenet.com/zapidoc_ce_v4.0/"
+descriptionAppend " "
+descriptionAppend "Zevenet Configuration Directory: ${appPath}/config/"
+descriptionAppend "Cherokee Server Configuration: ${appPath}/app/cherokee/etc/cherokee/cherokee.conf"
+descriptionAppend " "
 
 tagScript success
 
