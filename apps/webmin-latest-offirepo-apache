@@ -20,10 +20,10 @@ apt install -y software-properties-common apt-transport-https webmin
 
 echo "Configure app to use SSL" | log
 
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/webmin/server.key -out /etc/webmin/server.crt -days 120 -nodes -subj '/CN=localhost'
-cat /etc/webmin/server.crt /etc/webmin/server.key > /etc/webmin/server.pem
-sed -i '/keyfile/s/miniserv/server/g' /etc/webmin/miniserv.conf
-echo "referer=localhost" >> /etc/webmin/config     
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/webmin/webmin.key -out /etc/webmin/webmin.crt -days 1024 -nodes -subj '/CN=localhost'
+cat /etc/webmin/webmin.crt /etc/webmin/webmin.key > /etc/webmin/webmin.pem
+sed -i '/keyfile/s/miniserv/webmin/g' /etc/webmin/miniserv.conf
+echo "referer=localhost" >> /etc/webmin/config
 service webmin restart
 
 echo "Enable Apache SSL + proxy" | log
@@ -41,7 +41,7 @@ descriptionAppend "Webmin web interface: https://${SERVERIP}"
 descriptionAppend "Webmin admin user: root"
 descriptionAppend "Webmin admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "Webmin application location: /etc/webmin/"
+descriptionAppend "Webmin app location: /etc/webmin/"
 descriptionAppend "Webmin main configuration: /etc/webmin/config"
 descriptionAppend "Webmin mini-server location: /var/webmin/"
 descriptionAppend "Webmin mini-server configuration: /etc/webmin/miniserv.conf"
