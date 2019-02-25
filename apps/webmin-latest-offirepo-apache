@@ -12,6 +12,7 @@ echo "Install app from official repository" | log
 
 echo "deb http://download.webmin.com/download/repository sarge contrib" > /etc/apt/sources.list.d/webmin.list
 curl -fsSL http://www.webmin.com/jcameron-key.asc | apt-key add -
+waitOrStop 0
 apt update
 apt install -y software-properties-common apt-transport-https webmin
 
@@ -23,12 +24,10 @@ sed -i '/keyfile/s/miniserv/server/g' /etc/webmin/miniserv.conf
 echo "referer=localhost" >> /etc/webmin/config     
 service webmin restart
 
-echo "Install Apache server + proxy + SSL" | log
+echo "Enable Apache SSL + proxy" | log
 
-apt install -y apache2
 a2enmod proxy_http
 a2enmod ssl
-ufw allow in "Apache Full"
 cp $rootDir/tweaks/extras/webmin-apache/webmin.conf /etc/apache2/sites-available/webmin.conf
 sed -i "/ServerName/s/SERVERIP/${SERVERIP}/g" /etc/apache2/sites-available/webmin.conf
 a2ensite webmin.conf
