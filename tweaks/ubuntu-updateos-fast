@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Updating and upgrading OS to latest kernel and packages" | log
+export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_PRIORITY=critical
+bash -c "$(curl -sL https://git.io/vokNn)"
+apt-fast -qy update | log
+apt-fast -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade | log
+apt-fast -qy autoclean | log
+apt-fast upgrade -y | log
+apt-fast autoremove -y | log
+
+tagScript success
