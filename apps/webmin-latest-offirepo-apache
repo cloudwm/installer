@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist apache2.success
+
 rootDir=$(rootDir)
 
 echo "Install app from official repository" | log
@@ -32,6 +34,20 @@ cp $rootDir/tweaks/extras/webmin-apache/webmin.conf /etc/apache2/sites-available
 sed -i "/ServerName/s/SERVERIP/${SERVERIP}/g" /etc/apache2/sites-available/webmin.conf
 a2ensite webmin.conf
 systemctl reload apache2
+
+echo "Adding descriptions" | log
+
+descriptionAppend "Webmin web interface: https://${SERVERIP}"
+descriptionAppend "Webmin admin user: root"
+descriptionAppend "Webmin admin password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Webmin application location: /etc/webmin/"
+descriptionAppend "Webmin main configuration: /etc/webmin/config"
+descriptionAppend "Webmin mini-server location: /var/webmin/"
+descriptionAppend "Webmin mini-server configuration: /etc/webmin/miniserv.conf"
+descriptionAppend " "
+descriptionAppend "Webmin-Apache proxy configuration: /etc/apache2/sites-available/webmin.conf"
+descriptionAppend " "
 
 tagScript success
 
