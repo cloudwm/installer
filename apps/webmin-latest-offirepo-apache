@@ -6,39 +6,32 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+
+echo "Install app from official repository" | log
+
 echo "deb http://download.webmin.com/download/repository sarge contrib" > /etc/apt/sources.list.d/webmin.list
 curl -fsSL http://www.webmin.com/jcameron-key.asc | apt-key add -
 apt update
 apt install -y software-properties-common apt-transport-https webmin
 
-ufw allow webmin
+echo "Configure app to use SSL" | log
 
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/webmin/server.key -out /etc/webmin/server.crt -days 120 -nodes -subj '/CN=localhost'
 cat /etc/webmin/server.crt /etc/webmin/server.key > /etc/webmin/server.pem
-
 sed -i '/keyfile/s/miniserv/server/g' /etc/webmin/miniserv.conf
 echo "referer=localhost" >> /etc/webmin/config     
-	
 service webmin restart
+
+echo "Install Apache server + proxy + SSL" | log
 
 apt install -y apache2
 a2enmod proxy_http
 a2enmod ssl
 ufw allow in "Apache Full"
-
-cat << EOF > /etc/apache2/sites-available/webmin.conf
-	<VirtualHost *:443>
-		ServerName ${SERVERIP}
-		ProxyPass / https://localhost:10000/
-		ProxyPassReverse / https://localhost:10000/
-		SSLEngine on
-		SSLProxyEngine On
-		SSLCertificateFile /etc/webmin/server.crt
-		SSLCertificateKeyFile /etc/webmin/server.key
-	</VirtualHost>
-EOF
+cp $rootDir/tweaks/extras/webmin-apache/webmin.conf /etc/apache2/sites-available/webmin.conf
+sed -i "/ServerName/s/SERVERIP/${SERVERIP}/g" /etc/apache2/sites-available/webmin.conf
 a2ensite webmin.conf
-
 systemctl reload apache2
 
 tagScript success
