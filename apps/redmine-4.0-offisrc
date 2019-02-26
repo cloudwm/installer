@@ -6,10 +6,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist ruby.success
 checkTagExist mysqld.success
 
 echo "Installing Dependencies" | log
-apt install ruby ruby-dev build-essential zlib1g-dev libmysqlclient-dev -y | log
+apt install build-essential zlib1g-dev libmysqlclient-dev -y | log
 waitOrStop 0
 
 echo "Cloning from stable repository" | log
