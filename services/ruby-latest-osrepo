@@ -8,7 +8,7 @@ fi
 
 echo "Install ruby from apt" | log
 
-apt install ruby-full | log
+apt install -y ruby-full | log
 waitOrStop 0
 
 checkPackageInstalled ruby
