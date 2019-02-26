@@ -12,7 +12,6 @@ apt install -y ruby-full | log
 waitOrStop 0
 
 checkPackageInstalled ruby
-checkPackageInstalled ruby-dev
 
 tag ruby.success
 tagScript success
