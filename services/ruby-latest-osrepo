@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Install ruby from apt" | log
+
+apt install -y ruby-full | log
+waitOrStop 0
+
+checkPackageInstalled ruby
+
+tag ruby.success
+tagScript success
+exit 0
