@@ -1,0 +1,54 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist apache2.success
+
+rootDir=$(rootDir)
+
+echo "Install app from official repository" | log
+
+echo "deb http://download.webmin.com/download/repository sarge contrib" > /etc/apt/sources.list.d/webmin.list
+curl -fsSL http://www.webmin.com/jcameron-key.asc | apt-key add -
+waitOrStop 0
+apt update
+apt install -y software-properties-common apt-transport-https webmin
+
+echo "Configure app to use SSL" | log
+
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/webmin/webmin.key -out /etc/webmin/webmin.crt -days 1024 -nodes -subj '/CN=localhost'
+cat /etc/webmin/webmin.crt /etc/webmin/webmin.key > /etc/webmin/webmin.pem
+sed -i '/keyfile/s/miniserv/webmin/g' /etc/webmin/miniserv.conf
+echo "referer=localhost" >> /etc/webmin/config
+service webmin restart
+
+echo "Enable Apache SSL + proxy" | log
+
+a2enmod proxy_http
+a2enmod ssl
+cp $rootDir/tweaks/extras/webmin-apache/webmin.conf /etc/apache2/sites-available/webmin.conf
+sed -i "/ServerName/s/SERVERIP/${SERVERIP}/g" /etc/apache2/sites-available/webmin.conf
+a2ensite webmin.conf
+systemctl reload apache2
+
+echo "Adding descriptions" | log
+
+descriptionAppend "Webmin web interface: https://${SERVERIP}"
+descriptionAppend "Webmin admin user: root"
+descriptionAppend "Webmin admin password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Webmin app location: /etc/webmin/"
+descriptionAppend "Webmin main configuration: /etc/webmin/config"
+descriptionAppend "Webmin mini-server location: /var/webmin/"
+descriptionAppend "Webmin mini-server configuration: /etc/webmin/miniserv.conf"
+descriptionAppend " "
+descriptionAppend "Webmin-Apache proxy configuration: /etc/apache2/sites-available/webmin.conf"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
