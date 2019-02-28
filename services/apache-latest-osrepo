@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# install nginx from apt
+apt install apache2 -y | log
+waitOrStop 0
+
+checkPackageInstalled apache2
+
+echo "Changing ownership of /var/www/html to www-data user" | log
+chown -R www-data:www-data /var/www/html
+
+descriptionAppend "Apache configuration location: /etc/apache2/"
+descriptionAppend "Apache root Directory: /var/www/html"
+descriptionAppend " "
+
+tag apache2.success
+tag httpd.success
+tagScript success
+
+exit 0
