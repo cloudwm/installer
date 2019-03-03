@@ -30,7 +30,7 @@ waitOrStop 0
 
 checkPackageInstalled mysql-community-server
 
-echo "Runnign first setup process" | log
+echo "Running first setup process" | log
 
 checkPackageInstalled expect
 
