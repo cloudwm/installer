@@ -20,8 +20,12 @@ then
 fi
 
 rootDir=$(rootDir)
+
 echo "Copying mysql-server-autoconfig to $MYSQLAUTOCONFIG_DIR" | log
+
 cp -f $rootDir/tweaks/extras/mysql-server-autoconfig/* $MYSQLAUTOCONFIG_DIR
+
+echo "Tweaking rc.local" | log
 
 # If installer is running in a provisioning process, set rc.local file to the renamed file.
 
@@ -52,7 +56,7 @@ else
 
 fi
 
-descriptionAppend "mysql-server-autoconfig script: /opt/mysql-auto-config/mysql-autoconfig"
+descriptionAppend "mysql-server-autoconfig script: ${MYSQLAUTOCONFIG_DIR}/mysql-server-autoconfig"
 descriptionAppend " "
 
 tagScript success

@@ -8,7 +8,7 @@ fi
 
 checkTagExist ubuntu-updateos.success
 
-echo "add official repository packages to apt" | log
+echo "Adding official repository packages to apt" | log
 
 cat << EOF > /etc/apt/sources.list.d/mysql.list
 deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-apt-config
@@ -22,7 +22,7 @@ export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
 
-echo "install mysql from apt" | log
+echo "Installing mysql from apt" | log
 
 apt update
 apt install -y mysql-community-server expect | log
@@ -30,7 +30,7 @@ waitOrStop 0
 
 checkPackageInstalled mysql-community-server
 
-echo "run insallation process" | log
+echo "Runnign first setup process" | log
 
 checkPackageInstalled expect
 
@@ -70,20 +70,24 @@ echo "Set ~/.my.cnf root password for quick cli work" | log
 if [ ! -f ~/my.cnf ];
 then
 
-    echo "[client]" > ~/.my.cnf
-    echo "user=root" >> ~/.my.cnf
-    echo "password=$ADMINPASSWORD" >> ~/.my.cnf
+cat << EOF > ~/my.cnf
+[client]
+user=root
+password=${ADMINPASSWORD}
+EOF
 
 fi
 
-echo "Setting some defaults to /etc/mysql/mysql.conf.d/mysqld-installer.cnf" | log
+echo "Setting some defaults to mysqld-installer.cnf" | log
 
 if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
 then
 
-    echo "[mysqld]" > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
-    echo "skip-name-resolve=1" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
-    echo "max_allowed_packet=256M" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+cat << EOF > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+[mysqld]
+skip-name-resolve=1
+max_allowed_packet=256M
+EOF
 
 fi
 
@@ -98,7 +102,6 @@ descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
-echo "adding dependency tags" | log
 
 tag mysql-server-8.0.success
 tag mysqld.success

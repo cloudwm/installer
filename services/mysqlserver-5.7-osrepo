@@ -8,14 +8,14 @@ fi
 
 checkTagExist ubuntu-updateos.success
 
-echo "install mysql from apt" | log
+echo "Installing mysql from apt" | log
 
 apt install mysql-server-5.7 expect -y | log
 waitOrStop 0
 
 checkPackageInstalled mysql-server-5.7
 
-echo "run insallation process" | log
+echo "Running first setup process" | log
 
 checkPackageInstalled expect
 
@@ -52,23 +52,25 @@ echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_pass
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 
-if [ ! -f ~/my.cnf ];
-then
+if [ ! -f ~/my.cnf ]; then
 
-    echo "[client]" > ~/.my.cnf
-    echo "user=root" >> ~/.my.cnf
-    echo "password=$ADMINPASSWORD" >> ~/.my.cnf
+cat << EOF > ~/.my.cnf
+[client]
+user=root
+password=${ADMINPASSWORD}
+EOF
 
 fi
 
-echo "Setting some defaults to /etc/mysql/mysql.conf.d/mysqld-installer.cnf" | log
+echo "Setting some defaults to mysqld-installer.cnf" | log
 
-if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
-then
+if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ]; then
 
-    echo "[mysqld]" > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
-    echo "skip-name-resolve=1" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
-    echo "max_allowed_packet=256M" >> /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+cat << EOF > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+[mysqld]
+skip-name-resolve=1
+max_allowed_packet=256M
+EOF
 
 fi
 
@@ -76,14 +78,12 @@ echo "Restarting mysql.service" | log
 
 systemctl restart mysql.service
 
-echo "adding descriptions" | log
+echo "Adding descriptions" | log
 
 descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-
-echo "adding dependency tags" | log
 
 tag mysql-server-5.7.success
 tag mysqld.success
