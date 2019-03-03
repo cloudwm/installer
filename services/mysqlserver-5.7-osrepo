@@ -52,7 +52,7 @@ echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_pass
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 
-if [ ! -f ~/my.cnf ]; then
+if [ ! -f ~/.my.cnf ]; then
 
 cat << EOF > ~/.my.cnf
 [client]

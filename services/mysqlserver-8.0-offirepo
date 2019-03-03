@@ -67,10 +67,10 @@ EOF
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 
-if [ ! -f ~/my.cnf ];
+if [ ! -f ~/.my.cnf ];
 then
 
-cat << EOF > ~/my.cnf
+cat << EOF > ~/.my.cnf
 [client]
 user=root
 password=${ADMINPASSWORD}
