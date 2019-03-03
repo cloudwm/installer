@@ -36,7 +36,7 @@ if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
     # rm -rf /var/lib/mysql/logfile1_ib
 
     # Write calculated values to config
-cat << EOF > $CNFCONFD/installer.innodb.cnf
+cat << EOF > ${CNFCONFD}/installer.innodb.cnf
 [mysqld]
 default-storage-engine         = INNODB
 innodb-flush-method            = O_DIRECT
@@ -61,7 +61,7 @@ fi
 if [ -f $CNFCONFD/installer.tuning.cnf ]; then
     rm -f $CNFCONFD/installer.tuning.cnf
 fi
-cat << EOF > $CNFCONFD/installer.tuning.cnf
+cat << EOF > ${CNFCONFD}/installer.tuning.cnf
 [mysqld]
 max_connections              = ${max_connections}
 innodb_thread_concurrency    = ${thread_concurrency}
