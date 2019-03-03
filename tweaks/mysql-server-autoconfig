@@ -45,7 +45,7 @@ if [[ -z `cat /etc/rc.local | grep mysql-server-autoconfig` ]];then
 
     # remove "exit 0" set by default in /etc/rc.local/
     sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
-    echo "$MYSQLAUTOCONFIG_DIR/mysql-server-autoconfig" >> $RCLOCALFILE
+    echo "bash $MYSQLAUTOCONFIG_DIR/mysql-server-autoconfig" >> $RCLOCALFILE
 
     # return exit 0 to /etc/rc.local
     echo "exit 0" >> $RCLOCALFILE
