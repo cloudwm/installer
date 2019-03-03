@@ -38,7 +38,7 @@ fi
 
 # install in rc.local file
 
-if [[ -z `cat /etc/rc.local | grep mysql-server-autoconfig` ]];then
+if [[ -z `cat $RCLOCALFILE | grep mysql-server-autoconfig` ]];then
 
 
     echo "Installing mysql-server-autoconfig in /etc/rc.local" | log
