@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configure default conf.d location
-CNFCONFD="/etc/mysql/mysql.conf.d"
+CNFCONFD=/etc/mysql/mysql.conf.d
 
 # Configure the amount of RAM the service will ignore and reserve to OS or other applications (in MB).
 reserveRam=300
@@ -36,15 +36,18 @@ if [ ! -f $CNFCONFD/installer.innodb.cnf ]; then
     # rm -rf /var/lib/mysql/logfile1_ib
 
     # Write calculated values to config
-    echo "[mysqld]" > $CNFCONFD/installer.innodb.cnf
-    echo "default-storage-engine         = INNODB" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb-flush-method            = O_DIRECT" >> $CNFCONFD/installer.innodb.cnf 
-    echo "innodb-log-files-in-group      = 2" >> $CNFCONFD/installer.innodb.cnf
-    # echo "innodb-log-file-size           = ${innodb_log_file_size}" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb-flush-log-at-trx-commit = 1" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb-file-per-table          = 1" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb-buffer-pool-size        = ${innodb_buffer_pool_size}M" >> $CNFCONFD/installer.innodb.cnf
-    echo "innodb_buffer_pool_instances   = ${innodb_buffer_pool_instances}" >> $CNFCONFD/installer.innodb.cnf
+cat << EOF > ${CNFCONFD}/installer.innodb.cnf
+[mysqld]
+default-storage-engine         = INNODB
+innodb-flush-method            = O_DIRECT
+innodb-log-files-in-group      = 2
+innodb-flush-log-at-trx-commit = 1
+innodb-file-per-table          = 1
+innodb-buffer-pool-size        = ${innodb_buffer_pool_size}M
+innodb_buffer_pool_instances   = ${innodb_buffer_pool_instances}
+EOF
+#innodb-log-file-size           = ${innodb_log_file_size}
+
 fi
 
 # Fine tuning
@@ -56,14 +59,16 @@ if [ "$max_connections" -lt "20" ]; then
 fi
 
 if [ -f $CNFCONFD/installer.tuning.cnf ]; then
-    rm -rf $CNFCONFD/installer.tuning.cnf
+    rm -f $CNFCONFD/installer.tuning.cnf
 fi
-echo "[mysqld]" > $CNFCONFD/installer.tuning.cnf
-echo "max_connections              = ${max_connections}" >> $CNFCONFD/installer.tuning.cnf
-echo "innodb_thread_concurrency    = ${thread_concurrency}" >> $CNFCONFD/installer.tuning.cnf
+cat << EOF > ${CNFCONFD}/installer.tuning.cnf
+[mysqld]
+max_connections              = ${max_connections}
+innodb_thread_concurrency    = ${thread_concurrency}
+EOF
 # Default is recommended for those two
-# echo "query_cache_size           = 64M" >> $CNFCONFD/installer.tuning.cnf
-# echo "key_buffer_size           = 64M" >> $CNFCONFD/installer.tuning.cnf 
+#query_cache_size           = 64M
+#key_buffer_size           = 64M
 
 # Restart mysql
 systemctl restart mysql

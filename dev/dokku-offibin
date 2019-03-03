@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ntpd.success
+checkTagExist cwm-settimezone.success
+
+echo "Adding hostname to /etc/hosts" | log
+echo "127.0.0.1   `hostname`" >> /etc/hosts
+
+echo "Installing application" | log
+
+mkdir -p temp
+cd temp
+curl -O https://raw.githubusercontent.com/dokku/dokku/v0.14.6/bootstrap.sh
+DOKKU_TAG=v0.14.6 bash bootstrap.sh
+waitOrStop 0
+
+descriptionAppend "Please proceed to http://${SERVERIP}/  to finish the installation"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

@@ -9,10 +9,12 @@ fi
 
 runOnceCheck
 
-# Allow binding of mysql from all IP Addresses
+echo "Allow binding of mysql from all IP Addresses" | log
+
 sed -i '/bind-address.*/c\bind-address = 0.0.0.0' /etc/mysql/mysql.conf.d/mysqld.cnf
 
-# Restaring mysql daemon
+echo "Restaring mysql daemon" | log
+
 systemctl restart mysql.service | log
 
 tagScript success
