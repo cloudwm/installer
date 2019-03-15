@@ -20,6 +20,8 @@ curl -O https://raw.githubusercontent.com/dokku/dokku/v0.14.6/bootstrap.sh
 DOKKU_TAG=v0.14.6 bash bootstrap.sh
 waitOrStop 0
 
+echo "Adding descriptions" | log
+
 descriptionAppend "Please proceed to http://${SERVERIP}/  to finish the installation"
 descriptionAppend " "
 

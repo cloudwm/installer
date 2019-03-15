@@ -67,7 +67,17 @@ observer.observe(document, {
 EOF
 docker cp kamatera.js `docker ps | grep rancher | cut -d ' ' -f 1`:/usr/share/rancher/ui/assets/kamatera.js
 
+echo "Adding descriptions" | log
+
 descriptionAppend "Please proceed to https://${SERVERIP}/  to finish the installation"
+descriptionAppend " "
+descriptionAppend "In order to create a Cluster, you will need an API Key"
+descriptionAppend "You can create it at our web interface"
+descriptionAppend " API => Keys => Create New Key"
+descriptionAppend "Also you will need an Private Lan Network"
+descriptionAppend "You can create it at our web interface"
+descriptionAppend " My Cloud => Networks => Choose Zone => Create New Network"
+descriptionAppend "Currently only 172.16.0.0/23 networks are supported"
 descriptionAppend " "
 
 tagScript success
