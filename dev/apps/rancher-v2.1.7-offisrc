@@ -1,0 +1,66 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist docker-latest-offirepo.success
+
+# Install JQ for API manipulation
+apt install jq -y
+
+# Run Rancher docker (version is currently hardcoded due to bugs in current version)
+docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher:v2.1.7
+
+# Enter Rancher Docker to fix bugs
+#docker exec -i -t `docker ps | grep rancher | cut -d ' ' -f 1` /bin/bash
+
+# Login
+LOGINRESPONSE=`curl -s "https://${SERVERIP}/v3-public/localProviders/local?action=login" -H 'content-type: application/json' --data-binary '{"username":"admin","password":"admin"}' --insecure`
+LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
+
+# Change password
+curl -s "https://${SERVERIP}/v3/users?action=changepassword" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary '{"currentPassword":"admin","newPassword":"${ADMINPASSWORD}"}' --insecure
+
+# Create API key
+APIRESPONSE=`curl -s "https://${SERVERIP}/v3/token" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary '{"type":"token","description":"automation"}' --insecure`
+# Extract and store token
+APITOKEN=`echo $APIRESPONSE | jq -r .token`
+
+# Get All Current Drivers
+CURRENTDRIVERS=`curl -s 'https://${SERVERIP}/v3/nodedrivers' -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
+
+# Deactivate All foreign drivers
+for url in ${CURRENTDRIVERS}
+    do 
+        curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
+    done
+
+# Add Kamatera Docker Machine Driver
+curl -s "https://${SERVERIP}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.0-RC2/docker-machine-driver-kamatera_v1.0.0-RC2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
+
+
+
+# Injecting Javascript to hide Kubernetes providers.
+# They are still enabled, but won't show at cluster creation
+cat << EOF > kamatera.js
+MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
+
+var observer = new MutationObserver(function(mutations, observer) {
+  document.getElementsByClassName('azureaks')[0].style.visibility = 'hidden';
+  document.getElementsByClassName('googlegke')[0].style.visibility = 'hidden';
+  document.getElementsByClassName('amazoneks')[0].style.visibility = 'hidden';
+});
+
+observer.observe(document, {
+  subtree: true,
+  attributes: true
+});
+EOF
+
+docker cp kamatera.js `docker ps | grep rancher | cut -d ' ' -f 1`:/usr/share/rancher/ui/assets/kamatera.js
+
+exit 0
+
