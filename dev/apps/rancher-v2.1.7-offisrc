@@ -11,11 +11,20 @@ checkTagExist docker-latest-offirepo.success
 # Install JQ for API manipulation
 apt install jq -y
 
+# Start docker server, if not yet started
+systemctl start docker
+
 # Run Rancher docker (version is currently hardcoded due to bugs in current version)
 docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher:v2.1.7
 
 # Enter Rancher Docker to fix bugs
 #docker exec -i -t `docker ps | grep rancher | cut -d ' ' -f 1` /bin/bash
+
+# Wait untill Rancher initialize
+while ! nc -z localhost 443; do   
+  sleep 0.1 
+done
+sleep 10
 
 # Login
 LOGINRESPONSE=`curl -s "https://${SERVERIP}/v3-public/localProviders/local?action=login" -H 'content-type: application/json' --data-binary '{"username":"admin","password":"admin"}' --insecure`
