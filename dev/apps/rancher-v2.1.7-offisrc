@@ -8,46 +8,43 @@ fi
 
 checkTagExist docker-latest-offirepo.success
 
-# Install JQ for API manipulation
-apt install jq -y
+echo "Installing JQ for API manipulation" | log
+apt install jq -y | log
+waitOrStop 0
 
-# Start docker server, if not yet started
-systemctl start docker
+echo "Starting docker service" | log
+systemctl start docker | log
 
-# Run Rancher docker (version is currently hardcoded due to bugs in current version)
+echo "Launching Rancher docker" | log
 docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher:v2.1.7
+waitOrStop 0
 
-# Enter Rancher Docker to fix bugs
-#docker exec -i -t `docker ps | grep rancher | cut -d ' ' -f 1` /bin/bash
+echo "Waiting for Rancher to intialize" | log
+bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' https://localhost:443 --insecure)" != "200" ]]; do sleep 5; done'
+sleep 15
 
-# Wait untill Rancher initialize
-while ! nc -z localhost 443; do   
-  sleep 0.1 
-done
-sleep 10
-
-# Login
+echo "Getting Rancher Login Token" | log
 LOGINRESPONSE=`curl -s "https://${SERVERIP}/v3-public/localProviders/local?action=login" -H 'content-type: application/json' --data-binary '{"username":"admin","password":"admin"}' --insecure`
 LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
 
-# Change password
-curl -s "https://${SERVERIP}/v3/users?action=changepassword" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary '{"currentPassword":"admin","newPassword":"${ADMINPASSWORD}"}' --insecure
+echo "Changing Web Interface Password" | log
+curl -s "https://${SERVERIP}/v3/users?action=changepassword" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary "{\"currentPassword\":\"admin\",\"newPassword\":\"${ADMINPASSWORD}\"}" --insecure
 
-# Create API key
+echo "Creating API key" | log
 APIRESPONSE=`curl -s "https://${SERVERIP}/v3/token" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary '{"type":"token","description":"automation"}' --insecure`
-# Extract and store token
+echo "Getting API Token" | log
 APITOKEN=`echo $APIRESPONSE | jq -r .token`
 
-# Get All Current Drivers
-CURRENTDRIVERS=`curl -s 'https://${SERVERIP}/v3/nodedrivers' -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
+echo "Listing available drivers" | log
+CURRENTDRIVERS=`curl -s "https://${SERVERIP}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
 
-# Deactivate All foreign drivers
+echo "Deactivating foreign drivers" | log
 for url in ${CURRENTDRIVERS}
     do 
         curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
     done
 
-# Add Kamatera Docker Machine Driver
+echo "Adding Kamatera Docker Machine Driver" | log
 curl -s "https://${SERVERIP}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.0-RC2/docker-machine-driver-kamatera_v1.0.0-RC2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
 
 
@@ -68,8 +65,12 @@ observer.observe(document, {
   attributes: true
 });
 EOF
-
 docker cp kamatera.js `docker ps | grep rancher | cut -d ' ' -f 1`:/usr/share/rancher/ui/assets/kamatera.js
+
+descriptionAppend "Please proceed to https://${SERVERIP}/  to finish the installation"
+descriptionAppend " "
+
+tagScript success
 
 exit 0
 
