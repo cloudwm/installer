@@ -1,0 +1,86 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist docker-latest-offirepo.success
+
+echo "Installing JQ for API manipulation" | log
+apt install jq -y | log
+waitOrStop 0
+
+echo "Starting docker service" | log
+systemctl start docker | log
+
+echo "Launching Rancher docker" | log
+docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher:v2.1.7
+waitOrStop 0
+
+echo "Waiting for Rancher to intialize" | log
+bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' https://localhost:443 --insecure)" != "200" ]]; do sleep 5; done'
+sleep 15
+
+echo "Getting Rancher Login Token" | log
+LOGINRESPONSE=`curl -s "https://${SERVERIP}/v3-public/localProviders/local?action=login" -H 'content-type: application/json' --data-binary '{"username":"admin","password":"admin"}' --insecure`
+LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
+
+echo "Changing Web Interface Password" | log
+curl -s "https://${SERVERIP}/v3/users?action=changepassword" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary "{\"currentPassword\":\"admin\",\"newPassword\":\"${ADMINPASSWORD}\"}" --insecure
+
+echo "Creating API key" | log
+APIRESPONSE=`curl -s "https://${SERVERIP}/v3/token" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary '{"type":"token","description":"automation"}' --insecure`
+echo "Getting API Token" | log
+APITOKEN=`echo $APIRESPONSE | jq -r .token`
+
+echo "Listing available drivers" | log
+CURRENTDRIVERS=`curl -s "https://${SERVERIP}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
+
+echo "Deactivating foreign drivers" | log
+for url in ${CURRENTDRIVERS}
+    do 
+        curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
+    done
+
+echo "Adding Kamatera Docker Machine Driver" | log
+curl -s "https://${SERVERIP}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.0-RC2/docker-machine-driver-kamatera_v1.0.0-RC2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
+
+
+
+# Injecting Javascript to hide Kubernetes providers.
+# They are still enabled, but won't show at cluster creation
+cat << EOF > kamatera.js
+MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
+
+var observer = new MutationObserver(function(mutations, observer) {
+  document.getElementsByClassName('azureaks')[0].style.visibility = 'hidden';
+  document.getElementsByClassName('googlegke')[0].style.visibility = 'hidden';
+  document.getElementsByClassName('amazoneks')[0].style.visibility = 'hidden';
+});
+
+observer.observe(document, {
+  subtree: true,
+  attributes: true
+});
+EOF
+docker cp kamatera.js `docker ps | grep rancher | cut -d ' ' -f 1`:/usr/share/rancher/ui/assets/kamatera.js
+
+echo "Adding descriptions" | log
+
+descriptionAppend "Please proceed to https://${SERVERIP}/  to finish the installation"
+descriptionAppend " "
+descriptionAppend "In order to create a Cluster, you will need an API Key"
+descriptionAppend "You can create it at our web interface"
+descriptionAppend " API => Keys => Create New Key"
+descriptionAppend "Also you will need an Private Lan Network"
+descriptionAppend "You can create it at our web interface"
+descriptionAppend " My Cloud => Networks => Choose Zone => Create New Network"
+descriptionAppend "Currently only 172.16.0.0/23 networks are supported"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
