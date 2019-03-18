@@ -24,19 +24,22 @@ availablespace="\$(df / | awk 'NR==2{print \$4}')"
 
 if [ "\$availablespace" -lt "${minSpaceLeftKbytes}" ]; then
 
-    largeFilesList="\$(find /var/log/ -type f -size +${minLogSizeKbytes}k | sort | xargs file)"
+    largeFilesList="\$(find /var/log/ -type f -size +${minLogSizeKbytes}k | sort | xargs -r file)"
+
+fi
+
+if [ ! -z "\$largeFilesList" ]; then
 
     # Find text files and empty them
     textFiles="\$(printf "\$largeFilesList" | tr ':' ' ' | grep -i text)"
     printf "\$textFiles" | awk '{ print "emptying "\$1 }'
-    printf "\$textFiles" | awk '{ print \$1 }' | xargs truncate --size 0
+    printf "\$textFiles" | awk '{ print \$1 }' | xargs -r truncate --size 0
 
     # Find gzipped log files and remove them
     gzipFiles="\$(printf "\$largeFilesList" | tr ':' ' ' | grep -i gzip)"
     printf "\$gzipFiles" | awk '{ print "deleting "\$1 }'
-    printf "\$gzipFiles" | awk '{ print \$1 }' | xargs rm -f
+    printf "\$gzipFiles" | awk '{ print \$1 }' | xargs -r rm -f
 
-    echo "autoremove-old-logs was fired" >> /root/autoremove.log
 fi
 
 EOF
