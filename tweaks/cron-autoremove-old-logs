@@ -10,20 +10,46 @@ fi
 runOnceCheck
 
 cronFilename=/etc/cron.daily/installer-autoremove-old-logs
+minSpaceLeftKbytes=1000000
+minLogSizeKbytes=10000
 
-if [ ! -f "$cronFilename" ];
+if [ -f "$cronFilename" ];
 then
-    cat <<'EOF' > $cronFilename
-#!/bin/bash
-availablespace=`df / | awk 'NR==2{print $4}'`
-if [ "$availablespace" -lt "2097152" ]; then
-        # Find text files and empty them
-        find /var/log -type f  | xargs file | grep "ASCII text" | tr ':' ' ' | awk '{ print "echo > "$1}' | sh
-        # Find gzipped log files and remove them
-        find /var/log -type f  | xargs file | grep "gzip compressed data" | tr ':' ' ' | awk '{ print "rm -f "$1}' | sh
+    exit 0
 fi
+
+cat << EOF > ${cronFilename}
+
+#!/bin/bash
+
+availablespace="\$(df / | awk 'NR==2{print \$4}')"
+
+if [ "\$availablespace" -gt "${minSpaceLeftKbytes}" ]; then
+    exit 0
+fi
+
+# Generate list of large files in log directories
+largeFilesList="\$(find /var/log/ -type f -size +${minLogSizeKbytes}k | sort | xargs -r file)"
+
+if [ -z "\$largeFilesList" ]; then
+    exit 0
+fi
+
+# Find text files and empty them
+textFiles="\$(printf "\$largeFilesList" | tr ':' ' ' | grep -i text)"
+printf "\$textFiles" | awk '{ print "emptying "\$1 }'
+printf "\$textFiles" | awk '{ print \$1 }' | xargs -r truncate --size 0
+
+# Find gzipped log files and remove them
+gzipFiles="\$(printf "\$largeFilesList" | tr ':' ' ' | grep -i gzip)"
+printf "\$gzipFiles" | awk '{ print "deleting "\$1 }'
+printf "\$gzipFiles" | awk '{ print \$1 }' | xargs -r rm -f
+
+exit 0
+
 EOF
 chmod +x $cronFilename
-fi
 
 tagScript success
+
+exit 0
