@@ -1,0 +1,35 @@
+upstream rocketchat_backend {
+  server 127.0.0.1:3000;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name _;
+    ssl_certificate      /etc/ssl/certs/server.crt;
+    ssl_certificate_key  /etc/ssl/private/server.key;
+
+    access_log /var/log/nginx/rocketchat-access.log;
+    error_log /var/log/nginx/rocketchat-error.log;
+
+    location / {
+        proxy_pass http://rocketchat_backend/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forward-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forward-Proto http;
+        proxy_set_header X-Nginx-Proxy true;
+
+        proxy_redirect off;
+    }
+}
