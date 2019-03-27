@@ -12,8 +12,7 @@ echo "Open firewall for MongoDB" | log
 # Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for MongoDB.
 # if not, open 27017 to WAN.
 
-if [ ! -z "$LANNICIDS" ]; 
-then
+if [ ! -z "$LANNICIDS" ]; then
 
     for ip in $LANNICIDS;
     do

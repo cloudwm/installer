@@ -9,13 +9,11 @@ fi
 
 runOnceCheck
 
-if [ -z "$REDISAUTOCONFIG_DIR" ];
-then
+if [ -z "$REDISAUTOCONFIG_DIR" ]; then
     REDISAUTOCONFIG_DIR=/opt/redis-server-autoconfig
 fi
 
-if [ ! -d $REDISAUTOCONFIG_DIR ];
-then
+if [ ! -d $REDISAUTOCONFIG_DIR ]; then
 
     mkdir -p $REDISAUTOCONFIG_DIR
 fi
@@ -26,8 +24,7 @@ cp -f $rootDir/tweaks/extras/redis-server-autoconfig/* $REDISAUTOCONFIG_DIR
 
 # If installer is running in a provisioning process, set rc.local file to the renamed file.
 
-if [ -f /etc/rc.local.bck ];
-then
+if [ -f /etc/rc.local.bck ]; then
     RCLOCALFILE=/etc/rc.local.bck
 else
     RCLOCALFILE=/etc/rc.local
@@ -35,8 +32,7 @@ fi
 
 # install in rc.local file
 
-if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]];then
-
+if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]]; then
 
     echo "Installing redis-server-autoconfig in /etc/rc.local" | log
 

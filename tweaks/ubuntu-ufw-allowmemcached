@@ -10,8 +10,7 @@ checkTagExist ufw.success
 # Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for memcached.
 # if not, open 11211 to WAN.
 
-if [ ! -z "$LANNICIDS" ]; 
-then
+if [ ! -z "$LANNICIDS" ]; then
 
     for ip in $LANNICIDS;
     do

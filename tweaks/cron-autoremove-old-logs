@@ -13,8 +13,7 @@ cronFilename=/etc/cron.daily/installer-autoremove-old-logs
 minSpaceLeftKbytes=1000000
 minLogSizeKbytes=10000
 
-if [ -f "$cronFilename" ];
-then
+if [ -f "$cronFilename" ]; then
     exit 0
 fi
 

@@ -23,8 +23,7 @@ serviceRamConsumeBytes=`echo "$serviceRamConsume * 1024" | bc`
 
 serviceCpuConsume=`echo "scale=0; ($physicalCpu - $reserveCpu) *  $serviceCpuUsage/100" | bc`
 
-if [ "$serviceCpuConsume" -lt "1" ];
-then
+if [ "$serviceCpuConsume" -lt "1" ]; then
     serviceCpuConsume=1
 fi
 

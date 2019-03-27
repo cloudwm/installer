@@ -13,10 +13,15 @@ waitOrStop 0
 checkPackageInstalled nginx
 
 echo "Changing ownership of /var/www/html to www-data user" | log
-chown -R www-data:www-data /var/www/html
+if [ -d "/var/www/html" ]; then
+    chown -R www-data:www-data /var/www/html
+fi
 
+echo "Adding descriptions" | log
 descriptionAppend "NGINX configuration location: /etc/nginx/"
-descriptionAppend "NGINX root Directory: /var/www/html/"
+if [ -d "/var/www/html" ]; then
+    descriptionAppend "NGINX root Directory: /var/www/html/"
+fi
 descriptionAppend " "
 
 tag nginx.success
