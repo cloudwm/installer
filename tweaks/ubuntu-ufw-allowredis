@@ -10,8 +10,7 @@ checkTagExist ufw.success
 # Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for Redis.
 # if not, open 6379 to WAN.
 
-if [ ! -z "$LANNICIDS" ]; 
-then
+if [ ! -z "$LANNICIDS" ]; then
 
     for ip in $LANNICIDS;
     do
@@ -19,7 +18,7 @@ then
 	ipvar="ip$ip"
 	subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
 
-        ufw allow in to $subnet port 6379
+    ufw allow in to $subnet port 6379
 
 	unset ipvar
 	unset subnet

@@ -7,23 +7,25 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-if [ -f "/var/www/html/index.html" ]; 
-then
+appIndex=/var/www/html/index.html
 
-    if grep -q "in progress" /var/www/html/index.html; 
-    then
+if [ ! -f "$appIndex" ]; then
 
-        echo "Removing /var/www/html/index.html In Progress file." | log
-        rm -f /var/www/html/index.html 
-
-        tagScript success
-        exit 0
-
-    fi
-
-else
-
-    echo "/var/www/html/index.html file doesn't exist. Continuing"
+    echo "$appIndex file doesn't exist. Continuing"
     exit 99
 
 fi
+
+if grep -q "in progress" $appIndex; then
+
+    echo "Removing $appIndex In Progress file." | log
+    rm -f $appIndex 
+
+    tagScript success
+    exit 0
+
+fi
+
+# echo "$appIndex is not an In Progress file. Continuing" | log
+# tagScript success
+# exit 0

@@ -7,29 +7,28 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-if [ -d "/var/www/html" ];
-then
+appPath=/var/www/html
 
-    if [ ! -f "/var/www/html/index.html" ];
-    then
-        echo "Adding context Install in Progress to /var/www/html/index.html" | log
-	useFiglet
-	printf "<pre align=center>\n" > /var/www/html/index.html
-	bannerFiglet "Install in Progress\n Please Wait.\n" >> /var/www/html/index.html
-        printf "Application and services installation is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> /var/www/html/index.html
-
-        tagScript success
-
-    else
-
-	echo "index.html file exists. Skipping." | log
-
-    fi
-    exit 0
-
-else
+if [ ! -d "$appPath" ]; then
 
     echo "Web server directory doesn't exist, exiting." | log
     exit 1
 
 fi
+
+if [ -f "$appPath/index.html" ]; then
+
+    echo "index.html file exists. Skipping." | log
+    tagScript success
+    exit 0
+
+fi
+
+echo "Adding context Install in Progress to $appPath/index.html" | log
+useFiglet
+printf "<pre align=center>\n" > $appPath/index.html
+bannerFiglet "Install in Progress\n Please Wait.\n" >> $appPath/index.html
+printf "Application and services installation is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $appPath/index.html
+
+tagScript success
+exit 0

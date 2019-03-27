@@ -11,7 +11,7 @@ fi
 
 service=$(systemctl | grep fpm | awk '{print $1}')
 
-if [[ -z "$service" ]];then
+if [[ -z "$service" ]]; then
 	echo php-fpm is not installed | log
 	exit 1
 fi
@@ -20,7 +20,7 @@ fi
 
 MY_PATH="`dirname \"$0\"`"
 
-INSTALLER_PATH="/opt/php-fpm-autoconfig"
+INSTALLER_PATH=/opt/php-fpm-autoconfig
 
 if [ ! -d "$INSTALLER_PATH" ]; then
 	mkdir -p $INSTALLER_PATH
@@ -36,15 +36,14 @@ if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
 fi
 
 # If installer is running in a provisioning process, set rc.local file to the renamed file.
-if [ -f /etc/rc.local.bck ];
-then
+if [ -f /etc/rc.local.bck ]; then
     RCLOCALFILE=/etc/rc.local.bck
 else
     RCLOCALFILE=/etc/rc.local
 fi
 
 
-if [[ -z `cat /etc/rc.local | grep php-fpm-autoconfig` ]];then
+if [[ -z `cat /etc/rc.local | grep php-fpm-autoconfig` ]]; then
 
     echo "Installing php-fpm-autoconfig in /etc/rc.local" | log
 

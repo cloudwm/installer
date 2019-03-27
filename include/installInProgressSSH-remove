@@ -7,10 +7,14 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-if [ -f "/etc/update-motd.d/98-install-in-progress" ];
-then
+inProgressMessage=/etc/update-motd.d/98-install-in-progress
+
+if [ -f "$inProgressMessage" ]; then
+    
     echo "Removing Install in Progress SSH banner" | log
-    rm -rf /etc/update-motd.d/98-install-in-progress
+    rm -f $inProgressMessage
+
     tagScript success
     exit 0
+    
 fi
