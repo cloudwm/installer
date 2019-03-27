@@ -9,13 +9,11 @@ fi
 
 runOnceCheck
 
-if [ -z "$MYSQLAUTOCONFIG_DIR" ];
-then
+if [ -z "$MYSQLAUTOCONFIG_DIR" ]; then
     MYSQLAUTOCONFIG_DIR=/opt/mysql-server-autoconfig
 fi
 
-if [ ! -d $MYSQLAUTOCONFIG_DIR ];
-then
+if [ ! -d $MYSQLAUTOCONFIG_DIR ]; then
     mkdir -p $MYSQLAUTOCONFIG_DIR
 fi
 
@@ -29,8 +27,7 @@ echo "Tweaking rc.local" | log
 
 # If installer is running in a provisioning process, set rc.local file to the renamed file.
 
-if [ -f /etc/rc.local.bck ];
-then
+if [ -f /etc/rc.local.bck ]; then
     RCLOCALFILE=/etc/rc.local.bck
 else
     RCLOCALFILE=/etc/rc.local
@@ -38,8 +35,7 @@ fi
 
 # install in rc.local file
 
-if [[ -z `cat $RCLOCALFILE | grep mysql-server-autoconfig` ]];then
-
+if [[ -z `cat $RCLOCALFILE | grep mysql-server-autoconfig` ]]; then
 
     echo "Installing mysql-server-autoconfig in /etc/rc.local" | log
 

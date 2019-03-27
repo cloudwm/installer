@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+appPath=/var/www/html
+
 cat << EOF >> /etc/apt/sources.list.d/nginx.list
 deb http://nginx.org/packages/ubuntu/ bionic nginx
 deb-src http://nginx.org/packages/ubuntu/ bionic nginx
@@ -18,10 +20,18 @@ apt install nginx -y | log
 waitOrStop 0
 checkPackageInstalled nginx
 
-echo "Changing ownership of /var/www/html to www-data user" | log
-chown -R www-data:www-data /var/www/html
+echo "Changing ownership of $appPath to www-data user" | log
+if [ -d "$appPath" ]; then
+    chown -R www-data:www-data $appPath
+fi
 
-checkPackageInstalled nginx
+echo "Adding descriptions" | log
+descriptionAppend "NGINX configuration location: /etc/nginx/"
+
+if [ -d "$appPath" ]; then
+    descriptionAppend "NGINX root Directory: $appPath/"
+fi
+descriptionAppend " "
 
 tag nginx.success
 tag httpd.success
