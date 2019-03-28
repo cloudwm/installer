@@ -48,14 +48,16 @@ cat << EOF > /etc/systemd/system/rocketchat.service
 
 [Unit]
 Description=Rocket.Chat server
-After=network.target nss-lookup.target mongod.target
+After=network.target remote-fs.target nss-lookup.target mongod.target nginx.target
 
 [Service]
+Restart=always
+RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
 User=rocket
-Environment=MONGO_URL=${mongo_url} ROOT_URL=https://${SERVERIP} PORT=${app_port}
+Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${SERVERIP} PORT=${app_port}
 ExecStart=/usr/local/bin/node /opt/rocket/Rocket.Chat/main.js
 
 [Install]
@@ -66,6 +68,13 @@ EOF
 systemctl daemon-reload
 systemctl start rocketchat
 systemctl enable rocketchat
+
+echo "Adding Loading in Progress screen" | log
+nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
+useFiglet
+printf "<pre align=center>\n" > $nginxErrorPage
+bannerFiglet "Loading in Progress\n Please Wait.\n" >> $nginxErrorPage
+printf "Application and services loading is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $nginxErrorPage
 
 echo "Configuring nginx" | log
 cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat-nginx-config /etc/nginx/sites-available/rocketchat.conf
