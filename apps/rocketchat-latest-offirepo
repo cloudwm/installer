@@ -1,0 +1,92 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist mongodb.success
+checkTagExist nodejs.success
+
+rootDir=$(rootDir)
+
+echo "Installing and tweaking nodejs requirements" | log
+apt install graphicsmagick -y
+waitOrStop 0
+npm install -g inherits n
+n 8.11.3
+
+echo "Creat app user" | log
+useradd -m -U -r -d /opt/rocket rocket
+usermod -a -G rocket www-data
+chmod 750 /opt/rocket
+
+echo "Install main app" | log
+
+mongo_url="mongodb://admin:${ADMINPASSWORD}@localhost:27017/rocketchat?authSource=admin"
+app_port=3000
+
+su rocket << EOF
+cd /opt/rocket
+curl -L https://releases.rocket.chat/latest/download -o rocket.chat.tgz
+tar zxf rocket.chat.tgz
+mv bundle Rocket.Chat
+cd Rocket.Chat/programs/server
+npm install
+export PORT=${app_port}
+export ROOT_URL="http://0.0.0.0:"${app_port}"/"
+export MONGO_URL=${mongo_url}
+EOF
+
+ufw allow $app_port
+ufw allow 27017
+
+echo "Installing service" | log
+cat << EOF > /etc/systemd/system/rocketchat.service
+
+[Unit]
+Description=Rocket.Chat server
+After=network.target remote-fs.target nss-lookup.target mongod.target nginx.target
+
+[Service]
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=rocketchat
+User=rocket
+Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${SERVERIP} PORT=${app_port}
+ExecStart=/usr/local/bin/node /opt/rocket/Rocket.Chat/main.js
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+systemctl daemon-reload
+systemctl start rocketchat
+systemctl enable rocketchat
+
+echo "Adding Loading in Progress screen" | log
+nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
+useFiglet
+printf "<pre align=center>\n" > $nginxErrorPage
+bannerFiglet "Loading in Progress\n Please Wait.\n" >> $nginxErrorPage
+printf "Application and services loading is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $nginxErrorPage
+
+echo "Configuring nginx" | log
+cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat-nginx-config /etc/nginx/sites-available/rocketchat.conf
+# sed -i "s/SERVERIP/${SERVERIP}/g" /etc/nginx/sites-available/rocketchat.conf
+ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl reload nginx
+
+descriptionAppend "Rocket.chat application directory: /opt/rocket/Rocket.Chat/"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
