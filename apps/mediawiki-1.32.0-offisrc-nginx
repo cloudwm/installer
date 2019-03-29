@@ -42,7 +42,7 @@ echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 
 echo "Installing MediaWiki" | log
-echo "php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath=\"\" --server https://${SERVERIP} \"MediaWiki\" \"admin\"" | sh
+echo "cd /var/www/html && php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath=\"\" --server https://${SERVERIP} \"MediaWiki\" \"admin\"" | sh
 echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php 
 
 echo "Creating nginx configuration" | log
