@@ -1,0 +1,63 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist php.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+rootDir=$(rootDir)
+
+echo "Installing MediaWiki" | log
+echo "Downloading MediaWiki from original repo" | log
+mkdir -p temp
+cd temp
+curl -O https://releases.wikimedia.org/mediawiki/1.32/mediawiki-1.32.0.tar.gz
+waitOrStop 0
+
+mkdir -p /var/www/html
+mv mediawiki-1.32.0.tar.gz /var/www/html 
+
+echo "Extracting MediaWiki to /var/www/html/" | log
+tar -xzvf /var/www/html/mediawiki-1.32.0.tar.gz -C /var/www/html/ --strip 1
+waitOrStop 0
+rm -f /var/www/html/mediawiki-1.32.0.tar.gz
+waitOrStop 0
+
+echo "Setting directory permissions" | log
+chown -R www-data.www-data /var/www/html/
+find  /var/www/html/ -type f -exec chmod 644 {} \;
+find  /var/www/html/ -type d -exec chmod 755 {} \;
+
+echo "Creating MediaWiki Database" | log
+
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE wikidb;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'wikiuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON wikidb.* TO 'wikiuser'@'localhost' WITH GRANT OPTION;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+
+echo "Installing MediaWiki" | log
+echo "cd /var/www/html && php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath=\"\" --server https://${SERVERIP} \"MediaWiki\" \"admin\"" | sh
+echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php 
+
+echo "Creating nginx configuration" | log
+#copy configs to nginx folder
+cp $rootDir/tweaks/extras/mediawiki-nginx/mediawiki-nginx-config /etc/nginx/sites-available/mediawiki
+# Symlink mediawiki vhost
+ln -s /etc/nginx/sites-available/mediawiki /etc/nginx/sites-enabled/mediawiki
+# Remove default vhosts
+rm -f /etc/nginx/sites-available/default
+rm -f /etc/nginx/sites-available/default-ssl
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default-ssl
+
+systemctl restart nginx
+
+tagScript success
+
+exit 0
