@@ -85,6 +85,7 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 
 descriptionAppend "Rocket.chat application directory: /opt/rocket/Rocket.Chat/"
+descriptionAppend "Rocket.chat web UI: https://${SERVERIP}"
 descriptionAppend " "
 
 tagScript success
