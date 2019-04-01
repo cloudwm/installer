@@ -37,8 +37,8 @@ waitOrStop 0
 echo "Extracting Drupal to $appPath" | log
 
 tar -xzvf drupal.tar.gz -C $appPath/ --strip 1
-rm -f drupal.tar.gz
 waitOrStop 0
+rm -f drupal.tar.gz
 
 echo "Setting misc definitions & permissions for Drupal" | log
 

@@ -17,6 +17,7 @@ curl -fsSL http://www.webmin.com/jcameron-key.asc | apt-key add -
 waitOrStop 0
 apt update
 apt install -y software-properties-common apt-transport-https webmin
+waitOrStop 0
 
 echo "Configure app to use SSL" | log
 

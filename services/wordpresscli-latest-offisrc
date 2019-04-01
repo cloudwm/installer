@@ -15,9 +15,9 @@ echo "install wp cli for wordpress" | log
 
 cd $rootDir/temp
 curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+waitOrStop 0
 chmod +x wp-cli.phar
 mv wp-cli.phar /usr/local/bin/wp
-waitOrStop 0
 
 echo "check binary existence of wp cli" | log
 
