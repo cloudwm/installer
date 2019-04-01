@@ -29,7 +29,6 @@ mkdir -p $appPath/
 tar -xzvf joomla.tgz -C $appPath/ | log
 waitOrStop 0
 rm -f joomla.tgz
-waitOrStop 0
 
 echo "Creating Joomla Database" | log
 

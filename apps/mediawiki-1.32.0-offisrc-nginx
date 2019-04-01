@@ -29,7 +29,6 @@ echo "Extracting MediaWiki to $appPath/" | log
 tar -xzvf $appPath/mediawiki-1.32.0.tar.gz -C $appPath/ --strip 1
 waitOrStop 0
 rm -f $appPath/mediawiki-1.32.0.tar.gz
-waitOrStop 0
 
 echo "Setting directory permissions" | log
 chown -R www-data.www-data $appPath/
@@ -67,6 +66,8 @@ echo "Adding descriptions" | log
 descriptionAppend "Mediawiki web UI: https://${SERVERIP}"
 descriptionAppend "Mediawiki admin user: admin"
 descriptionAppend "Mediawiki admin password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Mediawiki settings file: ${appPath}/LocalSettings.php"
 descriptionAppend " "
 
 tagScript success

@@ -36,7 +36,6 @@ mv 2.3.0.tar.gz /var/www/html
 echo "Extracting Magento to /var/www/html/" | log
 tar -xzvf /var/www/html/2.3.0.tar.gz -C /var/www/html/ --strip 1
 waitOrStop 0
-
 rm -f /var/www/html/2.3.0.tar.gz
 
 echo "Setting permissions for Magento" | log

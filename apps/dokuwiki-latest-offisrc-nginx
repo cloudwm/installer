@@ -26,7 +26,6 @@ echo "Extracting dokuwiki to /var/www/html/" | log
 tar -xzvf /var/www/html/dokuwiki-stable.tgz -C /var/www/html/ --strip 1
 waitOrStop 0
 rm -f /var/www/html/dokuwiki-stable.tgz
-waitOrStop 0
 
 echo "Setting directory permissions" | log
 chown -R www-data.www-data /var/www/html/data/

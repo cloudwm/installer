@@ -19,8 +19,6 @@ phpfpmconfig="\        location ~ \\.php$ {\n                include snippets\/f
 sed -i '/\/var\/www\/html\;/a '"${phpfpmconfig}"'' /etc/nginx/sites-available/default
 sed -i -e 's/index index.html/index index.php index.html/' /etc/nginx/sites-available/default
 
-waitOrStop 0
-
 service nginx restart
 
 waitOrStop 0
