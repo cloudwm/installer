@@ -17,7 +17,7 @@ appPath=/var/www/html
 
 mkdir -p temp
 cd temp
-curl -L https://download.moodle.org/download.php/stable36/moodle-3.6.3.tgz
+curl -L https://download.moodle.org/stable36/moodle-3.6.3.tgz
 waitOrStop 0
 tar -xzvf moodle-3.6.3.tgz
 waitOrStop 0
