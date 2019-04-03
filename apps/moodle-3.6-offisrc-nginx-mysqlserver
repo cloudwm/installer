@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist php.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+rootDir=$(rootDir)
+appPath=/var/www/html
+
+mkdir -p temp
+cd temp
+curl -L https://download.moodle.org/download.php/stable36/moodle-3.6.3.tgz
+waitOrStop 0
+tar -xzvf moodle-3.6.3.tgz
+waitOrStop 0
+mkdir -p $appPath
+mv moodle $appPath
+rm -f moodle-3.6.3.tgz
+chown -R www-data:www-data $appPath/moodle/
+chmod -R 755 $appPath/moodle/
+
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE moodle;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON moodle.* TO 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}' WITH GRANT OPTION;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"FLUSH PRIVILEGES;\"" | sh
+
+ini=$(find /etc -type f -name "php.ini" | grep fpm)
+sed -i '/file_uploads/s/Off/On/g' $ini
+sed -i '/allow_url_fopen/s/Off/On/g' $ini
+sed -i '/max_execution_time/s/[0-9]\+/360/g' $ini
+sed -i '/cgi.fix_pathinfo/s/^#//g' file
+sed -i '/cgi.fix_pathinfo/s/[0-9]\+/0/g' $ini
+# sed -i '/date.timezone/s/_OLD_/_NEW_/g' $ini
+
+cat << EOF > /etc/nginx/sites-available/moodle
+server {
+    listen 80;
+    listen [::]:80;
+    root /var/www/html/moodle;
+    index  index.php index.html index.htm;
+    server_name _;
+
+    location / {
+        try_files $uri $uri/ =404;        
+    }
+ 
+    location /dataroot/ {
+        internal;
+        alias /var/www/html/moodledata/;
+    }
+
+    location ~ [^/]\.php(/|$) {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php7.2-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+EOF
+
+ln -s /etc/nginx/sites-available/moodle /etc/nginx/sites-enabled/
+systemctl restart nginx.service
+
+tagScript success
+
+exit 0
