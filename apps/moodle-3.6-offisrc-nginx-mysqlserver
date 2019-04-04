@@ -45,44 +45,8 @@ sed -i '/cgi.fix_pathinfo/s/[0-9]\+/0/g' $ini
 # sed -i '/date.timezone/s/_OLD_/_NEW_/g' $ini
 
 echo "Creating nginx configurations" | log
-cat << EOF > /etc/nginx/sites-available/moodle
-server {
-    listen 80;
-    listen [::]:80;
-    server_name _;
-    return 301 https://\$host\$request_uri;
-}
-
-server {
-    listen 443 ssl default_server;
-    listen [::]:443 ssl default_server;
-
-    ssl_certificate      /etc/ssl/certs/server.crt;
-    ssl_certificate_key  /etc/ssl/private/server.key;
-
-    root /var/www/html/moodle;
-
-    index index.php index.html index.htm;
-
-    server_name _;
-
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-
-    location /dataroot/ {
-        internal;
-        alias /var/www/html/moodledata/;
-    }
-
-    location ~ [^/]\.php(/|$) {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass 127.0.0.1:9000;
-    }
-}
-EOF
-
-ln -s /etc/nginx/sites-available/moodle /etc/nginx/sites-enabled/
+cp -f $rootDir/tweaks/extras/moodle-nginx/moodle-nginx-config /etc/nginx/sites-available/moodle.conf
+ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
