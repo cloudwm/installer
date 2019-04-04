@@ -17,4 +17,5 @@ apt-fast -qy autoclean | log
 apt-fast upgrade -y | log
 apt-fast autoremove -y | log
 
+tag ubuntu-updateos.success
 tagScript success
