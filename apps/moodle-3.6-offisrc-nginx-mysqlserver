@@ -59,6 +59,7 @@ descriptionAppend "Moodle admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Moodle db user: moodleuser"
 descriptionAppend "Moodle db password: ${ADMINPASSWORD}"
+descriptionAppend "(On initial setup, enter db user and password in the matching fields. Other fields should remain as is.)"
 descriptionAppend " "
 
 tagScript success
