@@ -1,0 +1,72 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ruby.success
+checkTagExist mysqld.success
+checkTagExist httpd.success
+checkTagExist passenger.success
+
+rootDir=$(rootDir)
+appPath=/var/www/redmine
+
+echo "Installing Dependencies" | log
+apt install build-essential libmysqlclient-dev imagemagick libmagickwand-dev -y
+waitOrStop 0
+
+echo "Cloning stable version from repository" | log
+mkdir -p /var/www
+cd /var/www/
+git clone https://github.com/redmine/redmine.git -b 4.0-stable | log
+waitOrStop 0
+
+echo "Creating Database and user" | log
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE redmine CHARACTER SET utf8mb4;\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"FLUSH PRIVILEGES;\"" | sh
+
+echo "Pushing database config" | log
+cat << EOF > ${appPath}/config/database.yml
+production:
+  adapter: mysql2
+  database: redmine
+  host: localhost
+  username: redmine
+  password: "${ADMINPASSWORD}"
+  encoding: utf8
+EOF
+
+echo "Installing Bundle" | log
+cd $appPath
+gem install bundler --no-rdoc --no-ri
+bundle install --without development test postgresql sqlite
+bundle exec rake generate_secret_token
+RAILS_ENV=production bundle exec rake db:migrate
+waitOrStop 0
+# echo "en" | RAILS_ENV=production bundle exec rake redmine:load_default_data
+chown -R www-data: $appPath/
+
+echo "Connecting app to nginx" | log
+cp -f $rootDir/tweaks/extras/redmine-nginx/redmine.nginx /etc/nginx/sites-available/redmine.conf
+sed -i "s|_appPath_|${appPath}|g" /etc/nginx/sites-available/redmine.conf
+ln -s /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx
+
+echo "Adding descriptions" | log
+descriptionAppend "Redmine URI: https://${SERVERIP}"
+descriptionAppend "First time credentials: admin/admin"
+descriptionAppend " "
+descriptionAppend "Redmine application directory: ${appPath}"
+descriptionAppend "Redmine configuration: ${appPath}/config/"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

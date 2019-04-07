@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist httpd.success
+
+apt install -y dirmngr gnupg apt-transport-https ca-certificates
+waitOrStop 0
+
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 561F9B9CAC40B2F7
+add-apt-repository 'deb https://oss-binaries.phusionpassenger.com/apt/passenger bionic main'
+apt update
+
+apt install libnginx-mod-http-passenger -y
+waitOrStop 0
+
+tag passenger.success
+tagScript success
+
+exit 0
