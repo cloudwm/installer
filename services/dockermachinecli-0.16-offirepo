@@ -8,7 +8,7 @@ fi
 
 echo "Downloading docker-machine from source repository" | log
 base=https://github.com/docker/machine/releases/download/v0.16.0
-curl -L $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine
+curl -L --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 --url $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine
 waitOrStop 0
 
 echo "Installing docker-machine in /usr/local/bin/docker-machine" | log
@@ -16,25 +16,28 @@ install /tmp/docker-machine /usr/local/bin/docker-machine
 waitOrStop 0
 
 echo "Downloading docker-machine bash auto-complete strings" | log
+mkdir -p /tmp/complete
+cd /tmp/complete
 base=https://raw.githubusercontent.com/docker/machine/v0.16.0
-
 for i in docker-machine-prompt.bash docker-machine-wrapper.bash docker-machine.bash
 do
-    wget "$base/contrib/completion/bash/${i}" -P /etc/bash_completion.d
+    # wget "$base/contrib/completion/bash/${i}" -P /etc/bash_completion.d
+    curl --url $base/contrib/completion/bash/${i} -LO --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30
     waitOrStop 0
 done
+mv /tmp/complete/* /etc/bash_completion.d/
 
 echo "Adding CWM/Kamatera to auto-complete" | log
 sed -i 's/amazonec2/kamatera\namazonec2/' /etc/bash_completion.d/docker-machine.bash
-waitOrStop 0
 
-echo "Downloading CWM/Kamatera docker-machine-driver" |log
+echo "Downloading CWM/Kamatera docker-machine-driver" | log
 base=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.0-RC2/docker-machine-driver-kamatera_v1.0.0-RC2_linux_amd64.tar.gz
 # curl -o /tmp/docker-machine-driver-kamatera.tar.gz $base -L
 curlDownload $base /tmp/docker-machine-driver-kamatera.tar.gz
 waitOrStop 0
 
 tar -xvf /tmp/docker-machine-driver-kamatera.tar.gz -C /tmp/
+waitOrStop 0
 chmod +x /tmp/docker-machine-driver-kamatera
 mv /tmp/docker-machine-driver-kamatera /usr/local/bin/
 
