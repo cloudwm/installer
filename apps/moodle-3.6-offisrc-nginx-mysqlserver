@@ -18,7 +18,8 @@ appPath=/var/www/html
 echo "Downloading and extracting application" | log
 mkdir -p temp
 cd temp
-curl -LO https://download.moodle.org/stable36/moodle-3.6.3.tgz
+# curl -LO https://download.moodle.org/stable36/moodle-3.6.3.tgz
+curlDownload https://download.moodle.org/stable36/moodle-3.6.3.tgz
 waitOrStop 0
 tar -xzvf moodle-3.6.3.tgz
 waitOrStop 0

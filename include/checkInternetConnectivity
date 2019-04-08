@@ -10,7 +10,8 @@ fi
 success=0
 echo "Checking internet connectivity" | log
 echo "Trying to fetch www.cloudwm.com" | log
-curl "http://www.cloudwm.com/"  --connect-timeout 10 > /dev/null
+curl "http://www.cloudwm.com/"  --connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 > /dev/null
+
 errorCode=$?
 
 if [ $errorCode -gt 0 ]; then
@@ -27,7 +28,7 @@ fi
 
 
 echo "Trying to fetch www.google.com" | log
-curl "http://www.google.com/"  --connect-timeout 10 > /dev/null
+curl "http://www.google.com/"  --connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 > /dev/null
 errorCode=$?
 
 if [ $errorCode -gt 0 ]; then
@@ -43,7 +44,7 @@ else
 fi
 
 echo "Trying to fetch www.yahoo.com" | log
-curl "http://www.yahoo.com/"  --connect-timeout 10 > /dev/null
+curl "http://www.yahoo.com/"  --connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 > /dev/null
 errorCode=$?
 
 if [ $errorCode -gt 0 ]; then

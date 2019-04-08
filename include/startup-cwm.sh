@@ -282,4 +282,24 @@ function removeSwapFile() {
     return 0
 }
 
+function curlDownload() {
+
+    checkPackageInstalled curl
+    
+    # check if url is given
+    if [ -z "$1" ]; then
+        echo "No download url is provided. Exiting (1)."
+        return 1
+    fi
+
+    # allow for nameless and nameful downloads
+    if [ -z "$2" ]; then 
+        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 --url $1 --remote-name 
+    else
+        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 --url $1 --output $2
+    fi
+
+    return $?
+}
+
 SERVERIP="$(getServerIP $CWMCONFIGFILE)"
