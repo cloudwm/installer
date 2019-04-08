@@ -32,6 +32,12 @@ chmod 600 /etc/ssl/private/pure-ftpd.pem
 
 systemctl restart pure-ftpd.service | log
 
+# how to connect remotely
+# how to open ports if necessary
+# config location
+# how to use config
+
+
 tag pure-ftpd.success
 tagScript success
 
