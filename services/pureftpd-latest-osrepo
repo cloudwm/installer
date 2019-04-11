@@ -6,16 +6,18 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+app_path=/var/www/html
+
 echo "Installing pure-ftpd" | log
 apt install pure-ftpd -y | log
 waitOrStop 0
 checkPackageInstalled pure-ftpd
 
 # Creating home folder, in case that it wasn't created by web server
-mkdir -p  /var/www/html
+mkdir -p $app_path
 
 echo "Creating admin user" | log
-(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d /var/www/html
+(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d $app_path
 pure-pw mkdb
 
 echo "Enabling Virtual Users and MinUID for www-data" | log
@@ -37,7 +39,7 @@ descriptionAppend " "
 descriptionAppend "FTP admin user: admin"
 descriptionAppend "FTP admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "Main storage folder: /var/www/html/"
+descriptionAppend "Main storage folder: ${app_path}/"
 descriptionAppend " "
 descriptionAppend "Pure FTPd config location: /etc/pure-ftpd/conf/"
 descriptionAppend " "
