@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-app_path=/var/www/html
+app_path=/home/ftpuser
 
 echo "Installing pure-ftpd" | log
 apt install pure-ftpd -y | log
@@ -16,8 +16,9 @@ checkPackageInstalled pure-ftpd
 # Creating home folder, in case that it wasn't created by web server
 mkdir -p $app_path
 
-echo "Creating admin user" | log
-(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d $app_path
+echo "Creating main ftp user" | log
+ftpuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
+(echo "$ftpuser_password" ; echo "$ftpuser_password") | pure-pw useradd ftpuser -u www-data -d $app_path
 pure-pw mkdb
 
 echo "Enabling Virtual Users and MinUID for www-data" | log
@@ -26,20 +27,18 @@ echo "33" > /etc/pure-ftpd/conf/MinUID
 ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
 
 echo "Enabling FTP over Explicit TLS (Port 21)" | log
-echo 1 > /etc/pure-ftpd/conf/TLS                
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/pure-ftpd.pem -out /etc/ssl/private/pure-ftpd.pem -days 1024 -nodes -subj '/CN=localhost'
 chmod 600 /etc/ssl/private/pure-ftpd.pem
+echo 1 > /etc/pure-ftpd/conf/TLS                
 
 systemctl restart pure-ftpd.service | log
 
 echo "Adding descriptions" | log
-descriptionAppend "Connect from another machine with: "
-descriptionAppend "# ftp ${SERVERIP}"
+descriptionAppend "Pure-FTPd Hostname: ${SERVERIP}"
+descriptionAppend "Pure-FTPd Username: ftpuser"
+descriptionAppend "Pure-FTPd Password: ${ftpuser_password}"
 descriptionAppend " "
-descriptionAppend "Pure-FTPd admin user: admin"
-descriptionAppend "Pure-FTPd admin password: ${ADMINPASSWORD}"
-descriptionAppend " "
-descriptionAppend "Pure-FTPd Main storage folder: ${app_path}/"
+descriptionAppend "Pure-FTPd main storage folder: ${app_path}/"
 descriptionAppend " "
 descriptionAppend "Pure-FTPd config location: /etc/pure-ftpd/conf/"
 descriptionAppend " "
