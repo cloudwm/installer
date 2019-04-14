@@ -7,6 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 app_path=/home/ftpuser
+app_owner=www-data
 
 echo "Installing pure-ftpd" | log
 apt install pure-ftpd -y | log
@@ -15,10 +16,11 @@ checkPackageInstalled pure-ftpd
 
 # Creating home folder, in case that it wasn't created by web server
 mkdir -p $app_path
+chown -R $app_owner:$app_owner $app_path/
 
 echo "Creating main ftp user" | log
 ftpuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
-(echo "$ftpuser_password" ; echo "$ftpuser_password") | pure-pw useradd ftpuser -u www-data -d $app_path
+(echo "$ftpuser_password" ; echo "$ftpuser_password") | pure-pw useradd ftpuser -u $app_owner -d $app_path
 pure-pw mkdb
 
 echo "Enabling Virtual Users and MinUID for www-data" | log
@@ -42,11 +44,12 @@ descriptionAppend "Pure-FTPd main storage folder: ${app_path}/"
 descriptionAppend " "
 descriptionAppend "Pure-FTPd config location: /etc/pure-ftpd/conf/"
 descriptionAppend " "
-descriptionAppend "See all configurations at once:"
+descriptionAppend "To list all modified configurations at once:"
 descriptionAppend "# head /etc/pure-ftpd/conf/*"
 descriptionAppend " "
 descriptionAppend "To change a configuration: "
 descriptionAppend "# echo {VALUE} > /etc/pure-ftpd/conf/{SETTING}"
+descriptionAppend "# systemctl restart pure-ftpd.service"
 descriptionAppend " "
 descriptionAppend "Pure-FTPd documentation: https://www.pureftpd.org/project/pure-ftpd/doc/"
 descriptionAppend " "
