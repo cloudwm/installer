@@ -6,31 +6,56 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install pure-ftpd
+app_path=/home/ftpuser
+app_owner=www-data
+
 echo "Installing pure-ftpd" | log
 apt install pure-ftpd -y | log
 waitOrStop 0
-
 checkPackageInstalled pure-ftpd
 
-# Creating home folder, incase that it wasn't created by web server
-mkdir -p  /var/www/html
+# Creating home folder, in case that it wasn't created by web server
+mkdir -p $app_path
+chown -R $app_owner:$app_owner $app_path/
 
-# Creating admin user
-(echo "$ADMINPASSWORD" ; echo "$ADMINPASSWORD") | pure-pw useradd admin  -u www-data -d /var/www/html
+echo "Creating main ftp user" | log
+ftpuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
+(echo "$ftpuser_password" ; echo "$ftpuser_password") | pure-pw useradd ftpuser -u $app_owner -d $app_path
 pure-pw mkdb
 
-# Enabling Virtual Users and MinUID for www-data
+echo "Enabling Virtual Users and MinUID for www-data" | log
 echo "/usr/sbin/nologin\r" >> /etc/shells
 echo "33" > /etc/pure-ftpd/conf/MinUID
 ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
 
-# Enabling FTP over Explicit TLS (Port 21)
-echo 1 > /etc/pure-ftpd/conf/TLS                
+echo "Enabling FTP over Explicit TLS (Port 21)" | log
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/pure-ftpd.pem -out /etc/ssl/private/pure-ftpd.pem -days 1024 -nodes -subj '/CN=localhost'
 chmod 600 /etc/ssl/private/pure-ftpd.pem
+echo 1 > /etc/pure-ftpd/conf/TLS                
 
 systemctl restart pure-ftpd.service | log
+
+echo "Adding descriptions" | log
+descriptionAppend "Pure-FTPd Hostname: ${SERVERIP}"
+descriptionAppend "Pure-FTPd Username: ftpuser"
+descriptionAppend "Pure-FTPd Password: ${ftpuser_password}"
+descriptionAppend " "
+descriptionAppend "Pure-FTPd main storage folder: ${app_path}/"
+descriptionAppend " "
+descriptionAppend "Pure-FTPd config location: /etc/pure-ftpd/conf/"
+descriptionAppend " "
+descriptionAppend "To list all modified configurations at once:"
+descriptionAppend "# head /etc/pure-ftpd/conf/*"
+descriptionAppend " "
+descriptionAppend "To change a configuration: "
+descriptionAppend "# echo {VALUE} > /etc/pure-ftpd/conf/{SETTING}"
+descriptionAppend "# systemctl restart pure-ftpd.service"
+descriptionAppend " "
+descriptionAppend "Pure-FTPd configuration file (optional): /etc/pure-ftpd/pure-ftpd.conf"
+descriptionAppend "For further information: https://download.pureftpd.org/pub/pure-ftpd/doc/README.Configuration-File"
+descriptionAppend " "
+descriptionAppend "Pure-FTPd documentation: https://www.pureftpd.org/project/pure-ftpd/doc/"
+descriptionAppend " "
 
 tag pure-ftpd.success
 tagScript success
