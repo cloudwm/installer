@@ -14,7 +14,6 @@ rubyVersion=ruby-2.6.1
 echo "Init setup and Downloading Ruby" | log
 apt install -y build-essential
 waitOrStop 0
-
 cd $rootDir/temp
 curlDownload "http://ftp.ruby-lang.org/pub/ruby/2.6/$rubyVersion.tar.gz" | log
 waitOrStop 0
@@ -22,7 +21,6 @@ tar -xzvf "$rubyVersion.tar.gz" | log
 waitOrStop 0
 
 echo "Building and installing Ruby" | log
-
 cd "$rubyVersion"/
 ./configure
 make

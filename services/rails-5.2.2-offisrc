@@ -31,7 +31,10 @@ gem install rails -v $railsVersion
 gem update --system
 bundler update --bundler
 
-echo "Initiating test db needed for demo start page" | log
+echo "Initiating demo app" | log
+rails new myapp -d mysql
+cd myapp
+# config/database.yml file to contain the username/password that you specified
 rake db:create
 
 echo "Adding descriptions" | log
