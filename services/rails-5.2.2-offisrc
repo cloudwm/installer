@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nodejs.success
+checkTagExist mysql-server-5.7.success
+checkTagExist ruby.success
+
+echo "Installing Yarn for package management" | log
+curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg | log
+waitOrStop 0
+apt-key add pubkey.gpg
+echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+apt update
+apt install -y software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn
+waitOrStop 0
+
+echo "Installing Bundler and Rails" | log
+gem install bundler
+gem install rails -v 5.2.2
+gem update --system
+bundler update --bundler
+
+echo "Initiating test db needed for demo start page" | log
+rake db:create
+
+echo "Adding descriptions" | log
+descriptionAppend "To run server:"
+descriptionAppend "# rails s -b ${SERVERIP} -p 80"
+descriptionAppend " "
+
+tag rails.success
+tagScript success
+exit 0
