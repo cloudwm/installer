@@ -11,7 +11,12 @@ checkTagExist nodejs.success
 checkTagExist mysql-server-5.7.success
 checkTagExist ruby.success
 
+rootDir=$(rootDir)
+mkdir -p $rootDir/temp
+railsVersion=5.2.2
+
 echo "Installing Yarn for package management" | log
+cd $rootDir/temp
 curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg | log
 waitOrStop 0
 apt-key add pubkey.gpg
@@ -22,7 +27,7 @@ waitOrStop 0
 
 echo "Installing Bundler and Rails" | log
 gem install bundler
-gem install rails -v 5.2.2
+gem install rails -v $railsVersion
 gem update --system
 bundler update --bundler
 
