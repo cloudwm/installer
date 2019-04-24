@@ -32,6 +32,7 @@ gem update --system
 bundler update --bundler
 
 echo "Initiating demo app" | log
+mkdir -p /var/www
 cd /var/www
 rails new myapp -d mysql
 cd myapp
