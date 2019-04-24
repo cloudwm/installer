@@ -34,7 +34,10 @@ bundler update --bundler
 echo "Initiating demo app" | log
 rails new myapp -d mysql
 cd myapp
+
+echo "Pushing database config" | log
 # config/database.yml file to contain the username/password that you specified
+sed "/^ *default:/,/^\n *[^:]*:/s/password: [0-9a-zA-Z]\+/password: ${ADMINPASSWORD}/" config/database.yml
 rake db:create
 
 echo "Adding descriptions" | log
