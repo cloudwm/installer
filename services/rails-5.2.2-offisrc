@@ -32,11 +32,9 @@ gem update --system
 bundler update --bundler
 
 echo "Initiating demo app" | log
+cd /var/www
 rails new myapp -d mysql
 cd myapp
-
-echo "Pushing database config" | log
-# config/database.yml file to contain the username/password that you specified
 sed -i "/^ *default:/,/^\n *[^:]*:/s/password:/password: ${ADMINPASSWORD}/" config/database.yml
 rake db:create
 
