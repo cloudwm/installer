@@ -22,7 +22,7 @@ waitOrStop 0
 apt-key add pubkey.gpg
 echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
 apt update
-apt install -y software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn
+apt install -y software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn mysql-client libmysqlclient-dev
 waitOrStop 0
 
 echo "Installing Bundler and Rails" | log
