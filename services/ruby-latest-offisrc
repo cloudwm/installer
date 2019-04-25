@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+mkdir -p $rootDir/temp
+rubyVersion=ruby-2.6.1
+
+echo "Init setup and Downloading Ruby" | log
+apt install -y build-essential
+waitOrStop 0
+cd $rootDir/temp
+curlDownload "http://ftp.ruby-lang.org/pub/ruby/2.6/$rubyVersion.tar.gz" | log
+waitOrStop 0
+tar -xzvf "$rubyVersion.tar.gz" | log
+waitOrStop 0
+
+echo "Building and installing Ruby" | log
+cd "$rubyVersion"/
+./configure
+make
+make install
+
+tag ruby.success
+tagScript success
+exit 0
