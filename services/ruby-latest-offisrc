@@ -26,6 +26,10 @@ rubyVersion=${rubyVersion}
 rubyInstallPath=${rubyInstallPath}
 EOF
 
+echo "Adding Ruby path to global environment" | log
+sed -i "s/\"$/:${rubyInstallPath}\/bin\"/" /etc/environment
+export PATH=`cat /etc/environment | cut -d'"' -f 2`
+
 tag ruby.success
 tagScript success
 exit 0

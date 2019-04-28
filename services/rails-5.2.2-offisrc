@@ -15,11 +15,6 @@ rootDir=$(rootDir)
 mkdir -p $rootDir/temp
 railsVersion=5.2.2
 
-if [ -z $rootDir/temp/rubyInstallParams.sh ]; then
-    echo "Couldn't find Ruby installation. Aborting(1). " | log
-    exit 1
-fi
-./$rootDir/temp/rubyInstallParams.sh
 
 
 echo "Installing Yarn for package management" | log
@@ -33,10 +28,10 @@ apt install -y software-properties-common zlib1g-dev libssl-dev libreadline-dev 
 waitOrStop 0
 
 echo "Installing Bundler and Rails" | log
-$rubyInstallPath/bin/gem install bundler
-$rubyInstallPath/bin/gem install rails -v $railsVersion
-$rubyInstallPath/bin/gem update --system
-$rubyInstallPath/bin/bundler update --bundler
+gem install bundler
+gem install rails -v $railsVersion
+gem update --system
+bundler update --bundler
 
 echo "Initiating demo app" | log
 mkdir -p /var/www
