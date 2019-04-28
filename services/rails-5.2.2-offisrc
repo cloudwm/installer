@@ -15,8 +15,6 @@ rootDir=$(rootDir)
 mkdir -p $rootDir/temp
 railsVersion=5.2.2
 
-
-
 echo "Installing Yarn for package management" | log
 cd $rootDir/temp
 curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg | log

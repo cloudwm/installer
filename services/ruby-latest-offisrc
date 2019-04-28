@@ -20,15 +20,16 @@ PREFIX=/usr/local ./ruby-build/install.sh
 
 ruby-build $rubyVersion $rubyInstallPath
 
-cat << EOF > $rootDir/temp/rubyInstallParams.sh
-#!/bin/bash
-rubyVersion=${rubyVersion}
-rubyInstallPath=${rubyInstallPath}
-EOF
+# cat << EOF > $rootDir/temp/rubyInstallParams.sh
+# #!/bin/bash
+# rubyVersion=${rubyVersion}
+# rubyInstallPath=${rubyInstallPath}
+# EOF
 
-echo "Adding Ruby path to global environment" | log
-sed -i "s/\"$/:${rubyInstallPath}\/bin\"/" /etc/environment
+echo "Adding Ruby path to global environment and root user" | log
+sed -i "s|\"$|:${rubyInstallPath}/bin\"|" /etc/environment
 export PATH=`cat /etc/environment | cut -d'"' -f 2`
+echo 'export PATH="'$PATH'"' >> ~/.bashrc
 
 tag ruby.success
 tagScript success
