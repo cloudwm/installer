@@ -15,7 +15,7 @@ rootDir=$(rootDir)
 mkdir -p $rootDir/temp
 railsVersion=5.2.2
 
-if [ ! -z $rootDir/temp/rubyInstallParams.sh ]; then
+if [ -z $rootDir/temp/rubyInstallParams.sh ]; then
     echo "Couldn't find Ruby installation. Aborting(1). " | log
     exit 1
 fi
