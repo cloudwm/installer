@@ -9,23 +9,8 @@ fi
 
 rootDir=$(rootDir)
 mkdir -p $rootDir/temp
-# rubyVersion=ruby-2.6.1
 rubyVersion=2.6.1
-
-# echo "Init setup and Downloading Ruby" | log
-# apt install -y build-essential
-# waitOrStop 0
-# cd $rootDir/temp
-# curlDownload "http://ftp.ruby-lang.org/pub/ruby/2.6/$rubyVersion.tar.gz" | log
-# waitOrStop 0
-# tar -xzvf "$rubyVersion.tar.gz" | log
-# waitOrStop 0
-
-# echo "Building and installing Ruby" | log
-# cd "$rubyVersion"/
-# ./configure
-# make
-# make install
+rubyInstallPath=/opt/ruby-$rubyVersion
 
 apt install -y autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev
 
@@ -33,7 +18,13 @@ cd $rootDir/temp
 git clone https://github.com/rbenv/ruby-build.git
 PREFIX=/usr/local ./ruby-build/install.sh
 
-ruby-build $rubyVersion /opt/ruby-$rubyVersion
+ruby-build $rubyVersion $rubyInstallPath
+
+cat << EOF > $rootDir/temp/rubyInstallParams.sh
+#!/bin/bash
+rubyVersion=${rubyVersion}
+rubyInstallPath=${rubyInstallPath}
+EOF
 
 tag ruby.success
 tagScript success
