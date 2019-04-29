@@ -17,12 +17,12 @@ apt install -y autoconf bison build-essential libssl-dev libyaml-dev libreadline
 
 echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp
-git clone https://github.com/rbenv/ruby-build.git
+git clone https://github.com/rbenv/ruby-build.git | log
 waitOrStop 0
 PREFIX=/usr/local ./ruby-build/install.sh
 
 echo "Installing Ruby" | log
-ruby-build $rubyVersion $rubyInstallPath
+ruby-build $rubyVersion $rubyInstallPath --verbose | log
 
 echo "Adding Ruby path to global environment" | log
 sed -i "s|\"$|:${rubyInstallPath}/bin\"|" /etc/environment
