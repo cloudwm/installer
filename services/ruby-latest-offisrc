@@ -9,22 +9,26 @@ fi
 
 rootDir=$(rootDir)
 mkdir -p $rootDir/temp
-rubyVersion=ruby-2.6.1
+rubyVersion=2.6.3
+rubyInstallPath=/opt/ruby-$rubyVersion
 
-echo "Init setup and Downloading Ruby" | log
-apt install -y build-essential
-waitOrStop 0
+echo "Installing dependencies" | log
+apt install -y autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev
+
+echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp
-curlDownload "http://ftp.ruby-lang.org/pub/ruby/2.6/$rubyVersion.tar.gz" | log
+git clone https://github.com/rbenv/ruby-build.git | log
 waitOrStop 0
-tar -xzvf "$rubyVersion.tar.gz" | log
-waitOrStop 0
+PREFIX=/usr/local ./ruby-build/install.sh
 
-echo "Building and installing Ruby" | log
-cd "$rubyVersion"/
-./configure
-make
-make install
+echo "Installing Ruby" | log
+ruby-build $rubyVersion $rubyInstallPath --verbose | log
+
+echo "Adding Ruby path to global environment" | log
+sed -i "s|\"$|:${rubyInstallPath}/bin\"|" /etc/environment
+
+echo "Adding descriptions" | log
+descriptionAppend "Ruby install path: ${rubyInstallPath}"
 
 tag ruby.success
 tagScript success
