@@ -27,6 +27,9 @@ ruby-build $rubyVersion $rubyInstallPath
 echo "Adding Ruby path to global environment" | log
 sed -i "s|\"$|:${rubyInstallPath}/bin\"|" /etc/environment
 
+echo "Adding descriptions" | log
+descriptionAppend "Ruby install path: ${rubyInstallPath}"
+
 tag ruby.success
 tagScript success
 exit 0
