@@ -12,19 +12,20 @@ mkdir -p $rootDir/temp
 rubyVersion=2.6.3
 rubyInstallPath=/opt/ruby-$rubyVersion
 
+echo "Installing dependencies" | log
 apt install -y autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev
 
+echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp
 git clone https://github.com/rbenv/ruby-build.git
+waitOrStop 0
 PREFIX=/usr/local ./ruby-build/install.sh
 
+echo "Installing Ruby" | log
 ruby-build $rubyVersion $rubyInstallPath
 
-echo "Adding Ruby path to global environment and root user" | log
+echo "Adding Ruby path to global environment" | log
 sed -i "s|\"$|:${rubyInstallPath}/bin\"|" /etc/environment
-# export PATH=`cat /etc/environment | cut -d'"' -f 2`
-# echo 'export PATH="'$PATH'"' >> ~/.bashrc
-# source ~/.bashrc
 
 tag ruby.success
 tagScript success
