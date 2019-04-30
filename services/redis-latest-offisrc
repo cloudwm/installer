@@ -14,9 +14,12 @@ apt update
 echo "Installing Redis" | log
 apt install redis -y | log
 waitOrStop 0
-
 checkPackageInstalled redis
 
+echo "Enabling Redis service" | log
+systemctl enable redis-server.service
+
+echo "Adding descriptions" | log
 descriptionAppend "Redis IP Address: ${SERVERIP}"
 descriptionAppend " "
 
