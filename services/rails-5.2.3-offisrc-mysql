@@ -35,6 +35,7 @@ bundler update --bundler
 echo "Initiating demo app" | log
 mkdir -p /var/www
 cd /var/www
+export HOME=/root
 rails new myapp -d mysql
 cd myapp
 sed -i "/^ *default:/,/^\n *[^:]*:/s/password:/password: ${ADMINPASSWORD}/" config/database.yml
