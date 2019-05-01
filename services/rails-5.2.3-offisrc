@@ -34,6 +34,7 @@ bundler update --bundler
 echo "Initiating demo app" | log
 mkdir -p /var/www
 cd /var/www
+touch ~/.railsrc
 rails new myapp --skip-active-record
 
 echo "Generating self-signed certificate" | log
