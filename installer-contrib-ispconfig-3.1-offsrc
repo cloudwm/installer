@@ -19,6 +19,11 @@ execute+=(tweaks/dbserver-check-ntpd)
 execute+=(services/mysqlserver-5.7-osrepo)
 execute+=(tweaks/mysql-server-setbindonall)
 execute+=(services/postfix-mysql-latest-osrepo)
+execute+=(services/dovecot-mysql-latest-osrepo)
+execute+=(services/amavisd-new-latest-osrepo)
+execute+=(services/spamassasin-latest-osrepo)
+execute+=(services/clamav-latest-osrepo)
+
 
 execute+=(apps/ispconfig-3.1-offsrc)
 

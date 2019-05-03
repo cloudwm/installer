@@ -23,8 +23,10 @@ waitOrStop 0
 checkPackageInstalled postfix
 checkPackageInstalled postfix-mysql 
 
-# Copy Virtual Host
+# Copy Prebuilt config
 cp $rootDir/tweaks/extras/postfix-mysql/master.cf  /etc/postfix/master.cf
+
+systemctl restart postfix
 
 tagScript success
 exit 0

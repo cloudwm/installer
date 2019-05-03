@@ -12,6 +12,6 @@ runOnceCheck
 echo "Disabling AppArmor" | log
 systemctl stop apparmor
 systemctl disable apparmor
-apt-get remove apparmor apparmor-utils
+apt-get remove apparmor apparmor-utils -y
 
 tagScript success
