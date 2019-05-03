@@ -8,14 +8,12 @@ fi
 
 echo "install amavisd-new from apt" | log
 
-apt install amavisd-new -y | log
-waitOrStop 0
-
+mkdir -p /etc/amavis/conf.d/
 echo "use strict;" > /etc/amavis/conf.d/05-node_id
 echo "\$myhostname = \"mail.${HOSTNAME}\";" >> /etc/amavis/conf.d/05-node_id
 echo "1;" >> /etc/amavis/conf.d/05-node_id
-
-dpkg-reconfigure amavisd-new
+echo "N" |apt install amavisd-new -y | log
+waitOrStop 0
 
 checkPackageInstalled amavisd-new
 
