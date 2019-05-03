@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist mysqld.success
+
+echo "install postfix from apt" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "postfix postfix/destinations string ${HOSTNAME}"
+debconf-set-selections <<< "postfix postfix/mailbox_limit string 51200000"              
+debconf-set-selections <<< "postfix postfix/mailname string ${HOSTNAME}"    
+debconf-set-selections <<< "postfix postfix/main_mailer_type select Internet Site"      
+debconf-set-selections <<< "postfix postfix/protocols select ipv4"                      
+debconf-set-selections <<< "postfix postfix/root_address string root"                   
+apt install postfix postfix-mysql -y | log
+waitOrStop 0
+
+checkPackageInstalled postfix
+checkPackageInstalled postfix-mysql 
+
+# Copy Prebuilt config
+cp $rootDir/tweaks/extras/postfix-mysql/master.cf  /etc/postfix/master.cf
+
+systemctl restart postfix
+
+tagScript success
+exit 0
