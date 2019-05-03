@@ -23,6 +23,11 @@ execute+=(services/dovecot-mysql-latest-osrepo)
 execute+=(services/amavisd-new-latest-osrepo)
 execute+=(services/spamassasin-latest-osrepo)
 execute+=(services/clamav-latest-osrepo)
+execute+=(services/apache-latest-osrepo)
+execute+=(services/phpfpm-7.2-osrepo)
+execute+=(tweaks/apache-enable-phpfpm)
+execute+=(services/certbot-latest-offirepo-apache)
+
 
 
 execute+=(apps/ispconfig-3.1-offsrc)
