@@ -10,7 +10,8 @@ fi
 useradd --system minio-user --shell /sbin/nologin
 
 # Download Minio Binary
-curl -O https://dl.minio.io/server/minio/release/linux-amd64/minio
+# curl -O https://dl.minio.io/server/minio/release/linux-amd64/minio
+curlDownload https://dl.minio.io/server/minio/release/linux-amd64/minio | log
 waitOrStop 0
 
 mv minio /usr/local/bin
@@ -30,7 +31,8 @@ echo "MINIO_OPTS=\"-C /etc/minio --certs-dir /etc/minio/certs --address $finalip
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 # Add Systemd Service
-curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
+# curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
+curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service | log
 waitOrStop 0
 
 mv minio.service /etc/systemd/system
