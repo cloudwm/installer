@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt-get -y install bind9 dnsutils 
+waitOrStop 0
+
+checkPackageInstalled bind9
+checkPackageInstalled dnsutils
+
+tagScript success
+
+exit 0

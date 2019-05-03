@@ -25,8 +25,10 @@ execute+=(services/spamassasin-latest-osrepo)
 execute+=(services/clamav-latest-osrepo)
 execute+=(services/nginx-latest-osrepo)
 execute+=(services/phpfpm-7.2-osrepo)
-execute+=(tweaks/nginx-enable-phpfpm)
+execute+=(tweaks/nginx-enable-php)
 execute+=(services/certbot-latest-offirepo-nginx)
+execute+=(services/pureftpd-latest-osrepo)
+execute+=(services/bind-latest-osrepo)
 
 execute+=(apps/ispconfig-3.1-offsrc)
 
