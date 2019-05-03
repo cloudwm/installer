@@ -13,7 +13,6 @@ checkTagExist php7.2-fpm.success
 
 a2enmod proxy_fcgi setenvif
 a2enconf php7.2-fpm
-sed -i 's/listen = \/run\/php\/php7.2-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/7.2/fpm/pool.d/www.conf && service php7.2-fpm restart
 sed  -i 's|.*SetHandler.*|SetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-enabled/php7.2-fpm.conf
 
 systemctl restart apache2
