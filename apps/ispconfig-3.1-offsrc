@@ -5,9 +5,3 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
-cd /tmp
-wget https://git.ispconfig.org/ispconfig/ispconfig3/raw/stable-3.1/helper_scripts/ubuntu-amavisd-new-2.11.patch
-cd /usr/sbin
-cp -pf amavisd-new amavisd-new_bak
-patch < /tmp/ubuntu-amavisd-new-2.11.patch
