@@ -15,7 +15,9 @@ echo "Downloading PhpBB3" | log
 mkdir -p /var/www/html
 mkdir -p temp
 cd temp
-curl -O https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
+# curl -O https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
+curlDownload https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
+waitOrStop 0
 tar -xjvf phpBB-3.2.5.tar.bz2  -C /var/www/html/ --strip 1
 waitOrStop 0
 rm -f phpBB-3.2.5.tar.bz2

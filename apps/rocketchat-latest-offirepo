@@ -11,6 +11,7 @@ checkTagExist mongodb.success
 checkTagExist nodejs.success
 
 rootDir=$(rootDir)
+app_path=/opt/rocket
 
 echo "Installing and tweaking nodejs requirements" | log
 apt install graphicsmagick -y
@@ -19,18 +20,19 @@ npm install -g inherits n
 n 8.11.3
 
 echo "Creat app user" | log
-useradd -m -U -r -d /opt/rocket rocket
+useradd -m -U -r -d $app_path rocket
 usermod -a -G rocket www-data
-chmod 750 /opt/rocket
+chmod 750 $app_path
 
 echo "Install main app" | log
 
 mongo_url="mongodb://admin:${ADMINPASSWORD}@localhost:27017/rocketchat?authSource=admin"
 app_port=3000
+curlDownload https://releases.rocket.chat/latest/download $app_path/rocket.chat.tgz
+chown -R rocket:rocket $app_path/rocket.chat.tgz
 
 su rocket << EOF
-cd /opt/rocket
-curl -L https://releases.rocket.chat/latest/download -o rocket.chat.tgz
+cd ${app_path}
 tar zxf rocket.chat.tgz
 mv bundle Rocket.Chat
 cd Rocket.Chat/programs/server
@@ -58,7 +60,7 @@ StandardError=syslog
 SyslogIdentifier=rocketchat
 User=rocket
 Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${SERVERIP} PORT=${app_port}
-ExecStart=/usr/local/bin/node /opt/rocket/Rocket.Chat/main.js
+ExecStart=/usr/local/bin/node ${app_path}/Rocket.Chat/main.js
 
 [Install]
 WantedBy=multi-user.target
@@ -84,7 +86,8 @@ unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 
-descriptionAppend "Rocket.chat application directory: /opt/rocket/Rocket.Chat/"
+descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
+descriptionAppend "Rocket.chat web UI: https://${SERVERIP}"
 descriptionAppend " "
 
 tagScript success

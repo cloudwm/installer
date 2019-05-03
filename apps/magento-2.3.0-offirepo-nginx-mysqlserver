@@ -29,14 +29,14 @@ echo "Downloading Magento 2.3.0 from github repo" | log
 mkdir -p /var/www/html
 mkdir -p temp
 cd temp
-curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
+# curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
+curlDownload https://codeload.github.com/magento/magento2/tar.gz/2.3.0 2.3.0.tar.gz | log
 waitOrStop 0
 mv 2.3.0.tar.gz /var/www/html
 
 echo "Extracting Magento to /var/www/html/" | log
 tar -xzvf /var/www/html/2.3.0.tar.gz -C /var/www/html/ --strip 1
 waitOrStop 0
-
 rm -f /var/www/html/2.3.0.tar.gz
 
 echo "Setting permissions for Magento" | log
@@ -70,6 +70,7 @@ echo "disable sign static files and force cache refresh" | log
 cd /var/www/html/ 
 bin/magento config:set dev/static/sign 0
 curl ${SERVERIP} > /dev/null
+waitOrStop 0
 bin/magento setup:static-content:deploy -f
 bin/magento cache:clean
 waitOrStop 0

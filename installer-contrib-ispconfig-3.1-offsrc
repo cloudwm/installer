@@ -3,28 +3,26 @@
 #
 # installer will read variables and will execute them one by one.
 #
-
 execute+=(tweaks/cwm-settimezone)
 execute+=(include/installInProgressSSH)
 execute+=(include/checkInternetConnectivity)
 execute+=(tweaks/ubuntu-ufw-enable)
-execute+=(tweaks/ubuntu-ufw-allowhttp)
 execute+=(tweaks/ubuntu-updateos)
+execute+=(tweaks/ubuntu-enable-bash)
+execute+=(tweaks/ubuntu-disable-apparmor)
 
 . installer-contrib-tweaks-optimize.conf
 
-execute+=(services/nginx-latest-osrepo)
-execute+=(include/installInProgressHttpd)
-execute+=(tweaks/nginx-enable-ssl)
-execute+=(services/sendmail-latest-osrepo)
-execute+=(services/mongodb-3.6-offirepo)
-execute+=(tweaks/mongodb-server-adjustments)
-execute+=(services/nodejs-11-offirepo)
+execute+=(services/ntpd-latest-osrepo)
+execute+=(tweaks/dbserver-check-ntpd)
 
-execute+=(apps/rocketchat-latest-offirepo)
+execute+=(services/mysqlserver-5.7-osrepo)
+execute+=(tweaks/mysql-server-setbindonall)
+execute+=(services/postfix-mysql-latest-osrepo)
+
+execute+=(apps/ispconfig-3.1-offsrc)
 
 execute+=(tweaks/motd-header-tweak)
 execute+=(tweaks/motd-description-append)
 
-execute+=(include/installInProgressHttpd-remove)
 execute+=(include/installInProgressSSH-remove)
