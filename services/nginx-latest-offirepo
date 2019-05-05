@@ -8,17 +8,18 @@ fi
 
 appPath=/var/www/html
 
-cat << EOF >> /etc/apt/sources.list.d/nginx.list
-deb http://nginx.org/packages/ubuntu/ bionic nginx
-deb-src http://nginx.org/packages/ubuntu/ bionic nginx
-EOF
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ABF5BD827BD9BF62
+echo "Adding nginx repo to apt" | log
+# cat << EOF >> /etc/apt/sources.list.d/nginx.list
+# deb http://nginx.org/packages/ubuntu/ bionic nginx
+# deb-src http://nginx.org/packages/ubuntu/ bionic nginx
+# EOF
+# apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ABF5BD827BD9BF62
+add-apt-repository -y ppa:nginx/stable | log
 apt update
 
-# install nginx from apt
-apt install nginx -y | log
+echo "Installing nginx from apt" | log
+apt install nginx-full -y | log
 waitOrStop 0
-checkPackageInstalled nginx
 
 echo "Changing ownership of $appPath to www-data user" | log
 if [ -d "$appPath" ]; then
