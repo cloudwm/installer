@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "install amavisd-new from apt" | log
+
+mkdir -p /etc/amavis/conf.d/
+echo "use strict;" > /etc/amavis/conf.d/05-node_id
+echo "\$myhostname = \"mail.${HOSTNAME}\";" >> /etc/amavis/conf.d/05-node_id
+echo "1;" >> /etc/amavis/conf.d/05-node_id
+echo "N" |apt install amavisd-new -y | log
+waitOrStop 0
+
+checkPackageInstalled amavisd-new
+
+tagScript success
+exit 0

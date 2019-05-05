@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+echo "Disabling AppArmor" | log
+systemctl stop apparmor
+systemctl disable apparmor
+apt-get remove apparmor apparmor-utils -y
+
+tagScript success

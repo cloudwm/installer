@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "install clamav from apt" | log
+
+apt install clamav clamav-daemon -y | log
+waitOrStop 0
+
+checkPackageInstalled clamav
+checkPackageInstalled clamav-daemon
+
+systemctl stop clamav-daemon
+systemctl stop clamav-freshclam
+freshclam
+systemctl start clamav-daemon
+systemctl start clamav-freshclam
+
+tagScript success
+exit 0

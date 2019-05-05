@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "install spamassassin from apt" | log
+
+apt install spamassassin -y | log
+waitOrStop 0
+
+checkPackageInstalled spamassassin
+
+tagScript success
+exit 0
