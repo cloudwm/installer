@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Adding php7.3 repo" | log
+apt install -y software-properties-common
+waitOrStop 0
+add-apt-repository -y ppa:ondrej/php | log
+apt update
+
+echo "Installing php7.3" | log
+apt install -y php7.3 
+waitOrStop 0
+
+echo "Installing php7.3 modules" | log
+apt install -y php7.3-bcmath php7.3-bz2 php7.3-cli php7.3-common php7.3-curl php7.3-gd php7.3-intl php7.3-json php7.3-mbstring php7.3-mysql php7.3-mysqlnd php7.3-readline php7.3-soap php7.3-xml php7.3-zip php-pear php-php-gettext php-phpseclib php-tcpdf | log
+waitOrStop 0
+
+echo "Adding descriptions" | log
+descriptionAppend "PHP configuration location: /etc/php/"
+descriptionAppend " "
+
+tag php.success
+tagScript success
+
+exit 0
