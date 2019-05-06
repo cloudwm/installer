@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+
+echo "Installing php7.2-fpm" | log
+apt install php7.2-fpm -y | log
+waitOrStop 0
+checkPackageInstalled php7.2-fpm
+
+echo "Configuring php-fpm to listen on correct socket" | log
+sed -i 's/listen = \/run\/php\/php7.2-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/7.2/fpm/pool.d/www.conf
+waitOrStop 0
+
+echo "Restarting service to implement changes" | log
+service php7.2-fpm restart
+
+echo "Adding descriptions" | log
+descriptionAppend "PHP-FPM configuration location: /etc/php/7.2/fpm/"
+descriptionAppend " "
+
+tag php-fpm.success
+tag php7.2-fpm.success
+
+tagScript success
+
+exit 0
