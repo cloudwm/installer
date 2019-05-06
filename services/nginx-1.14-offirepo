@@ -7,13 +7,14 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 appPath=/var/www/html
+nginxVersion="1.14.2-0+bionic1"
 
 echo "Adding nginx repo to apt" | log
 add-apt-repository -y ppa:nginx/stable | log
 apt update
 
 echo "Installing nginx from apt" | log
-apt install -y nginx-full | log
+apt install -y nginx-full=$nginxVersion | log
 waitOrStop 0
 
 echo "Changing ownership of $appPath to www-data user" | log
