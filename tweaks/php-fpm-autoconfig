@@ -7,19 +7,16 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-### basic check of php-fpm existence ###
-
+echo "Checking if php-fpm exists" | log
 service=$(systemctl | grep fpm | awk '{print $1}')
 
 if [[ -z "$service" ]]; then
-	echo php-fpm is not installed | log
+	echo "php-fpm is not installed" | log
 	exit 1
 fi
 
-### check existing startup scripts folder ###
-
+echo "Checking existing startup scripts folder" | log
 MY_PATH="`dirname \"$0\"`"
-
 INSTALLER_PATH=/opt/php-fpm-autoconfig
 
 if [ ! -d "$INSTALLER_PATH" ]; then
@@ -35,7 +32,7 @@ if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
 	chmod +x $INSTALLER_PATH/php-fpm-autoconfig
 fi
 
-# If installer is running in a provisioning process, set rc.local file to the renamed file.
+echo "Setting rc.local to the renamed file if installer is running in a provisioning process." | log
 if [ -f /etc/rc.local.bck ]; then
     RCLOCALFILE=/etc/rc.local.bck
 else
@@ -60,6 +57,7 @@ else
 
 fi
 
+echo "Adding descriptions" | log
 descriptionAppend "php-fpm-autoconfig script: /opt/php-fpm-autoconfig/php-fpm-autoconfig"
 descriptionAppend " "
 
