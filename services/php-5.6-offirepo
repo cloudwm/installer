@@ -1,0 +1,34 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Adding php5.6 repo" | log
+apt install -y software-properties-common
+waitOrStop 0
+add-apt-repository -y ppa:ondrej/php | log
+apt update
+
+echo "Installing php5.6" | log
+apt install -y php5.6 | log
+waitOrStop 0
+
+echo "Installing php5.6 modules" | log
+apt install -y php5.6-bcmath php5.6-bz2 php5.6-cli php5.6-common php5.6-curl php5.6-gd php5.6-intl php5.6-json php5.6-mbstring php5.6-mysql php5.6-mysqlnd php5.6-readline php5.6-soap php5.6-xml php5.6-zip php-pear php-php-gettext php-phpseclib php-tcpdf | log
+waitOrStop 0
+
+echo "Disabling non-critical services" | log
+systemctl stop apache2.service
+systemctl disable apache2.service
+
+echo "Adding descriptions" | log
+descriptionAppend "PHP configuration location: /etc/php/"
+descriptionAppend " "
+
+tag php.success
+tagScript success
+
+exit 0
