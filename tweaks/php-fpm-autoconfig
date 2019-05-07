@@ -7,13 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Checking if php-fpm exists" | log
-service=$(systemctl | grep fpm | awk '{print $1}')
-
-if [[ -z "$service" ]]; then
-	echo "php-fpm is not installed" | log
-	exit 1
-fi
+checkTagExist php-fpm.success
 
 echo "Checking existing startup scripts folder" | log
 MY_PATH="`dirname \"$0\"`"

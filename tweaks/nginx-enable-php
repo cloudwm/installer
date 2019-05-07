@@ -8,11 +8,14 @@ fi
 runOnceCheck
 checkTagExist nginx.success
 checkTagExist php-fpm.success
-checkTagExist php7.2-fpm.success
+# checkTagExist php7.2-fpm.success
 
-sed -i 's/listen = \/run\/php\/php7.2-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/7.2/fpm/pool.d/www.conf && service php7.2-fpm restart
+phpVersion=$(systemctl | grep fpm | awk '{print $1}' | grep -o -P '(?<=php).*(?=-fpm)')
 
-waitOrStop 0
+sed -i 's/listen = \/run\/php\/php'"${phpVersion}"'-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/$phpVersion/fpm/pool.d/www.conf
+service php$phpVersion-fpm restart
+
+# waitOrStop 0
 
 phpfpmconfig="\        location ~ \\.php$ {\n                include snippets\/fastcgi-php.conf\;\n                fastcgi_pass 127.0.0.1:9000\;\n        }\n"
 
@@ -21,7 +24,7 @@ sed -i -e 's/index index.html/index index.php index.html/' /etc/nginx/sites-avai
 
 service nginx restart
 
-waitOrStop 0
+# waitOrStop 0
 
 tagScript success
 
