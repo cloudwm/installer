@@ -1,0 +1,34 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
+
+echo "Installing php$phpVersion-fpm" | log
+apt install php$phpVersion-fpm -y | log
+waitOrStop 0
+checkPackageInstalled php$phpVersion-fpm
+
+echo "Configuring php-fpm to listen on correct socket" | log
+sed -i 's/listen = \/run\/php\/php'"${phpVersion}"'-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/$phpVersion/fpm/pool.d/www.conf
+waitOrStop 0
+
+echo "Restarting service to implement changes" | log
+service php$phpVersion-fpm restart
+
+echo "Adding descriptions" | log
+descriptionAppend "PHP-FPM configuration location: /etc/php/$phpVersion/fpm/"
+descriptionAppend " "
+
+tag php-fpm.success
+# tag php$phpVersion-fpm.success
+
+tagScript success
+
+exit 0
