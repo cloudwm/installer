@@ -27,7 +27,6 @@ descriptionAppend "PHP-FPM configuration location: /etc/php/$phpVersion/fpm/"
 descriptionAppend " "
 
 tag php-fpm.success
-# tag php$phpVersion-fpm.success
 
 tagScript success
 
