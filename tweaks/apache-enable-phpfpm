@@ -8,9 +8,8 @@ fi
 runOnceCheck
 checkTagExist apache2.success
 checkTagExist php-fpm.success
-# checkTagExist php7.2-fpm.success
 
-phpVersion=$(systemctl | grep fpm | awk '{print $1}' | grep -o -P '(?<=php).*(?=-fpm)')
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 a2enmod proxy_fcgi setenvif
 a2enconf php$phpVersion-fpm
 sed  -i 's|.*SetHandler.*|SetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-enabled/php$phpVersion-fpm.conf

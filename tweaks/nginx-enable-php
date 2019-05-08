@@ -8,9 +8,8 @@ fi
 runOnceCheck
 checkTagExist nginx.success
 checkTagExist php-fpm.success
-# checkTagExist php7.2-fpm.success
 
-phpVersion=$(systemctl | grep fpm | awk '{print $1}' | grep -o -P '(?<=php).*(?=-fpm)')
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 
 sed -i 's/listen = \/run\/php\/php'"${phpVersion}"'-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 service php$phpVersion-fpm restart

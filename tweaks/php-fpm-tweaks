@@ -11,7 +11,7 @@ checkTagExist php-fpm.success
 
 rootDir=$(rootDir)
 
-phpVersion=$(systemctl | grep fpm | awk '{print $1}' | grep -o -P '(?<=php).*(?=-fpm)')
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 phpiniPath=/etc/php/$phpVersion/fpm/php.ini
 
 echo "Enabling php to accept short open tags" | log

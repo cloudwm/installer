@@ -1,5 +1,13 @@
 #!/bin/bash
 
+### basic check php-fpm existence
+service=$(systemctl | grep fpm | awk '{print $1}')
+
+if [[ -z "$service" ]]; then
+    echo "php-fpm is not installed"
+    exit 1
+fi
+
 # php-fpm-autocnfig path
 INSTALLER_PATH="/opt/php-fpm-autoconfig"
 
@@ -14,14 +22,6 @@ ramphpfpm=85
 
 # Configure the minimum processes the php-fpm will wait in memory.
 minphpfpm=6
-
-### basic check php-fpm existence
-service=$(systemctl | grep fpm | awk '{print $1}')
-
-if [[ -z "$service" ]]; then
-    echo "php-fpm is not installed"
-    exit 1
-fi
 
 ### Configuring php-fpm file ###
 ini=$(find /etc -type f -name "php.ini" | grep fpm)
