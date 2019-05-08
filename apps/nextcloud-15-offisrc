@@ -11,6 +11,7 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 
 echo "Downloading NextCloud 15" | log
 
@@ -58,19 +59,20 @@ waitOrStop 0
 checkPackageInstalled php-imagick
 
 # modify php.ini opcache settings
-sed -i '/opcache.enable=/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.memory_consumption=/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.interned_strings_buffer=/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.max_accelerated_files=/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i '/opcache.save_comments=/s/^;//g' /etc/php/7.2/fpm/php.ini
-sed -i "s/;opcache.enable_cli=0/opcache.enable_cli=1/g" /etc/php/7.2/fpm/php.ini
-sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" /etc/php/7.2/fpm/php.ini
+phpIniPath=/etc/php/$phpVersion/fpm/php.ini
+sed -i '/opcache.enable=/s/^;//g' $phpIniPath
+sed -i '/opcache.memory_consumption=/s/^;//g' $phpIniPath
+sed -i '/opcache.interned_strings_buffer=/s/^;//g' $phpIniPath
+sed -i '/opcache.max_accelerated_files=/s/^;//g' $phpIniPath
+sed -i '/opcache.save_comments=/s/^;//g' $phpIniPath
+sed -i "s/;opcache.enable_cli=0/opcache.enable_cli=1/g" $phpIniPath
+sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" $phpIniPath
 # modify www.conf settings
-sed -i '/env\[PATH\]/s/^;//g' /etc/php/7.2/fpm/pool.d/www.conf
+sed -i '/env\[PATH\]/s/^;//g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 # Add Server IP to Trusted Servers
 sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${SERVERIP}',/" /var/www/html/config/config.php
 
-systemctl restart php7.2-fpm.service
+systemctl restart php$phpVersion-fpm.service
 
 echo "Adding descriptions" | log
 
