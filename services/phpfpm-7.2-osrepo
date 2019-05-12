@@ -27,9 +27,8 @@ descriptionAppend "PHP configuration location: /etc/php/"
 descriptionAppend "PHP-FPM configuration location: /etc/php/7.2/fpm/"
 descriptionAppend " "
 
-tag php-fpm.success
-tag php7.2-fpm.success
 tag php.success
+tag php-fpm.success
 
 tagScript success
 
