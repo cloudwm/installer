@@ -6,9 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "pre requirements check" | log
+checkTagExist php.success
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
+checkPackageInstalled php$phpVersion-cli
 
-checkPackageInstalled php7.2-cli
 rootDir=$(rootDir)
 
 echo "install wp cli for wordpress" | log

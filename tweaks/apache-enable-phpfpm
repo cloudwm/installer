@@ -8,16 +8,15 @@ fi
 runOnceCheck
 checkTagExist apache2.success
 checkTagExist php-fpm.success
-checkTagExist php7.2-fpm.success
 
-
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 a2enmod proxy_fcgi setenvif
-a2enconf php7.2-fpm
-sed  -i 's|.*SetHandler.*|SetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-enabled/php7.2-fpm.conf
+a2enconf php$phpVersion-fpm
+sed  -i 's|.*SetHandler.*|SetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-enabled/php$phpVersion-fpm.conf
 
 systemctl restart apache2
 
-waitOrStop 0
+# waitOrStop 0
 
 tagScript success
 
