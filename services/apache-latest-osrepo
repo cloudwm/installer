@@ -6,7 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install apache from apt
+appPath=/var/www/html
+
+echo "Install apache from apt" | log
 apt install apache2 -y | log
 waitOrStop 0
 
@@ -14,11 +16,16 @@ checkPackageInstalled apache2
 
 a2enmod ssl
 
-echo "Changing ownership of /var/www/html to www-data user" | log
-chown -R www-data:www-data /var/www/html
+echo "Changing ownership of $appPath to www-data user" | log
+chown -R www-data:www-data $appPath
 
+echo "Enabling apache service" | log
+systemctl start apache2.service
+systemctl enable apache2.service
+
+echo "Adding descriptions" | log
 descriptionAppend "Apache configuration location: /etc/apache2/"
-descriptionAppend "Apache root Directory: /var/www/html"
+descriptionAppend "Apache root Directory: ${appPath}"
 descriptionAppend " "
 
 tag apache2.success
