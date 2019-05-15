@@ -37,13 +37,16 @@ sed -i '/<VirtualHost/{ :a N;/<\/VirtualHost>/!b a; /ServerName/!s!\([[:blank:]]
 
 echo "Enabling apache ssl modules" | log
 a2enmod ssl
+waitOrStop 0
 a2enmod headers
+waitOrStop 0
 a2enconf ssl-params
+waitOrStop 0
 a2ensite default-ssl
+waitOrStop 0
 
 echo "Restarting apache service" | log
 systemctl restart apache2.service
-waitOrStop 0
 
 tagScript success
 
