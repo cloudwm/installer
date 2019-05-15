@@ -43,6 +43,7 @@ a2ensite default-ssl
 
 echo "Restarting apache service" | log
 systemctl restart apache2.service
+waitOrStop 0
 
 tagScript success
 
