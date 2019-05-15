@@ -36,7 +36,7 @@ EOF
 a2enconf ssl-params
 
 echo "Tweaking SSL virtual host" | log
-$defaultSSL=/etc/apache2/sites-available/default-ssl.conf
+defaultSSL=/etc/apache2/sites-available/default-ssl.conf
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
 sed -i '/SSLCertificateFile/s/ssl-cert-snakeoil.pem/server.crt/g' $defaultSSL
 sed -i '/SSLCertificateKeyFile/s/ssl-cert-snakeoil.key/server.key/g' $defaultSSL
