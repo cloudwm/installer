@@ -27,6 +27,20 @@ SSLStaplingCache "shmcb:logs/stapling-cache(150000)"
 SSLSessionTickets Off
 EOF
 
+echo "Tweaking SSL virtual host" | log
+$defaultSSL=/etc/apache2/sites-available/default-ssl.conf
+sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
+sed -i '/SSLCertificateFile/s/ssl-cert-snakeoil.pem/server.crt/g' $defaultSSL
+sed -i '/SSLCertificateKeyFile/s/ssl-cert-snakeoil.key/server.key/g' $defaultSSL
+sed -i '/<VirtualHost/{ :a N;/<\/VirtualHost>/!b a; /ServerName/!s!\([[:blank:]]*\)\(</VirtualHost>\)!\1\tServerName '"${SERVERIP}"'\n\1\2!}' $defaultSSL
+
+echo "Enable apache modules and hosts" | log
+a2enmod ssl
+a2enmod headers
+a2enconf ssl-params
+
+systemctl restart apache2.service
+
 tagScript success
 
 exit 0
