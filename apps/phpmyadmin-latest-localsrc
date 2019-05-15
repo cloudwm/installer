@@ -7,13 +7,12 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist php.success
-# checkTagExist nginx.success
 checkTagExist httpd.success
 
 rootDir=$(rootDir)
+myadminPath=/var/www/html/phpmyadmin
 
 echo "Installing phpMyAdmin" | log
-myadminPath=/var/www/html/phpmyadmin
 mkdir -p $myadminPath
 tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz -C $myadminPath/ --strip-components=1
 waitOrStop 0
@@ -24,7 +23,6 @@ mv config.sample.inc.php config.inc.php
 
 echo "Making sure tmp folder exists" | log
 if [ ! -d "$myadminPath/tmp" ]; then
-
     echo "tmp directory doesn't exist, creating it." | log
     mkdir -p $myadminPath/tmp/
     chown -R www-data:www-data $myadminPath/tmp/
