@@ -11,11 +11,16 @@ checkTagExist php-fpm.success
 
 echo "Tweaking apache to work with php-fpm" | log
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-a2enmod proxy_fcgi setenvif
+
 # a2enmod actions fastcgi alias
-# a2enmod actions fastcgi alias proxy_fcgi
+
+a2enmod actions fastcgi alias proxy_fcgi
+sed  -i 's|.*SetHandler.*|\tSetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-available/php$phpVersion-fpm.conf
 a2enconf php$phpVersion-fpm
-sed  -i 's|.*SetHandler.*|SetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-enabled/php$phpVersion-fpm.conf
+
+# a2enmod proxy_fcgi setenvif
+# a2enconf php$phpVersion-fpm
+# sed  -i 's|.*SetHandler.*|\tSetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-enabled/php$phpVersion-fpm.conf
 
 systemctl restart apache2.service
 
