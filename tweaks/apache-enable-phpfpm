@@ -16,7 +16,7 @@ echo "Tweaking apache to work with php-fpm" | log
 echo "Enabling apache fpm modules" | log
 a2enmod actions fastcgi alias proxy_fcgi
 
-echo "Modifying configs to handle fpm" | log
+echo "Modifying virtual hosts to handle fpm" | log
 cp $rootDir/tweaks/extras/lamp/000-default.conf /etc/apache2/sites-available/
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' /etc/apache2/sites-available/000-default.conf
 

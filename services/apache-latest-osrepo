@@ -14,8 +14,6 @@ waitOrStop 0
 
 checkPackageInstalled apache2
 
-# a2enmod ssl
-
 echo "Changing ownership of $appPath to www-data user" | log
 chown -R www-data:www-data $appPath
 

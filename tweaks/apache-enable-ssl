@@ -32,6 +32,7 @@ defaultSSL=/etc/apache2/sites-available/default-ssl.conf
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
 sed -i '/SSLCertificateFile/s/ssl-cert-snakeoil.pem/server.crt/g' $defaultSSL
 sed -i '/SSLCertificateKeyFile/s/ssl-cert-snakeoil.key/server.key/g' $defaultSSL
+# add ServerName + fpm install placeholder
 sed -i '/<VirtualHost/{ :a N;/<\/VirtualHost>/!b a; /ServerName/!s!\([[:blank:]]*\)\(</VirtualHost>\)!\1\tServerName localhost\n\t\t#FPM_INSTALL_PLACEHOLDER\n\1\2!}' $defaultSSL
 
 echo "Enabling apache ssl modules" | log
