@@ -25,10 +25,23 @@ debconf-set-selections <<< "mysql-community-server mysql-community-server/re-roo
 echo "Installing mysql from apt" | log
 
 apt update
-apt install -y mysql-community-server expect | log
+apt install -y mysql-server expect | log
 waitOrStop 0
 
 checkPackageInstalled mysql-community-server
+
+echo "Set ~/.my.cnf root password for quick cli work" | log
+
+if [ ! -f ~/.my.cnf ];
+then
+
+cat << EOF > ~/.my.cnf
+[client]
+user=root
+password=${ADMINPASSWORD}
+EOF
+
+fi
 
 echo "Running first setup process" | log
 
@@ -64,21 +77,10 @@ expect eof
 
 EOF
 
-echo "Set Password for root, using echo for string manipulation, mysql_secure will not set it for mysql 8.0" | log
-echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" | sh
+echo "Setting Password method for root" | log
 
-echo "Set ~/.my.cnf root password for quick cli work" | log
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" | sh
 
-if [ ! -f ~/.my.cnf ];
-then
-
-cat << EOF > ~/.my.cnf
-[client]
-user=root
-password=${ADMINPASSWORD}
-EOF
-
-fi
 
 echo "Setting some defaults to mysqld-installer.cnf" | log
 
