@@ -25,7 +25,6 @@ debconf-set-selections <<< "mysql-community-server mysql-community-server/re-roo
 echo "Installing mysql from apt" | log
 
 apt update
-# apt install -y mysql-server expect | log
 apt install -y mysql-server | log
 waitOrStop 0
 

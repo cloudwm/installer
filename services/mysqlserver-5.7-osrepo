@@ -10,7 +10,7 @@ checkTagExist ubuntu-updateos.success
 
 echo "Installing mysql from apt" | log
 
-apt install mysql-server-5.7 expect -y | log
+apt install mysql-server-5.7 -y | log
 waitOrStop 0
 
 checkPackageInstalled mysql-server-5.7
