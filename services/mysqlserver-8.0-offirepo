@@ -28,7 +28,7 @@ apt update
 apt install -y mysql-server expect | log
 waitOrStop 0
 
-checkPackageInstalled mysql-community-server
+checkPackageInstalled mysql-server
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 
