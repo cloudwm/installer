@@ -25,7 +25,8 @@ debconf-set-selections <<< "mysql-community-server mysql-community-server/re-roo
 echo "Installing mysql from apt" | log
 
 apt update
-apt install -y mysql-server expect | log
+# apt install -y mysql-server expect | log
+apt install -y mysql-server | log
 waitOrStop 0
 
 checkPackageInstalled mysql-server
@@ -45,37 +46,47 @@ fi
 
 echo "Running first setup process" | log
 
-checkPackageInstalled expect
-
-/usr/bin/expect << EOF
-
-set timeout 10
-spawn $(which mysql_secure_installation)
-
-expect "Enter password for user root:"
-send "${ADMINPASSWORD}\r"
-
-expect "Press y|Y for Yes, any other key for No:"
-send "n\r"
-
-expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
-send "n\r"
-
-expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
-send "y\r"
-
-expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
-send "y\r"
-
-expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
-send "y\r"
-
-expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
-send "y\r"
-
-expect eof
-
+mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
+${ADMINPASSWORD}
+n
+n
+y
+y
+y
+y
 EOF
+
+# checkPackageInstalled expect
+
+# /usr/bin/expect << EOF
+
+# set timeout 10
+# spawn $(which mysql_secure_installation)
+
+# expect "Enter password for user root:"
+# send "${ADMINPASSWORD}\r"
+
+# expect "Press y|Y for Yes, any other key for No:"
+# send "n\r"
+
+# expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
+# send "n\r"
+
+# expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
+# send "y\r"
+
+# expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
+# send "y\r"
+
+# expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
+# send "y\r"
+
+# expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+# send "y\r"
+
+# expect eof
+
+# EOF
 
 echo "Setting Password method for root" | log
 
