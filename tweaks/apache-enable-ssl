@@ -1,0 +1,23 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist apache2.success
+
+
+echo "Symlink SSL vhost to sites-enabled" | log 
+ln -s /etc/apache2/sites-available/default-ssl.conf /etc/apache2/sites-enabled/default-ssl.conf
+
+echo "Restart Apache2 service" | log
+systemctl restart apache2.service
+
+descriptionAppend "SSL certificates location: /etc/ssl/"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
