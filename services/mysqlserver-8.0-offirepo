@@ -65,8 +65,7 @@ expect eof
 EOF
 
 echo "Set Password for root, using echo for string manipulation, mysql_secure will not set it for mysql 8.0" | log
-
-echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" |sh
+echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" | sh
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 

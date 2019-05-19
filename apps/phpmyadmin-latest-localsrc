@@ -25,8 +25,8 @@ echo "Making sure tmp folder exists" | log
 if [ ! -d "$myadminPath/tmp" ]; then
     echo "tmp directory doesn't exist, creating it." | log
     mkdir -p $myadminPath/tmp/
-    chown -R www-data:www-data $myadminPath/tmp/
 fi
+chown -R www-data:www-data $myadminPath/tmp/
 
 echo "Generating blowfish_secret string and replacing it in config.inc.php" | log
 blowfish_secret=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 ; echo ''`
