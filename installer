@@ -25,7 +25,7 @@ else
 
 	if [ ! -f "$1" ];
 	then
-		echo "$1 conf file not found." | log
+		echo "$1 file not found." | log
 		exit 1
 	else
     	. $1
