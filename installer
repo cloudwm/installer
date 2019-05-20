@@ -23,7 +23,13 @@ then
 
 else
 
-    . $1
+	if [ ! -f "$1" ];
+	then
+		echo "$1 conf file not found." | log
+		exit 1
+	else
+    	. $1
+	fi
 
 fi
 
