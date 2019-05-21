@@ -1,0 +1,33 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+
+rootDir=$(rootDir)
+# app_path=/opt/rocket
+
+echo "installing snap and then rocket.chat" | log
+apt install snapd -y
+waitOrStop 0
+snap install rocketchat-server 
+waitOrStop 0
+
+echo "Configuring nginx" | log
+cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat-nginx-config /etc/nginx/sites-available/rocketchat.conf
+ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl reload nginx
+
+# descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
+descriptionAppend "Rocket.chat web UI: https://${SERVERIP}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
