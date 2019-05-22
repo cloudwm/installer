@@ -9,9 +9,8 @@ fi
 checkTagExist nginx.success
 
 rootDir=$(rootDir)
-# app_path=/opt/rocket
 
-echo "installing snap and then rocket.chat" | log
+echo "Installing snap and then rocket.chat" | log
 apt install snapd -y
 waitOrStop 0
 snap install rocketchat-server 
@@ -31,8 +30,31 @@ unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 
-# descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
+echo "Adding descriptions" | log
 descriptionAppend "Rocket.chat web UI: https://${SERVERIP}"
+descriptionAppend " "
+descriptionAppend "Rocket.chat application directories:"
+descriptionAppend "/snap/rocketchat-server/"
+descriptionAppend "/var/snap/rocketchat-server"
+descriptionAppend " "
+descriptionAppend "Rocket.chat mongoDB management:"
+descriptionAppend "# rocketchat-server.mongo parties"
+descriptionAppend " "
+descriptionAppend "Rocket.chat service logs:"
+descriptionAppend "# journalctl -f -u snap.rocketchat-server.rocketchat-server"
+descriptionAppend "# journalctl -f -u snap.rocketchat-server.rocketchat-mongo"
+descriptionAppend "# journalctl -f -u snap.rocketchat-server.rocketchat-caddy"
+descriptionAppend " "
+descriptionAppend "Rocket.chat service control: (status/start/stop/restart)"
+descriptionAppend "# service snap.rocketchat-server.rocketchat-[SERVICE] [COMMAND]"
+descriptionAppend " "
+descriptionAppend "For example:"
+descriptionAppend "# service snap.rocketchat-server.rocketchat-server restart"
+descriptionAppend "# service snap.rocketchat-server.rocketchat-mongo status"
+descriptionAppend "# service snap.rocketchat-server.rocketchat-caddy stop"
+descriptionAppend " "
+descriptionAppend "For further information:"
+descriptionAppend "https://rocket.chat/docs/installation/manual-installation/ubuntu/snaps/"
 descriptionAppend " "
 
 tagScript success
