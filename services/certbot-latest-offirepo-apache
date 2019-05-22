@@ -8,6 +8,7 @@ fi
 
 checkTagExist apache2.success
 
+echo "Installing certbot for apache" | log
 add-apt-repository ppa:certbot/certbot -y | log
 apt install python-certbot-apache -y | log
 waitOrStop 0

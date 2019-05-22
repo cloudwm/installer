@@ -9,14 +9,24 @@ runOnceCheck
 checkTagExist apache2.success
 checkTagExist php-fpm.success
 
-phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-a2enmod proxy_fcgi setenvif
-a2enconf php$phpVersion-fpm
-sed  -i 's|.*SetHandler.*|SetHandler "proxy:fcgi://localhost:9000/"|'  /etc/apache2/conf-enabled/php$phpVersion-fpm.conf
+rootDir=$(rootDir)
 
-systemctl restart apache2
+echo "Tweaking apache to work with php-fpm" | log
 
-# waitOrStop 0
+echo "Enabling apache fpm modules" | log
+a2enmod actions fastcgi alias proxy_fcgi
+
+echo "Modifying virtual hosts to handle fpm" | log
+cp $rootDir/tweaks/extras/lamp/000-default.conf /etc/apache2/sites-available/
+sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' /etc/apache2/sites-available/000-default.conf
+
+if [ -f "$rootDir/temp/apache-enable-ssl.success" ];
+then
+    tweakFilePath=$rootDir/tweaks/extras/lamp/default-ssl-customize
+    perl -i -p0e 's/\t\t#FPM_INSTALL_PLACEHOLDER/`cat $ARGV[0]`/se' -- /etc/apache2/sites-available/default-ssl.conf "$tweakFilePath"
+fi
+
+systemctl restart apache2.service
 
 tagScript success
 

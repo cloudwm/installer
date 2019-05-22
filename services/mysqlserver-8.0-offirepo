@@ -25,45 +25,10 @@ debconf-set-selections <<< "mysql-community-server mysql-community-server/re-roo
 echo "Installing mysql from apt" | log
 
 apt update
-apt install -y mysql-community-server expect | log
+apt install -y mysql-server | log
 waitOrStop 0
 
-checkPackageInstalled mysql-community-server
-
-echo "Running first setup process" | log
-
-checkPackageInstalled expect
-
-/usr/bin/expect << EOF
-
-set timeout 10
-spawn $(which mysql_secure_installation)
-
-expect "Enter password for user root:"
-send "${ADMINPASSWORD}\r"
-
-expect "Press y|Y for Yes, any other key for No:"
-send "n\r"
-
-expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
-send "n\r"
-
-expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
-send "y\r"
-
-expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
-send "y\r"
-
-expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
-send "y\r"
-
-expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
-send "y\r"
-
-expect eof
-
-EOF
-
+checkPackageInstalled mysql-server
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 
@@ -77,6 +42,31 @@ password=${ADMINPASSWORD}
 EOF
 
 fi
+
+echo "Running first setup process" | log
+
+mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
+${ADMINPASSWORD}
+n
+n
+y
+y
+y
+y
+EOF
+
+# expect "Enter password for user root:"
+# expect "Press y|Y for Yes, any other key for No:"
+# expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
+# expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
+# expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
+# expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
+# expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+
+echo "Setting Password method for root" | log
+
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" | sh
+
 
 echo "Setting some defaults to mysqld-installer.cnf" | log
 
