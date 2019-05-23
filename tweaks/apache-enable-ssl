@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Add this at the begining of all scripts.
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -8,11 +9,39 @@ fi
 
 checkTagExist apache2.success
 
+echo "Generating self-signed certificate" | log
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.key -out /etc/ssl/certs/server.crt -days 1024 -nodes -subj '/CN=localhost'
 
-echo "Symlink SSL vhost to sites-enabled" | log 
-ln -s /etc/apache2/sites-available/default-ssl.conf /etc/apache2/sites-enabled/default-ssl.conf
+echo "Creating SSL params" | log
+cat << EOF >> /etc/apache2/conf-available/ssl-params.conf
+SSLCipherSuite EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH
+SSLProtocol All -SSLv2 -SSLv3 -TLSv1 -TLSv1.1
+SSLHonorCipherOrder On
+Header always set X-Frame-Options DENY
+Header always set X-Content-Type-Options nosniff
+# Requires Apache >= 2.4
+SSLCompression off
+SSLUseStapling on
+SSLStaplingCache "shmcb:logs/stapling-cache(150000)"
+# Requires Apache >= 2.4.11
+SSLSessionTickets Off
+EOF
 
-echo "Restart Apache2 service" | log
+echo "Tweaking SSL virtual host" | log
+defaultSSL=/etc/apache2/sites-available/default-ssl.conf
+sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
+sed -i '/SSLCertificateFile/s/ssl-cert-snakeoil.pem/server.crt/g' $defaultSSL
+sed -i '/SSLCertificateKeyFile/s/ssl-cert-snakeoil.key/server.key/g' $defaultSSL
+# add ServerName + fpm install placeholder
+sed -i '/<VirtualHost/{ :a N;/<\/VirtualHost>/!b a; /ServerName/!s!\([[:blank:]]*\)\(</VirtualHost>\)!\1\tServerName localhost\n\t\t#FPM_INSTALL_PLACEHOLDER\n\1\2!}' $defaultSSL
+
+echo "Enabling apache ssl modules" | log
+a2enmod ssl
+a2enmod headers
+a2enconf ssl-params
+a2ensite default-ssl
+
+echo "Restarting apache service" | log
 systemctl restart apache2.service
 
 descriptionAppend "SSL certificates location: /etc/ssl/"
