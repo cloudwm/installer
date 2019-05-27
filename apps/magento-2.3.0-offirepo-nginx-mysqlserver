@@ -81,10 +81,11 @@ echo "setting nginx config" | log
 # main magento config
 cp $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento
 # specific configs supplied by magento install, included by main magento config
-cp $appPath/nginx.conf.sample /etc/nginx/conf.d/magento.conf.sample
+mkdir -p /etc/nginx/config
+cp $appPath/nginx.conf.sample /etc/nginx/config/magento.conf.sample
 # tweak locations in magento config to allow for user themes and folders
 tweakFilePath=$rootDir/tweaks/extras/magento-nginx/magento-locations-allow-custom
-perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/conf.d/magento.conf.sample "$tweakFilePath"
+perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/config/magento.conf.sample "$tweakFilePath"
 # Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 # Remove default vhosts
