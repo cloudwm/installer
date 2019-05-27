@@ -12,6 +12,8 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 rootDir=$(rootDir)
+appPath=/var/www/html
+appVersion=2.3.1
 
 echo "Creating Magento Database" | log
 
@@ -25,49 +27,49 @@ apt install composer -y | log
 waitOrStop 0
 checkPackageInstalled composer
 
-echo "Downloading Magento 2.3.0 from github repo" | log
-mkdir -p /var/www/html
+echo "Downloading Magento ${appVersion} from github repo" | log
+mkdir -p $appPath
 mkdir -p temp
 cd temp
 # curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
-curlDownload https://codeload.github.com/magento/magento2/tar.gz/2.3.0 2.3.0.tar.gz | log
+curlDownload https://codeload.github.com/magento/magento2/tar.gz/$appVersion $appVersion.tar.gz | log
 waitOrStop 0
-mv 2.3.0.tar.gz /var/www/html
+mv $appVersion.tar.gz $appPath
 
-echo "Extracting Magento to /var/www/html/" | log
-tar -xzvf /var/www/html/2.3.0.tar.gz -C /var/www/html/ --strip 1
+echo "Extracting Magento to ${appPath}" | log
+tar -xzvf $appPath/$appVersion.tar.gz -C $appPath/ --strip 1
 waitOrStop 0
-rm -f /var/www/html/2.3.0.tar.gz
+rm -f $appPath/$appVersion.tar.gz
 
 echo "Setting permissions for Magento" | log
-cd /var/www/html/ 
+cd $appPath
 find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
 find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
 chown -R www-data:www-data .
 chmod u+x bin/magento
 
 echo "Installing Composer dependencies for Magento" | log
-cd /var/www/html/ 
+cd $appPath
 export COMPOSER_HOME=/root
 composer install -v | log
 waitOrStop 0
 
 echo "Installing Magento" | log
-/var/www/html/bin/magento setup:install --base-url=http://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
+$appPath/bin/magento setup:install --base-url=http://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
 
 ADMIN_URI=`grep "Admin URI:" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 # ADMIN_URI=`php /var/www/html/bin/magento info:adminuri | rev | cut -d ' ' -f 1 | rev`
 
 
 echo "Verifying permissions for Magento" | log
-cd /var/www/html/ 
+cd $appPath
 find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
 find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
 chown -R www-data:www-data .
 chmod u+x bin/magento
 
 echo "disable sign static files and force cache refresh" | log
-cd /var/www/html/ 
+cd $appPath
 bin/magento config:set dev/static/sign 0
 curl ${SERVERIP} > /dev/null
 waitOrStop 0
@@ -79,7 +81,7 @@ echo "setting nginx config" | log
 # main magento config
 cp $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento
 # specific configs supplied by magento install, included by main magento config
-cp /var/www/html/nginx.conf.sample /etc/nginx/conf.d/magento.conf.sample
+cp $appPath/nginx.conf.sample /etc/nginx/conf.d/magento.conf.sample
 # tweak locations in magento config to allow for user themes and folders
 tweakFilePath=$rootDir/tweaks/extras/magento-nginx/magento-locations-allow-custom
 perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/conf.d/magento.conf.sample "$tweakFilePath"
