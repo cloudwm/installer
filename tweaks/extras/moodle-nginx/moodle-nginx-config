@@ -22,6 +22,10 @@ server {
         try_files $uri $uri/ =404;
     }
 
+    location /phpmyadmin/ {
+        try_files $uri $uri/ =418;
+    }
+
     location /dataroot/ {
         internal;
         alias /var/www/html/moodledata/;
