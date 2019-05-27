@@ -45,6 +45,11 @@ sed -i '/cgi.fix_pathinfo/s/[0-9]\+/0/g' $ini
 # sed -i '/date.timezone/s/^;//g' $ini
 # sed -i '/date.timezone/s/_OLD_/_NEW_/g' $ini
 
+echo "Move phpmyadmin into app if available" | log
+if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
+    mv $appPath/phpmyadmin $appPath/moodle
+fi
+
 echo "Creating nginx configurations" | log
 cp -f $rootDir/tweaks/extras/moodle-nginx/moodle-nginx-config /etc/nginx/sites-available/moodle.conf
 ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
