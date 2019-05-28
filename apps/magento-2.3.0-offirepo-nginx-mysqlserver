@@ -55,7 +55,7 @@ composer install -v | log
 waitOrStop 0
 
 echo "Installing Magento" | log
-$appPath/bin/magento setup:install --base-url=http://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 | log
+$appPath/bin/magento setup:install --base-url-secure=https://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 --use-secure=1 --use-secure-admin=1 | log
 
 ADMIN_URI=`grep "Admin URI:" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 # ADMIN_URI=`php /var/www/html/bin/magento info:adminuri | rev | cut -d ' ' -f 1 | rev`
@@ -81,10 +81,11 @@ echo "setting nginx config" | log
 # main magento config
 cp $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento
 # specific configs supplied by magento install, included by main magento config
-cp $appPath/nginx.conf.sample /etc/nginx/conf.d/magento.conf.sample
+mkdir -p /etc/nginx/config
+cp $appPath/nginx.conf.sample /etc/nginx/config/magento.conf.sample
 # tweak locations in magento config to allow for user themes and folders
 tweakFilePath=$rootDir/tweaks/extras/magento-nginx/magento-locations-allow-custom
-perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/conf.d/magento.conf.sample "$tweakFilePath"
+perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/config/magento.conf.sample "$tweakFilePath"
 # Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 # Remove default vhosts
@@ -95,7 +96,7 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
 
-descriptionAppend "Magento Admin URI: http://${SERVERIP}${ADMIN_URI}"
+descriptionAppend "Magento Admin URI: https://${SERVERIP}${ADMIN_URI}"
 descriptionAppend "Magento Admin Email: ${ADMINEMAIL}"
 descriptionAppend "Magento Admin User: admin"
 descriptionAppend "Magento Admin Password: ${ADMINPASSWORD}" 
