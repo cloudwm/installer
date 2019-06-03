@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Adding repo to apt" | log
+# wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch | log
+waitOrStop 0
+apt-key add GPG-KEY-elasticsearch
+
+echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list
+apt update
+
+echo "Installing Elasticsearch and Kibana web UI" | log
+apt install -y elasticsearch kibana | log
+waitOrStop 0
+
+# echo "Creating ssl certificates" | log
+# openssl req -x509 -batch -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/kibana-access.key -out /etc/ssl/certs/kibana-access.pem
+
+echo "Creating basic auth to secure Kibana web UI" | log
+# echo "kibadmin:`openssl passwd -apr1`" | tee -a /etc/nginx/htpasswd.users
+echo "admin:${ADMINPASSWORD}" | tee -a /etc/nginx/htpasswd.users
+
+echo "Tweaking Elasticsearch configuration" | log
+elasticPort=8881
+# uncomment network.host
+# replace ipaddress with localhost
+# uncomment http.port
+# replace port with elasticPort
+
+echo "Tweaking Kibana web UI configuration" | log
+kibanaPort=8882
+# uncomment server.port
+# replace port with kibanaPort
+# uncomment server.host
+# replace ipaddress with localhost
+# uncomment elasticsearch.hosts
+# replace address with reallocalhost:elasticPort
+
+echo "Setting nginx configuration" | log
+# copy readymade config to nginx sites
+# place elasticPort for elasticsearch upstream
+# place kibanaPort for kibana upstream
+
+# echo "Production best practices" | log
+
+echo "Adding descriptions" | log
+descriptionAppend "Elasticsearch admin user: admin"
+descriptionAppend "Elasticsearch admin password: ${ADMINPASSWORD}"
+descriptionAppend "Elasticsearch (Kibana) web interface: https://${SERVERIP}"
+descriptionAppend " "
+descriptionAppend "Elasticsearch configuration: /etc/elasticsearch/"
+descriptionAppend "Kibana configuration: /etc/kibana/kibana.yml"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
