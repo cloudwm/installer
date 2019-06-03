@@ -7,6 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+checkTagExist nginx.success
+checkTagExist nginx-enable-ssl.success
+
 echo "Adding repo to apt" | log
 # wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
 curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch | log
@@ -29,24 +33,39 @@ echo "admin:${ADMINPASSWORD}" | tee -a /etc/nginx/htpasswd.users
 
 echo "Tweaking Elasticsearch configuration" | log
 elasticPort=8881
-# uncomment network.host
-# replace ipaddress with localhost
-# uncomment http.port
-# replace port with elasticPort
+elasticConfigPath=/etc/elasticsearch/elasticsearch.yml
+# tweak network.host
+sed -i '/network.host:/s/^#//g' $elasticConfigPath
+sed -i '/network.host:/s/192.168.0.1/127.0.0.1/g' $elasticConfigPath
+# tweak http.port
+sed -i '/http.port:/s/^#//g' $elasticConfigPath
+sed -i '/http.port:/s/9200/'"${elasticPort}"'/g' $elasticConfigPath
 
 echo "Tweaking Kibana web UI configuration" | log
 kibanaPort=8882
-# uncomment server.port
-# replace port with kibanaPort
-# uncomment server.host
-# replace ipaddress with localhost
-# uncomment elasticsearch.hosts
-# replace address with reallocalhost:elasticPort
+kibanaConfigPath=/etc/kibana/kibana.yml
+# tweak server.port
+sed -i '/server.port:/s/^#//g' $kibanaConfigPath
+sed -i '/server.port:/s/5601/'"${kibanaPort}"'/g' $kibanaConfigPath
+# tweak server.host
+sed -i '/server.host:/s/^#//g' $kibanaConfigPath
+sed -i '/server.host:/s/localhost/127.0.0.1/g' $kibanaConfigPath
+# tweak elasticsearch.hosts
+sed -i '/elasticsearch.hosts:/s/^#//g' $kibanaConfigPath
+sed -i '/elasticsearch.hosts:/s/localhost/127.0.0.1/g' $kibanaConfigPath
+sed -i '/elasticsearch.hosts:/s/9200/'"${elasticPort}"'/g' $kibanaConfigPath
 
 echo "Setting nginx configuration" | log
+nginxConfigPath=/etc/nginx/sites-available/kibana.conf
 # copy readymade config to nginx sites
+cp -f $rootDir/tweaks/extras/elasticsearch-nginx/elasticsearch-nginx-config $nginxConfigPath
 # place elasticPort for elasticsearch upstream
+sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath
 # place kibanaPort for kibana upstream
+sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath
+
+# link site to enable
+ln -s $nginxConfigPath /etc/nginx/sites-enabled/
 
 # echo "Production best practices" | log
 
