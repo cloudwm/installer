@@ -63,10 +63,16 @@ cp -f $rootDir/tweaks/extras/elasticsearch-nginx/elasticsearch-nginx-config $ngi
 sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath
 # place kibanaPort for kibana upstream
 sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath
-
 # link site to enable
 ln -s $nginxConfigPath /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
 
+echo "Starting and enabling services"
+systemctl enable elasticsearch.service
+systemctl enable kibana.service
+systemctl restart elasticsearch.service
+systemctl restart kibana.service
 # echo "Production best practices" | log
 
 echo "Adding descriptions" | log
