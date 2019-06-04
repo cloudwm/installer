@@ -71,6 +71,7 @@ systemctl restart elasticsearch.service
 systemctl restart kibana.service
 
 # echo "Production best practices" | log
+# check heap size and change to 50% RAM if needed
 
 echo "Adding descriptions" | log
 descriptionAppend "Elasticsearch admin user: admin"
