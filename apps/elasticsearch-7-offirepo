@@ -12,7 +12,6 @@ checkTagExist nginx.success
 checkTagExist nginx-enable-ssl.success
 
 echo "Adding repo to apt" | log
-# wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
 curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch | log
 waitOrStop 0
 apt-key add GPG-KEY-elasticsearch
@@ -23,13 +22,6 @@ apt update
 echo "Installing Elasticsearch and Kibana web UI" | log
 apt install -y elasticsearch kibana | log
 waitOrStop 0
-
-# echo "Creating ssl certificates" | log
-# openssl req -x509 -batch -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/kibana-access.key -out /etc/ssl/certs/kibana-access.pem
-
-echo "Creating basic auth to secure Kibana web UI" | log
-# echo "kibadmin:`openssl passwd -apr1`" | tee -a /etc/nginx/htpasswd.users
-echo "admin:${ADMINPASSWORD}" | tee -a /etc/nginx/htpasswd.users
 
 echo "Tweaking Elasticsearch configuration" | log
 elasticPort=8881
@@ -55,6 +47,9 @@ sed -i '/elasticsearch.hosts:/s/^#//g' $kibanaConfigPath
 sed -i '/elasticsearch.hosts:/s/localhost/127.0.0.1/g' $kibanaConfigPath
 sed -i '/elasticsearch.hosts:/s/9200/'"${elasticPort}"'/g' $kibanaConfigPath
 
+echo "Creating basic auth to secure Kibana web UI" | log
+echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" > /etc/nginx/htpasswd.users
+
 echo "Setting nginx configuration" | log
 nginxConfigPath=/etc/nginx/sites-available/kibana.conf
 # copy readymade config to nginx sites
@@ -67,12 +62,14 @@ sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfig
 ln -s $nginxConfigPath /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
 
 echo "Starting and enabling services"
 systemctl enable elasticsearch.service
 systemctl enable kibana.service
 systemctl restart elasticsearch.service
 systemctl restart kibana.service
+
 # echo "Production best practices" | log
 
 echo "Adding descriptions" | log
