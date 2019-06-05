@@ -75,6 +75,7 @@ sed -i '/-Xms/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
 sed -i '/-Xmx/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
 # keep memory from switching away from elasticsearch
 sed -i '/bootstrap.memory_lock:/s/^#//g' $elasticConfigPath
+mkdir -p /etc/systemd/system/elasticsearch.service.d/
 cat << EOF > /etc/systemd/system/elasticsearch.service.d/override.conf
 [Service]
 LimitMEMLOCK=infinity
