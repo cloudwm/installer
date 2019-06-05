@@ -66,14 +66,27 @@ unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 service nginx reload
 
+echo "Tweaking optimal performance settings" | log
+# reduce vm swappiness to minimum
+sysctl vm.swappiness=1
+# check heap size and change to 50% RAM
+totalram=$(cat /proc/meminfo | grep MemTotal | awk '{print int($2/1024)}')
+sed -i '/-Xms/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
+sed -i '/-Xmx/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
+# keep memory from switching away from elasticsearch
+sed -i '/bootstrap.memory_lock:/s/^#//g' $elasticConfigPath
+cat << EOF > /etc/systemd/system/elasticsearch.service.d/override.conf
+[Service]
+LimitMEMLOCK=infinity
+EOF
+systemctl daemon-reload
+
 echo "Starting and enabling services"
 systemctl enable elasticsearch.service
 systemctl enable kibana.service
 systemctl restart elasticsearch.service
 systemctl restart kibana.service
 
-# echo "Production best practices" | log
-# check heap size and change to 50% RAM if needed
 
 echo "Adding descriptions" | log
 descriptionAppend "Elasticsearch admin user: admin"
