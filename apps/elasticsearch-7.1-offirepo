@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+checkTagExist nginx.success
+checkTagExist nginx-enable-ssl.success
+elasticVersion="7.1.1"
+kibanaVersion="7.1.1"
+
+echo "Adding repo to apt" | log
+curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch | log
+waitOrStop 0
+apt-key add GPG-KEY-elasticsearch
+echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list
+apt update
+
+echo "Installing Elasticsearch and Kibana web UI" | log
+apt install -y elasticsearch=$elasticVersion kibana=$kibanaVersion | log
+waitOrStop 0
+
+echo "Tweaking Elasticsearch configuration" | log
+elasticPort=8881
+elasticConfigPath=/etc/elasticsearch/elasticsearch.yml
+# tweak network.host
+sed -i '/network.host:/s/^#//g' $elasticConfigPath
+sed -i '/network.host:/s/192.168.0.1/127.0.0.1/g' $elasticConfigPath
+# tweak http.port
+sed -i '/http.port:/s/^#//g' $elasticConfigPath
+sed -i '/http.port:/s/9200/'"${elasticPort}"'/g' $elasticConfigPath
+
+echo "Tweaking Kibana web UI configuration" | log
+kibanaPort=8882
+kibanaConfigPath=/etc/kibana/kibana.yml
+# tweak server.port
+sed -i '/server.port:/s/^#//g' $kibanaConfigPath
+sed -i '/server.port:/s/5601/'"${kibanaPort}"'/g' $kibanaConfigPath
+# tweak server.host
+sed -i '/server.host:/s/^#//g' $kibanaConfigPath
+sed -i '/server.host:/s/localhost/127.0.0.1/g' $kibanaConfigPath
+# tweak elasticsearch.hosts
+sed -i '/elasticsearch.hosts:/s/^#//g' $kibanaConfigPath
+sed -i '/elasticsearch.hosts:/s/localhost/127.0.0.1/g' $kibanaConfigPath
+sed -i '/elasticsearch.hosts:/s/9200/'"${elasticPort}"'/g' $kibanaConfigPath
+
+echo "Creating basic auth to secure Kibana web UI" | log
+echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" > /etc/nginx/htpasswd.users
+
+echo "Setting nginx configuration" | log
+nginxConfigPath=/etc/nginx/sites-available/kibana.conf
+# copy readymade config to nginx sites
+cp -f $rootDir/tweaks/extras/elasticsearch-nginx/elasticsearch-nginx-config $nginxConfigPath
+# place elasticPort for elasticsearch upstream
+sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath
+# place kibanaPort for kibana upstream
+sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath
+# link site to enable
+ln -s $nginxConfigPath /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
+
+echo "Tweaking optimal performance settings" | log
+# reduce vm swappiness to minimum
+sysctl vm.swappiness=1
+# check heap size and change to 50% RAM
+totalram=$(cat /proc/meminfo | grep MemTotal | awk '{print int($2/1024)}')
+sed -i '/-Xms/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
+sed -i '/-Xmx/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
+# keep memory from switching away from elasticsearch
+sed -i '/bootstrap.memory_lock:/s/^#//g' $elasticConfigPath
+mkdir -p /etc/systemd/system/elasticsearch.service.d/
+cat << EOF > /etc/systemd/system/elasticsearch.service.d/override.conf
+[Service]
+LimitMEMLOCK=infinity
+EOF
+systemctl daemon-reload
+
+echo "Starting and enabling services"
+systemctl enable elasticsearch.service
+systemctl enable kibana.service
+systemctl restart elasticsearch.service
+systemctl restart kibana.service
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Elasticsearch admin user: admin"
+descriptionAppend "Elasticsearch admin password: ${ADMINPASSWORD}"
+descriptionAppend "Elasticsearch (Kibana) web interface: https://${SERVERIP}"
+descriptionAppend " "
+descriptionAppend "Elasticsearch configuration: /etc/elasticsearch/"
+descriptionAppend "Kibana configuration: /etc/kibana/kibana.yml"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
