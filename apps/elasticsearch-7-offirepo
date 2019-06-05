@@ -17,12 +17,11 @@ echo "Adding repo to apt" | log
 curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch | log
 waitOrStop 0
 apt-key add GPG-KEY-elasticsearch
-
 echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list
 apt update
 
 echo "Installing Elasticsearch and Kibana web UI" | log
-apt-fast install -y elasticsearch=$elasticVersion kibana=$kibanaVersion | log
+apt install -y elasticsearch=$elasticVersion kibana=$kibanaVersion | log
 waitOrStop 0
 
 echo "Tweaking Elasticsearch configuration" | log
