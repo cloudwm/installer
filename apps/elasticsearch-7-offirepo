@@ -20,7 +20,7 @@ echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /e
 apt update
 
 echo "Installing Elasticsearch and Kibana web UI" | log
-apt install -y elasticsearch kibana | log
+apt install -y elasticsearch=7.1.1 kibana | log
 waitOrStop 0
 
 echo "Tweaking Elasticsearch configuration" | log
