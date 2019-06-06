@@ -15,12 +15,12 @@ echo "deb https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.
 
 echo "Installing openjdk" | log
 apt update
-apt install -y openjdk-8-jre-headless
+apt-fast install -y openjdk-8-jre-headless
 waitOrStop 0
 
 echo "Installing jenkins" | log
 apt update
-apt install -y jenkins
+apt-fast install -y jenkins
 waitOrStop 0
 
 echo "Tweaking server settings" | log
