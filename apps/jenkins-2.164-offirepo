@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+packageVersion="2.164.3"
+
 echo "Setting jenkins repository and key" | log
 # curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | apt-key add -
 curlDownload https://pkg.jenkins.io/debian-stable/jenkins.io.key | log
@@ -20,7 +22,7 @@ waitOrStop 0
 
 echo "Installing jenkins" | log
 apt update
-apt-fast install -y jenkins
+apt-fast install -y jenkins=$packageVersion
 waitOrStop 0
 
 echo "Tweaking server settings" | log
@@ -41,6 +43,7 @@ descriptionAppend "If main page is blank after initial setup, restart the server
 descriptionAppend "# systemctl restart jenkins"
 descriptionAppend " "
 
+tag jenkins.success
 tagScript success
 
 exit 0
