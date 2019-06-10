@@ -6,6 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+packageVersion="2.164.3"
+assignedPort="9090"
+
 echo "Setting jenkins repository and key" | log
 # curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | apt-key add -
 curlDownload https://pkg.jenkins.io/debian-stable/jenkins.io.key | log
@@ -20,12 +23,16 @@ waitOrStop 0
 
 echo "Installing jenkins" | log
 apt update
-apt install -y jenkins
+apt install -y jenkins=$packageVersion
 waitOrStop 0
 
 echo "Tweaking server settings" | log
-sed -i 's/HTTP_PORT=8080/HTTP_PORT=9090/g' /etc/default/jenkins
+sed -i 's/HTTP_PORT=8080/HTTP_PORT='"${assignedPort}"'/g' /etc/default/jenkins
 sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenkins
+
+echo "Setting HTTPS settings" | log
+sed -i '/JENKINS_ARGS=/s/".*"/"--webroot=\/var\/cache\/$NAME\/war --httpsPort=$HTTP_PORT --httpPort=-1"/g' /etc/default/jenkins
+
 sleep 30
 unlockkey="$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
 
@@ -34,7 +41,7 @@ systemctl restart jenkins
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Initial setup URL: http://${SERVERIP}:9090"
+descriptionAppend "Initial setup URL: https://${SERVERIP}:${assignedPort}"
 descriptionAppend "Unlock key: $unlockkey"
 descriptionAppend " "
 descriptionAppend "If main page is blank after initial setup, restart the server:"
