@@ -28,6 +28,10 @@ waitOrStop 0
 echo "Tweaking server settings" | log
 sed -i 's/HTTP_PORT=8080/HTTP_PORT=9090/g' /etc/default/jenkins
 sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenkins
+
+echo "Setting HTTPS settings" | log
+sed -i '/JENKINS_ARGS=/s/".*"/"--webroot=\/var\/cache\/$NAME\/war --httpsPort=$HTTP_PORT --httpPort=-1"/g' /etc/default/jenkins
+
 sleep 30
 unlockkey="$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
 
