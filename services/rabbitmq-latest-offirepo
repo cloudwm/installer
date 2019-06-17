@@ -6,6 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist nginx.success
+rootDir=$(rootDir)
+
 echo "Add repository" | log
 
 apt-key adv --keyserver "hkps.pool.sks-keyservers.net" --recv-keys "0x6B73A36E6026DFCA"
@@ -32,40 +35,12 @@ rabbitmqctl add_user admin $ADMINPASSWORD
 rabbitmqctl set_user_tags admin administrator
 rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
 
-echo "Open application to remote access" | log
-
-cat << EOF > /etc/rabbitmq/rabbitmq.conf
-
-#listeners.ssl.default = 5671
-
-#ssl_options.cacertfile = /opt/installer/tlsgen/tls-gen/basic/result/ca_certificate.pem
-#ssl_options.certfile   = /opt/installer/tlsgen/tls-gen/basic/result/server_certificate.pem
-#ssl_options.keyfile    = /opt/installer/tlsgen/tls-gen/basic/result/server_key.pemser
-#ssl_options.verify     = verify_peer
-#ssl_options.fail_if_no_peer_cert = false
-
-#management.listener.port = 15672
-#management.tcp.port       = 15672
-listeners.tcp.default = :::5672
-#listeners.tcp.1 = :::5672
-management.listener.port = 15672
-management.listener.ip   = 0.0.0.0
-management.listener.ssl  = true
-management.listener.ssl_opts.cacertfile = /opt/installer/tlsgen/tls-gen/basic/result/ca_certificate.pem
-management.listener.ssl_opts.certfile   = /opt/installer/tlsgen/tls-gen/basic/result/server_certificate.pem
-management.listener.ssl_opts.keyfile    = /opt/installer/tlsgen/tls-gen/basic/result/server_key.pem
-
-#management.ssl.port       = 15671
-#management.ssl.cacertfile = /opt/installer/tlsgen/tls-gen/basic/result/ca_certificate.pem
-#management.ssl.certfile   = /opt/installer/tlsgen/tls-gen/basic/result/server_certificate.pem
-#management.ssl.keyfile    = /opt/installer/tlsgen/tls-gen/basic/result/server_key.pem
-
-EOF
-
-echo "Tweaking and optimizing" | log
-
-# port forward to allow access to web ui
-#iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 15672
+echo "Open web UI to remote access" | log
+cp -f $rootDir/tweaks/extras/rabbitmq-nginx/rabbitmq_management-nginx-config /etc/nginx/sites-available/rabbitmq-nginx.conf
+ln -s /etc/nginx/sites-available/rabbitmq-nginx.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl reload nginx
 
 echo "starting Rabbitmq service" | log
 
