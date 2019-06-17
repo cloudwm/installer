@@ -8,6 +8,8 @@ fi
 
 checkTagExist nginx.success
 rootDir=$(rootDir)
+erlangVersion="1:22.0.3-1"
+rabbitmqVersion="3.7.15-1"
 
 echo "Add repository" | log
 
@@ -19,11 +21,11 @@ apt update
 echo "Install Erlang & Rabbitmq" | log
 
 # install erlang package
-apt install erlang-nox -y
+apt install -y erlang-nox=$erlangVersion
 waitOrStop 0
 checkPackageInstalled erlang-nox
 # install main package
-apt install rabbitmq-server -y
+apt install -y rabbitmq-server=$rabbitmqVersion
 waitOrStop 0
 checkPackageInstalled rabbitmq-server
 # enable web ui plugin
