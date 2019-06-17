@@ -1,0 +1,74 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+########################### DOCKER INSTALL ##########################
+echo "Downloading docker repository and key" | log
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
+waitOrStop 0
+
+echo "Install docker-ce" | log
+cat > /usr/sbin/policy-rc.d <<EOF
+#!/bin/sh
+exit 101
+EOF
+chmod a+x /usr/sbin/policy-rc.d
+
+apt-get install -y docker-ce
+waitOrStop 0
+checkPackageInstalled docker-ce
+
+rm -f /usr/sbin/policy-rc.d
+
+# Enable Service
+systemctl enable docker
+systemctl enable containerd
+
+systemctl start docker
+systemctl start containerd
+######################################################################
+
+# Docker Machine 0.16.1 INSTALL
+base=https://github.com/docker/machine/releases/download/v0.16.1 &&
+  curl -L $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine &&
+  install /tmp/docker-machine /usr/local/bin/docker-machine
+
+# install Jq
+apt install -y jq
+
+# Install the docker-machine-server.sh script ### MUST FORK
+curl -s -L https://raw.githubusercontent.com/OriHoch/docker-machine-server/v0.0.5/docker-machine-server.sh \
+    | tee /usr/local/bin/docker-machine-server.sh >/dev/null &&\
+chmod +x /usr/local/bin/docker-machine-server.sh
+
+# Install the kamatera-cluster.sh script ### MUST FORK
+curl -s -L https://raw.githubusercontent.com/OriHoch/docker-machine-server/v0.0.5/scripts/kamatera-cluster.sh \
+    | tee /usr/local/bin/kamatera-cluster.sh >/dev/null &&\
+chmod +x /usr/local/bin/kamatera-cluster.sh
+
+# Export Rancher version
+export RANCHER_VERSION=v2.2.4
+clientId=`cat /root/guest.conf | grep apiClientId | cut -d '=' -f 2`
+secret=`cat /root/guest.conf | grep apiSecret | cut -d '=' -f 2`
+vlan=`cat /root/guest.conf  | grep lan | grep -v wan | cut -d'=' -f 2`
+datacenter=`cat /root/guest.conf | grep zone | cut -d '=' -f 2 | head -1`
+export email=`cat /root/guest.conf | grep email | cut -d '=' -f 2`
+sed -i 's/read -p "RANCHER_DOMAIN_NAME: " -e -i "${RANCHER_DOMAIN_NAME}" RANCHER_DOMAIN_NAME/RANCHER_DOMAIN_NAME="rancher.$(docker-machine ip $(docker-machine active)).xip.io"/' /usr/local/bin/kamatera-cluster.sh
+sed -i 's/read -p "LETSENCRYPT_EMAIL: " -e -i "${LETSENCRYPT_EMAIL}" LETSENCRYPT_EMAIL/LETSENCRYPT_EMAIL="${email}"/' /usr/local/bin/kamatera-cluster.sh
+kamatera-cluster.sh "0.0.5" "${vlan}" << EOF
+${clientId}
+${secret}
+7
+/usr/local/bin
+rancher-admin-${datacenter}
+4096
+2B
+${datacenter}
+50
+EOF
