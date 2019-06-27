@@ -15,9 +15,9 @@ mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
 
 echo "Preparing database for application" | log
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER '${mmuser_name}'@'localhost' IDENTIFIED BY '${mmuser_password}';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER '${mmuser_name}'@'127.0.0.1' IDENTIFIED BY '${mmuser_password}';\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE mattermost;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON mattermost.* TO '${mmuser_name}'@'localhost';\"" | sh
+echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON mattermost.* TO '${mmuser_name}'@'127.0.0.1';\"" | sh
 
 echo "Downloading and extracting application" | log
 mkdir -p $appPath
@@ -35,8 +35,7 @@ chown -R mattermost:mattermost $appPath
 chmod -R g+w $appPath
 
 $appPath/bin/mattermost config set SqlSettings.DriverName mysql
-# dataSource="${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
-dataSource="${mmuser_name}:${mmuser_password}@tcp(localhost:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
+dataSource="${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
 $appPath/bin/mattermost config set SqlSettings.DataSource $dataSource
 chown mattermost:mattermost $appPath/config/config.json
 
