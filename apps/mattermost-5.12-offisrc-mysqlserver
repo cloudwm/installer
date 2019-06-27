@@ -9,7 +9,7 @@ fi
 
 checkTagExist mysqld.success
 
-appVersion=5.11.0
+appVersion=5.12.0
 appPath=/opt/mattermost
 mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
@@ -33,14 +33,12 @@ echo "Preparing system users for application" | log
 useradd --system --user-group mattermost
 chown -R mattermost:mattermost $appPath
 chmod -R g+w $appPath
-
 $appPath/bin/mattermost config set SqlSettings.DriverName mysql
 dataSource="${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
 $appPath/bin/mattermost config set SqlSettings.DataSource $dataSource
 chown mattermost:mattermost $appPath/config/config.json
 
 echo "Setting up application as a system service" | log
-
 cat << EOF > /lib/systemd/system/mattermost.service
 [Unit]
 Description=Mattermost
@@ -67,27 +65,22 @@ systemctl daemon-reload
 systemctl enable mattermost.service
 systemctl start mattermost.service
 
-ufw allow 8065
-
-# TODO: setup TLS
+echo "Setting HTTPS support" | log
 mkdir -p $appPath/ssl/private
 mkdir -p $appPath/ssl/certs
 serverKey=$appPath/ssl/private/server.key
 serverCert=$appPath/ssl/certs/server.crt
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout ${serverKey} -out ${serverCert} -days 1024 -nodes -subj '/CN=localhost'
 chown -R mattermost:mattermost $appPath/ssl
-
 $appPath/bin/mattermost config set ServiceSettings.TLSKeyFile $serverKey
 $appPath/bin/mattermost config set ServiceSettings.TLSCertFile $serverCert 
 $appPath/bin/mattermost config set ServiceSettings.ListenAddress :443
 $appPath/bin/mattermost config set ServiceSettings.ConnectionSecurity TLS
 $appPath/bin/mattermost config set ServiceSettings.Forward80To443 true
-
 setcap cap_net_bind_service=+ep $appPath/bin/mattermost
 systemctl restart mattermost.service
 
 echo "Adding descriptions" | log
-
 descriptionAppend "Mattermost db user: ${mmuser_name}"
 descriptionAppend "Mattermost db password: ${mmuser_password}"
 descriptionAppend " "
