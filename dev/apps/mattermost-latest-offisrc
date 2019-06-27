@@ -35,7 +35,8 @@ chown -R mattermost:mattermost $appPath
 chmod -R g+w $appPath
 
 $appPath/bin/mattermost config set SqlSettings.DriverName mysql
-dataSource="${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
+# dataSource="${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
+dataSource="${mmuser_name}:${mmuser_password}@tcp(localhost:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
 $appPath/bin/mattermost config set SqlSettings.DataSource $dataSource
 chown mattermost:mattermost $appPath/config/config.json
 
