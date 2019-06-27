@@ -34,60 +34,60 @@ cd mattermost
 mv * $appPath/
 mkdir -p $appPath/data
 
-echo "Preparing system users for application" | log
-useradd --system --user-group mattermost
-chown -R mattermost:mattermost $appPath
-chmod -R g+w $appPath
+# echo "Preparing system users for application" | log
+# useradd --system --user-group mattermost
+# chown -R mattermost:mattermost $appPath
+# chmod -R g+w $appPath
 
-configFile=$appPath/config/config.json
-jq '.SqlSettings.DriverName = "mysql"' $configFile > tmp.$$.json && mv tmp.$$.json $configFile
-dataSource="\"${mmuser_name}:${mmuser_password}@tcp(${SERVERIP}:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s\""
-jq ".SqlSettings.DataSource = ${dataSource}" $configFile > tmp.$$.json && mv tmp.$$.json $configFile
-chown mattermost:mattermost $configFile
-# /opt/mattermost/config/config.json
-# "SqlSettings"
-# Set "DriverName" to "mysql"
-# Set "DataSource" to the following value, replacing <mmuser-password> and <host-name-or-IP> with the appropriate values. Also make sure that the database name is mattermost instead of mattermost_test:
-# "mmuser:<mmuser-password>@tcp(<host-name-or-IP>:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
+# configFile=$appPath/config/config.json
+# jq '.SqlSettings.DriverName = "mysql"' $configFile > tmp.$$.json && mv tmp.$$.json $configFile
+# dataSource="\"${mmuser_name}:${mmuser_password}@tcp(${SERVERIP}:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s\""
+# jq ".SqlSettings.DataSource = ${dataSource}" $configFile > tmp.$$.json && mv tmp.$$.json $configFile
+# chown mattermost:mattermost $configFile
+# # /opt/mattermost/config/config.json
+# # "SqlSettings"
+# # Set "DriverName" to "mysql"
+# # Set "DataSource" to the following value, replacing <mmuser-password> and <host-name-or-IP> with the appropriate values. Also make sure that the database name is mattermost instead of mattermost_test:
+# # "mmuser:<mmuser-password>@tcp(<host-name-or-IP>:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
 
-echo "Setting up application as a system service" | log
+# echo "Setting up application as a system service" | log
 
-cat << EOF > /lib/systemd/system/mattermost.service
-[Unit]
-Description=Mattermost
-After=network.target
-After=mysql.service
-Requires=mysql.service
+# cat << EOF > /lib/systemd/system/mattermost.service
+# [Unit]
+# Description=Mattermost
+# After=network.target
+# After=mysql.service
+# Requires=mysql.service
 
-[Service]
-Type=notify
-ExecStart=${appPath}/bin/mattermost
-TimeoutStartSec=3600
-Restart=always
-RestartSec=10
-WorkingDirectory=${appPath}
-User=mattermost
-Group=mattermost
-LimitNOFILE=49152
+# [Service]
+# Type=notify
+# ExecStart=${appPath}/bin/mattermost
+# TimeoutStartSec=3600
+# Restart=always
+# RestartSec=10
+# WorkingDirectory=${appPath}
+# User=mattermost
+# Group=mattermost
+# LimitNOFILE=49152
 
-[Install]
-WantedBy=mysql.service
-EOF
+# [Install]
+# WantedBy=mysql.service
+# EOF
 
-systemctl daemon-reload
-systemctl enable mattermost.service
-systemctl start mattermost.service
+# systemctl daemon-reload
+# systemctl enable mattermost.service
+# systemctl start mattermost.service
 
-# TODO: setup mail
-# TODO: setup TLS
+# # TODO: setup mail
+# # TODO: setup TLS
 
-echo "Adding descriptions" | log
+# echo "Adding descriptions" | log
 
-descriptionAppend "Mattermost db user: ${mmuser_name}"
-descriptionAppend "Mattermost db password: ${mmuser_password}"
-descriptionAppend " "
-descriptionAppend "Mattermost web UI: http://${SERVERIP}:8065"
-descriptionAppend " "
-tagScript success
+# descriptionAppend "Mattermost db user: ${mmuser_name}"
+# descriptionAppend "Mattermost db password: ${mmuser_password}"
+# descriptionAppend " "
+# descriptionAppend "Mattermost web UI: http://${SERVERIP}:8065"
+# descriptionAppend " "
+# tagScript success
 
-exit 0
+# exit 0
