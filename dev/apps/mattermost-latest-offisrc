@@ -40,10 +40,15 @@ chown -R mattermost:mattermost $appPath
 chmod -R g+w $appPath
 
 configFile=$appPath/config/config.json
-jq '.SqlSettings.DriverName = "mysql"' $configFile > tmp.$$.json && mv tmp.$$.json $configFile
+# jq '.SqlSettings.DriverName = "mysql"' $configFile > tmp.$$.json && mv tmp.$$.json $configFile
 # dataSource="\"${mmuser_name}:${mmuser_password}@tcp(${SERVERIP}:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s\""
-dataSource="\"${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s\""
-jq ".SqlSettings.DataSource = ${dataSource}" $configFile > tmp.$$.json && mv tmp.$$.json $configFile
+# dataSource="\"${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s\""
+# jq ".SqlSettings.DataSource = ${dataSource}" $configFile > tmp.$$.json && mv tmp.$$.json $configFile
+
+$appPath/bin/mattermost config set SqlSettings.DriverName mysql
+dataSource=${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s
+$appPath/bin/mattermost config set SqlSettings.DataSource $dataSource
+
 chown mattermost:mattermost $configFile
 # /opt/mattermost/config/config.json
 # "SqlSettings"
@@ -79,8 +84,25 @@ systemctl daemon-reload
 systemctl enable mattermost.service
 systemctl start mattermost.service
 
+ufw allow 8065
 # TODO: setup mail
+
 # TODO: setup TLS
+serverKey=$appPath/ssl/private/server.key
+serverCert=$appPath/ssl/certs/server.crt
+
+su mattermost << EOF
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout ${serverKey} -out ${serverCert} -days 1024 -nodes -subj '/CN=localhost'
+EOF
+
+$appPath/bin/mattermost config set ServiceSettings.TLSKeyFile $serverKey
+$appPath/bin/mattermost config set ServiceSettings.TLSCertFile $serverCert 
+$appPath/bin/mattermost config set ServiceSettings.ListenAddress :443
+$appPath/bin/mattermost config set ServiceSettings.ConnectionSecurity TLS
+$appPath/bin/mattermost config set ServiceSettings.Forward80To443 true
+
+setcap cap_net_bind_service=+ep $appPath/bin/mattermost
+systemctl restart mattermost.service
 
 echo "Adding descriptions" | log
 
