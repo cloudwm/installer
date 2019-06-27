@@ -88,6 +88,9 @@ ufw allow 8065
 # TODO: setup mail
 
 # TODO: setup TLS
+mkdir -p $appPath/ssl/private
+mkdir -p $appPath/ssl/certs
+
 serverKey=$appPath/ssl/private/server.key
 serverCert=$appPath/ssl/certs/server.crt
 
