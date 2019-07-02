@@ -70,7 +70,8 @@ sleep 5
 rm -f /etc/motd
 
 echo "Allow web ui in firewall" | log
-ufw allow ${freePort}
+# ufw allow ${freePort}
+export ZEVEPORT=$freePort
 
 echo "Adding descriptions" | log
 descriptionAppend "Zevenet Admin URI: https://${SERVERIP}:${freePort}"
