@@ -15,6 +15,8 @@ waitOrStop 0
 
 checkPackageInstalled haproxy
 
+#TODO ufw allow stats port
+
 descriptionAppend "HAProxy configuration: /etc/haproxy/haproxy.cfg"
 descriptionAppend "HAProxy documentation (on-server): /usr/share/doc/haproxy/"
 descriptionAppend "HAProxy documentation (online): http://cbonte.github.io/haproxy-dconv/1.9/intro.html"
