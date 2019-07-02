@@ -10,7 +10,7 @@ rootDir=$(rootDir)
 mkdir -p $rootDir/temp
 appPath=/usr/local/zevenet
 appVersion=5.9.\*
-freePort="4444"
+freePort=4444
 aptSourceList=/etc/apt/sources.list.d/zevenet.list
 
 echo "Backup ip settings" | log
