@@ -10,62 +10,114 @@ rootDir=$(rootDir)
 mkdir -p $rootDir/temp
 appPath=/usr/local/zevenet
 freePort="4444"
+aptSourceList=/etc/apt/sources.list.d/zevenet.list
 
 echo "Backup ip settings" | log
 cp /etc/network/interfaces $rootDir/temp/interfaces
 
 echo "Add zevenet repository" | log
-# curl -fsSL http://repo.zevenet.com/zevenet.com.gpg.key | apt-key add -
 curlDownload http://repo.zevenet.com/zevenet.com.gpg.key | log
 waitOrStop 0
 apt-key add zevenet.com.gpg.key
-echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list.d/zevenet.list
-apt update
+echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> $aptSourceList
 
-echo "Install dependencies" | log
-apt install software-properties-common libev4 libjansson4 -y
+# echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> /etc/apt/sources.list
+
+# cat << EOF > ${aptSourceList}
+# deb http://deb.debian.org/debian/ buster main contrib non-free
+# deb-src http://deb.debian.org/debian/ buster main contrib non-free
+
+# deb http://deb.debian.org/debian/ buster-updates main contrib non-free
+# deb-src http://deb.debian.org/debian/ buster-updates main contrib non-free
+
+# deb http://security.debian.org/debian-security buster/updates main
+# deb-src http://security.debian.org/debian-security buster/updates main
+
+# #official Zevenet repository
+# deb http://repo.zevenet.com/ce/v5/ buster main
+# EOF
+
+# echo "Adding debian keys" | log
+# curlDownload https://ftp-master.debian.org/keys/archive-key-10.asc | log
+# waitOrStop 0
+# apt-key add archive-key-10.asc | log
+# curlDownload https://ftp-master.debian.org/keys/archive-key-10-security.asc | log
+# waitOrStop 0
+# apt-key add archive-key-10-security.asc | log
+
+apt update
 waitOrStop 0
 
-echo "Install dependencies manually" | log
+echo "Installing dependencies from apt" | log
+apt-fast install software-properties-common libev4 libjansson4 -y
+waitOrStop 0
+
+echo "Installing dependencies manually" | log
 
 cd $rootDir/temp
 
-# curl -Lo nftlll.deb  http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb  | log
-curlDownload http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb nftlll.deb | log
+curlDownload http://ftp.debian.org/debian/pool/main/libn/libnftnl/libnftnl11_1.1.2-2_amd64.deb libnftnl11_1.1.2-2_amd64.deb | log
 waitOrStop 0
-dpkg -i nftlll.deb 
-rm -rf nftlll.deb
+dpkg -i libnftnl11_1.1.2-2_amd64.deb 
+rm -rf libnftnl11_1.1.2-2_amd64.deb
 
-# curl -Lo libnftables.deb http://ftp.debian.org/debian/pool/main/n/nftables/libnftables0_0.9.0-2_amd64.deb | log
-curlDownload http://ftp.debian.org/debian/pool/main/n/nftables/libnftables0_0.9.0-2_amd64.deb libnftables.deb | log
+curlDownload http://ftp.debian.org/debian/pool/main/n/nftables/libnftables0_0.9.0-2_amd64.deb libnftables0_0.9.0-2_amd64.deb | log
 waitOrStop 0
-dpkg -i libnftables.deb 
-rm -rf libnftables.deb
+dpkg -i libnftables0_0.9.0-2_amd64.deb 
+rm -rf libnftables0_0.9.0-2_amd64.deb
 
-# curl -Lo nftlb.deb http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/nftlb_0.2-1_amd64.deb | log 
-curlDownload http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/nftlb_0.2-1_amd64.deb nftlb.deb | log 
+# curlDownload http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/nftlb_0.2-1_amd64.deb nftlb.deb | log 
+curlDownload http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/nftlb_0.3-1_amd64.deb nftlb_0.3-1_amd64.deb | log 
 waitOrStop 0
-dpkg -i nftlb.deb 
-rm -rf nftlb.deb
+dpkg -i nftlb_0.3-1_amd64.deb 
+rm -rf nftlb_0.3-1_amd64.deb
 
-echo "Install zevenet gui and core" | log
-apt install -y nftables zevenet zevenet-gui-ce | log
+echo "Installing zevenet gui and core" | log
+# apt install -y nftables zevenet zevenet-gui-ce | log
+apt-fast install -y zevenet zevenet-gui-ce | log
+# apt install -y zevenet  | log
 waitOrStop 0
 sleep 5
 
 echo "Tweaking configurations" | log
 # Overwrite with backed up network config
-cp $rootDir/temp/interfaces /etc/network/interfaces
+cp -f $rootDir/temp/interfaces /etc/network/interfaces
+sed -i '1 i\#zenmodified' /etc/network/interfaces
 # Configre zevenet virtual ip
 sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' $appPath/config/if_eth0_conf
 # Configure free port not blocked by system
 sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = ${freePort}/" $appPath/app/cherokee/etc/cherokee/cherokee.conf
 # Generate and apply random zapi key
-zapi_key=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 ; echo ''`
+zapi_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64 ; echo '')
 sed -i "s/\$zapikey=\"\"\;/\$zapikey=\"${zapi_key}\"\;/" $appPath/config/global.conf
 # Restart server to apply changes
-/etc/init.d/cherokee restart
+/etc/init.d/cherokee stop
+/etc/init.d/cherokee start
 sleep 5
+# Clear zevenet motd message
+rm -f /etc/motd
+
+# echo "Activating nftables firewall" | log
+# setup standard firewall rules including zevenet
+# cp -f /usr/share/doc/nftables/examples/syntax/workstation /etc/nftables.conf
+# sed -i "/tcp/s/^\t\t#/\t\t/g" /etc/nftables.conf
+# sed -i "/tcp/s/443 }/443, ${freePort} }/g" /etc/nftables.conf
+# setup loading firewall at boot
+# systemctl disable nftables.service
+## cp -f $rootDir/tweaks/extras/zevenet/nftables_custom.service /etc/systemd/system/multi-user.target.wants/
+# cp -f $rootDir/tweaks/extras/zevenet/nftables_custom.service /lib/systemd/system/
+# systemctl enable nftables_custom.service
+# systemctl start nftables_custom.service
+# # cp -f $rootDir/tweaks/extras/zevenet/nftservice /etc/init.d/
+# # chmod u+x /etc/init.d/nftservice
+# # update-rc.d nftservice defaults
+
+# load firewall
+# nft -f /etc/nftables.conf
+# service nftables stop
+# sleep 3
+# service nftables start
+# sleep 3
 
 echo "Adding descriptions" | log
 descriptionAppend "Zevenet Admin URI: https://${SERVERIP}:${freePort}"
@@ -77,6 +129,9 @@ descriptionAppend "Zevenet API Reference: https://www.zevenet.com/zapidoc_ce_v4.
 descriptionAppend " "
 descriptionAppend "Zevenet Configuration Directory: ${appPath}/config/"
 descriptionAppend "Cherokee Server Configuration: ${appPath}/app/cherokee/etc/cherokee/cherokee.conf"
+# descriptionAppend "Firewall rules (nftables): /etc/nftables.conf"
+descriptionAppend " "
+descriptionAppend "Zevenet knowledge base: https://www.zevenet.com/knowledge-base/"
 descriptionAppend " "
 
 tagScript success
