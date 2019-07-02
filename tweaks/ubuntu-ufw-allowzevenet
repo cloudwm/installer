@@ -7,7 +7,7 @@ fi
 
 checkTagExist ufw.success
 
-ufw allow $ZEVEPORT | log
+ufw allow ${ZEVEPORT} | log
 
 ufw status | log
 
