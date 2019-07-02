@@ -42,15 +42,11 @@ base=https://github.com/docker/machine/releases/download/v0.16.1 &&
 # install Jq
 apt install -y jq
 
-# Install the docker-machine-server.sh script ### MUST FORK
-curl -s -L https://raw.githubusercontent.com/OriHoch/docker-machine-server/v0.0.5/docker-machine-server.sh \
-    | tee /usr/local/bin/docker-machine-server.sh >/dev/null &&\
-chmod +x /usr/local/bin/docker-machine-server.sh
+# Install the docker-machine-server.sh script 
+cp $rootDir/tweaks/extras/postfix-mysql/docker-machine-server.sh  /usr/local/bin/docker-machine-server.sh
 
-# Install the kamatera-cluster.sh script ### MUST FORK
-curl -s -L https://raw.githubusercontent.com/OriHoch/docker-machine-server/v0.0.5/scripts/kamatera-cluster.sh \
-    | tee /usr/local/bin/kamatera-cluster.sh >/dev/null &&\
-chmod +x /usr/local/bin/kamatera-cluster.sh
+# Install the kamatera-cluster.sh script
+cp $rootDir/tweaks/extras/rancher-2.2.4/0.0.5/kamatera-cluster.sh  /usr/local/bin/kamatera-cluster.sh
 
 # Export Rancher version
 export RANCHER_VERSION=v2.2.4
@@ -59,8 +55,6 @@ secret=`cat /root/guest.conf | grep apiSecret | cut -d '=' -f 2`
 vlan=`cat /root/guest.conf  | grep lan | grep -v wan | cut -d'=' -f 2`
 datacenter=`cat /root/guest.conf | grep zone | cut -d '=' -f 2 | head -1`
 export email=`cat /root/guest.conf | grep email | cut -d '=' -f 2`
-sed -i 's/read -p "RANCHER_DOMAIN_NAME: " -e -i "${RANCHER_DOMAIN_NAME}" RANCHER_DOMAIN_NAME/RANCHER_DOMAIN_NAME="rancher.$(docker-machine ip $(docker-machine active)).xip.io"/' /usr/local/bin/kamatera-cluster.sh
-sed -i 's/read -p "LETSENCRYPT_EMAIL: " -e -i "${LETSENCRYPT_EMAIL}" LETSENCRYPT_EMAIL/LETSENCRYPT_EMAIL="${email}"/' /usr/local/bin/kamatera-cluster.sh
 kamatera-cluster.sh "0.0.5" "${vlan}" << EOF
 ${clientId}
 ${secret}
