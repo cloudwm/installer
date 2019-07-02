@@ -25,7 +25,7 @@ apt update
 waitOrStop 0
 
 echo "Installing dependencies from apt" | log
-apt-fast install software-properties-common libev4 libjansson4 -y
+apt install software-properties-common libev4 libjansson4 -y
 waitOrStop 0
 
 echo "Installing dependencies manually" | log
@@ -47,7 +47,7 @@ dpkg -i $nftlb
 rm -rf $nftlb
 
 echo "Installing zevenet gui and core" | log
-apt-fast install -y zevenet=$appVersion zevenet-gui-ce | log
+apt install -y zevenet=$appVersion zevenet-gui-ce | log
 waitOrStop 0
 sleep 5
 
