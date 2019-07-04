@@ -15,7 +15,7 @@ waitOrStop 0
 
 checkPackageInstalled haproxy
 
-#TODO ufw allow stats port
+ufw allow 8404
 
 descriptionAppend "HAProxy configuration: /etc/haproxy/haproxy.cfg"
 descriptionAppend "HAProxy documentation (on-server): /usr/share/doc/haproxy/"
