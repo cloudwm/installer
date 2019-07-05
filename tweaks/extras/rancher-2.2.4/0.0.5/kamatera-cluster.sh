@@ -136,7 +136,7 @@ install_or_update_rancher() {
     echo The domain will be used for Rancher, e.g. rancher.my-domain.com
     read -p "Press <Enter> when the DNS A Record was set"
     echo Enter the Rancher domain name
-    RANCHER_DOMAIN_NAME="rancher.$(docker-machine ip $(docker-machine active)).xip.io"
+    RANCHER_DOMAIN_NAME="_"
     echo Enter an Email for lets encrypt registration
     LETSENCRYPT_EMAIL="${email}"
     CERTBOT_DOMAINS="${RANCHER_DOMAIN_NAME}"

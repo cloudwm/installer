@@ -6,33 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-########################### DOCKER INSTALL ##########################
-echo "Downloading docker repository and key" | log
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-
-add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
-waitOrStop 0
-
-echo "Install docker-ce" | log
-cat > /usr/sbin/policy-rc.d <<EOF
-#!/bin/sh
-exit 101
-EOF
-chmod a+x /usr/sbin/policy-rc.d
-
-apt-get install -y docker-ce
-waitOrStop 0
-checkPackageInstalled docker-ce
-
-rm -f /usr/sbin/policy-rc.d
-
-# Enable Service
-systemctl enable docker
-systemctl enable containerd
-
-systemctl start docker
-systemctl start containerd
-######################################################################
+checkTagExist docker-latest-offirepo.success
 
 echo "Docker Machine 0.16.1 INSTALL" | log
 base=https://github.com/docker/machine/releases/download/v0.16.1 &&
@@ -112,11 +86,20 @@ for url in ${CURRENTDRIVERS}
         curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
     done
 
-echo "Creating Kamatera Control Plane Template" | log
-echo "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"30\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"2048\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Conrol Plane\", \"useInternalIpAddress\":true}"
-curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"30\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"2048\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Conrol Plane\", \"useInternalIpAddress\":true}" --insecure 
+# Currently not working due to some bug in rancher, need to investigate
+# echo "Creating Kamatera Control Plane Template" | log
+# curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"30\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"2048\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Conrol Plane\", \"useInternalIpAddress\":true}" --insecure 
 
-echo "Creating Kamatera Control Plane Template" | log
-echo "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"50\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"4096\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Worker\", \"useInternalIpAddress\":true}"
-curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"50\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"4096\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Worker\", \"useInternalIpAddress\":true}" --insecure 
+# Currently not working due to some bug in rancher, need to investigate
+# echo "Creating Kamatera Control Plane Template" | log
+# curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"50\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"4096\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Worker\", \"useInternalIpAddress\":true}" --insecure 
 
+echo "Adding descriptions" | log
+descriptionAppend "Rancher web UI: https://${activemachine}"
+descriptionAppend "Rancher admin user: admin"
+descriptionAppend "Rancher admin password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
