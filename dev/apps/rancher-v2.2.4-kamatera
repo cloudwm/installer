@@ -43,10 +43,10 @@ base=https://github.com/docker/machine/releases/download/v0.16.1 &&
 apt install -y jq
 
 # Install the docker-machine-server.sh script 
-cp $rootDir/tweaks/extras/postfix-mysql/docker-machine-server.sh  /usr/local/bin/docker-machine-server.sh
+cp /opt/installer/tweaks/extras/postfix-mysql/docker-machine-server.sh  /usr/local/bin/docker-machine-server.sh
 
 # Install the kamatera-cluster.sh script
-cp $rootDir/tweaks/extras/rancher-2.2.4/0.0.5/kamatera-cluster.sh  /usr/local/bin/kamatera-cluster.sh
+cp /opt/installer/tweaks/extras/rancher-2.2.4/0.0.5/kamatera-cluster.sh  /usr/local/bin/kamatera-cluster.sh
 
 # Export Rancher version
 export RANCHER_VERSION=v2.2.4

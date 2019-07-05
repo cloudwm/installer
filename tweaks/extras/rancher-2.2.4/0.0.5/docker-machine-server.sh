@@ -150,7 +150,7 @@ init() {
     docker-machine ssh ${ACTIVE_DOCKER_MACHINE} \
         'sudo bash -c "
             curl  -s -f https://raw.githubusercontent.com/ddark-il/installer/staging/tweaks/extras/rancher-2.2.4/0.0.5/docker-machine-server.sh > /usr/local/bin/docker-machine-server &&\
-            chmod +x /usr/local/bin/docker-machine-server
+            chmod +x /usr/local/bin/docker-machine-server &&\
             mkdir -p /etc/docker-machine-server && echo '${DOCKER_MACHINE_SERVER_VERSION}' > /etc/docker-machine-server/version  &&\
         "'
     [ "$?" != "0" ] && error Failed to initialize docker-machine-server && return 1
