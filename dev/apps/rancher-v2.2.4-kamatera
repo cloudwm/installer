@@ -34,21 +34,23 @@ systemctl start docker
 systemctl start containerd
 ######################################################################
 
-# Docker Machine 0.16.1 INSTALL
+echo "Docker Machine 0.16.1 INSTALL" | log
 base=https://github.com/docker/machine/releases/download/v0.16.1 &&
   curl -L $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine &&
   install /tmp/docker-machine /usr/local/bin/docker-machine
 
-# install Jq
+echo "install Jq" | log
 apt install -y jq
+waitOrStop 0
+checkPackageInstalled jq
 
-# Install the docker-machine-server.sh script 
+echo "Install the docker-machine-server.sh script" | log
 cp /opt/installer/tweaks/extras/rancher-2.2.4/0.0.5/docker-machine-server.sh  /usr/local/bin/docker-machine-server.sh
 
-# Install the kamatera-cluster.sh script
+echo "Install the kamatera-cluster.sh script" | log
 cp /opt/installer/tweaks/extras/rancher-2.2.4/0.0.5/kamatera-cluster.sh  /usr/local/bin/kamatera-cluster.sh
 
-# Export Rancher version
+echo "Installing Rancher" | log
 export RANCHER_VERSION=v2.2.4
 clientId=`cat /root/guest.conf | grep apiClientId | cut -d '=' -f 2`
 secret=`cat /root/guest.conf | grep apiSecret | cut -d '=' -f 2`
@@ -111,8 +113,10 @@ for url in ${CURRENTDRIVERS}
     done
 
 echo "Creating Kamatera Control Plane Template" | log
+echo "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"30\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"2048\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Conrol Plane\", \"useInternalIpAddress\":true}"
 curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"30\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"2048\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Conrol Plane\", \"useInternalIpAddress\":true}" --insecure 
 
 echo "Creating Kamatera Control Plane Template" | log
+echo "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"50\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"4096\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Worker\", \"useInternalIpAddress\":true}"
 curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"50\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"4096\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Worker\", \"useInternalIpAddress\":true}" --insecure 
 
