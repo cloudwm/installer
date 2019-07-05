@@ -70,7 +70,11 @@ EOF
 activemachine=`docker-machine ls | grep rancher-admin-${datacenter} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"`
 
 echo "Waiting for Rancher to intialize" | log
-bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure)" != "200" ]]; do sleep 5; done'
+HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure`
+until [ "$HTTPD" == "200" ]; do
+    sleep 3
+    HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure`
+done
 sleep 15
 
 echo "Getting Rancher Login Token" | log
@@ -85,7 +89,7 @@ APIRESPONSE=`curl -s "https://${activemachine}/v3/token" -H 'content-type: appli
 echo "Getting API Token" | log
 APITOKEN=`echo $APIRESPONSE | jq -r .token`
 
-echo "Listing available drivers" | log
+echo "Listing available Node drivers" | log
 CURRENTDRIVERS=`curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
@@ -96,3 +100,13 @@ for url in ${CURRENTDRIVERS}
 
 echo "Adding Kamatera Docker Machine Driver" | log
 curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.0-RC2/docker-machine-driver-kamatera_v1.0.0-RC2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
+
+echo "Listing available Kubernetes drivers" | log
+CURRENTDRIVERS=`curl -s "https://${activemachine}/v3/kontainerdrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
+
+echo "Deactivating foreign drivers" | log
+for url in ${CURRENTDRIVERS}
+    do 
+        curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
+    done
+
