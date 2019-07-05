@@ -154,13 +154,9 @@ init() {
             tar -xzf 'v${DOCKER_MACHINE_SERVER_VERSION}'.tar.gz &&\
             rm -rf /usr/local/src/docker-machine-server && mkdir -p /usr/local/src/docker-machine-server &&\
             cp -rf docker-machine-server-'${DOCKER_MACHINE_SERVER_VERSION}'/* /usr/local/src/docker-machine-server/ &&\
-            cp -f /usr/local/src/docker-machine-server/docker-machine-server.sh /usr/local/bin/docker-machine-server &&\
-            chmod +x /usr/local/bin/docker-machine-server &&\
-            mkdir -p /etc/docker-machine-server && echo '${DOCKER_MACHINE_SERVER_VERSION}' > /etc/docker-machine-server/version  &&\
-            ## EDITS
-            rm -rf /usr/local/bin/docker-machine-server  &&\
             curl  -s -f https://raw.githubusercontent.com/ddark-il/installer/staging/tweaks/extras/rancher-2.2.4/0.0.5/docker-machine-server.sh > /usr/local/bin/docker-machine-server &&\
             chmod +x /usr/local/bin/docker-machine-server
+            mkdir -p /etc/docker-machine-server && echo '${DOCKER_MACHINE_SERVER_VERSION}' > /etc/docker-machine-server/version  &&\
         "'
     [ "$?" != "0" ] && error Failed to initialize docker-machine-server && return 1
     great_success && return 0
@@ -174,8 +170,8 @@ init_dev() {
     docker-machine scp -q -d -r . ${ACTIVE_DOCKER_MACHINE}:/usr/local/src/docker-machine-server/ &&\
     docker-machine ssh ${ACTIVE_DOCKER_MACHINE} \
         'sudo bash -c "
-            cp -f /usr/local/src/docker-machine-server/docker-machine-server.sh /usr/local/bin/docker-machine-server &&\
-            chmod +x /usr/local/bin/docker-machine-server &&\
+            curl  -s -f https://raw.githubusercontent.com/ddark-il/installer/staging/tweaks/extras/rancher-2.2.4/0.0.5/docker-machine-server.sh > /usr/local/bin/docker-machine-server &&\
+            chmod +x /usr/local/bin/docker-machine-server
             mkdir -p /etc/docker-machine-server && echo '0.0.0' > /etc/docker-machine-server/version
         "'
     [ "$?" != "0" ] && error Failed to initialize docker-machine-server && return 1
