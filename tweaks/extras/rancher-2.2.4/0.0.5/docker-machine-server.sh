@@ -149,30 +149,9 @@ init() {
     info Initializing Docker Machine ${ACTIVE_DOCKER_MACHINE} with docker-machine-server v${DOCKER_MACHINE_SERVER_VERSION} &&\
     docker-machine ssh ${ACTIVE_DOCKER_MACHINE} \
         'sudo bash -c "
-            TEMPDIR=`mktemp -d` && cd \$TEMPDIR &&\
-            wget -q https://github.com/OriHoch/docker-machine-server/archive/v'${DOCKER_MACHINE_SERVER_VERSION}'.tar.gz &&\
-            tar -xzf 'v${DOCKER_MACHINE_SERVER_VERSION}'.tar.gz &&\
-            rm -rf /usr/local/src/docker-machine-server && mkdir -p /usr/local/src/docker-machine-server &&\
-            cp -rf docker-machine-server-'${DOCKER_MACHINE_SERVER_VERSION}'/* /usr/local/src/docker-machine-server/ &&\
             curl  -s -f https://raw.githubusercontent.com/ddark-il/installer/staging/tweaks/extras/rancher-2.2.4/0.0.5/docker-machine-server.sh > /usr/local/bin/docker-machine-server &&\
             chmod +x /usr/local/bin/docker-machine-server
             mkdir -p /etc/docker-machine-server && echo '${DOCKER_MACHINE_SERVER_VERSION}' > /etc/docker-machine-server/version  &&\
-        "'
-    [ "$?" != "0" ] && error Failed to initialize docker-machine-server && return 1
-    great_success && return 0
-}
-
-init_dev() {
-    ! client_side && return 1
-    ! local ACTIVE_DOCKER_MACHINE=`docker-machine active` && return 1
-    ! [ -e ./docker-machine-server.sh ] && error init_dev must run from docker-machine-server project directory && return 1
-    info Syncing local directory to Docker Machine ${ACTIVE_DOCKER_MACHINE} &&\
-    docker-machine scp -q -d -r . ${ACTIVE_DOCKER_MACHINE}:/usr/local/src/docker-machine-server/ &&\
-    docker-machine ssh ${ACTIVE_DOCKER_MACHINE} \
-        'sudo bash -c "
-            curl  -s -f https://raw.githubusercontent.com/ddark-il/installer/staging/tweaks/extras/rancher-2.2.4/0.0.5/docker-machine-server.sh > /usr/local/bin/docker-machine-server &&\
-            chmod +x /usr/local/bin/docker-machine-server
-            mkdir -p /etc/docker-machine-server && echo '0.0.0' > /etc/docker-machine-server/version
         "'
     [ "$?" != "0" ] && error Failed to initialize docker-machine-server && return 1
     great_success && return 0
