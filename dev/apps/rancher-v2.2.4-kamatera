@@ -110,3 +110,9 @@ for url in ${CURRENTDRIVERS}
         curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
     done
 
+echo "Creating Kamatera Control Plane Template" | log
+curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"useInternalIpAddress\":true,\"type\":\"nodeTemplate\",\"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\",\"engineRegistryMirror\":[],\"kamateraConfig\":{\"apiClientId\":\"${clientId}\",\"apiSecret\":\"${secret}\",\"billing\":\"hourly\",\"cpu\":\"2B\",\"createServerCommandId\":\"0\",\"datacenter\":\"${datacenter}\",\"diskSize\":\"30\",\"image\":\"ubuntu_server_18.04_64-bit\",\"privateNetworkIp\":\"\",\"privateNetworkName\":\"${vlan}\",\"ram\":\"2048\",\"type\":\"kamateraConfig\"},\"namespaceId\":\"fixme\",\"name\":\"Kamatera Control Plane\",\"labels\":{},\"engineOpt\":{},\"engineLabel\":{},\"engineEnv\":{},\"engineStorageDriver\":\"overlay2\"}" --insecure 
+
+echo "Creating Kamatera Control Plane Template" | log
+curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"useInternalIpAddress\":true,\"type\":\"nodeTemplate\",\"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\",\"engineRegistryMirror\":[],\"kamateraConfig\":{\"apiClientId\":\"${clientId}\",\"apiSecret\":\"${secret}\",\"billing\":\"hourly\",\"cpu\":\"2B\",\"createServerCommandId\":\"0\",\"datacenter\":\"${datacenter}\",\"diskSize\":\"50\",\"image\":\"ubuntu_server_18.04_64-bit\",\"privateNetworkIp\":\"\",\"privateNetworkName\":\"${vlan}\",\"ram\":\"4096\",\"type\":\"kamateraConfig\"},\"namespaceId\":\"fixme\",\"name\":\"Kamatera Worker\",\"labels\":{},\"engineOpt\":{},\"engineLabel\":{},\"engineEnv\":{},\"engineStorageDriver\":\"overlay2\"}" --insecure 
+
