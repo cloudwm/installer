@@ -101,7 +101,7 @@ for url in ${CURRENTDRIVERS}
     done
 
 echo "Adding Kamatera Docker Machine Driver" | log
-curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.0-RC2/docker-machine-driver-kamatera_v1.0.0-RC2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
+curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.2/docker-machine-driver-kamatera_v1.0.2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
 
 echo "Listing available Kubernetes drivers" | log
 CURRENTDRIVERS=`curl -s "https://${activemachine}/v3/kontainerdrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
