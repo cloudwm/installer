@@ -156,7 +156,11 @@ init() {
             cp -rf docker-machine-server-'${DOCKER_MACHINE_SERVER_VERSION}'/* /usr/local/src/docker-machine-server/ &&\
             cp -f /usr/local/src/docker-machine-server/docker-machine-server.sh /usr/local/bin/docker-machine-server &&\
             chmod +x /usr/local/bin/docker-machine-server &&\
-            mkdir -p /etc/docker-machine-server && echo '${DOCKER_MACHINE_SERVER_VERSION}' > /etc/docker-machine-server/version
+            mkdir -p /etc/docker-machine-server && echo '${DOCKER_MACHINE_SERVER_VERSION}' > /etc/docker-machine-server/version  &&\
+            ## EDITS
+            rm -rf /usr/local/bin/docker-machine-server  &&\
+            curl  -s -f https://raw.githubusercontent.com/ddark-il/installer/staging/tweaks/extras/rancher-2.2.4/0.0.5/docker-machine-server.sh > /usr/local/bin/docker-machine-server &&\
+            chmod +x /usr/local/bin/docker-machine-server
         "'
     [ "$?" != "0" ] && error Failed to initialize docker-machine-server && return 1
     great_success && return 0
