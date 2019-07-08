@@ -13,7 +13,9 @@ waitOrStop 0
 echo "Installing XRDP From Source" | log
 cd /tmp && git clone https://github.com/neutrinolabs/xrdp.git
 cd /tmp/xrdp && ./bootstrap 
-cd /tmp/xrdp && ./configure --enable-fuse --enable-jpeg 
+cd /tmp/xrdp && ./configure --enable-fuse --enable-jpeg --enable-rfxcodec
+cd /tmp/xrdp/librfxcodec && ./bootstrap
+cd /tmp/xrdp/librfxcodec && ./configure
 cd /tmp/xrdp && make
 cd /tmp/xrdp && make install 
 
