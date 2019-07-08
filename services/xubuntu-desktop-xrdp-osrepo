@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing xUbuntu Desktop" | log
+apt install -y xrdp xubuntu-desktop
+waitOrStop 0
+
+echo "Add XFCE4 Session to root user"
+echo /usr/bin/xfce4-session > /root/.xsession
+
+echo "Disable Compositing"
+xfconf-query -c xfwm4 -p /general/use_compositing -s false
+
+echo "Adding descriptions" | log
+descriptionAppend "Please connect via Microsoft Remote Desktop"
+descriptionAppend " "
+descriptionAppend "Computer Address: ${SERVERIP}"
+descriptionAppend "Ubuntu user: root"
+descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
+descriptionAppend " "
+tagScript success
+
+exit 0
