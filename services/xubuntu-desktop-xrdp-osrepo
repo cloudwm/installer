@@ -14,7 +14,11 @@ echo "Add XFCE4 Session to root user"
 echo /usr/bin/xfce4-session > /root/.xsession
 
 echo "Disable Compositing"
-xfconf-query -c xfwm4 -p /general/use_compositing -s false
+mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
+cp $rootDir/tweaks/extras/xubuntu-desktop/xfwm4.xml /root/.config/xfce4/xfconf/xfce-perchannel-xml/
+
+echo "Restart xRDP service" | log
+systemctl restart xrdp
 
 echo "Adding descriptions" | log
 descriptionAppend "Please connect via Microsoft Remote Desktop"
