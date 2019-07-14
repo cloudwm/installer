@@ -1,0 +1,35 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing lubuntu Desktop" | log
+apt install -y xrdp lubuntu-desktop
+waitOrStop 0
+
+echo "Add LXDE Session to root user"
+echo lxsession -s Lubuntu > /root/.xsession
+
+echo "Configuring default theme"
+cp $rootDir/tweaks/extras/lubuntu-desktop/lubuntu-config.tgz /root/
+cd /root/ && tar -xvzf lubuntu-config.tgz
+rm -f /root/lubuntu-config.tgz
+chown -R root.root /root
+mkdir -p /root/Desktop /root/Documents /root/Downloads /root/Music /root/Pictures /root/Public /root/Templates /root/Videos
+
+echo "Restart xRDP service" | log
+systemctl restart xrdp
+
+echo "Adding descriptions" | log
+descriptionAppend "Please connect via Microsoft Remote Desktop"
+descriptionAppend " "
+descriptionAppend "Computer Address: ${SERVERIP}"
+descriptionAppend "Ubuntu user: root"
+descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
+descriptionAppend " "
+tagScript success
+
+exit 0
