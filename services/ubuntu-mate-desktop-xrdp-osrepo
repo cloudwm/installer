@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Ubuntu Mate Desktop" | log
+apt install -y xrdp ubuntu-mate-desktop
+waitOrStop 0
+
+echo "Add Mate Session to root user"
+echo mate-session > /root/.xsession
+
+echo "Disable Compositing"
+mkdir -p /root/.config/dconf
+cp $rootDir/tweaks/extras/ubuntu-mate-desktop/user /root/.config/dconf/
+
+echo "Restart xRDP service" | log
+systemctl restart xrdp
+
+echo "Adding descriptions" | log
+descriptionAppend "Please connect via Microsoft Remote Desktop"
+descriptionAppend " "
+descriptionAppend "Computer Address: ${SERVERIP}"
+descriptionAppend "Ubuntu user: root"
+descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
+descriptionAppend " "
+tagScript success
+
+exit 0

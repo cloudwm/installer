@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing xUbuntu Desktop" | log
+apt install -y xrdp xubuntu-desktop
+waitOrStop 0
+
+echo "Add XFCE4 Session to root user"
+echo /usr/bin/xfce4-session > /root/.xsession
+
+echo "Disable Compositing"
+mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
+cp $rootDir/tweaks/extras/xubuntu-desktop/xfwm4.xml /root/.config/xfce4/xfconf/xfce-perchannel-xml/
+
+echo "Restart xRDP service" | log
+systemctl restart xrdp
+
+echo "Adding descriptions" | log
+descriptionAppend "Please connect via Microsoft Remote Desktop"
+descriptionAppend " "
+descriptionAppend "Computer Address: ${SERVERIP}"
+descriptionAppend "Ubuntu user: root"
+descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
+descriptionAppend " "
+tagScript success
+
+exit 0
