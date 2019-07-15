@@ -87,12 +87,12 @@ function checkOs {
 
     if [[ "$OS $OSVersion" != *"Ubuntu"*"18" ]]; then
 
-        echo "$OS $OSVersion is not support, exiting. (1)" | log
+        echo "$OS $OSVersion is not supported, exiting. (1)" | log
         exit 1
         
     fi
 
-    echo "Found Supported OS: $OS $OSVersion" | log
+    echo "Found supported OS: $OS $OSVersion" | log
 
 }
 
@@ -189,7 +189,7 @@ function backupFile() {
     if [ -f "$1" ]; then
 
         rootDir=$(rootDir)
-        echo "Backuping file $1 to $rootDir/temp/backup/"
+        echo "Backing up file $1 to $rootDir/temp/backup/"
 
         fileDirectory=`dirname $1`
 
@@ -204,7 +204,7 @@ function backupFile() {
 
     else
 
-        echo "Backuping file $1 Failed. file doesn't exist."
+        echo "Backing up file $1 Failed. file doesn't exist."
 
     fi
 
