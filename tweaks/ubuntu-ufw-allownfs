@@ -11,17 +11,16 @@ echo "Check if LAN VLAN exists, open only LAN VLAN subnets in the firewall." | l
 
 if [ ! -z "$LANNICIDS" ]; then
 
-    for ip in $LANNICIDS;
-    do
+    for ip in $LANNICIDS; do
 
-	ipvar="ip$ip"
-	subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
+	    ipvar="ip$ip"
+	    subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
 
         ufw allow in to $subnet port 111
         ufw allow in to $subnet port 2049
 
-	unset ipvar
-	unset subnet
+	    unset ipvar
+	    unset subnet
 
     done
 
@@ -31,6 +30,7 @@ else
     echo "$lanText" | log
     descriptionAppend "NOTICE: $lanText"
     descriptionAppend " "
+    
 fi
 
 ufw status | log

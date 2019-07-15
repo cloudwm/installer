@@ -20,10 +20,11 @@ echo "Modifying virtual hosts to handle fpm" | log
 cp $rootDir/tweaks/extras/lamp/000-default.conf /etc/apache2/sites-available/
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' /etc/apache2/sites-available/000-default.conf
 
-if [ -f "$rootDir/temp/apache-enable-ssl.success" ];
-then
+if [ -f "$rootDir/temp/apache-enable-ssl.success" ]; then
+
     tweakFilePath=$rootDir/tweaks/extras/lamp/default-ssl-customize
     perl -i -p0e 's/\t\t#FPM_INSTALL_PLACEHOLDER/`cat $ARGV[0]`/se' -- /etc/apache2/sites-available/default-ssl.conf "$tweakFilePath"
+    
 fi
 
 systemctl restart apache2.service

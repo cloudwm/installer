@@ -12,8 +12,7 @@ checkTagExist ufw.success
 
 if [ ! -z "$LANNICIDS" ]; then
 
-    for ip in $LANNICIDS;
-    do
+    for ip in $LANNICIDS; do
 
         ipvar="ip$ip"
         subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`

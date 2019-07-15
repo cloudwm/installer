@@ -14,10 +14,13 @@
 case $1 in
   start)
     if [ -e /sys/block/sda/queue/read_ahead_kb ]; then
-      echo 0 > /sys/block/sda/queue/read_ahead_kb
-    else
-      return 0
-    fi
 
-    ;;
+      echo 0 > /sys/block/sda/queue/read_ahead_kb
+
+    else
+    
+      return 0
+
+    fi
+  ;;
 esac
