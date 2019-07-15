@@ -7,47 +7,50 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-ZONE=`grep "zone=" $CWMCONFIGFILE | cut -c 6-`
+if [ -f "$CWMCONFIGFILE" ]; then
 
-case  $ZONE  in
-    IL| IL-JR|IL-TA|IL-RH|IL-PT)
-        echo "Setting timezone for Israel" | log
-        timedatectl set-timezone "Asia/Jerusalem" | log
-    ;;
-    EU)
-        echo "Setting timezone for Amsterdam" | log
-        timedatectl set-timezone "Europe/Amsterdam" | log
-    ;;
-    EU-LO)
-        echo "Setting timezone for London" | log
-        timedatectl set-timezone "Europe/London" | log
-    ;;
-    EU-FR)
-        echo "Setting timezone for Frankfurt" | log
-        timedatectl set-timezone "Europe/Berlin" | log
-    ;;
-    US-NY2)
-        echo "Setting timezone for New York" | log
-        timedatectl set-timezone "America/New_York" | log
-    ;;
-    US-TX)
-        echo "Setting timezone for Austin" | log
-        timedatectl set-timezone "America/Chicago" | log
-    ;;
-    US-SC)
-        echo "Setting timezone for Santa-Clara" | log
-        timedatectl set-timezone "America/Los_Angeles" | log
-    ;;
-    CA-TR)
-        echo "Setting timezone for Toronto" | log
-        timedatectl set-timezone "America/Toronto" | log
-    ;;
-    AS)
-        echo "Setting timezone for Hong Kong" | log
-        timedatectl set-timezone "Asia/Hong_Kong" | log
-    ;;
-esac
+    ZONE=`grep "zone=" $CWMCONFIGFILE | cut -c 6-`
 
+    case  $ZONE  in
+        IL| IL-JR|IL-TA|IL-RH|IL-PT)
+            echo "Setting timezone for Israel" | log
+            timedatectl set-timezone "Asia/Jerusalem" | log
+        ;;
+        EU)
+            echo "Setting timezone for Amsterdam" | log
+            timedatectl set-timezone "Europe/Amsterdam" | log
+        ;;
+        EU-LO)
+            echo "Setting timezone for London" | log
+            timedatectl set-timezone "Europe/London" | log
+        ;;
+        EU-FR)
+            echo "Setting timezone for Frankfurt" | log
+            timedatectl set-timezone "Europe/Berlin" | log
+        ;;
+        US-NY2)
+            echo "Setting timezone for New York" | log
+            timedatectl set-timezone "America/New_York" | log
+        ;;
+        US-TX)
+            echo "Setting timezone for Austin" | log
+            timedatectl set-timezone "America/Chicago" | log
+        ;;
+        US-SC)
+            echo "Setting timezone for Santa-Clara" | log
+            timedatectl set-timezone "America/Los_Angeles" | log
+        ;;
+        CA-TR)
+            echo "Setting timezone for Toronto" | log
+            timedatectl set-timezone "America/Toronto" | log
+        ;;
+        AS)
+            echo "Setting timezone for Hong Kong" | log
+            timedatectl set-timezone "Asia/Hong_Kong" | log
+        ;;
+    esac
+
+fi
 
 tagScript success
 

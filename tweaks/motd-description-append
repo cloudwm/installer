@@ -6,15 +6,15 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-apt install -y update-motd | log
-waitOrStop 0
-
 rootDir=$(rootDir)
 descriptionMotd=/etc/update-motd.d/98-description
 
 echo "Adding $rootDir/DESCRIPTION.TXT to $descriptionMotd file" | log
 
 if [ -f "$rootDir/DESCRIPTION.TXT" ]; then
+
+    apt install -y update-motd | log
+    waitOrStop 0
 
     echo "#!/bin/sh" >> $descriptionMotd
     echo "echo \"=== System Description =======================================================\"" >> $descriptionMotd
@@ -31,10 +31,9 @@ if [ -f "$rootDir/DESCRIPTION.TXT" ]; then
     echo "echo \"To delete this message of the day: rm $descriptionMotd  \""  >> $descriptionMotd
 
     chmod +x $descriptionMotd
+    update-motd
 
 fi
-
-update-motd
 
 tagScript success
 

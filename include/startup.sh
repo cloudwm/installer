@@ -16,11 +16,11 @@ function rootDir() {
 
     if [ -f "installer" ]; then
 
-	rootDir=$(pwd)
+    	rootDir=$(pwd)
 
     elif [ -f "../installer" ]; then
 
-	rootDir=$(dirname $(pwd))
+	    rootDir=$(dirname $(pwd))
 
     fi
 
@@ -36,7 +36,7 @@ function checkTempDir() {
 
     if [ ! -d "$rootDir/temp" ]; then
 
-	mkdir $rootDir/temp
+	    mkdir $rootDir/temp
 
     fi
 
@@ -49,13 +49,13 @@ function log() {
 
     if [ -z "$logDir" ]; then
 
-	logDir="$rootDir/temp"
+	    logDir="$rootDir/temp"
 
     fi
 
     if [ ! -d "$logDir" ]; then 
 
-	mkdir $logDir
+	    mkdir $logDir
 
     fi
 
