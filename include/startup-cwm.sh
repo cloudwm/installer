@@ -138,14 +138,14 @@ function setServerDescriptionTXT() {
 
 function getServerIP() {
 
-    IPS=`cat $1 | grep ^ip.*=* | cut -f 2 -d"i" | cut -f 2 -d"p"`
+    if [ -z "$CONFIG" ]; then
 
-    if [ -z "$IPS" ]; then
-
-        hostname -I
+        hostname -I | awk '{print $1}'
         return 0
 
     fi
+    
+    IPS=`echo $CONFIG | grep ^ip.*=* | cut -f 2 -d"i" | cut -f 2 -d"p"`
 
     if [ ! -z "$WANNICIDS" ]; then
 
@@ -169,7 +169,12 @@ function getServerIP() {
 
 function getServerIPAll() {
 
-    echo `cat $CWMCONFIGFILE | grep ^ip.*=* | cut -f 2 -d"="`
+    if [ -z "$CONFIG" ]; then
+        hostname -I
+        return 0
+    fi
+        
+    echo $CONFIG | grep ^ip.*=* | cut -f 2 -d"="
 
 }
 
@@ -328,4 +333,4 @@ function curlDownload() {
 
 }
 
-SERVERIP="$(getServerIP $CWMCONFIGFILE)"
+SERVERIP="$(getServerIP)"
