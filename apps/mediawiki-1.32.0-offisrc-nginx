@@ -13,6 +13,8 @@ checkTagExist nginx-enable-php-ssl.success
 
 rootDir=$(rootDir)
 appPath=/var/www/html
+appVersion=1.32.3
+appArchive=mediawiki-$appVersion.tar.gz
 
 echo "Installing MediaWiki" | log
 
@@ -20,16 +22,16 @@ echo "Downloading MediaWiki from original repo" | log
 mkdir -p temp
 cd temp
 # curl -O https://releases.wikimedia.org/mediawiki/1.32/mediawiki-1.32.0.tar.gz
-curlDownload https://releases.wikimedia.org/mediawiki/1.32/mediawiki-1.32.0.tar.gz | log
+curlDownload https://releases.wikimedia.org/mediawiki/${appVersion:: -2}/$appArchive | log
 waitOrStop 0
 
 mkdir -p $appPath
-mv mediawiki-1.32.0.tar.gz $appPath 
+mv $appArchive $appPath 
 
 echo "Extracting MediaWiki to $appPath/" | log
-tar -xzvf $appPath/mediawiki-1.32.0.tar.gz -C $appPath/ --strip 1
+tar -xzvf $appPath/$appArchive -C $appPath/ --strip 1
 waitOrStop 0
-rm -f $appPath/mediawiki-1.32.0.tar.gz
+rm -f $appPath/$appArchive
 
 echo "Setting directory permissions" | log
 chown -R www-data.www-data $appPath/

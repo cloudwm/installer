@@ -14,6 +14,7 @@ checkTagExist nginx-enable-php-ssl.success
 rootDir=$(rootDir)
 currentDate=`date +"%Y-%m-%d %H:%M:%S"`
 appPath=/var/www/html
+appVersion=3-9-1
 
 echo "Installing Joomla" | log
 
@@ -21,7 +22,8 @@ echo "Downloading Joomla from original repo" | log
 
 cd $rootDir/temp
 # curl -Lo joomla.tgz https://downloads.joomla.org/cms/joomla3/3-9-1/joomla_3-9-1-stable-full_package-tar-gz?format=gz | log
-curlDownload https://downloads.joomla.org/cms/joomla3/3-9-1/joomla_3-9-1-stable-full_package-tar-gz?format=gz joomla.tgz | log
+# curlDownload https://downloads.joomla.org/cms/joomla3/3-9-1/joomla_3-9-1-stable-full_package-tar-gz?format=gz joomla.tgz | log
+curlDownload https://downloads.joomla.org/cms/joomla3/$appVersion/joomla_$appVersion-stable-full_package-tar-gz?format=gz joomla.tgz | log
 waitOrStop 0
 
 echo "Extracting Joomla to ${appPath}/" | log

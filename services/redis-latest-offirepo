@@ -6,13 +6,15 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+appVersion=5:5.0.\*
+
 echo "Adding Redis to apt" | log
 add-apt-repository ppa:chris-lea/redis-server -y | log
 waitOrStop 0
 apt update
 
 echo "Installing Redis" | log
-apt install redis -y | log
+apt install -y redis=$appVersion | log
 waitOrStop 0
 checkPackageInstalled redis
 

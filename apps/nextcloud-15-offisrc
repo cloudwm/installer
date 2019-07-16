@@ -12,18 +12,19 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
+appPath=/var/www/html
 
 echo "Downloading NextCloud 15" | log
 
-mkdir -p /var/www/html
+mkdir -p $appPath
 mkdir -p temp
 cd temp
 # curl -O https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
 curlDownload https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
-tar -xjvf latest-15.tar.bz2  -C /var/www/html/ --strip 1
+tar -xjvf latest-15.tar.bz2  -C $appPath/ --strip 1
 waitOrStop 0
-rm -f platest-15.tar.bz2 
-chown -R www-data:www-data /var/www/html
+rm -f latest-15.tar.bz2 
+chown -R www-data:www-data $appPath
 
 echo "Preparing database" | log
 
@@ -33,7 +34,7 @@ echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\""
 
 echo "Installing application" | log
 
-cd /var/www/html
+cd $appPath
 sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
 sudo -u www-data php occ db:convert-filecache-bigint --no-interaction
 
@@ -70,7 +71,7 @@ sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" $phpIniPath
 # modify www.conf settings
 sed -i '/env\[PATH\]/s/^;//g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 # Add Server IP to Trusted Servers
-sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${SERVERIP}',/" /var/www/html/config/config.php
+sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${SERVERIP}',/" $appPath/config/config.php
 
 systemctl restart php$phpVersion-fpm.service
 

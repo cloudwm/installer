@@ -11,19 +11,17 @@ checkOs
 checkRootUser
 runOnceCheck
 
-echo "checking app has all services dependencies" | log
 checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist php.success
 checkTagExist maild.success
 checkTagExist wp-cli.success
 
-echo "set variables and get guest.conf details" | log
 rootDir=$(rootDir)
 WP_PATH="/var/www/html"
 WPID=`shuf -i 100000-999999 -n 1`
 
-echo "set nginx config" | log
+echo "Setting nginx config" | log
 cp $rootDir/tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/sites-available/wordpress
 # Symlink wordpress vhost
 ln -s /etc/nginx/sites-available/wordpress /etc/nginx/sites-enabled/wordpress
@@ -35,31 +33,26 @@ rm -f /etc/nginx/sites-enabled/default-ssl
 service nginx restart
 waitOrStop 0
 
-echo "create mysql user and permissions" | log
-
+echo "Creating mysql user and permissions" | log
 echo "mysql --defaults-file=/root/.my.cnf -e \"create database wordpress_${WPID};\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -e \"grant all privileges on wordpress_${WPID}.* to wp_${WPID}@'localhost' identified by '"${ADMINPASSWORD}"';\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -e \"flush privileges;\"" | sh
 
 echo "Downloading wordpress and installing" | log
-
 wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 waitOrStop 0
-
 wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
 waitOrStop 0
-
 wp core multisite-install --url=http://${SERVERIP} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
 waitOrStop 0
 
-echo "fixing permissions" | log
-
+echo "Fixing app permissions" | log
 chown -R www-data:www-data ${WP_PATH}
 
-echo "cleanups" | log
-
+echo "Misc. cleanups" | log
 rm $WP_PATH/index.nginx-debian.html
 
+echo "Adding descriptions" | log
 descriptionAppend "Wordpress Login: http://${SERVERIP}/wp-login.php"
 descriptionAppend "Wordpress Admin Username: admin"
 descriptionAppend "Wordpress Admin password: ${ADMINPASSWORD}"

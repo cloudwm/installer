@@ -11,17 +11,21 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
+appVersion=3.2.7
+appArchive=phpBB-$appVersion.tar.bz2
+appPath=/var/www/html
+
 echo "Downloading PhpBB3" | log
-mkdir -p /var/www/html
+mkdir -p $appPath
 mkdir -p temp
 cd temp
 # curl -O https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
-curlDownload https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
+curlDownload https://www.phpbb.com/files/release/$appArchive | log
 waitOrStop 0
-tar -xjvf phpBB-3.2.5.tar.bz2  -C /var/www/html/ --strip 1
+tar -xjvf $appArchive  -C $appPath/ --strip 1
 waitOrStop 0
-rm -f phpBB-3.2.5.tar.bz2
-chown -R www-data:www-data /var/www/html
+rm -f $appArchive
+chown -R www-data:www-data $appPath
 
 echo "Preparing database" | log
 
@@ -31,7 +35,7 @@ echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\""
 
 echo "Installing PhpBB3" | log
 
-cat << EOF > /var/www/html/config.yml
+cat << EOF > ${appPath}/config.yml
 installer:
     admin:
         name: admin
@@ -72,15 +76,15 @@ installer:
     extensions: ['phpbb/viglink']
 EOF
 
-php /var/www/html/install/phpbbcli.php install /var/www/html/config.yml 
+php $appPath/install/phpbbcli.php install $appPath/config.yml 
 
 echo "Removing Install Files" | log
 
-rm -f /var/www/html/config.yml 
-rm -rf /var/www/html/install
-rm -rf /var/www/html/docs
-chmod 640 /var/www/html/config.php
-chown -R www-data:www-data /var/www/html
+rm -f $appPath/config.yml 
+rm -rf $appPath/install
+rm -rf $appPath/docs
+chmod 640 $appPath/config.php
+chown -R www-data:www-data $appPath
 
 echo "Adding descriptions" | log
 
