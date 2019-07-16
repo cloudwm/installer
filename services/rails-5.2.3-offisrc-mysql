@@ -12,7 +12,7 @@ checkTagExist mysql-server-5.7.success
 checkTagExist ruby.success
 
 rootDir=$(rootDir)
-mkdir -p $rootDir/temp
+# mkdir -p $rootDir/temp
 railsVersion=5.2.3
 export PATH=`cat /etc/environment | cut -d'"' -f 2`
 

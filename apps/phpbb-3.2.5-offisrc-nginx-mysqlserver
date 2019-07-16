@@ -17,7 +17,7 @@ appPath=/var/www/html
 
 echo "Downloading PhpBB3" | log
 mkdir -p $appPath
-mkdir -p temp
+# mkdir -p temp
 cd temp
 # curl -O https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
 curlDownload https://www.phpbb.com/files/release/$appArchive | log

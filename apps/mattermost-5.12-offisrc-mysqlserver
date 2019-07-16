@@ -21,7 +21,7 @@ echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES
 
 echo "Downloading and extracting application" | log
 mkdir -p $appPath
-mkdir -p temp
+# mkdir -p temp
 cd temp
 curlDownload https://releases.mattermost.com/$appVersion/mattermost-$appVersion-linux-amd64.tar.gz | log
 tar -xvzf mattermost*.gz

@@ -14,7 +14,7 @@ appPackage=openvpn-as-$appVersion-Ubuntu18.amd_64.deb
 
 echo "Downloading binary" | log
 
-mkdir -p temp
+# mkdir -p temp
 cd temp
 # curl -O http://swupdate.openvpn.org/as/openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
 curlDownload http://swupdate.openvpn.org/as/$appPackage | log

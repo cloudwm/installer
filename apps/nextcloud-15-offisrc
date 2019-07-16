@@ -17,7 +17,7 @@ appPath=/var/www/html
 echo "Downloading NextCloud 15" | log
 
 mkdir -p $appPath
-mkdir -p temp
+# mkdir -p temp
 cd temp
 # curl -O https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
 curlDownload https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log

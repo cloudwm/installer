@@ -29,7 +29,7 @@ checkPackageInstalled composer
 echo "Downloading latest Drupal" | log
 
 mkdir -p $appPath
-mkdir -p temp
+# mkdir -p temp
 cd temp
 # curl -o drupal.tar.gz https://www.drupal.org/download-latest/tar.gz -L
 # curlDownload https://www.drupal.org/download-latest/tar.gz drupal.tar.gz | log
