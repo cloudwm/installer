@@ -323,11 +323,11 @@ function curlDownload() {
     # allow for nameless and nameful downloads
     if [ -z "$2" ]; then 
 
-        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 60 --url $1 --remote-name 
+        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --remote-name 
 
     else
 
-        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 60 --url $1 --output $2
+        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --output $2
 
     fi
 
