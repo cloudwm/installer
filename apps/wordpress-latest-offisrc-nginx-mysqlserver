@@ -26,10 +26,8 @@ cp $rootDir/tweaks/extras/wordpress-nginx/wordpress-nginx-config /etc/nginx/site
 # Symlink wordpress vhost
 ln -s /etc/nginx/sites-available/wordpress /etc/nginx/sites-enabled/wordpress
 # Remove default vhosts
-rm -f /etc/nginx/sites-available/default
-rm -f /etc/nginx/sites-available/default-ssl
-rm -f /etc/nginx/sites-enabled/default
-rm -f /etc/nginx/sites-enabled/default-ssl
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
 service nginx restart
 waitOrStop 0
 
@@ -53,7 +51,7 @@ echo "Misc. cleanups" | log
 rm $WP_PATH/index.nginx-debian.html
 
 echo "Adding descriptions" | log
-descriptionAppend "Wordpress Login: http://${SERVERIP}/wp-login.php"
+descriptionAppend "Wordpress Login: https://${SERVERIP}/wp-login.php"
 descriptionAppend "Wordpress Admin Username: admin"
 descriptionAppend "Wordpress Admin password: ${ADMINPASSWORD}"
 descriptionAppend " "

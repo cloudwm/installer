@@ -89,10 +89,8 @@ perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/config/
 # Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 # Remove default vhosts
-rm -f /etc/nginx/sites-available/default
-rm -f /etc/nginx/sites-available/default-ssl
-rm -f /etc/nginx/sites-enabled/default
-rm -f /etc/nginx/sites-enabled/default-ssl
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
 
 systemctl restart nginx
 
