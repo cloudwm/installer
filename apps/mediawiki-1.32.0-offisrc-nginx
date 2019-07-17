@@ -11,16 +11,16 @@ checkTagExist php.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
-rootDir=$(rootDir)
 appPath=/var/www/html
 appVersion=1.32.3
 appArchive=mediawiki-$appVersion.tar.gz
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Installing MediaWiki" | log
 
 echo "Downloading MediaWiki from original repo" | log
-# mkdir -p temp
-cd temp
+cd $rootDir/temp
 # curl -O https://releases.wikimedia.org/mediawiki/1.32/mediawiki-1.32.0.tar.gz
 curlDownload https://releases.wikimedia.org/mediawiki/${appVersion:: -2}/$appArchive | log
 waitOrStop 0

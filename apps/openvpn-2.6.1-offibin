@@ -11,11 +11,11 @@ checkTagExist cwm-settimezone.success
 
 appVersion=2.6.1
 appPackage=openvpn-as-$appVersion-Ubuntu18.amd_64.deb
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Downloading binary" | log
-
-# mkdir -p temp
-cd temp
+cd $rootDir/temp
 # curl -O http://swupdate.openvpn.org/as/openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
 curlDownload http://swupdate.openvpn.org/as/$appPackage | log
 waitOrStop 0

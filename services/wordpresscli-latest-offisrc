@@ -9,8 +9,8 @@ fi
 checkTagExist php.success
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 checkPackageInstalled php$phpVersion-cli
-
 rootDir=$(rootDir)
+checkTempDir
 
 echo "install wp cli for wordpress" | log
 

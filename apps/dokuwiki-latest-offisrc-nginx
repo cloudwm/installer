@@ -10,14 +10,15 @@ checkTagExist nginx.success
 checkTagExist php.success
 checkTagExist nginx-enable-php-ssl.success
 
-rootDir=$(rootDir)
 versionFilename=dokuwiki-2018-04-22b.tgz
 appPath=/var/www/html
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Installing dokuwiki" | log
+
 echo "Downloading dokuwiki from original repo" | log
-# mkdir -p temp
-cd temp
+cd $rootDir/temp
 # curl -O https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz
 # curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz | log
 curlDownload https://download.dokuwiki.org/src/dokuwiki/$versionFilename | log

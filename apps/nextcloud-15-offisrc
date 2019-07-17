@@ -13,12 +13,12 @@ checkTagExist nginx-enable-php-ssl.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 appPath=/var/www/html
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Downloading NextCloud 15" | log
-
 mkdir -p $appPath
-# mkdir -p temp
-cd temp
+cd $rootDir/temp
 # curl -O https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
 curlDownload https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
 tar -xjvf latest-15.tar.bz2  -C $appPath/ --strip 1

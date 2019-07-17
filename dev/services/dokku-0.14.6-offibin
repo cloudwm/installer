@@ -9,13 +9,15 @@ fi
 checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
+rootDir=$(rootDir)
+checkTempDir
+
 echo "Adding hostname to /etc/hosts" | log
 echo "127.0.0.1   `hostname`" >> /etc/hosts
 
 echo "Installing application" | log
 
-# mkdir -p temp
-cd temp
+cd $rootDir/temp
 curl -O https://raw.githubusercontent.com/dokku/dokku/v0.14.6/bootstrap.sh
 DOKKU_TAG=v0.14.6 bash bootstrap.sh
 waitOrStop 0

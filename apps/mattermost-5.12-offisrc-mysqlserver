@@ -13,6 +13,8 @@ appVersion=5.12.4
 appPath=/opt/mattermost
 mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
+# rootDir=$(rootDir)
+checkTempDir
 
 echo "Preparing database for application" | log
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER '${mmuser_name}'@'127.0.0.1' IDENTIFIED BY '${mmuser_password}';\"" | sh
@@ -21,8 +23,7 @@ echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES
 
 echo "Downloading and extracting application" | log
 mkdir -p $appPath
-# mkdir -p temp
-cd temp
+cd $rootDir/temp
 curlDownload https://releases.mattermost.com/$appVersion/mattermost-$appVersion-linux-amd64.tar.gz | log
 tar -xvzf mattermost*.gz
 cd mattermost

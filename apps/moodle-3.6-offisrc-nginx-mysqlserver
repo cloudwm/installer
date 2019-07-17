@@ -12,13 +12,13 @@ checkTagExist php.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
-rootDir=$(rootDir)
 appPath=/var/www/html
 appVersion=3.6.5
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Downloading and extracting application" | log
-# mkdir -p temp
-cd temp
+cd $rootDir/temp
 # curl -LO https://download.moodle.org/stable36/moodle-3.6.3.tgz
 curlDownload https://download.moodle.org/stable36/moodle-$appVersion.tgz
 waitOrStop 0

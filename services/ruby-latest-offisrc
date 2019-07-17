@@ -7,10 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
-# mkdir -p $rootDir/temp
 rubyVersion=2.6.3
 rubyInstallPath=/opt/ruby-$rubyVersion
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Installing dependencies" | log
 apt install -y autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev
