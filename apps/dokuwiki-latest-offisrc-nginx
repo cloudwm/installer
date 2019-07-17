@@ -10,7 +10,7 @@ checkTagExist nginx.success
 checkTagExist php.success
 checkTagExist nginx-enable-php-ssl.success
 
-versionFilename=dokuwiki-2018-04-22b.tgz
+versionFilename=2018-04-22b
 appPath=/var/www/html
 rootDir=$(rootDir)
 checkTempDir
@@ -21,16 +21,16 @@ echo "Downloading DokuWiki from original repo" | log
 cd $rootDir/temp
 # curl -O https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz
 # curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz | log
-curlDownload https://download.dokuwiki.org/src/dokuwiki/$versionFilename | log
+curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-$versionFilename.tgz | log
 waitOrStop 0
 
 mkdir -p $appPath
-mv $versionFilename $appPath
+mv dokuwiki-$versionFilename.tgz $appPath
 
 echo "Extracting DokuWiki to ${appPath}/" | log
-tar -xzvf $appPath/$versionFilename -C $appPath/ --strip 1
+tar -xzvf $appPath/dokuwiki-$versionFilename.tgz -C $appPath/ --strip 1
 waitOrStop 0
-rm -f $appPath/$versionFilename
+rm -f $appPath/dokuwiki-$versionFilename.tgz
 
 echo "Setting directory permissions" | log
 chown -R www-data.www-data $appPath/data/
