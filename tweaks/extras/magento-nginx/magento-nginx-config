@@ -3,13 +3,12 @@ upstream fastcgi_backend {
 }
 
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    index index.php;
+    listen 80;
+    listen [::]:80;
     server_name _;
-    set $MAGE_ROOT /var/www/html;
-    include /etc/nginx/config/magento.conf.sample;
+    return 301 https://$host$request_uri;
 }
+
 server {
     listen 443 ssl default_server;
     listen [::]:443 ssl default_server;
