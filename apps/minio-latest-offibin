@@ -25,10 +25,9 @@ mkdir /etc/minio
 chown minio-user:minio-user /minio
 chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/minio/\"" >> /etc/default/minio
-modips=`getServerIPAll | awk 'NF{print $0 ":443"}'`
-finalips=$(join_by " " $modips)
-echo "MINIO_OPTS=\"-C /etc/minio --certs-dir /etc/minio/certs --address $finalips\"" >> /etc/default/minio
-
+ips=$(getServerIPAll)
+echo "MINIO_PUBLIC_IPS=${ips// /,}" >> /etc/default/minio
+echo "MINIO_OPTS=\"-C /etc/minio --certs-dir /etc/minio/certs --address :443\"" >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 echo "Adding Systemd Service" | log
