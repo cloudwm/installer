@@ -6,48 +6,48 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# Add Minio user
+echo "Adding Minio user" | log
 useradd --system minio-user --shell /sbin/nologin
 
-# Download Minio Binary
+echo "Download Minio Binary" | log
 # curl -O https://dl.minio.io/server/minio/release/linux-amd64/minio
 curlDownload https://dl.minio.io/server/minio/release/linux-amd64/minio | log
 waitOrStop 0
 
+echo "Install minio binary" | log
 mv minio /usr/local/bin
 chmod +x /usr/local/bin/minio
 chown minio-user:minio-user /usr/local/bin/minio
 
-# Create Configs
+echo "Creating Configs" | log
 mkdir /minio
 mkdir /etc/minio
 chown minio-user:minio-user /minio
 chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/minio/\"" >> /etc/default/minio
-modips=`getServerIPAll | awk 'NF{print $0 ":443"}'`
-finalips=$(join_by " " $modips)
-echo "MINIO_OPTS=\"-C /etc/minio --certs-dir /etc/minio/certs --address $finalips\"" >> /etc/default/minio
-
+ips=$(getServerIPAll)
+echo "MINIO_PUBLIC_IPS=${ips// /,}" >> /etc/default/minio
+echo "MINIO_OPTS=\"-C /etc/minio --certs-dir /etc/minio/certs --address :443\"" >> /etc/default/minio
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
-# Add Systemd Service
+echo "Adding Systemd Service" | log
 # curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
 curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service | log
 waitOrStop 0
-
 mv minio.service /etc/systemd/system
 
-# Generate self-signed certificate
+echo "Generating self-signed certificate" | log
 mkdir -p /etc/minio/certs/
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/minio/certs/private.key -out /etc/minio/certs/public.crt -days 1024 -nodes -subj '/CN=localhost'
 chown -R minio-user:minio-user /etc/minio/certs
 
-# Start Minio
+echo "Starting Minio service" | log
 systemctl enable minio
 systemctl start minio
 waitOrStop 0
-
 sleep 5
+
+echo "Adding descriptions" | log
 access_key=`cat /minio/.minio.sys/config/config.json | grep accessKey | sed -e 's/"accessKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
 secret_key=`cat /minio/.minio.sys/config/config.json | grep secretKey | sed -e 's/"secretKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
 

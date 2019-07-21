@@ -4,71 +4,60 @@ installerDir=$(dirname "`readlink -f $0`")
 
 . include/startup.sh
 
-if [ -z "$1" ]; 
-then
+if [ -z "$1" ]; then
 
-    if [ -f "./installer.conf" ];
-    then 
+    if [ ! -f "./installer.conf" ]; then 
 
-        . ./installer.conf
-
-    else
-
-	echo "installer.conf file not found." | log
-	echo "Usage: ./installer installer.config.file.conf"  | log
-
-	exit 1
-    
+		echo "installer.conf file not found." | log
+		echo "Usage: ./installer installer.config.file.conf"  | log
+		exit 1
     fi
-
+	
+	. ./installer.conf
+    
 else
 
-	if [ ! -f "$1" ];
-	then
+	if [ ! -f "$1" ]; then
+
 		echo "$1 file not found." | log
 		exit 1
-	else
-    	. $1
+
 	fi
+
+	. $1
 
 fi
 
 checkRootUser
 checkOs
 
-for run in "${execute[@]}"
-do
+for run in "${execute[@]}"; do
 
     echo "Executing ${run}" | log
     ${run}
     scriptExitCode=$?
 
     case "$scriptExitCode" in
-	0)
-	echo "Done. (0)" | log
-	continue;
-	;;
-
-	98)
-	echo "Exit Code 98. Script already executed, can run only once. Continuing. (98)" | log
-	continue;
-	;;
-
-
-	99)
-	echo "Exit Code 99. Continuing. (99)" | log
-	continue;
-	;;
-
-	127)
-	echo "Error. ${run} not found. dying. (127)" | log
-	exit 1;
-	;;
-
-	*)
-	echo "Exit Code not configured. Dying. ($scriptExitCode)" | log
-	exit 1
-	;;
-    esac
+		0)
+			echo "Done. (0)" | log
+			continue;
+		;;
+		98)
+			echo "Exit Code 98. Script already executed, can run only once. Continuing. (98)" | log
+			continue;
+		;;
+		99)
+			echo "Exit Code 99. Continuing. (99)" | log
+			continue;
+		;;
+		127)
+			echo "Error. ${run} not found. dying. (127)" | log
+			exit 1;
+		;;
+		*)
+			echo "Exit Code not configured. Dying. ($scriptExitCode)" | log
+			exit 1
+		;;
+	esac
 
 done

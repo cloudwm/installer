@@ -11,12 +11,12 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
-rootDir=$(rootDir)
 appPath=/var/www/html
 appVersion=2.3.1
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Creating Magento Database" | log
-
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"create database magentodb;\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"create user magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
@@ -29,8 +29,7 @@ checkPackageInstalled composer
 
 echo "Downloading Magento ${appVersion} from github repo" | log
 mkdir -p $appPath
-mkdir -p temp
-cd temp
+cd $rootDir/temp
 # curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
 curlDownload https://codeload.github.com/magento/magento2/tar.gz/$appVersion $appVersion.tar.gz | log
 waitOrStop 0
@@ -55,7 +54,7 @@ composer install -v | log
 waitOrStop 0
 
 echo "Installing Magento" | log
-$appPath/bin/magento setup:install --base-url-secure=https://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=America/Chicago --use-rewrites=1 --use-secure=1 --use-secure-admin=1 | log
+$appPath/bin/magento setup:install --base-url-secure=https://${SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=$(cat /etc/timezone) --use-rewrites=1 --use-secure=1 --use-secure-admin=1 | log
 
 ADMIN_URI=`grep "Admin URI:" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
 # ADMIN_URI=`php /var/www/html/bin/magento info:adminuri | rev | cut -d ' ' -f 1 | rev`
@@ -68,7 +67,7 @@ find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
 chown -R www-data:www-data .
 chmod u+x bin/magento
 
-echo "disable sign static files and force cache refresh" | log
+echo "Disabling sign static files and forcing cache refresh" | log
 cd $appPath
 bin/magento config:set dev/static/sign 0
 curl ${SERVERIP} > /dev/null
@@ -77,7 +76,7 @@ bin/magento setup:static-content:deploy -f
 bin/magento cache:clean
 waitOrStop 0
 
-echo "setting nginx config" | log
+echo "Setting nginx config" | log
 # main magento config
 cp $rootDir/tweaks/extras/magento-nginx/magento-nginx-config /etc/nginx/sites-available/magento
 # specific configs supplied by magento install, included by main magento config
@@ -89,13 +88,11 @@ perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/config/
 # Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 # Remove default vhosts
-rm -f /etc/nginx/sites-available/default
-rm -f /etc/nginx/sites-available/default-ssl
-rm -f /etc/nginx/sites-enabled/default
-rm -f /etc/nginx/sites-enabled/default-ssl
-
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
+echo "Adding descriptions" | log
 descriptionAppend "Magento Admin URI: https://${SERVERIP}${ADMIN_URI}"
 descriptionAppend "Magento Admin Email: ${ADMINEMAIL}"
 descriptionAppend "Magento Admin User: admin"

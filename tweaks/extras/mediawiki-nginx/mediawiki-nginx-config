@@ -1,14 +1,8 @@
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    listen 80;
+    listen [::]:80;
     server_name _;
-    root /var/www/html;
-    client_max_body_size 5m;
-    client_body_timeout 60;
-    index index.php;
-
-    include /etc/nginx/config/mediawiki-locations.conf;
-
+    return 301 https://$host$request_uri;
 }
 
 server {

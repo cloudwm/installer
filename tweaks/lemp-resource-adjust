@@ -9,17 +9,19 @@ fi
 
 rootDir=$(rootDir)
 
-if [ -f "$rootDir/temp/php-fpm.success" ];
-then
+if [ -f "$rootDir/temp/php-fpm.success" ]; then
+
     installerPathPhp="/opt/php-fpm-autoconfig"
     sed -i "s/^serviceRamUsage=[0-9]\+$/serviceRamUsage=50/" $installerPathPhp/php-fpm-autoconfig
+
 fi
 
-if [ -f "$rootDir/temp/mysqld.success" ];
-then
+if [ -f "$rootDir/temp/mysqld.success" ]; then
+
     installerPathMysql="/opt/mysql-server-autoconfig"
     sed -i "s/^serviceRamUsage=[0-9]\+$/serviceRamUsage=50/" $installerPathMysql/mysql-server-autoconfig
     sed -i "s/^serviceCpuUsage=[0-9]\+$/serviceCpuUsage=50/" $installerPathMysql/mysql-server-autoconfig
+    
 fi
 
 tagScript success

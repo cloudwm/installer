@@ -8,18 +8,16 @@ fi
 
 checkTagExist nginx.success
 rootDir=$(rootDir)
-erlangVersion="1:22.0.3-1"
-rabbitmqVersion="3.7.15-1"
+erlangVersion=1:22.0.\*
+rabbitmqVersion=3.7.\*
 
-echo "Add repository" | log
-
+echo "Adding RabbitMQ repository" | log
 apt-key adv --keyserver "hkps.pool.sks-keyservers.net" --recv-keys "0x6B73A36E6026DFCA"
 echo "deb https://dl.bintray.com/rabbitmq-erlang/debian bionic erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list
 echo "deb https://dl.bintray.com/rabbitmq/debian bionic main" >> /etc/apt/sources.list.d/bintray.rabbitmq.list
 apt update
 
-echo "Install Erlang & Rabbitmq" | log
-
+echo "Installing Erlang & Rabbitmq" | log
 # install erlang package
 apt install -y erlang-nox=$erlangVersion
 waitOrStop 0
@@ -31,14 +29,13 @@ checkPackageInstalled rabbitmq-server
 # enable web ui plugin
 rabbitmq-plugins enable rabbitmq_management
 
-echo "Add admin user" | log
-
+echo "Adding admin user" | log
 rabbitmqctl add_user admin $ADMINPASSWORD
 rabbitmqctl set_user_tags admin administrator
 rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
 rabbitmqctl delete_user guest
 
-echo "Open web UI to remote access" | log
+echo "Opening web UI to remote access" | log
 cp -f $rootDir/tweaks/extras/rabbitmq-nginx/rabbitmq-nginx-config /etc/nginx/sites-available/rabbitmq-nginx.conf
 ln -s /etc/nginx/sites-available/rabbitmq-nginx.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
@@ -46,7 +43,6 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 
 echo "Starting Rabbitmq service" | log
-
 systemctl enable rabbitmq-server
 systemctl start rabbitmq-server
 
