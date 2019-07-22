@@ -14,7 +14,7 @@ elasticVersion="7.1.1"
 kibanaVersion="7.1.1"
 
 echo "Adding repo to apt" | log
-curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch | log
+curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch
 waitOrStop 0
 apt-key add GPG-KEY-elasticsearch
 echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list

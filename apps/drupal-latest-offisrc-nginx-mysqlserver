@@ -31,7 +31,7 @@ mkdir -p $appPath
 cd $rootDir/temp
 # curl -o drupal.tar.gz https://www.drupal.org/download-latest/tar.gz -L
 # curlDownload https://www.drupal.org/download-latest/tar.gz drupal.tar.gz | log
-curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.gz | log
+curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.gz
 waitOrStop 0
 
 echo "Extracting Drupal to $appPath" | log

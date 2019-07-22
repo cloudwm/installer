@@ -22,7 +22,7 @@ echo "Installing MediaWiki" | log
 echo "Downloading MediaWiki from original repo" | log
 cd $rootDir/temp
 # curl -O https://releases.wikimedia.org/mediawiki/1.32/mediawiki-1.32.0.tar.gz
-curlDownload https://releases.wikimedia.org/mediawiki/${appVersion:: -2}/$appArchive | log
+curlDownload https://releases.wikimedia.org/mediawiki/${appVersion:: -2}/$appArchive
 waitOrStop 0
 mkdir -p $appPath
 mv $appArchive $appPath 

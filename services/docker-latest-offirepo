@@ -10,7 +10,7 @@ appVersion=5:18.09.\*
 
 echo "Downloading docker repository and key" | log
 # curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-curlDownload https://download.docker.com/linux/ubuntu/gpg | log
+curlDownload https://download.docker.com/linux/ubuntu/gpg
 waitOrStop 0
 apt-key add gpg
 
