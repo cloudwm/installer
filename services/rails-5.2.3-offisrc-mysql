@@ -18,7 +18,7 @@ checkTempDir
 
 echo "Installing Yarn for package management" | log
 cd $rootDir/temp
-curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg | log
+curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg
 waitOrStop 0
 apt-key add pubkey.gpg
 echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list

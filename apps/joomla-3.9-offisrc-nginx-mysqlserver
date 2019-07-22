@@ -23,7 +23,7 @@ echo "Downloading Joomla from original repo" | log
 cd $rootDir/temp
 # curl -Lo joomla.tgz https://downloads.joomla.org/cms/joomla3/3-9-1/joomla_3-9-1-stable-full_package-tar-gz?format=gz | log
 # NOTICE: there's been a change of route paths between older 3-9-1 and 3-9-10, not just different versions
-curlDownload https://downloads.joomla.org/cms/joomla3/$appVersion/joomla_$appVersion-stable-full_package.tar.gz?format=gz joomla.tgz | log
+curlDownload https://downloads.joomla.org/cms/joomla3/$appVersion/joomla_$appVersion-stable-full_package.tar.gz?format=gz joomla.tgz
 waitOrStop 0
 
 echo "Extracting Joomla to ${appPath}/" | log

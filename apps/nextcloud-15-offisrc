@@ -21,7 +21,7 @@ echo "Downloading NextCloud 15" | log
 mkdir -p $appPath
 cd $rootDir/temp
 # curl -O https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
-curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2 | log
+curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
 tar -xjvf nextcloud-$appVersion.tar.bz2 -C $appPath/ --strip 1
 waitOrStop 0
 rm -f nextcloud-$appVersion.tar.bz2

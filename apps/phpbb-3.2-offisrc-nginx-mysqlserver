@@ -21,7 +21,7 @@ echo "Downloading PhpBB3" | log
 mkdir -p $appPath
 cd $rootDir/temp
 # curl -O https://www.phpbb.com/files/release/phpBB-3.2.5.tar.bz2 | log
-curlDownload https://www.phpbb.com/files/release/$appArchive | log
+curlDownload https://www.phpbb.com/files/release/$appArchive
 waitOrStop 0
 tar -xjvf $appArchive  -C $appPath/ --strip 1
 waitOrStop 0
