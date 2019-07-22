@@ -6,16 +6,19 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+
 echo "Adding Minio user" | log
 useradd --system minio-user --shell /sbin/nologin
 
 echo "Download Minio Binary" | log
+cd $rootDir/temp
 # curl -O https://dl.minio.io/server/minio/release/linux-amd64/minio
 curlDownload https://dl.minio.io/server/minio/release/linux-amd64/minio | log
 waitOrStop 0
 
 echo "Install minio binary" | log
-mv minio /usr/local/bin
+mv $rootDir/temp/minio /usr/local/bin
 chmod +x /usr/local/bin/minio
 chown minio-user:minio-user /usr/local/bin/minio
 

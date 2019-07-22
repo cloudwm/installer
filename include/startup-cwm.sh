@@ -323,15 +323,24 @@ function curlDownload() {
     # allow for nameless and nameful downloads
     if [ -z "$2" ]; then 
 
-        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --remote-name 
+        httpResponse=$(curl --fail --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --remote-name)
+        local exitCode=$?
 
     else
 
-        curl --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --output $2
+        httpResponse=$(curl --fail --location --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --output $2)
+        local exitCode=$?
 
     fi
 
-    return $?
+    if [ "$exitCode" != "0" ] || [ "$httpResponse" != "200" ]; then
+
+        echo "Download failed with exitCode:$exitCode and httpResponse:$httpResponse"
+        return 1
+        
+    fi
+
+    return 0
 
 }
 
