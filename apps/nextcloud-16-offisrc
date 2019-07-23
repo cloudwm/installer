@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-appVersion=15.0.10
+appVersion=16.0.3
 appPath=/var/www/html
 rootDir=$(rootDir)
 checkTempDir
@@ -24,7 +24,7 @@ cd $rootDir/temp
 curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
 tar -xjvf nextcloud-$appVersion.tar.bz2 -C $appPath/ --strip 1
 waitOrStop 0
-rm -f nextcloud-$appVersion.tar.bz2
+rm -f nextcloud-$appVersion.tar.bz2 
 chown -R www-data:www-data $appPath
 
 echo "Preparing database" | log

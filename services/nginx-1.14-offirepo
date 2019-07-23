@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 appPath=/var/www/html
-nginxVersion="1.14.2-0+bionic1"
+nginxVersion=1.14.\*
 
 echo "Adding nginx repo to apt" | log
 add-apt-repository -y ppa:nginx/stable | log

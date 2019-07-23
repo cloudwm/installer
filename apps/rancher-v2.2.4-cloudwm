@@ -69,10 +69,11 @@ echo "Listing available Node drivers" | log
 CURRENTDRIVERS=`curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
-for url in ${CURRENTDRIVERS}
-    do 
-        curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
-    done
+for url in ${CURRENTDRIVERS}; do 
+
+    curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
+
+done
 
 echo "Adding Kamatera Docker Machine Driver" | log
 curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.2/docker-machine-driver-kamatera_v1.0.2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
@@ -81,10 +82,11 @@ echo "Listing available Kubernetes drivers" | log
 CURRENTDRIVERS=`curl -s "https://${activemachine}/v3/kontainerdrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
-for url in ${CURRENTDRIVERS}
-    do 
-        curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
-    done
+for url in ${CURRENTDRIVERS}; do 
+
+    curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
+
+done
 
 # Currently not working due to some bug in rancher, need to investigate
 # echo "Creating Kamatera Control Plane Template" | log

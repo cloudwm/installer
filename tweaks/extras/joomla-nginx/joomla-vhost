@@ -1,48 +1,17 @@
+
 server {
-        listen 80 default_server;
-        listen [::]:80 default_server;
-        server_name _;
-        server_name_in_redirect off;
-        # Maximum file upload size is 8MB - change accordingly if needed
-        client_max_body_size 8M;
-        client_body_buffer_size 128k;
-        root /var/www/html;
-        index index.php index.html index.htm default.html default.htm;
-        # Support Clean (aka Search Engine Friendly) URLs
-        location / {
-                try_files $uri $uri/ /index.php?$args;
-        }
-
-        # deny running scripts inside writable directories
-        location ~* /(images|cache|media|logs|tmp)/.*\.(php|pl|py|jsp|asp|sh|cgi)$ {
-                return 403;
-                error_page 403 /403_error.html;
-        }
-
-        location ~ \.php$ {
-            fastcgi_pass  127.0.0.1:9000;
-            fastcgi_index index.php;
-            include fastcgi_params;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            include /etc/nginx/fastcgi.conf;
-        }
-
-        # caching of files 
-        location ~* \.(ico|pdf|flv)$ {
-                expires 1y;
-        }
-
-        location ~* \.(js|css|png|jpg|jpeg|gif|swf|xml|txt)$ {
-                expires 14d;
-        }
-
+    listen 80;
+    listen [::]:80;
+    server_name _;
+    return 301 https://$host$request_uri;
 }
+
 server {
         listen 443 ssl default_server;
         listen [::]:443 ssl default_server;
         server_name _;
         # Maximum file upload size is 8MB - change accordingly if needed
-        client_max_body_size 8M;
+        client_max_body_size 100M;
         client_body_buffer_size 128k;
         ssl_certificate      /etc/ssl/certs/server.crt;
         ssl_certificate_key  /etc/ssl/private/server.key;

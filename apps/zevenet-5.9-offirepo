@@ -6,18 +6,18 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
-mkdir -p $rootDir/temp
 appPath=/usr/local/zevenet
 appVersion=5.9.\*
 freePort=4444
 aptSourceList=/etc/apt/sources.list.d/zevenet.list
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Backup ip settings" | log
 cp /etc/network/interfaces $rootDir/temp/interfaces
 
 echo "Add zevenet repository" | log
-curlDownload http://repo.zevenet.com/zevenet.com.gpg.key | log
+curlDownload http://repo.zevenet.com/zevenet.com.gpg.key
 waitOrStop 0
 apt-key add zevenet.com.gpg.key
 echo "deb http://repo.zevenet.com/ce/v5/ buster main" >> $aptSourceList
@@ -31,17 +31,17 @@ waitOrStop 0
 echo "Installing dependencies manually" | log
 cd $rootDir/temp
 libnftnl=libnftnl11_1.1.2-2_amd64.deb
-curlDownload http://ftp.debian.org/debian/pool/main/libn/libnftnl/$libnftnl $libnftnl | log
+curlDownload http://ftp.debian.org/debian/pool/main/libn/libnftnl/$libnftnl $libnftnl
 waitOrStop 0
 dpkg -i $libnftnl
 rm -rf $libnftnl
 libnftables=libnftables0_0.9.0-2_amd64.deb
-curlDownload http://ftp.debian.org/debian/pool/main/n/nftables/$libnftables $libnftables | log
+curlDownload http://ftp.debian.org/debian/pool/main/n/nftables/$libnftables $libnftables
 waitOrStop 0
 dpkg -i $libnftables
 rm -rf $libnftables
 nftlb=nftlb_0.3-1_amd64.deb
-curlDownload http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/$nftlb $nftlb | log 
+curlDownload http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/$nftlb $nftlb
 waitOrStop 0
 dpkg -i $nftlb
 rm -rf $nftlb

@@ -16,11 +16,11 @@ function rootDir() {
 
     if [ -f "installer" ]; then
 
-	rootDir=$(pwd)
+    	rootDir=$(pwd)
 
     elif [ -f "../installer" ]; then
 
-	rootDir=$(dirname $(pwd))
+	    rootDir=$(dirname $(pwd))
 
     fi
 
@@ -36,7 +36,7 @@ function checkTempDir() {
 
     if [ ! -d "$rootDir/temp" ]; then
 
-	mkdir $rootDir/temp
+	    mkdir $rootDir/temp
 
     fi
 
@@ -49,13 +49,13 @@ function log() {
 
     if [ -z "$logDir" ]; then
 
-	logDir="$rootDir/temp"
+	    logDir="$rootDir/temp"
 
     fi
 
     if [ ! -d "$logDir" ]; then 
 
-	mkdir $logDir
+	    mkdir $logDir
 
     fi
 
@@ -78,25 +78,23 @@ function checkOs {
 
     echo "Checking if OS is supported ..." | log
 
-    if [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; 
-    then
+    if [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; then
 
-	OS=Ubuntu
-	OSVersion=$(lsb_release -sr | awk -F. '{print $1}')
+    	OS=Ubuntu
+    	OSVersion=$(lsb_release -sr | awk -F. '{print $1}')
 
     fi
 
-    if [[ "$OS $OSVersion" != *"Ubuntu"*"18" ]];
-    then
+    if [[ "$OS $OSVersion" != *"Ubuntu"*"18" ]]; then
 
-        echo "$OS $OSVersion is not support, exiting. (1)" | log
+        echo "$OS $OSVersion is not supported, exiting. (1)" | log
         exit 1
+        
     fi
 
-    echo "Found Supported OS: $OS $OSVersion" | log
+    echo "Found supported OS: $OS $OSVersion" | log
 
 }
-
 
 function rebootSystem() {
 
@@ -107,10 +105,9 @@ function rebootSystem() {
 
 function useFiglet() {
 
-    if [ ! -f "/usr/bin/figlet-figlet" ]; 
-    then
+    if [ ! -f "/usr/bin/figlet-figlet" ]; then
 
-	echo "Figlet not found, installing figlet." | log
+	    echo "Figlet not found, installing figlet." | log
         apt install figlet -y
 
     fi
@@ -119,13 +116,11 @@ function useFiglet() {
 
 function bannerFiglet() {
 
-    if [ -f "/usr/bin/figlet" ];
-    then
+    if [ -f "/usr/bin/figlet" ]; then
         echo -e $1 | figlet -f big
     fi
 
 }
-
 
 function descriptionAppend() {
 
@@ -140,26 +135,24 @@ function tagScript() {
 
     rootDir=$(rootDir)
     touch $rootDir/temp/`basename $0`.$1
-}
 
+}
 
 function runOnceCheck() {
 
     state=$1
 
-    if [ -z "$state" ]; 
-    then
+    if [ -z "$state" ]; then
 
-	state="success"
+	    state="success"
 
     fi
 
     rootDir=$(rootDir)
-    if [ -f "$rootDir/temp/`basename $0`.$state" ]; 
-    then
+    if [ -f "$rootDir/temp/`basename $0`.$state" ]; then
 
-	echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.$state to execute again." | log
-	echo "execution stopped, exiting (98). " | log
+	    echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.$state to execute again." | log
+	    echo "execution stopped, exiting (98). " | log
         exit 98;
 
     fi
@@ -177,16 +170,15 @@ function tag() {
 function checkTagExist() {
 
     rootDir=$(rootDir)
-    if [ ! -f "$rootDir/temp/$1" ];
-    then
+    if [ ! -f "$rootDir/temp/$1" ]; then
 
-	echo "checkTagExist: Tag temp/$1 doesn't exist." | log
-	echo "execution stopped, exiting (1). " | log
+	    echo "checkTagExist: Tag temp/$1 doesn't exist." | log
+	    echo "execution stopped, exiting (1). " | log
         exit 1;
 
     else
 
-	echo "checkTagExist: Tag temp/$1 exist. continuing." | log
+	    echo "checkTagExist: Tag temp/$1 exist. continuing." | log
 
     fi
 
@@ -197,22 +189,22 @@ function backupFile() {
     if [ -f "$1" ]; then
 
         rootDir=$(rootDir)
-        echo "Backuping file $1 to $rootDir/temp/backup/"
+        echo "Backing up file $1 to $rootDir/temp/backup/"
 
         fileDirectory=`dirname $1`
 
         if [ ! -d "$rootDir/temp/backup/$fileDirectory" ]; then 
 
-	mkdir -p $rootDir/temp/backup/$fileDirectory
+	        mkdir -p $rootDir/temp/backup/$fileDirectory
 
         fi
 
-	newFilename=`basename $1`.`date +%Y%m%d%H%M%S`
+	    newFilename=`basename $1`.`date +%Y%m%d%H%M%S`
         cp $1 $rootDir/temp/backup/$fileDirectory/$newFilename
 
     else
 
-        echo "Backuping file $1 Failed. file doesn't exist."
+        echo "Backing up file $1 Failed. file doesn't exist."
 
     fi
 
@@ -223,10 +215,9 @@ function waitOrStop() {
     exitCode=$?
     waitExitCode=$1
 
-    if [ "$waitExitCode" != "$exitCode" ];
-    then
+    if [ "$waitExitCode" != "$exitCode" ]; then
 
-	echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log
+	    echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log
         exit 1;
 
     fi
@@ -235,18 +226,16 @@ function waitOrStop() {
 
 function checkPackageInstalled() {
 
-    if [ ! -z "$1" ];
-    then
+    if [ ! -z "$1" ]; then
 
-	package=`dpkg -l $1 | grep "ii.*$1 "`
+	    package=`dpkg -l $1 | grep "ii.*$1 "`
 
-	if [ -z "$package" ];
-	then
+	    if [ -z "$package" ]; then
 	
-	    echo "Package $1 is not installed. exiting (1)." | log
-	    exit 1;
+	        echo "Package $1 is not installed. exiting (1)." | log
+	        exit 1;
 
-	fi
+	    fi
 
     fi
 

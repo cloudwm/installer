@@ -27,13 +27,11 @@ echo "Installing mysql from apt" | log
 apt update
 apt install -y mysql-server | log
 waitOrStop 0
-
 checkPackageInstalled mysql-server
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 
-if [ ! -f ~/.my.cnf ];
-then
+if [ ! -f ~/.my.cnf ]; then
 
 cat << EOF > ~/.my.cnf
 [client]
@@ -70,8 +68,7 @@ echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"ALTER USER 'root'@'l
 
 echo "Setting some defaults to mysqld-installer.cnf" | log
 
-if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ];
-then
+if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ]; then
 
 cat << EOF > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
 [mysqld]

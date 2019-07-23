@@ -11,38 +11,35 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
-rootDir=$(rootDir)
 appPath=/var/www/html
+versionFilename=8.7.4
+rootDir=$(rootDir)
+checkTempDir
 
 echo "Creating Drupal Database" | log
-
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON drupal.* TO 'drupaluser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
 echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 
 echo "Installing Composer for machine" | log
-
 apt install composer  -y | log
 waitOrStop 0
 checkPackageInstalled composer
 
 echo "Downloading latest Drupal" | log
-
 mkdir -p $appPath
-mkdir -p temp
-cd temp
+cd $rootDir/temp
 # curl -o drupal.tar.gz https://www.drupal.org/download-latest/tar.gz -L
-curlDownload https://www.drupal.org/download-latest/tar.gz drupal.tar.gz | log
+# curlDownload https://www.drupal.org/download-latest/tar.gz drupal.tar.gz | log
+curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.gz
 waitOrStop 0
 
 echo "Extracting Drupal to $appPath" | log
-
-tar -xzvf drupal.tar.gz -C $appPath/ --strip 1
+tar -xzvf drupal-$versionFilename.tar.gz -C $appPath/ --strip 1
 waitOrStop 0
-rm -f drupal.tar.gz
+rm -f drupal-$versionFilename.tar.gz
 
 echo "Setting misc definitions & permissions for Drupal" | log
-
 cd $appPath/sites/default
 cp default.settings.php settings.php
 cp default.services.yml services.yml
@@ -51,7 +48,6 @@ chmod a+w *
 chown -R www-data:www-data files
 
 echo "Create temp swap for composer processes" | log
-
 #increase vm swappiness to allow swap to dominate process
 sysctl vm.swappiness=80
 # create swap file and moint as partition
@@ -60,14 +56,12 @@ sleep 5
 waitOrStop 0
 
 echo "Installing Drush" | log
-
 cd $appPath
 export COMPOSER_HOME=/root
 composer require drush/drush -v | log
 waitOrStop 0
 
 echo "Creating Website" | log
-
 cd $appPath
 # site install
 export HOME=$appPath
@@ -78,9 +72,11 @@ vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
 # permissions and cleanup
 rm index.nginx-debian.html
 chown -R www-data:www-data .
+cat << EOF >> ${appPath}/sites/default/settings.php
+\$settings['trusted_host_patterns'] = ['^${SERVERIP}$'];
+EOF
 
 echo "Setting nginx config" | log
-
 #main drupal config
 cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
 # specific configs supplied by nginx for drupal
@@ -89,15 +85,11 @@ cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/d
 # Symlink drupal vhost
 ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
 # Remove default vhosts
-rm -f /etc/nginx/sites-available/default
-rm -f /etc/nginx/sites-available/default-ssl
-rm -f /etc/nginx/sites-enabled/default
-rm -f /etc/nginx/sites-enabled/default-ssl
-
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
 
 echo "Remove temp swap" | log
-
 # set vm swappiness to recommended optimal case
 sysctl vm.swappiness=10
 # mount off and remove swap file 
@@ -105,6 +97,7 @@ removeSwapFile $swapFilename
 sleep 5
 waitOrStop 0
 
+echo "Adding descriptions" | log
 descriptionAppend "Drupal Admin URI: https://${SERVERIP}/user/login"
 descriptionAppend "Drupal Admin User: admin"
 descriptionAppend "Drupal Admin Password: ${ADMINPASSWORD}"

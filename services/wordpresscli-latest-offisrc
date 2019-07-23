@@ -9,25 +9,26 @@ fi
 checkTagExist php.success
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 checkPackageInstalled php$phpVersion-cli
-
 rootDir=$(rootDir)
+checkTempDir
 
 echo "install wp cli for wordpress" | log
 
 cd $rootDir/temp
 # curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-curlDownload https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar | log
+curlDownload https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
 waitOrStop 0
 chmod +x wp-cli.phar
 mv wp-cli.phar /usr/local/bin/wp
 
 echo "check binary existence of wp cli" | log
 
-if [ -f "/usr/local/bin/wp" ]; then
-	tag wp-cli.success
-	tagScript success
-	exit 0
-else 
+if [ ! -f "/usr/local/bin/wp" ]; then
 	echo "Failed installing wp-cli"
 	exit 1
 fi
+
+tag wp-cli.success
+tagScript success
+
+exit 0

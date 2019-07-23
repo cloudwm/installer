@@ -9,18 +9,21 @@ fi
 checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
-echo "Downloading binary" | log
+appVersion=2.6.1
+appPackage=openvpn-as-$appVersion-Ubuntu18.amd_64.deb
+rootDir=$(rootDir)
+checkTempDir
 
-mkdir -p temp
-cd temp
+echo "Downloading binary" | log
+cd $rootDir/temp
 # curl -O http://swupdate.openvpn.org/as/openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
-curlDownload http://swupdate.openvpn.org/as/openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
+curlDownload http://swupdate.openvpn.org/as/$appPackage
 waitOrStop 0
 
 echo "Installing application" | log
 
-dpkg -i openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
-rm -f openvpn-as-2.6.1-Ubuntu18.amd_64.deb
+dpkg -i $appPackage | log
+rm -f $appPackage
 
 echo "Configuring first user" | log
 

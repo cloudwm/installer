@@ -12,16 +12,15 @@ checkTagExist ufw.success
 
 if [ ! -z "$LANNICIDS" ]; then
 
-    for ip in $LANNICIDS;
-    do
+    for ip in $LANNICIDS; do
 
-	ipvar="ip$ip"
-	subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
+	    ipvar="ip$ip"
+	    subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
 
-    ufw allow in to $subnet port 6379
+        ufw allow in to $subnet port 6379
 
-	unset ipvar
-	unset subnet
+	    unset ipvar
+	    unset subnet
 
     done
 
