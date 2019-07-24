@@ -7,8 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
-
 echo "Installing update-motd" | log
 apt install -y update-motd
 waitOrStop 0
@@ -24,15 +22,6 @@ echo -e "\n$(/usr/lib/update-notifier/apt-check --human-readable)\n" > /var/lib/
 
 update-motd
 
-if [ -f "$rootDir/DESCRIPTION.TXT" ]; then
-
-    echo "Updating description in CWM backend" | log
-    appendServerDescriptionTXT
-    # descriptions=$(cat $rootDir/DESCRIPTION.TXT)
-    # updateServerDescription "$descriptions"
-    # appendServerDescription "$descriptions"
-
-fi 
 tagScript success
 
 exit 0
