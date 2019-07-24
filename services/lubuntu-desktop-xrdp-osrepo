@@ -6,16 +6,19 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+
 echo "Installing lubuntu Desktop" | log
 apt install -y xrdp lubuntu-desktop
 waitOrStop 0
 
-echo "Add LXDE Session to root user"
+echo "Add LXDE Session to root user" | log
 echo lxsession -s Lubuntu > /root/.xsession
 
-echo "Configuring default theme"
+echo "Configuring default theme" | log
 cp $rootDir/tweaks/extras/lubuntu-desktop/lubuntu-config.tgz /root/
-cd /root/ && tar -xvzf lubuntu-config.tgz
+cd /root/ 
+tar -xvzf lubuntu-config.tgz
 rm -f /root/lubuntu-config.tgz
 chown -R root.root /root
 mkdir -p /root/Desktop /root/Documents /root/Downloads /root/Music /root/Pictures /root/Public /root/Templates /root/Videos
@@ -30,6 +33,7 @@ descriptionAppend "Computer Address: ${SERVERIP}"
 descriptionAppend "Ubuntu user: root"
 descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
 descriptionAppend " "
+
 tagScript success
 
 exit 0
