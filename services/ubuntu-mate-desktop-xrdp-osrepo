@@ -7,10 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-pkgVersion=1.225
 
 echo "Installing Ubuntu Mate Desktop" | log
-apt install -y xrdp ubuntu-mate-desktop=$pkgVersion
+apt install -y xrdp ubuntu-mate-desktop
 waitOrStop 0
 
 echo "Add Mate Session to root user" | log

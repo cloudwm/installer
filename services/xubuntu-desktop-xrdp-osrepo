@@ -7,10 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-pkgVersion=2.225
 
 echo "Installing xUbuntu Desktop" | log
-apt install -y xrdp xubuntu-desktop=$pkgVersion
+apt install -y xrdp xubuntu-desktop
 waitOrStop 0
 
 echo "Add XFCE4 Session to root user" | log

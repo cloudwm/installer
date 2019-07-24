@@ -7,10 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-pkgVersion=0.94.1
 
 echo "Installing lubuntu Desktop" | log
-apt install -y xrdp lubuntu-desktop=$pkgVersion
+apt install -y xrdp lubuntu-desktop
 waitOrStop 0
 
 echo "Add LXDE Session to root user" | log
