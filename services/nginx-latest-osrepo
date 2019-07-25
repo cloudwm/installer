@@ -13,7 +13,7 @@ echo "install nginx from apt" | log
 apt install -y nginx-full=$nginxVersion | log
 waitOrStop 0
 
-checkPackageInstalled nginx
+checkPackageInstalled nginx-full
 
 echo "Changing ownership of $appPath to www-data user" | log
 if [ -d "$appPath" ]; then
