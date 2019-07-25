@@ -6,21 +6,25 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install nginx from apt
-apt install nginx -y | log
+appPath=/var/www/html
+nginxVersion=1.14.\*
+
+echo "install nginx from apt" | log
+apt install -y nginx-full=$nginxVersion | log
 waitOrStop 0
 
 checkPackageInstalled nginx
 
-echo "Changing ownership of /var/www/html to www-data user" | log
-if [ -d "/var/www/html" ]; then
-    chown -R www-data:www-data /var/www/html
+echo "Changing ownership of $appPath to www-data user" | log
+if [ -d "$appPath" ]; then
+    chown -R www-data:www-data $appPath
 fi
 
 echo "Adding descriptions" | log
 descriptionAppend "NGINX configuration location: /etc/nginx/"
-if [ -d "/var/www/html" ]; then
-    descriptionAppend "NGINX root Directory: /var/www/html/"
+
+if [ -d "$appPath" ]; then
+    descriptionAppend "NGINX root Directory: $appPath/"
 fi
 descriptionAppend " "
 
