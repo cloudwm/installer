@@ -52,7 +52,7 @@ function updateServerDescription() {
 
     if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]]; then
 
-        curl -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" -d $'description='"$1"
+        curl -v --location -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" -d $'description='"$1"
         errorCode=$?
 
         if [ $errorCode != '0' ]; then
@@ -77,7 +77,7 @@ function getServerDescription() {
 
     if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]]; then
 
-        description=`curl -f -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}" "https://$CWMSITE/svc/server/$UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
+        description=`curl -v --location -f -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}" "https://$CWMSITE/svc/server/$UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
         errorCode=$?
 
         if [ $errorCode != '0' ]; then
@@ -101,7 +101,8 @@ function getServerDescription() {
 function appendServerDescription() {
 
     description=`getServerDescription`
-    updateServerDescription "$description $1"
+    fulltext=$(echo -e "$description\\n$1")
+    updateServerDescription "$fulltext"
 
 }
 
@@ -117,7 +118,8 @@ function appendServerDescriptionTXT() {
     fi
 
     description=`getServerDescription`
-    updateServerDescription "$description $fileContent"
+    fulltext=$(echo -e "$description\\n$fileContent")
+    updateServerDescription "$fulltext"
 
 }
 
