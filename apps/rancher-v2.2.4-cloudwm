@@ -51,7 +51,7 @@ ${datacenter}
 
 EOF
 
-activemachine=`docker-machine ls | grep rancher-admin-${datacenter} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | awk '{ print "rancher."$1".cloud-xip.io" }'`
+activemachine=`docker-machine ls | grep rancher-admin-${datacenter} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"`
 
 echo "Waiting for Rancher to intialize" | log
 HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure`
