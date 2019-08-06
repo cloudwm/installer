@@ -17,9 +17,15 @@ rootDir=$(rootDir)
 checkTempDir
 
 echo "Creating Drupal Database" | log
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON drupal.* TO 'drupaluser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON drupal.* TO 'drupaluser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON drupal.* TO 'drupaluser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+EOF
 
 echo "Installing Composer for machine" | log
 apt install composer  -y | log

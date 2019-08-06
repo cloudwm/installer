@@ -29,10 +29,14 @@ rm -f $appArchive
 chown -R www-data:www-data $appPath
 
 echo "Preparing database" | log
-
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE phpbb3 CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON phpbb3.* TO 'phpbb3'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE phpbb3 CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON phpbb3.* TO 'phpbb3'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE phpbb3 CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+GRANT ALL ON phpbb3.* TO 'phpbb3'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+EOF
 
 echo "Installing PhpBB3" | log
 
