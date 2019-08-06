@@ -9,7 +9,9 @@ fi
 checkTagExist ubuntu-updateos.success
 
 echo "Installing mysql from apt" | log
-
+export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "mysql-server-5.7 mysql-server/root_password password ${ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-server-5.7 mysql-server/root_password_again password ${ADMINPASSWORD}"
 apt install mysql-server-5.7 -y | log
 waitOrStop 0
 
@@ -21,7 +23,7 @@ if [ ! -f ~/.my.cnf ]; then
 cat << EOF > ~/.my.cnf
 [client]
 user=root
-password=${ADMINPASSWORD}
+password='${ADMINPASSWORD}'
 EOF
 
 fi
@@ -30,26 +32,24 @@ echo "Running first setup process" | log
 
 mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
 n
-${ADMINPASSWORD}
-${ADMINPASSWORD}
-y
-y
-y
 n
+y
+y
+y
+y
 EOF
 
-# expect "Press y|Y for Yes, any other key for No:"
-# expect "New password:"
-# expect "Re-enter new password:"
-# expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
-# expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
-# expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) :"
-# expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+# "Validate password plugin?" n
+# "New password?" n
+# "Remove anonymous users?" y
+# "Disallow root login remotely?" y
+# "Remove test database and access to it?" y
+# "Reload privilege tables now?" y
 
-echo "Set Password for root, using echo for string manipulation, mysql_secure will not set it for mysql 5.7" | log
+# echo "Set Password for root, using echo for string manipulation, mysql_secure will not set it for mysql 5.7" | log
 
-# echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" |sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" | sh
+# # echo "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" |sh
+# # echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" | sh
 
 
 echo "Setting some defaults to mysqld-installer.cnf" | log
