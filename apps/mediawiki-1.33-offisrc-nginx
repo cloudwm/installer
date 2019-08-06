@@ -38,10 +38,16 @@ find  $appPath/ -type f -exec chmod 644 {} \;
 find  $appPath/ -type d -exec chmod 755 {} \;
 
 echo "Creating MediaWiki Database" | log
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE wikidb;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'wikiuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON wikidb.* TO 'wikiuser'@'localhost' WITH GRANT OPTION;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE wikidb;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'wikiuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON wikidb.* TO 'wikiuser'@'localhost' WITH GRANT OPTION;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE wikidb;
+CREATE USER 'wikiuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+GRANT ALL PRIVILEGES ON wikidb.* TO 'wikiuser'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
 
 echo "Installing MediaWiki" | log
 echo "cd $appPath && php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath=\"\" --server https://${SERVERIP} \"MediaWiki\" \"admin\"" | sh

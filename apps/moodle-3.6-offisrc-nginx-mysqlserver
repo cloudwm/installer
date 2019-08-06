@@ -31,10 +31,16 @@ chown -R www-data:www-data $appPath/moodle/
 chmod -R 755 $appPath/moodle/
 
 echo "Setting database and db user " | log
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE moodle;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON moodle.* TO 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}' WITH GRANT OPTION;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"FLUSH PRIVILEGES;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE moodle;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON moodle.* TO 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}' WITH GRANT OPTION;\"" | sh
+# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"FLUSH PRIVILEGES;\"" | sh
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE moodle;
+CREATE USER 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+GRANT ALL ON moodle.* TO 'moodleuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
 
 echo "Tweaking PHP settings" | log
 ini=$(find /etc -type f -name "php.ini" | grep fpm)
