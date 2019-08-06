@@ -39,7 +39,6 @@ fi
 echo "Running first setup process" | log
 
 mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
-${ADMINPASSWORD}
 n
 n
 y
@@ -48,13 +47,12 @@ y
 y
 EOF
 
-# expect "Enter password for user root:"
-# expect "Press y|Y for Yes, any other key for No:"
-# expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
-# expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
-# expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
-# expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
-# expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+# "Validate password plugin?" n
+# "New password?" n
+# "Remove anonymous users?" y
+# "Disallow root login remotely?" y
+# "Remove test database and access to it?" y
+# "Reload privilege tables now?" y
 
 echo "Setting Password method for root" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
