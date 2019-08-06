@@ -9,34 +9,29 @@ fi
 checkTagExist ubuntu-updateos.success
 
 echo "Adding official repository packages to apt" | log
-
 cat << EOF > /etc/apt/sources.list.d/mysql.list
 deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-apt-config
 deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-8.0
 deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-tools
 EOF
-
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8C718D3B5072E1F5
 
+echo "Installing mysql from apt" | log
 export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
-
-echo "Installing mysql from apt" | log
-
 apt update
 apt install -y mysql-server | log
 waitOrStop 0
 checkPackageInstalled mysql-server
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
-
 if [ ! -f ~/.my.cnf ]; then
 
 cat << EOF > ~/.my.cnf
 [client]
 user=root
-password=${ADMINPASSWORD}
+password='${ADMINPASSWORD}'
 EOF
 
 fi
@@ -44,7 +39,6 @@ fi
 echo "Running first setup process" | log
 
 mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
-${ADMINPASSWORD}
 n
 n
 y
@@ -53,21 +47,20 @@ y
 y
 EOF
 
-# expect "Enter password for user root:"
-# expect "Press y|Y for Yes, any other key for No:"
-# expect "Change the password for root ? ((Press y|Y for Yes, any other key for No) :"
-# expect "Remove anonymous users? (Press y|Y for Yes, any other key for No) :"
-# expect "Disallow root login remotely? (Press y|Y for Yes, any other key for No) :"
-# expect "Remove test database and access to it? (Press y|Y for Yes, any other key for No) : "
-# expect "Reload privilege tables now? (Press y|Y for Yes, any other key for No) :"
+# "Validate password plugin?" n
+# "New password?" n
+# "Remove anonymous users?" y
+# "Disallow root login remotely?" y
+# "Remove test database and access to it?" y
+# "Reload privilege tables now?" y
 
 echo "Setting Password method for root" | log
-
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$ADMINPASSWORD';\"" | sh
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
+EOF
 
 
 echo "Setting some defaults to mysqld-installer.cnf" | log
-
 if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ]; then
 
 cat << EOF > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
@@ -79,16 +72,13 @@ EOF
 fi
 
 echo "Restarting mysql.service" | log
-
 systemctl restart mysql.service
 
 echo "adding descriptions" | log
-
 descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-
 
 tag mysql-server-8.0.success
 tag mysqld.success
