@@ -14,7 +14,7 @@ if [ -f "$CWMCONFIGFILE" ]; then
 
     CWMSITE=$url
     ADMINEMAIL=$email
-    ADMINPASSWORD='$password'
+    ADMINPASSWORD=$password
     ZONE=$zone
     VMNAME=$name
     WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
