@@ -50,7 +50,8 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Installing MediaWiki" | log
-echo "cd $appPath && php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath=\"\" --server https://${SERVERIP} \"MediaWiki\" \"admin\"" | sh
+cd $appPath
+php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath="" --server https://${SERVERIP} "MediaWiki" "admin"
 echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php 
 
 echo "Creating nginx configuration" | log
