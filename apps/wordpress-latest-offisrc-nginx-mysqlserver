@@ -32,12 +32,9 @@ service nginx restart
 waitOrStop 0
 
 echo "Creating mysql user and permissions" | log
-# echo "mysql --defaults-file=/root/.my.cnf -e \"create database wordpress_${WPID};\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -e \"grant all privileges on wordpress_${WPID}.* to wp_${WPID}@'localhost' identified by '"${ADMINPASSWORD}"';\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -e \"flush privileges;\"" | sh
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE wordpress_${WPID};
-GRANT all privileges on wordpress_${WPID}.* to wp_${WPID}@'localhost' identified by '"${ADMINPASSWORD}"';
+GRANT all privileges on wordpress_${WPID}.* to wp_${WPID}@'localhost' identified by '${ADMINPASSWORD}';
 FLUSH PRIVILEGES;
 EOF
 

@@ -17,10 +17,6 @@ rootDir=$(rootDir)
 checkTempDir
 
 echo "Creating Magento Database" | log
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"create database magentodb;\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"create user magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"grant all privileges on magentodb.* to magentouser@localhost identified by '${ADMINPASSWORD}';\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE magentodb;
 CREATE USER magentouser@localhost identified by '${ADMINPASSWORD}';
