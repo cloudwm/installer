@@ -30,7 +30,8 @@ ufw allow 8404
 echo "Placing annotated config file" | log
 mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
 cp -f $rootDir/tweaks/extras/haproxy/haproxy.cfg /etc/haproxy/
-sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:'"${ADMINPASSWORD}"'/g' /etc/haproxy/haproxy.cfg
+pass=$(echo ${ADMINPASSWORD} | sed 's|[\\"$#'"'"']|\\\\&|g')
+sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
 service haproxy reload
 
 echo "Adding descriptions" | log

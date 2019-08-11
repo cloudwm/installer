@@ -32,9 +32,11 @@ waitOrStop 0
 rm -f joomla.tgz
 
 echo "Creating Joomla Database" | log
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE joomla CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON joomla.* TO 'joomla'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE joomla CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+GRANT ALL ON joomla.* TO 'joomla'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+EOF
 
 echo "Configuring Joomla for first use" | log
 cp $rootDir/tweaks/extras/joomla-nginx/configuration.php $appPath/configuration.php
@@ -43,7 +45,9 @@ sed -i "s/some@mail.com/${ADMINEMAIL}/g" $appPath/configuration.php
 mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
 waitOrStop 0
 
-echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);\"" | sh
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);
+EOF
 
 echo "Setting permissions and cleanup" | log
 rm -rf $appPath/installation/
