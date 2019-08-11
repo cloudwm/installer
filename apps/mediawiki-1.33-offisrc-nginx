@@ -38,10 +38,6 @@ find  $appPath/ -type f -exec chmod 644 {} \;
 find  $appPath/ -type d -exec chmod 755 {} \;
 
 echo "Creating MediaWiki Database" | log
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE wikidb;\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'wikiuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON wikidb.* TO 'wikiuser'@'localhost' WITH GRANT OPTION;\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE wikidb;
 CREATE USER 'wikiuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';

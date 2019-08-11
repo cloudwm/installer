@@ -28,9 +28,6 @@ rm -f nextcloud-$appVersion.tar.bz2
 chown -R www-data:www-data $appPath
 
 echo "Preparing database" | log
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE nextcloud CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL ON nextcloud.* TO 'nextcloud'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"flush privileges;\"" | sh
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE nextcloud CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 GRANT ALL ON nextcloud.* TO 'nextcloud'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';

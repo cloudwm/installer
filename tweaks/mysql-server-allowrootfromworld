@@ -10,11 +10,6 @@ fi
 runOnceCheck
 
 echo "Allow connecting to mySQL with user root from anywhere." | log
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"use mysql; UPDATE user set Host = '%' where User = 'root';\"" |sh
-
-# echo "Flushing privileges." | log
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \" flush privileges;\"" |sh
-
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 USE mysql;
 UPDATE USER set Host = '%' where User = 'root';

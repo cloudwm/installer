@@ -25,10 +25,6 @@ git clone https://github.com/redmine/redmine.git -b 4.0-stable | log
 waitOrStop 0
 
 echo "Creating Database and user" | log
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE DATABASE redmine CHARACTER SET utf8mb4;\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';\"" | sh
-# echo "mysql --defaults-file=/root/.my.cnf -h localhost -e \"FLUSH PRIVILEGES;\"" | sh
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE redmine CHARACTER SET utf8mb4;
 CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
