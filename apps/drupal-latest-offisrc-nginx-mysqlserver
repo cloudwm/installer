@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-versionFilename=8.7.5
+versionFilename=8.7.6
 rootDir=$(rootDir)
 checkTempDir
 drupaluser_password="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')"
