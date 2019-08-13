@@ -26,10 +26,9 @@ cp $scriptPath/extras/$scriptName/* $installerPath/
 
 echo "Setting rc.local to the renamed file if installer is running in a provisioning process." | log
 
+rcLocalFile=/etc/rc.local	
 if [ -f "$rcLocalFile.bck" ]; then
     rcLocalFile=/etc/rc.local.bck
-else
-	rcLocalFile=/etc/rc.local	
 fi
 
 if [[ ! -z $(grep $scriptName $rcLocalFile) ]]; then
