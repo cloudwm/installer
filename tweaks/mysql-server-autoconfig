@@ -9,50 +9,42 @@ fi
 
 runOnceCheck
 
-if [ -z "$MYSQLAUTOCONFIG_DIR" ]; then
-    MYSQLAUTOCONFIG_DIR=/opt/mysql-server-autoconfig
+scriptName=$(basename $BASH_SOURCE)
+scriptPath=$(dirname $BASH_SOURCE)
+
+echo "Checking existing startup scripts folder" | log
+
+if [ -z "$installerPath" ]; then
+	installerPath=/opt/$scriptName
 fi
 
-if [ ! -d $MYSQLAUTOCONFIG_DIR ]; then
-    mkdir -p $MYSQLAUTOCONFIG_DIR
+if [ ! -d "$installerPath" ]; then
+	mkdir -p $installerPath
 fi
 
-rootDir=$(rootDir)
+cp $scriptPath/extras/$scriptName/* $installerPath/
 
-echo "Copying mysql-server-autoconfig to $MYSQLAUTOCONFIG_DIR" | log
+echo "Setting rc.local to the renamed file if installer is running in a provisioning process." | log
 
-cp -f $rootDir/tweaks/extras/mysql-server-autoconfig/* $MYSQLAUTOCONFIG_DIR
-
-echo "Tweaking rc.local" | log
-
-# If installer is running in a provisioning process, set rc.local file to the renamed file.
-
-if [ -f /etc/rc.local.bck ]; then
-    RCLOCALFILE=/etc/rc.local.bck
+if [ -f "$rcLocalFile.bck" ]; then
+    rcLocalFile=/etc/rc.local.bck
 else
-    RCLOCALFILE=/etc/rc.local
+	rcLocalFile=/etc/rc.local	
 fi
 
-# install in rc.local file
-
-if [[ -z `cat $RCLOCALFILE | grep mysql-server-autoconfig` ]]; then
-
-    echo "Installing mysql-server-autoconfig in /etc/rc.local" | log
-
+if [[ ! -z $(grep $scriptName $rcLocalFile) ]]; then
+    echo "$0 is already installed in rc.local" | log
+else
+    echo "Installing $scriptName in rc.local" | log
     # remove "exit 0" set by default in /etc/rc.local/
-    sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
-    echo "bash $MYSQLAUTOCONFIG_DIR/mysql-server-autoconfig" >> $RCLOCALFILE
-
+    sed -i -e '/exit 0/s/.*//' $rcLocalFile
+    echo "bash $installerPath/$scriptName" >> $rcLocalFile
     # return exit 0 to /etc/rc.local
-    echo "exit 0" >> $RCLOCALFILE
-
-else
-
-    echo "$0 is already installed in /etc/rc.local" | log
-
+    echo "exit 0" >> $rcLocalFile
 fi
 
-descriptionAppend "mysql-server-autoconfig script: ${MYSQLAUTOCONFIG_DIR}/mysql-server-autoconfig"
+echo "Adding descriptions" | log
+descriptionAppend "$scriptName script: $installerPath/$scriptName"
 descriptionAppend " "
 
 tagScript success
