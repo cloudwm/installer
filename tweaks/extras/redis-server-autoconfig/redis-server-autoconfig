@@ -28,5 +28,5 @@ if [ "$serviceCpuConsume" -lt "1" ]; then
 fi
 
 echo "Setting redis.conf/maxmemory to $serviceRamConsumeBytes bytes" | logger -s
-sed -i -e '/^# maxmemory <bytes>/s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
-sed -i -e '/^maxmemory /s/.*/maxmemory '$serviceRamConsumeBytes'/' /etc/redis/redis.conf
+sed -i -e '/^# maxmemory <bytes>/s/.*/maxmemory '$serviceRamConsumeBytes'/' $REDISCONF
+sed -i -e '/^maxmemory /s/.*/maxmemory '$serviceRamConsumeBytes'/' $REDISCONF
