@@ -8,8 +8,8 @@ if [[ -z "$service" ]]; then
     exit 1
 fi
 
-# php-fpm-autocnfig path
-INSTALLER_PATH="/opt/php-fpm-autoconfig"
+# php-fpm-autoconfig path
+autoconfigPath=/opt/installer/autoconfig/php-fpm-autoconfig
 
 # Configure the amount of RAM the service will ignore and reserve to OS or other applications (in MB).
 reserveRam=300
@@ -39,11 +39,11 @@ currentmem=`awk '/memory_limit/' $ini`
 
 ### override settings of this script ###
 
-overridemem=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/memory/'`
-overridemaxchild=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.max_children/'`
-overridestartsrv=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.start_servers/'`
-overrideminsparesrv=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.min_spare_servers/'`
-overridemaxsparesrv=`awk '!/#/' $INSTALLER_PATH/php.ini | awk '/pm.max_spare_servers/'`
+overridemem=`awk '!/#/' $autoconfigPath/php.ini | awk '/memory/'`
+overridemaxchild=`awk '!/#/' $autoconfigPath/php.ini | awk '/pm.max_children/'`
+overridestartsrv=`awk '!/#/' $autoconfigPath/php.ini | awk '/pm.start_servers/'`
+overrideminsparesrv=`awk '!/#/' $autoconfigPath/php.ini | awk '/pm.min_spare_servers/'`
+overridemaxsparesrv=`awk '!/#/' $autoconfigPath/php.ini | awk '/pm.max_spare_servers/'`
 
 ### read fpm settings ###
 

@@ -9,20 +9,20 @@ fi
 
 runOnceCheck
 
+rootDir=$(rootDir)
 scriptName=$(basename $BASH_SOURCE)
-scriptPath=$(dirname $BASH_SOURCE)
 
 echo "Checking existing startup scripts folder" | log
 
 if [ -z "$installerPath" ]; then
-	installerPath=/opt/$scriptName
+	installerPath=$rootDir/autoconfig/$scriptName
 fi
 
 if [ ! -d "$installerPath" ]; then
 	mkdir -p $installerPath
 fi
 
-cp $scriptPath/extras/$scriptName/* $installerPath/
+cp $rootDir/tweaks/extras/$scriptName/* $installerPath/
 
 echo "Setting rc.local to the renamed file if installer is running in a provisioning process." | log
 

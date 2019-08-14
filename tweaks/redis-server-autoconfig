@@ -9,45 +9,42 @@ fi
 
 runOnceCheck
 
-if [ -z "$REDISAUTOCONFIG_DIR" ]; then
-    REDISAUTOCONFIG_DIR=/opt/redis-server-autoconfig
-fi
-
-if [ ! -d $REDISAUTOCONFIG_DIR ]; then
-
-    mkdir -p $REDISAUTOCONFIG_DIR
-fi
-
 rootDir=$(rootDir)
-echo "Copying redis-server-autoconfig to $REDISAUTOCONFIG_DIR" | log
-cp -f $rootDir/tweaks/extras/redis-server-autoconfig/* $REDISAUTOCONFIG_DIR
+scriptName=$(basename $BASH_SOURCE)
 
-# If installer is running in a provisioning process, set rc.local file to the renamed file.
+echo "Checking existing startup scripts folder" | log
 
-if [ -f /etc/rc.local.bck ]; then
-    RCLOCALFILE=/etc/rc.local.bck
-else
-    RCLOCALFILE=/etc/rc.local
+if [ -z "$installerPath" ]; then
+	installerPath=$rootDir/autoconfig/$scriptName
 fi
 
-# install in rc.local file
+if [ ! -d "$installerPath" ]; then
+	mkdir -p $installerPath
+fi
 
-if [[ -z `cat /etc/rc.local | grep redis-server-autoconfig` ]]; then
+cp $rootDir/tweaks/extras/$scriptName/* $installerPath/
 
-    echo "Installing redis-server-autoconfig in /etc/rc.local" | log
+echo "Setting rc.local to the renamed file if installer is running in a provisioning process." | log
 
+rcLocalFile=/etc/rc.local	
+if [ -f "$rcLocalFile.bck" ]; then
+    rcLocalFile=/etc/rc.local.bck
+fi
+
+if [[ ! -z $(grep $scriptName $rcLocalFile) ]]; then
+    echo "$0 is already installed in rc.local" | log
+else
+    echo "Installing $scriptName in rc.local" | log
     # remove "exit 0" set by default in /etc/rc.local/
-    sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
-    echo "$REDISAUTOCONFIG_DIR/redis-server-autoconfig" >> $RCLOCALFILE
-
+    sed -i -e '/exit 0/s/.*//' $rcLocalFile
+    echo "bash $installerPath/$scriptName" >> $rcLocalFile
     # return exit 0 to /etc/rc.local
-    echo "exit 0" >> $RCLOCALFILE
-
-else
-
-    echo "$0 is already installed in /etc/rc.local" | log
-
+    echo "exit 0" >> $rcLocalFile
 fi
+
+echo "Adding descriptions" | log
+descriptionAppend "$scriptName script: $installerPath/$scriptName"
+descriptionAppend " "
 
 tagScript success
 

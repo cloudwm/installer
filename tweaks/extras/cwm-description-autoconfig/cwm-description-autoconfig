@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd /opt/installer 
+cd /opt/installer/autoconfig 
 
 # Add this at the begining of all scripts.
 if [ -f "include/startup.sh" ]; then
