@@ -42,10 +42,6 @@ else
     echo "exit 0" >> $rcLocalFile
 fi
 
-echo "Adding descriptions" | log
-descriptionAppend "$scriptName script: $installerPath/$scriptName"
-descriptionAppend " "
-
 tagScript success
 
 exit 0
