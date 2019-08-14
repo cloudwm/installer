@@ -30,3 +30,9 @@ fi
 echo "Setting redis.conf/maxmemory to $serviceRamConsumeBytes bytes" | logger -s
 sed -i -e '/^# maxmemory <bytes>/s/.*/maxmemory '$serviceRamConsumeBytes'/' $REDISCONF
 sed -i -e '/^maxmemory /s/.*/maxmemory '$serviceRamConsumeBytes'/' $REDISCONF
+
+# disable script after first run
+scriptName=$(basename $BASH_SOURCE)
+rcLocalFile=/etc/rc.local	
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck

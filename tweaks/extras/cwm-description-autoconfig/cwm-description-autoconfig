@@ -16,6 +16,12 @@ fi
 echo "Updating description in CWM backend" | log
 appendServerDescriptionTXT
 
+# disable script after first run
+scriptName=$(basename $BASH_SOURCE)
+rcLocalFile=/etc/rc.local	
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck
+
 tagScript success
 
 exit 0

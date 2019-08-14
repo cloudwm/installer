@@ -111,4 +111,10 @@ else
     sed -i "s/$currentmem/$overridemem/g" $ini
 fi
 
+# disable script after first run
+scriptName=$(basename $BASH_SOURCE)
+rcLocalFile=/etc/rc.local	
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck
+
 exit 0
