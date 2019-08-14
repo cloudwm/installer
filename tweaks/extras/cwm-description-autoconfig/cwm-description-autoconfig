@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd /opt/installer 
+
 # Add this at the begining of all scripts.
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
