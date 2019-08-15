@@ -42,9 +42,6 @@ else
     echo "exit 0" >> $rcLocalFile
 fi
 
-# systemctl enable rc-local
-# systemctl start rc-local.service
-
 tagScript success
 
 exit 0
