@@ -118,7 +118,7 @@ function appendServerDescriptionTXT() {
     fi
 
     description=`getServerDescription`
-    fulltext=$(echo -e "$description\\n$fileContent")
+    fulltext=$(echo -e "$description\\n\\n$fileContent")
     updateServerDescription "$fulltext"
 
 }

@@ -33,9 +33,6 @@ if [ -f "$rootDir/DESCRIPTION.TXT" ]; then
     chmod +x $descriptionMotd
     update-motd
 
-    echo "Updating description in CWM backend" | log
-    appendServerDescriptionTXT
-
 fi
 
 tagScript success

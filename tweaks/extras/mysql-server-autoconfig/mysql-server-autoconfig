@@ -72,3 +72,9 @@ EOF
 
 # Restart mysql
 systemctl restart mysql
+
+# disable script after first run
+scriptName=$(basename $BASH_SOURCE)
+rcLocalFile=/etc/rc.local	
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck
