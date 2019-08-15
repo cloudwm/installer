@@ -8,16 +8,9 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Installing Ubuntu Mate Desktop" | log
-apt install -y xrdp ubuntu-mate-desktop
+echo "Installing xRDP service" | log
+apt install -y xrdp
 waitOrStop 0
-
-echo "Add Mate Session to root user" | log
-echo mate-session > /root/.xsession
-
-echo "Disable Compositing" | log
-mkdir -p /root/.config/dconf
-cp $rootDir/tweaks/extras/ubuntu-mate-desktop/user /root/.config/dconf/
 
 echo "Restart xRDP service" | log
 systemctl restart xrdp
