@@ -14,7 +14,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 # delay script until cwm api connection established
-sleep 45
+sleep 30
 
 echo "Updating description in CWM backend" | log
 appendServerDescriptionTXT
