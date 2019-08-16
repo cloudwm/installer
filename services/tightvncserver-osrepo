@@ -24,8 +24,8 @@ echo "Fixing VNC Cursor" | log
 sed -i 's/xsetroot/& -cursor_name left_ptr/' /root/.vnc/xstartup
 
 echo "Fixing VNC Session" | log
-sed -i '/Xsession/d'
-cat /root/.xsession >> /root/.vnc/xstartup
+sed -i '/XKL_XMODMAP_DISABLE/d'  /root/.vnc/xstartup
+echo "export XKL_XMODMAP_DISABLE=1" >> /root/.vnc/xstartup
 
 echo "Creating VNC start-up daemon" | log
 cat > /etc/systemd/system/vncserver@.service  << EOF
