@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing Ubuntu Mate Desktop" | log
+apt install -y ubuntu-mate-desktop
+waitOrStop 0
+
+echo "Add Mate Session to root user" | log
+echo mate-session > /root/.xsession
+
+echo "Disable Compositing" | log
+mkdir -p /root/.config/dconf
+cp $rootDir/tweaks/extras/ubuntu-mate-desktop/user /root/.config/dconf/
+
+tagScript success
+
+exit 0

@@ -1,0 +1,68 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing VNC service" | log
+apt install -y tightvncserver
+waitOrStop 0
+
+echo "Creating Default VNC Session" | log
+mkdir -p  /root/.vnc/
+VNC_PASSWORD=`< /dev/urandom tr -dc A-Z-a-z-0-9 | head -c8`
+echo ${VNC_PASSWORD}| vncpasswd -f > /root/.vnc/passwd
+chmod 0700 ~/.vnc/passwd
+vncserver
+vncserver -kill :1
+
+echo "Fixing VNC Cursor" | log
+sed -i 's/xsetroot/& -cursor_name left_ptr/' /root/.vnc/xstartup
+
+echo "Fixing VNC Session" | log
+sed -i '/XKL_XMODMAP_DISABLE/d'  /root/.vnc/xstartup
+echo "export XKL_XMODMAP_DISABLE=1" >> /root/.vnc/xstartup
+
+echo "Creating VNC start-up daemon" | log
+cat > /etc/systemd/system/vncserver@.service  << EOF
+[Unit]
+Description=Start TightVNC server at startup
+After=syslog.target network.target
+
+[Service]
+Type=forking
+User=root
+Group=root
+WorkingDirectory=/root
+
+PIDFile=/root/.vnc/%H:%i.pid
+ExecStartPre=-/usr/bin/vncserver -kill :%i > /dev/null 2>&1
+ExecStart=/usr/bin/vncserver -depth 24 -geometry 1600x900 :%i
+ExecStop=/usr/bin/vncserver -kill :%i
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable vncserver@1.service
+systemctl start vncserver@1
+
+echo "Adding descriptions" | log
+descriptionAppend "Please connect via VNC Client"
+descriptionAppend " "
+descriptionAppend "Computer Address: ${SERVERIP}"
+descriptionAppend "Ubuntu user: root"
+descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "VNC Port: 5901"
+descriptionAppend "VNC password: ${VNC_PASSWORD}"
+descriptionAppend " "
+
+
+tagScript success
+
+exit 0
