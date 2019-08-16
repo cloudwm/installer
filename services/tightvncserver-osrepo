@@ -19,8 +19,13 @@ echo ${VNC_PASSWORD}| vncpasswd -f > /root/.vnc/passwd
 chmod 0700 ~/.vnc/passwd
 vncserver
 vncserver -kill :1
+
 echo "Fixing VNC Cursor" | log
 sed -i 's/xsetroot/& -cursor_name left_ptr/' /root/.vnc/xstartup
+
+echo "Fixing VNC Session" | log
+sed -i '/Xsession/d'
+cat /root/.xsession >> /root/.vnc/xstartup
 
 echo "Creating VNC start-up daemon" | log
 cat > /etc/systemd/system/vncserver@.service  << EOF
