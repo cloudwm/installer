@@ -7,53 +7,40 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist php-fpm.success
+runOnceCheck
+
+rootDir=$(rootDir)
+scriptName=$(basename $BASH_SOURCE)
 
 echo "Checking existing startup scripts folder" | log
-MY_PATH="`dirname \"$0\"`"
-INSTALLER_PATH=/opt/php-fpm-autoconfig
 
-if [ ! -d "$INSTALLER_PATH" ]; then
-	mkdir -p $INSTALLER_PATH
+if [ -z "$installerPath" ]; then
+	installerPath=$rootDir/autoconfig/$scriptName
 fi
 
-if [ ! -f "$INSTALLER_PATH/php.ini" ]; then
-	cp $MY_PATH/extras/php-fpm-autoconfig/php.ini $INSTALLER_PATH/
+if [ ! -d "$installerPath" ]; then
+	mkdir -p $installerPath
 fi
 
-if [ ! -f "$INSTALLER_PATH/php-fpm-memadjust" ]; then
-	cp $MY_PATH/extras/php-fpm-autoconfig/php-fpm-autoconfig $INSTALLER_PATH/php-fpm-autoconfig
-	chmod +x $INSTALLER_PATH/php-fpm-autoconfig
-fi
+cp $rootDir/tweaks/extras/$scriptName/* $installerPath/
 
 echo "Setting rc.local to the renamed file if installer is running in a provisioning process." | log
-if [ -f /etc/rc.local.bck ]; then
-    RCLOCALFILE=/etc/rc.local.bck
-else
-    RCLOCALFILE=/etc/rc.local
+
+rcLocalFile=/etc/rc.local	
+if [ -f "$rcLocalFile.bck" ]; then
+    rcLocalFile=/etc/rc.local.bck
 fi
 
-
-if [[ -z `cat /etc/rc.local | grep php-fpm-autoconfig` ]]; then
-
-    echo "Installing php-fpm-autoconfig in /etc/rc.local" | log
-
+if [[ ! -z $(grep $scriptName $rcLocalFile) ]]; then
+    echo "$0 is already installed in rc.local" | log
+else
+    echo "Installing $scriptName in rc.local" | log
     # remove "exit 0" set by default in /etc/rc.local/
-    sed -i -e '/exit 0/s/.*//' $RCLOCALFILE
-    echo "$INSTALLER_PATH/php-fpm-autoconfig" >> $RCLOCALFILE
-
+    sed -i -e '/exit 0/s/.*//' $rcLocalFile
+    echo "bash $installerPath/$scriptName" >> $rcLocalFile
     # return exit 0 to /etc/rc.local
-    echo "exit 0" >> $RCLOCALFILE
-
-else
-
-    echo "$0 is already installed in /etc/rc.local" | log
-
+    echo "exit 0" >> $rcLocalFile
 fi
-
-echo "Adding descriptions" | log
-descriptionAppend "php-fpm-autoconfig script: /opt/php-fpm-autoconfig/php-fpm-autoconfig"
-descriptionAppend " "
 
 tagScript success
 

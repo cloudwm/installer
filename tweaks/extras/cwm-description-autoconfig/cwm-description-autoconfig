@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# DEBUG: log all actions
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>/tmp/log.out 2>&1
+
+cd /opt/installer
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# delay script until cwm api connection established
+sleep 15
+
+echo "Updating description in CWM backend" | log
+appendServerDescriptionTXT
+
+# disable script after first run
+scriptName=$(basename $BASH_SOURCE)
+rcLocalFile=/etc/rc.local	
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck
+
+tagScript success
+
+exit 0

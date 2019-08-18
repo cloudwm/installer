@@ -52,7 +52,7 @@ function updateServerDescription() {
 
     if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]]; then
 
-        curl -v --location -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" -d $'description='"$1"
+        curl -v --location -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" --data-urlencode $'description='"$1"
         errorCode=$?
 
         if [ $errorCode != '0' ]; then
@@ -118,7 +118,7 @@ function appendServerDescriptionTXT() {
     fi
 
     description=`getServerDescription`
-    fulltext=$(echo -e "$description\\n$fileContent")
+    fulltext=$(echo -e "$description\\n\\n$fileContent")
     updateServerDescription "$fulltext"
 
 }
