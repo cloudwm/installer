@@ -13,19 +13,21 @@ apt install -y tightvncserver
 waitOrStop 0
 
 echo "Creating Default VNC Session" | log
-mkdir -p  /root/.vnc/
-VNC_PASSWORD=`< /dev/urandom tr -dc A-Z-a-z-0-9 | head -c8`
-echo ${VNC_PASSWORD}| vncpasswd -f > /root/.vnc/passwd
-chmod 0700 ~/.vnc/passwd
+export HOME=/root
+export USER=root
+mkdir -p  $HOME/.vnc/
+VNC_PASSWORD="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8 ; echo '')"
+echo ${VNC_PASSWORD}| vncpasswd -f > $HOME/.vnc/passwd
+chmod 0700 $HOME/.vnc/passwd
 vncserver
 vncserver -kill :1
 
 echo "Fixing VNC Cursor" | log
-sed -i 's/xsetroot/& -cursor_name left_ptr/' /root/.vnc/xstartup
+sed -i 's/xsetroot/& -cursor_name left_ptr/' $HOME/.vnc/xstartup
 
 echo "Fixing VNC Session" | log
-sed -i '/XKL_XMODMAP_DISABLE/d'  /root/.vnc/xstartup
-echo "export XKL_XMODMAP_DISABLE=1" >> /root/.vnc/xstartup
+sed -i '/XKL_XMODMAP_DISABLE/d'  $HOME/.vnc/xstartup
+echo "export XKL_XMODMAP_DISABLE=1" >> $HOME/.vnc/xstartup
 
 echo "Creating VNC start-up daemon" | log
 cat > /etc/systemd/system/vncserver@.service  << EOF
@@ -37,9 +39,9 @@ After=syslog.target network.target
 Type=forking
 User=root
 Group=root
-WorkingDirectory=/root
+WorkingDirectory=${HOME}
 
-PIDFile=/root/.vnc/%H:%i.pid
+PIDFile=${HOME}/.vnc/%H:%i.pid
 ExecStartPre=-/usr/bin/vncserver -kill :%i > /dev/null 2>&1
 ExecStart=/usr/bin/vncserver -depth 24 -geometry 1600x900 :%i
 ExecStop=/usr/bin/vncserver -kill :%i
