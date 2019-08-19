@@ -14,6 +14,7 @@ waitOrStop 0
 
 echo "Creating Default VNC Session" | log
 export HOME=/root
+export USER=root
 mkdir -p  $HOME/.vnc/
 VNC_PASSWORD="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8 ; echo '')"
 echo ${VNC_PASSWORD}| vncpasswd -f > $HOME/.vnc/passwd
