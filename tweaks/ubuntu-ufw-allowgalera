@@ -20,8 +20,6 @@ if [ ! -z "$LANNICIDS" ]; then
         ufw allow from $subnet to any port 3306
         ufw allow from $subnet to any port 4567
         ufw allow from $subnet to any port 4568
-        ufw allow from $subnet to any port 4444/tcp
-        ufw allow from $subnet to any port 4567/udp
 
         unset ipvar
         unset subnet
@@ -30,9 +28,8 @@ if [ ! -z "$LANNICIDS" ]; then
 
 else
 
-    ufw allow 3306,4567,4568,4444/tcp | log
-    ufw allow 4567/udp | log
-
+    ufw allow 3306,4567,4568 | log
+    
 fi
 
 ufw status | log
