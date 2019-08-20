@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ubuntu-updateos.success
+
+echo "Adding Galera Repository" | log
+apt-key adv --keyserver keyserver.ubuntu.com --recv BC19DDBA
+cat << EOF > /etc/apt/sources.list.d/Galera-MySQL.list
+deb https://releases.galeracluster.com/mysql-wsrep-5.7/ubuntu bionic main
+deb https://releases.galeracluster.com/galera-3/ubuntu bionic main
+EOF
+cat << EOF > /etc/apt/preferences.d/Galera-MySQL.pref
+# Prefer Codership repository
+Package: *
+Pin: origin releases.galeracluster.com
+Pin-Priority: 1001
+EOF
+apt update
+
+echo "Installing mysql from apt" | log
+export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "mysql-wsrep-server-5.7 mysql-server/root_password password ${ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-wsrep-server-5.7 mysql-server/root_password_again password ${ADMINPASSWORD}"
+apt install galera-3 galera-arbitrator-3 mysql-wsrep-5.7 -y
+waitOrStop 0
+checkPackageInstalled mysql-wsrep-server-5.7
+
+
+echo "Restarting mysql.service" | log
+systemctl restart mysql.service
+
+echo "Adding descriptions" | log
+descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
+descriptionAppend "mySQL Server Username: root"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tag mysql-server-5.7.success
+tag mysqld.success
+
+tagScript success
+
+exit 0

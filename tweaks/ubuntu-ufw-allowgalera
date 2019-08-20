@@ -1,0 +1,37 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ufw.success
+
+# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for mySQL.
+# if not, open 3306 to WAN.
+
+if [ ! -z "$LANNICIDS" ]; then
+
+    for ip in $LANNICIDS; do
+
+        ipvar="ip$ip"
+        subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
+        
+        ufw allow from $subnet to any port 3306
+        ufw allow from $subnet to any port 4567
+        ufw allow from $subnet to any port 4568
+
+        unset ipvar
+        unset subnet
+    
+    done
+
+else
+
+    ufw allow 3306,4567,4568 | log
+    
+fi
+
+ufw status | log
+
+tagScript success
