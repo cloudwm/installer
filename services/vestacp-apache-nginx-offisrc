@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Running VestaCP Official Installer" | log
+curlDownload http://vestacp.com/pub/vst-install.sh
+waitOrStop 0
+email=`cat /root/guest.conf | grep email | cut -d '=' -f 2`
+hostname=`hostname -I | tr '.' '-' | awk '{ print "plesk."$1".cloud-xip.io"}'`
+sh bash vst-install.sh --nginx yes --phpfpm no --apache yes --named yes --vsftpd yes --proftpd no --iptables yes --fail2ban yes --quota no --exim yes --dovecot yes --spamassassin yes --clamav yes --softaculous yes --mysql yes --postgresql no --interactive no --passwd ${ADMINPASSWORD} --email ${email} --hostname ${hostname} | log
+waitOrStop 0
+
+echo "Adding descriptions" | log
+descriptionAppend "VestaCP Address: ${SERVERIP}:8443"
+descriptionAppend "VestaCP user: admin"
+descriptionAppend "VestaCP password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

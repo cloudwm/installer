@@ -52,7 +52,7 @@ function updateServerDescription() {
 
     if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]]; then
 
-        curl -v --location -f -X PUT -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" --data-urlencode $'description='"$1"
+        curl --location -f -X PUT --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" --data-urlencode $'description='"$1"
         errorCode=$?
 
         if [ $errorCode != '0' ]; then
@@ -77,7 +77,7 @@ function getServerDescription() {
 
     if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]]; then
 
-        description=`curl -v --location -f -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}" "https://$CWMSITE/svc/server/$UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
+        description=`curl --location -f --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}" "https://$CWMSITE/svc/server/$UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
         errorCode=$?
 
         if [ $errorCode != '0' ]; then
