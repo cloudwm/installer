@@ -11,7 +11,7 @@ runOnceCheck
 
 echo "Allow binding of mysql from all IP Addresses" | log
 
-sed -i '/bind-address.*/c\bind-address = 0.0.0.0' /etc/mysql/mysql.conf.d/mysqld.cnf
+sed -i '/^bind-address\t= /{h;s/=.*/= 0.0.0.0/};${x;/^$/{s//bind-address\t= 0.0.0.0/;H};x}' /etc/mysql/mysql.conf.d/mysqld.cnf
 
 echo "Restaring mysql daemon" | log
 

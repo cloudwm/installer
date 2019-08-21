@@ -11,8 +11,7 @@ runOnceCheck
 
 echo "Allow connecting to mySQL with user root from anywhere." | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-USE mysql;
-UPDATE USER set Host = '%' where User = 'root';
+UPDATE mysql.user SET host = '%' WHERE user = 'root';
 FLUSH PRIVILEGES;
 EOF
 
