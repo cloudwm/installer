@@ -20,7 +20,7 @@ waitOrStop 0
 
 echo "Installing Zentyal 6.0" | log
 debconf-set-selections <<< "zentyal-core zentyal-core/port string 8443"
-apt install zentyal -y | log
+apt install zentyal zentyal-network -y | log
 waitOrStop 0
 checkPackageInstalled zentyal
 
