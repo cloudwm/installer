@@ -8,50 +8,66 @@ fi
 
 checkTagExist docker-latest-offirepo.success
 
+rootDir=$(rootDir)
+checkTempDir
+dockermachineUrl=https://github.com/docker/machine/releases/download/v0.16.1
+dmServerUrl=https://raw.githubusercontent.com/OriHoch/docker-machine-server/v0.0.5/
+engineInstallUrl=https://releases.rancher.com/install-docker/18.09.sh
+kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.2/docker-machine-driver-kamatera_v1.0.2_linux_amd64.tar.gz
+machineScript=docker-machine-server.sh
+clusterScript=kamatera-cluster.sh
+export RANCHER_VERSION=v2.2.4
+export email=$ADMINEMAIL
+clientId=`cat ${CWMCONFIGFILE} | grep apiClientId | cut -d '=' -f 2`
+secret=`cat ${CWMCONFIGFILE} | grep apiSecret | cut -d '=' -f 2`
+vlan=`cat ${CWMCONFIGFILE}  | grep lan | grep -v wan | cut -d'=' -f 2`
+datacenter=$ZONE
+servername="$($VMNAME | tr -cd [:alnum:])"
+ranchername="qa-omc-rancher-${datacenter}-${servername}"
+
 echo "Docker Machine 0.16.1 INSTALL" | log
-base=https://github.com/docker/machine/releases/download/v0.16.1 &&
-  curl -L $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine &&
-  install /tmp/docker-machine /usr/local/bin/docker-machine
+# curl -L --url $dockermachineUrl/docker-machine-$(uname -s)-$(uname -m) --retry-connrefused --retry 3 --retry-delay 2 --max-redirs 3 --max-time 30 >/tmp/docker-machine
+cd $rootDir/temp
+curlDownload $dockermachineUrl/docker-machine-$(uname -s)-$(uname -m)
+waitOrStop 0
+install docker-machine /usr/local/bin/docker-machine
+waitOrStop 0
 
 echo "install Jq" | log
 apt install -y jq
 waitOrStop 0
 checkPackageInstalled jq
 
-echo "Install the docker-machine-server.sh script" | log
-curl -s -L https://raw.githubusercontent.com/OriHoch/docker-machine-server/v0.0.5/docker-machine-server.sh \
-    |  tee /usr/local/bin/docker-machine-server.sh >/dev/null &&\
-chmod +x /usr/local/bin/docker-machine-server.sh
+echo "Install the ${machineScript} script" | log
+# curl -s -L $dmServerUrl/$machineScript | tee /usr/local/bin/$machineScript >/dev/null
+curlDownload $dmServerUrl/$machineScript
+waitOrStop 0
+chmod +x $machineScript
+mv $machineScript /usr/local/bin/
 
-echo "Install the kamatera-cluster.sh script" | log
-curl -s -L https://raw.githubusercontent.com/OriHoch/docker-machine-server/v0.0.5/scripts/kamatera-cluster.sh \
-    |  tee /usr/local/bin/kamatera-cluster.sh >/dev/null &&\
- chmod +x /usr/local/bin/kamatera-cluster.sh
-
-sed -i 's/read -p "LETSENCRYPT_EMAIL: " -e -i "${LETSENCRYPT_EMAIL}" LETSENCRYPT_EMAIL/LETSENCRYPT_EMAIL="${email}"/' /usr/local/bin/kamatera-cluster.sh
-sed -i 's/read -p "RANCHER_DOMAIN_NAME: " -e -i "${RANCHER_DOMAIN_NAME}" RANCHER_DOMAIN_NAME/RANCHER_DOMAIN_NAME="rancher.$(docker-machine ip $(docker-machine active) | sed  '"'"'s;\\.;-;g'"'"').cloud-xip.io"/' /usr/local/bin/kamatera-cluster.sh
+echo "Install the ${clusterScript} script" | log
+# curl -s -L $dmServerUrl/scripts/$clusterScript | tee /usr/local/bin/$clusterScript >/dev/null
+curlDownload $dmServerUrl/scripts/$clusterScript
+waitOrStop 0
+chmod +x $clusterScript
+mv $clusterScript /usr/local/bin/
+sed -i 's/read -p "LETSENCRYPT_EMAIL: " -e -i "${LETSENCRYPT_EMAIL}" LETSENCRYPT_EMAIL/LETSENCRYPT_EMAIL="${email}"/' /usr/local/bin/$clusterScript
+sed -i 's/read -p "RANCHER_DOMAIN_NAME: " -e -i "${RANCHER_DOMAIN_NAME}" RANCHER_DOMAIN_NAME/RANCHER_DOMAIN_NAME="rancher.$(docker-machine ip $(docker-machine active) | sed  '"'"'s;\\.;-;g'"'"').cloud-xip.io"/' /usr/local/bin/$clusterScript
 
 echo "Installing Rancher" | log
-export RANCHER_VERSION=v2.2.4
-clientId=`cat /root/guest.conf | grep apiClientId | cut -d '=' -f 2`
-secret=`cat /root/guest.conf | grep apiSecret | cut -d '=' -f 2`
-vlan=`cat /root/guest.conf  | grep lan | grep -v wan | cut -d'=' -f 2`
-datacenter=`cat /root/guest.conf | grep zone | cut -d '=' -f 2 | head -1`
-export email=`cat /root/guest.conf | grep email | cut -d '=' -f 2`
-kamatera-cluster.sh "0.0.5" "${vlan}" << EOF
+${clusterScript} "0.0.5" "${vlan}" << EOF
 ${clientId}
 ${secret}
 7
 /usr/local/bin
-rancher-admin-${datacenter}
+${ranchername}
 4096
 2B
 ${datacenter}
 50
-
 EOF
 
-activemachine=`docker-machine ls | grep rancher-admin-${datacenter} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"`
+activemachine=`docker-machine ls | grep ${ranchername} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"`
 
 echo "Waiting for Rancher to intialize" | log
 HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure`
@@ -61,48 +77,93 @@ until [ "$HTTPD" == "200" ]; do
 done
 sleep 15
 
+curlBaseParams="--insecure --silent --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json'"
+
 echo "Getting Rancher Login Token" | log
-LOGINRESPONSE=`curl -s "https://${activemachine}/v3-public/localProviders/local?action=login" -H 'content-type: application/json' --data-binary '{"username":"admin","password":"admin"}' --insecure`
+LOGINRESPONSE=`curl --url "https://${activemachine}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' $curlBaseParams`
 LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
 
 echo "Changing Web Interface Password" | log
-curl -s "https://${activemachine}/v3/users?action=changepassword" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary "{\"currentPassword\":\"admin\",\"newPassword\":\"${ADMINPASSWORD}\"}" --insecure
+curl --url "https://${activemachine}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" $curlBaseParams  
 
 echo "Creating API key" | log
-APIRESPONSE=`curl -s "https://${activemachine}/v3/token" -H 'content-type: application/json' -H "Authorization: Bearer $LOGINTOKEN" --data-binary '{"type":"token","description":"automation"}' --insecure`
+APIRESPONSE=`curl --url "https://${activemachine}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" $curlBaseParams`
 echo "Getting API Token" | log
 APITOKEN=`echo $APIRESPONSE | jq -r .token`
 
 echo "Listing available Node drivers" | log
-CURRENTDRIVERS=`curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
+NODEDRIVERS=`curl --url "https://${activemachine}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" $curlBaseParams | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
-for url in ${CURRENTDRIVERS}; do 
+for url in ${NODEDRIVERS}; do 
 
-    curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
+    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams
 
 done
 
 echo "Adding Kamatera Docker Machine Driver" | log
-curl -s "https://${activemachine}/v3/nodedrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{"active":true, "builtin":false, "url":"https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.2/docker-machine-driver-kamatera_v1.0.2_linux_amd64.tar.gz", "whitelistDomains":[]}' --insecure 
+curl --url "https://${activemachine}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams 
 
 echo "Listing available Kubernetes drivers" | log
-CURRENTDRIVERS=`curl -s "https://${activemachine}/v3/kontainerdrivers" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" --insecure | jq -r .data[].actions.deactivate`
+KONTAINERDRIVERS=`curl --url "https://${activemachine}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" $curlBaseParams | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
-for url in ${CURRENTDRIVERS}; do 
+for url in ${KONTAINERDRIVERS}; do 
 
-    curl -s "$url" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d '{}' --insecure 
+    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams 
 
 done
 
-# Currently not working due to some bug in rancher, need to investigate
-# echo "Creating Kamatera Control Plane Template" | log
-# curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"30\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"2048\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Conrol Plane\", \"useInternalIpAddress\":true}" --insecure 
-
-# Currently not working due to some bug in rancher, need to investigate
-# echo "Creating Kamatera Control Plane Template" | log
-# curl -s "https://${activemachine}/v3/nodetemplates" -H 'content-type: application/json' -H "Authorization: Bearer $APITOKEN" -X POST  -d "{\"engineInsecureRegistry\":[], \"engineInstallURL\":\"https://releases.rancher.com/install-docker/18.09.sh\", \"engineRegistryMirror\":[], \"engineStorageDriver\":\"overlay2\", \"kamateraConfig\":{\"apiClientId\":\"${clientId}\", \"apiSecret\":\"${secret}\", \"billing\":\"hourly\", \"cpu\":\"2B\", \"createServerCommandId\":\"0\", \"datacenter\":\"${datacenter}\", \"diskSize\":\"50\", \"image\":\"ubuntu_server_18.04_64-bit\", \"privateNetworkIp\":\"\", \"privateNetworkName\":\"${vlan}\", \"ram\":\"4096\", \"type\":\"kamateraConfig\"}, \"name\":\"Kamatera Worker\", \"useInternalIpAddress\":true}" --insecure 
+echo "Creating Kamatera templates on Rancher" | log
+sleep 10
+# Kamatera Control Plane
+PLANE_JSON_STRING='{
+"engineInsecureRegistry":[],
+"engineInstallURL":"'"${engineInstallUrl}"'",
+"engineRegistryMirror":[],
+"engineStorageDriver":"overlay2",
+"kamateraConfig":{
+"apiClientId":"'"${clientId}"'",
+"apiSecret":"'"${secret}"'",
+"billing":"hourly",
+"cpu":"2B",
+"createServerCommandId":"0",
+"datacenter":"'"${datacenter}"'",
+"diskSize":"30",
+"image":"ubuntu_server_18.04_64-bit",
+"privateNetworkIp":"",
+"privateNetworkName":"'"${vlan}"'",
+"ram":"2048",
+"type":"kamateraConfig"
+},
+"name":"Kamatera Control Plane",
+"useInternalIpAddress":true
+}'
+curl --url "https://${activemachine}/v3/nodetemplates" -d $(jsonize "$PLANE_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams | log
+#Kamatera Worker
+WORKER_JSON_STRING='{
+"engineInsecureRegistry":[],
+"engineInstallURL":"'"${engineInstallUrl}"'",
+"engineRegistryMirror":[],
+"engineStorageDriver":"overlay2",
+"kamateraConfig":{
+"apiClientId":"'"${clientId}"'",
+"apiSecret":"'"${secret}"'",
+"billing":"hourly",
+"cpu":"2B",
+"createServerCommandId":"0",
+"datacenter":"'"${datacenter}"'",
+"diskSize":"50",
+"image":"ubuntu_server_18.04_64-bit",
+"privateNetworkIp":"",
+"privateNetworkName":"'"${vlan}"'",
+"ram":"4096",
+"type":"kamateraConfig"
+},
+"name":"Kamatera Worker",
+"useInternalIpAddress":true
+}'
+curl --url "https://${activemachine}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams | log
 
 echo "Adding descriptions" | log
 descriptionAppend "Rancher web UI: https://${activemachine}"
