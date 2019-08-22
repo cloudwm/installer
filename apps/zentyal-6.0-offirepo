@@ -1,0 +1,42 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+aptSourceList=/etc/apt/sources.list.d/zentyal.list
+rootDir=$(rootDir)
+checkTempDir
+
+echo "Add Zentyal 6.0 repository" | log
+curlDownload http://keys.zentyal.org/zentyal-6.0-archive.asc
+waitOrStop 0
+apt-key add zentyal-6.0-archive.asc
+echo "deb http://archive.zentyal.org/zentyal 6.0 main" >> $aptSourceList
+apt update | log
+waitOrStop 0
+
+echo "Installing Zentyal 6.0" | log
+debconf-set-selections <<< "zentyal-core zentyal-core/port string 8443"
+apt install zentyal zentyal-network -y | log
+waitOrStop 0
+checkPackageInstalled zentyal
+
+echo "Creating admin user and disabling root" | log
+useradd admin -s /bin/bash -m -g users -G sudo
+chpasswd <<< "admin:${ADMINPASSWORD}"
+passwd -l root
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Zentyal Admin URI: https://${SERVERIP}:8443"
+descriptionAppend "Zentyal Admin User: admin"
+descriptionAppend "Zentyal Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+
+tagScript success
+
+exit 0
