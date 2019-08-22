@@ -28,9 +28,10 @@ ranchername="qa-omc-rancher-${datacenter}-${servername}"
 echo "Docker Machine 0.16.1 INSTALL" | log
 # curl -L --url $dockermachineUrl/docker-machine-$(uname -s)-$(uname -m) --retry-connrefused --retry 3 --retry-delay 2 --max-redirs 3 --max-time 30 >/tmp/docker-machine
 cd $rootDir/temp
-curlDownload $dockermachineUrl/docker-machine-$(uname -s)-$(uname -m)
+dmFile=docker-machine-$(uname -s)-$(uname -m)
+curlDownload $dockermachineUrl/$dmFile
 waitOrStop 0
-install docker-machine /usr/local/bin/docker-machine
+install $dmFile /usr/local/bin/docker-machine
 waitOrStop 0
 
 echo "install Jq" | log
