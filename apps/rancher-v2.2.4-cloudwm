@@ -26,7 +26,6 @@ servername=$(echo $VMNAME | tr -cd [:alnum:])
 ranchername="qa-omc-rancher-${datacenter}-${servername:: 30}"
 
 echo "Docker Machine 0.16.1 INSTALL" | log
-# curl -L --url $dockermachineUrl/docker-machine-$(uname -s)-$(uname -m) --retry-connrefused --retry 3 --retry-delay 2 --max-redirs 3 --max-time 30 >/tmp/docker-machine
 cd $rootDir/temp
 dmFile=docker-machine-$(uname -s)-$(uname -m)
 curlDownload $dockermachineUrl/$dmFile
@@ -40,14 +39,12 @@ waitOrStop 0
 checkPackageInstalled jq
 
 echo "Install the ${machineScript} script" | log
-# curl -s -L $dmServerUrl/$machineScript | tee /usr/local/bin/$machineScript >/dev/null
 curlDownload $dmServerUrl/$machineScript
 waitOrStop 0
 chmod +x $machineScript
 mv $machineScript /usr/local/bin/
 
 echo "Install the ${clusterScript} script" | log
-# curl -s -L $dmServerUrl/scripts/$clusterScript | tee /usr/local/bin/$clusterScript >/dev/null
 curlDownload $dmServerUrl/scripts/$clusterScript
 waitOrStop 0
 chmod +x $clusterScript
@@ -166,10 +163,16 @@ WORKER_JSON_STRING='{
 }'
 curl --url "https://${activemachine}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
+
 echo "Adding descriptions" | log
-descriptionAppend "Rancher web UI: https://${activemachine}"
-descriptionAppend "Rancher admin user: admin"
-descriptionAppend "Rancher admin password: ${ADMINPASSWORD}"
+rancherServerPass="$(docker-machine inspect ${ranchername} | jq -r '.Driver.Password')"
+descriptionAppend "Rancher web UI: https://rancher.${activemachine//./-}.cloud-xip.io"
+descriptionAppend "Rancher web UI user: admin"
+descriptionAppend "Rancher web UI password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Rancher server address: ${activemachine}"
+descriptionAppend "Rancher server root user: root"
+descriptionAppend "Rancher server root password: ${rancherServerPass}"
 descriptionAppend " "
 
 tagScript success
