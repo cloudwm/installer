@@ -23,7 +23,7 @@ secret=`cat ${CWMCONFIGFILE} | grep apiSecret | cut -d '=' -f 2`
 vlan=`cat ${CWMCONFIGFILE}  | grep lan | grep -v wan | cut -d'=' -f 2`
 datacenter=$ZONE
 servername=$(echo $VMNAME | tr -cd [:alnum:])
-ranchername="qa-omc-rancher-${datacenter}-${servername}"
+ranchername="qa-omc-rancher-${datacenter}-${servername:: 30}"
 
 echo "Docker Machine 0.16.1 INSTALL" | log
 # curl -L --url $dockermachineUrl/docker-machine-$(uname -s)-$(uname -m) --retry-connrefused --retry 3 --retry-delay 2 --max-redirs 3 --max-time 30 >/tmp/docker-machine
@@ -67,6 +67,8 @@ ${ranchername}
 ${datacenter}
 50
 EOF
+
+: <<'END'
 
 activemachine=`docker-machine ls | grep ${ranchername} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"`
 
@@ -173,5 +175,7 @@ descriptionAppend "Rancher admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
+
+END
 
 exit 0
