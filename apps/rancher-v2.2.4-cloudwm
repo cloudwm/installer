@@ -55,9 +55,6 @@ mv $clusterScript /usr/local/bin/
 sed -i 's/read -p "LETSENCRYPT_EMAIL: " -e -i "${LETSENCRYPT_EMAIL}" LETSENCRYPT_EMAIL/LETSENCRYPT_EMAIL="${email}"/' /usr/local/bin/$clusterScript
 sed -i 's/read -p "RANCHER_DOMAIN_NAME: " -e -i "${RANCHER_DOMAIN_NAME}" RANCHER_DOMAIN_NAME/RANCHER_DOMAIN_NAME="rancher.$(docker-machine ip $(docker-machine active) | sed  '"'"'s;\\.;-;g'"'"').cloud-xip.io"/' /usr/local/bin/$clusterScript
 
-echo "RANCHER_DOMAIN_NAME: "$RANCHER_DOMAIN_NAME
-
-: <<'END'
 echo "Installing Rancher" | log
 ${clusterScript} "0.0.5" "${vlan}" << EOF
 ${clientId}
@@ -176,6 +173,5 @@ descriptionAppend "Rancher admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
-END
 
 exit 0
