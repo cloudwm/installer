@@ -23,7 +23,7 @@ secret=`cat ${CWMCONFIGFILE} | grep apiSecret | cut -d '=' -f 2`
 vlan=`cat ${CWMCONFIGFILE}  | grep lan | grep -v wan | cut -d'=' -f 2`
 datacenter=$ZONE
 servername=$(echo $VMNAME | tr -cd [:alnum:])
-ranchername="qa-omc-rancher-${datacenter}-${servername:: 30}"
+ranchername="rancher-admin-${datacenter}-${servername:: 30}"
 
 echo "Docker Machine 0.16.1 INSTALL" | log
 cd $rootDir/temp
