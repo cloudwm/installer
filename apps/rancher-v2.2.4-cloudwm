@@ -68,8 +68,6 @@ ${datacenter}
 50
 EOF
 
-: <<'END'
-
 activemachine=`docker-machine ls | grep ${ranchername} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"`
 
 echo "Waiting for Rancher to intialize" | log
@@ -80,40 +78,40 @@ until [ "$HTTPD" == "200" ]; do
 done
 sleep 15
 
-curlBaseParams="--insecure --silent --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json'"
+curlBaseParams=(--insecure --silent --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
 echo "Getting Rancher Login Token" | log
-LOGINRESPONSE=`curl --url "https://${activemachine}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' $curlBaseParams`
+LOGINRESPONSE=`curl --url "https://${activemachine}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' "${curlBaseParams[@]}"`
 LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
 
 echo "Changing Web Interface Password" | log
-curl --url "https://${activemachine}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" $curlBaseParams  
+curl --url "https://${activemachine}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"  
 
 echo "Creating API key" | log
-APIRESPONSE=`curl --url "https://${activemachine}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" $curlBaseParams`
+APIRESPONSE=`curl --url "https://${activemachine}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"`
 echo "Getting API Token" | log
 APITOKEN=`echo $APIRESPONSE | jq -r .token`
 
 echo "Listing available Node drivers" | log
-NODEDRIVERS=`curl --url "https://${activemachine}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" $curlBaseParams | jq -r .data[].actions.deactivate`
+NODEDRIVERS=`curl --url "https://${activemachine}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
 for url in ${NODEDRIVERS}; do 
 
-    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams
+    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
 done
 
 echo "Adding Kamatera Docker Machine Driver" | log
-curl --url "https://${activemachine}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams 
+curl --url "https://${activemachine}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
 
 echo "Listing available Kubernetes drivers" | log
-KONTAINERDRIVERS=`curl --url "https://${activemachine}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" $curlBaseParams | jq -r .data[].actions.deactivate`
+KONTAINERDRIVERS=`curl --url "https://${activemachine}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
 for url in ${KONTAINERDRIVERS}; do 
 
-    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams 
+    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
 
 done
 
@@ -142,7 +140,7 @@ PLANE_JSON_STRING='{
 "name":"Kamatera Control Plane",
 "useInternalIpAddress":true
 }'
-curl --url "https://${activemachine}/v3/nodetemplates" -d $(jsonize "$PLANE_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams | log
+curl --url "https://${activemachine}/v3/nodetemplates" -d $(jsonize "$PLANE_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 #Kamatera Worker
 WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
@@ -166,7 +164,7 @@ WORKER_JSON_STRING='{
 "name":"Kamatera Worker",
 "useInternalIpAddress":true
 }'
-curl --url "https://${activemachine}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" $curlBaseParams | log
+curl --url "https://${activemachine}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
 echo "Adding descriptions" | log
 descriptionAppend "Rancher web UI: https://${activemachine}"
@@ -175,7 +173,5 @@ descriptionAppend "Rancher admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
-
-END
 
 exit 0
