@@ -67,7 +67,7 @@ EOF
 
 activemachine=`docker-machine ls | grep ${ranchername} | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"`
 rancherDomain="rancher.${activemachine//./-}.cloud-xip.io"
-curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
+curlBaseParams=( --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
 echo "Waiting for Rancher to intialize" | log
 HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure`
