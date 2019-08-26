@@ -10,7 +10,7 @@ fi
 echo "Updating and upgrading OS to latest kernel and packages" | log
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
-add-apt-repository ppa:apt-fast/stable
+add-apt-repository ppa:apt-fast/stable -y
 apt update -y
 apt install apt-fast -y
 apt-fast -qy update | log
