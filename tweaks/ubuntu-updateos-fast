@@ -10,7 +10,9 @@ fi
 echo "Updating and upgrading OS to latest kernel and packages" | log
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
-bash -c "$(curl -sL https://git.io/vokNn)"
+add-apt-repository ppa:apt-fast/stable
+apt update -y
+apt install apt-fast -y
 apt-fast -qy update | log
 apt-fast -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade | log
 apt-fast -qy autoclean | log
