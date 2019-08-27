@@ -8,6 +8,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Applying apt-fast for concurrent downloads" | log
+export DEBIAN_FRONTEND=noninteractive
 add-apt-repository ppa:apt-fast/stable -y
 apt update -y
 apt install apt-fast -y
