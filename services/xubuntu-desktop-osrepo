@@ -9,7 +9,7 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing xUbuntu Desktop" | log
-apt-fast install -y xubuntu-desktop
+apt install -y xubuntu-desktop
 waitOrStop 0
 
 echo "Add XFCE4 Session to root user" | log
