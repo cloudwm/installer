@@ -10,10 +10,12 @@ fi
 echo "Updating and upgrading OS to latest kernel and packages" | log
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
-apt-get -qy update | log
-apt-get -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" upgrade | log
-apt-get -qy autoclean | log
+apt update -qy | log
+apt upgrade -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" | log
+apt autoclean -qy | log
 apt upgrade -y | log
 apt autoremove -y | log
 
 tagScript success
+
+exit 0

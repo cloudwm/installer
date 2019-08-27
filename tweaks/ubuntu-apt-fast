@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Applying apt-fast for concurrent downloads" | log
+export DEBIAN_FRONTEND=noninteractive
+add-apt-repository ppa:apt-fast/stable -y
+apt update -y
+apt install apt-fast -y
+
+tagScript success
+
+exit 0
