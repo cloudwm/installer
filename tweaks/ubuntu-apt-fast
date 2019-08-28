@@ -13,6 +13,7 @@ add-apt-repository ppa:apt-fast/stable -y
 apt update -y
 apt install apt-fast -y
 
+tag apt-fast.success
 tagScript success
 
 exit 0

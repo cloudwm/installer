@@ -362,7 +362,7 @@ function jsonize() {
 }
 
 function apt () {
-    if [ -f "$rootDir/temp/ubuntu-apt-fast.success" ]; then
+    if [ -f "$rootDir/temp/apt-fast.success" ]; then
 
         command apt-fast "$@"
 
