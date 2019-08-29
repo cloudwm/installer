@@ -21,6 +21,9 @@ if [ -f "$CWMCONFIGFILE" ]; then
     LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
     DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
     UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
+    CPU=$cpu
+    RAM=$ram
+    DISKSIZE=$disk0size
 
     var=0
     for nicid in $WANNICIDS; do
