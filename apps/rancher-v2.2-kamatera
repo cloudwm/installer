@@ -162,7 +162,6 @@ WORKER_JSON_STRING='{
 }'
 curl --url "https://${rancherDomain}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
-
 echo "Adding descriptions" | log
 rancherServerPass="$(docker-machine inspect ${ranchername} | jq -r '.Driver.Password')"
 descriptionAppend "Rancher web UI: https://${rancherDomain}"
@@ -173,6 +172,16 @@ descriptionAppend "Rancher server address: ${activemachine}"
 descriptionAppend "Rancher server root user: root"
 descriptionAppend "Rancher server root password: ${rancherServerPass}"
 descriptionAppend " "
+
+echo "Removing installer and upating description" | log
+cd $rootDir/temp
+cp $rootDir/tweaks/extras/rancher/postinstall.sh .
+sed -i '/CWMSITE/s/URL_PLACEHOLDER/'"${CWMSITE}"'/' postinstall.sh
+sed -i '/PARENTUUID/s/ID_PLACEHOLDER/'"${UUID}"'/' postinstall.sh
+docker-machine scp postinstall.sh $ranchername:/root/
+docker-machine scp $rootDir/DESCRIPTION.TXT $ranchername:/root/
+docker-machine ssh $ranchername chmod +x postinstall.sh
+docker-machine ssh $ranchername ./postinstall.sh
 
 tagScript success
 
