@@ -19,7 +19,7 @@ dpkg -i $appFilename
 rm $appFilename
 
 echo "Allowing Chrome to run as root" | log
-sed '$s/$/ --user-data-dir --test-type --no-sandbox/' /opt/google/chrome/google-chrome
+sed -i '$s/$/ --user-data-dir --test-type --no-sandbox/' /opt/google/chrome/google-chrome
 
 tagScript success
 
