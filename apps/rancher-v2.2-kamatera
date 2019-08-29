@@ -181,7 +181,7 @@ sed -i '/PARENTUUID/s/ID_PLACEHOLDER/'"${UUID}"'/' postinstall.sh
 docker-machine scp postinstall.sh $ranchername:/root/
 docker-machine scp $rootDir/DESCRIPTION.TXT $ranchername:/root/
 docker-machine ssh $ranchername chmod +x postinstall.sh
-docker-machine ssh $ranchername ./postinstall.sh
+docker-machine ssh $ranchername ./postinstall.sh &
 
 tagScript success
 
