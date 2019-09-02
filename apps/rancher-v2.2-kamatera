@@ -45,7 +45,7 @@ echo "Creating nginx configuration" | log
 # copy ssl configs to nginx folders
 cp $rootDir/tweaks/extras/rancher/rancher-ssl.conf /etc/nginx/sites-available/
 # symlink sites
-ln -s /etc/nginx/sites-available/rancher-ssl.conf /etc/nginx/sites-enabled/rancher.conf
+ln -s /etc/nginx/sites-available/rancher-ssl.conf /etc/nginx/sites-enabled/rancher-ssl.conf
 # add keys to ssl configs
 sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rancherDomain}/privkey.pem|" /etc/nginx/sites-available/rancher-ssl.conf
 sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rancherDomain}/fullchain.pem|" /etc/nginx/sites-available/rancher-ssl.conf
@@ -153,14 +153,9 @@ WORKER_JSON_STRING='{
 curl --url "https://${rancherDomain}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
 echo "Adding descriptions" | log
-rancherServerPass="$(docker-machine inspect ${ranchername} | jq -r '.Driver.Password')"
 descriptionAppend "Rancher web UI: https://${rancherDomain}"
 descriptionAppend "Rancher web UI user: admin"
 descriptionAppend "Rancher web UI password: ${ADMINPASSWORD}"
-descriptionAppend " "
-descriptionAppend "Rancher server address: ${SERVERIP}"
-descriptionAppend "Rancher server root user: root"
-descriptionAppend "Rancher server root password: ${rancherServerPass}"
 descriptionAppend " "
 
 tagScript success
