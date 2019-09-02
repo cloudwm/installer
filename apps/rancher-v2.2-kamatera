@@ -18,79 +18,40 @@ kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/rele
 RANCHER_VERSION=v2.2.8
 clientId=`cat ${CWMCONFIGFILE} | grep apiClientId | cut -d '=' -f 2`
 secret=`cat ${CWMCONFIGFILE} | grep apiSecret | cut -d '=' -f 2`
+rancherDomain="rancher.${SERVERIP//./-}.cloud-xip.io"
 
-echo "install Jq" | log
+echo "Installing Jq" | log
 apt install -y jq
 waitOrStop 0
 checkPackageInstalled jq
 
+echo "Enabling certbot for Rancher" | log
 mkdir -p /var/lib/letsencrypt/.well-known
 chgrp www-data /var/lib/letsencrypt
 chmod g+s /var/lib/letsencrypt
-
-activemachine=`hostname -I | cut -d ' ' -f 1`
-rancherDomain="rancher.${activemachine//./-}.cloud-xip.io"
-
-cat << EOF > /etc/nginx/snippets/letsencrypt.conf
-location ^~ /.well-known/acme-challenge/ {
-  allow all;
-  root /var/lib/letsencrypt/;
-  default_type "text/plain";
-  try_files \$uri =404;
-}
-EOF
-
-cat << EOF >> /etc/nginx/sites-enabled/default
-server {
-  listen 80;
-  server_name _;
-  include snippets/letsencrypt.conf;
-  location / {
-      return 200 "it works!";
-      add_header Content-Type text/plain;
-  }
-}
-EOF 
-
+# remove default vhosts
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+# copy configs to nginx folders
+cp $rootDir/tweaks/extras/rancher/letsencrypt.conf /etc/nginx/snippets/
+cp $rootDir/tweaks/extras/rancher/rancher.conf /etc/nginx/sites-available/
+# symlink sites
+ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
+systemctl restart nginx
+# creating certbot
 certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain}
 
-cat << EOF >> /etc/nginx/sites-enabled/default
-map \$http_upgrade \$connection_upgrade {
-    default Upgrade;
-    ''      close;
-}
-server {
-        listen 443 ssl;
-        server_name _;
-        ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
-        ssl_prefer_server_ciphers on;
-        ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
-        ssl_session_timeout 5m;
-        ssl_session_cache shared:SSL:10m;
-        add_header Strict-Transport-Security max-age=31536000;
-
-        ssl_certificate      /path/to/your.crt;
-        ssl_certificate_key  /path/to/your.key;
-
-        location / {
-           proxy_pass       http://127.0.0.1:8000;
-           proxy_set_header X-Forwarded-For \$remote_addr;
-           proxy_set_header Host \$http_host;
-           proxy_set_header X-Forwarded-Proto \$scheme;
-           proxy_set_header X-Forwarded-Port \$server_port;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade \$http_upgrade;
-           proxy_set_header Connection \$connection_upgrade;
-           proxy_read_timeout 900s;
-        }
-}
-EOF 
-
-sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rancherDomain}/privkey.pem|" /etc/nginx/sites-enabled/default
-sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rancherDomain}/fullchain.pem|" /etc/nginx/sites-enabled/default
-
+echo "Creating nginx configuration" | log
+# copy ssl configs to nginx folders
+cp $rootDir/tweaks/extras/rancher/rancher-ssl.conf /etc/nginx/sites-available/
+# symlink sites
+ln -s /etc/nginx/sites-available/rancher-ssl.conf /etc/nginx/sites-enabled/rancher.conf
+# add keys to ssl configs
+sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rancherDomain}/privkey.pem|" /etc/nginx/sites-available/rancher-ssl.conf
+sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rancherDomain}/fullchain.pem|" /etc/nginx/sites-available/rancher-ssl.conf
 systemctl restart nginx
 
+echo "Creating Rancher admin" | log
 mkdir -p /var/lib/rancher 
 systemctl start docker.service
 docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
@@ -98,10 +59,10 @@ docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/ra
 curlBaseParams=( --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
 echo "Waiting for Rancher to intialize" | log
-HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure`
+HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${SERVERIP}:443 --insecure`
 until [ "$HTTPD" == "200" ]; do
     sleep 3
-    HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${activemachine}:443 --insecure`
+    HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${SERVERIP}:443 --insecure`
 done
 sleep 15
 
@@ -197,7 +158,7 @@ descriptionAppend "Rancher web UI: https://${rancherDomain}"
 descriptionAppend "Rancher web UI user: admin"
 descriptionAppend "Rancher web UI password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "Rancher server address: ${activemachine}"
+descriptionAppend "Rancher server address: ${SERVERIP}"
 descriptionAppend "Rancher server root user: root"
 descriptionAppend "Rancher server root password: ${rancherServerPass}"
 descriptionAppend " "
