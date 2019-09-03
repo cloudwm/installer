@@ -9,6 +9,7 @@ fi
 checkTagExist docker-latest-offirepo.success
 
 if [[ -z "$LANNICIDS" ]]; then 
+    echo "No LAN found, exiting." | log
     exit 1
 fi
 
