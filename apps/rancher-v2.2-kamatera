@@ -6,8 +6,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist lan-found.success
 checkTagExist docker-latest-offirepo.success
+
+if [[ ! -z "$LANNICIDS" ]]; then 
+    exit 1
+fi
 
 rootDir=$(rootDir)
 checkTempDir
