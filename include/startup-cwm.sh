@@ -19,6 +19,7 @@ if [ -f "$CWMCONFIGFILE" ]; then
     VMNAME=$name
     WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
     LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+    [[ ! -z "$LANNICIDS" ]] && tag lan-found.success
     DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
     UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     CPU=$cpu
