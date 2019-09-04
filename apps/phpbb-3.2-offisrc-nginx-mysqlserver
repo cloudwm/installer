@@ -15,7 +15,6 @@ appVersion=3.2.7
 appArchive=phpBB-$appVersion.tar.bz2
 appPath=/var/www/html
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Downloading PhpBB3" | log
 mkdir -p $appPath

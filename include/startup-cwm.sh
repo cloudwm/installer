@@ -1,49 +1,59 @@
 #!/bin/bash
 
-if [ -f "$CWMCONFIGFILE" ]; then
+if [ ! -f "$CWMCONFIGFILE" ]; then
+    echo "Missing CWM config file. Exiting."
+    exit 1
+fi
 
-    CONFIG=`cat $CWMCONFIGFILE`
+CONFIG=`cat $CWMCONFIGFILE`
 
-    IFS=$'\n'
+IFS=$'\n'
 
-    for d in $CONFIG; do
+for d in $CONFIG; do
 
-        export `echo $d | cut -f 1 -d"="`="`echo $d | cut -f 2 -d"="`"
+    export `echo $d | cut -f 1 -d"="`="`echo $d | cut -f 2 -d"="`"
 
-    done
+done
 
-    CWMSITE=$url
-    ADMINEMAIL=$email
-    ADMINPASSWORD="$password"
-    ZONE=$zone
-    VMNAME=$name
-    WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
-    LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
-    DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
-    UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
-    CPU=$cpu
-    RAM=$ram
-    DISKSIZE=$disk0size
+CWMSITE=$url
+ADMINEMAIL=$email
+ADMINPASSWORD="$password"
+APICLIENTID=$apiClientId
+APISECRET=$apiSecret
+VMNAME=$name
+ZONE=$zone
+CPU=$cpu
+RAM=$ram
+DISKSIZE=$disk0size
+WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
+UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
 
-    var=0
-    for nicid in $WANNICIDS; do
+var=0
+for nicid in $WANNICIDS; do
 
-        var=$((var+1))
-        nicvar=ip${nicid}
-        export `echo WANIP$var`=`echo ${!nicvar}`
-        unset nicvar
+    var=$((var+1))
+    nicvar=ip${nicid}
+    export `echo WANIP$var`=`echo ${!nicvar}`
+    unset nicvar
 
-    done
+done
 
-    var=0
-    for nicid in $LANNICIDS; do
+var=0
+for nicid in $LANNICIDS; do
 
-        var=$((var+1))
-        nicvar=ip${nicid}
-        export `echo LANIP$var`=`echo ${!nicvar}`
-        unset nicvar
+    var=$((var+1))
+    nicvar=ip${nicid}
+    export `echo LANIP$var`=`echo ${!nicvar}`
+    unset nicvar
 
-    done
+done
+
+if [[ -z "$APICLIENTID" || -z "$APISECRET" ]]; then
+
+    echo "No CWM API Client ID or Secret is set. Exiting."
+    exit 1
 
 fi
 
@@ -53,51 +63,33 @@ fi
 
 function updateServerDescription() {
 
-    if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]]; then
+    curl --location -f -X PUT --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${APICLIENTID}" -H "AuthSecret: ${APISECRET}"  "https://$CWMSITE/svc/server/$UUID/description" --data-urlencode $'description='"$1"
 
-        curl --location -f -X PUT --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}"  "https://$CWMSITE/svc/server/$UUID/description" --data-urlencode $'description='"$1"
-        errorCode=$?
+    errorCode=$?
+    if [ $errorCode -ne 0 ]; then
 
-        if [ $errorCode != '0' ]; then
-
-		    echo "Error updating server description" | log
-
-	    else 
-
-	        echo "Updated Overview->Description data for $UUID" | log
-
-        fi
-
-    else
-
-	    echo "No API Client ID or Secret is set, description not set" | log
+        echo "Error updating server description" | log
+        return 1
 
     fi
+
+    echo "Updated Overview->Description data for $UUID" | log
 
 }
 
 function getServerDescription() {
 
-    if [[ ! -z "$apiClientId" && ! -z "$apiSecret" ]]; then
+    description=`curl --location -f --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${APICLIENTID}" -H "AuthSecret: ${APISECRET}" "https://$CWMSITE/svc/server/$UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
+    
+    errorCode=$?
+    if [ $errorCode -ne 0 ]; then
 
-        description=`curl --location -f --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${apiClientId}" -H "AuthSecret: ${apiSecret}" "https://$CWMSITE/svc/server/$UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
-        errorCode=$?
-
-        if [ $errorCode != '0' ]; then
-
-            echo "Error retrieving server overview"
-
-        else 
-
-            echo -e $description
-
-        fi
-
-    else
-
-        echo "No API Client ID or Secret is set, unable to retrieve server overview"
+        echo "Error retrieving server overview"
+        return 1
 
     fi
+
+    echo -e $description
 
 }
 

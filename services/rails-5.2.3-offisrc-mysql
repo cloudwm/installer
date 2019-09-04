@@ -14,7 +14,6 @@ checkTagExist ruby.success
 railsVersion=5.2.3
 export PATH=`cat /etc/environment | cut -d'"' -f 2`
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Installing Yarn for package management" | log
 cd $rootDir/temp

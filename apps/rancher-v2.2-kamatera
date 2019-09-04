@@ -14,13 +14,10 @@ if [[ -z "$LANNICIDS" ]]; then
 fi
 
 rootDir=$(rootDir)
-checkTempDir
 engineInstallUrl=https://releases.rancher.com/install-docker/18.09.sh
 kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.2/docker-machine-driver-kamatera_v1.0.2_linux_amd64.tar.gz
 
 RANCHER_VERSION=v2.2.8
-clientId=`cat ${CWMCONFIGFILE} | grep apiClientId | cut -d '=' -f 2`
-secret=`cat ${CWMCONFIGFILE} | grep apiSecret | cut -d '=' -f 2`
 vlan=`cat ${CWMCONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 rancherDomain="rancher.${SERVERIP//./-}.cloud-xip.io"
 
@@ -114,8 +111,8 @@ PLANE_JSON_STRING='{
 "engineRegistryMirror":[],
 "engineStorageDriver":"overlay2",
 "kamateraConfig":{
-"apiClientId":"'"${clientId}"'",
-"apiSecret":"'"${secret}"'",
+"apiClientId":"'"${APICLIENTID}"'",
+"apiSecret":"'"${APISECRET}"'",
 "billing":"hourly",
 "cpu":"2B",
 "createServerCommandId":"0",
@@ -138,8 +135,8 @@ WORKER_JSON_STRING='{
 "engineRegistryMirror":[],
 "engineStorageDriver":"overlay2",
 "kamateraConfig":{
-"apiClientId":"'"${clientId}"'",
-"apiSecret":"'"${secret}"'",
+"apiClientId":"'"${APICLIENTID}"'",
+"apiSecret":"'"${APISECRET}"'",
 "billing":"hourly",
 "cpu":"2B",
 "createServerCommandId":"0",

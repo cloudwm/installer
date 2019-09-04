@@ -15,7 +15,6 @@ phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 appVersion=16.0.3
 appPath=/var/www/html
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Downloading NextCloud 15" | log
 mkdir -p $appPath

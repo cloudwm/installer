@@ -14,7 +14,6 @@ checkTagExist nginx-enable-php-ssl.success
 appPath=/var/www/html
 appVersion=2.3.1
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Creating Magento Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF

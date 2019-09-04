@@ -15,7 +15,6 @@ appPath=/var/www/html
 appVersion=1.33.0
 appArchive=mediawiki-$appVersion.tar.gz
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Installing MediaWiki" | log
 

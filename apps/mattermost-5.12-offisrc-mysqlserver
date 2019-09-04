@@ -13,8 +13,7 @@ appVersion=5.12.4
 appPath=/opt/mattermost
 mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
-# rootDir=$(rootDir)
-checkTempDir
+rootDir=$(rootDir)
 
 echo "Preparing database for application" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF

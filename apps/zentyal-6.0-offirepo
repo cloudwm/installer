@@ -8,7 +8,6 @@ fi
 
 aptSourceList=/etc/apt/sources.list.d/zentyal.list
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Add Zentyal 6.0 repository" | log
 curlDownload http://keys.zentyal.org/zentyal-6.0-archive.asc

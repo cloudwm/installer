@@ -10,7 +10,6 @@ checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Adding hostname to /etc/hosts" | log
 echo "127.0.0.1   `hostname`" >> /etc/hosts

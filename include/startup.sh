@@ -36,7 +36,7 @@ function checkTempDir() {
 
     if [ ! -d "$rootDir/temp" ]; then
 
-	    mkdir $rootDir/temp
+	    mkdir -p $rootDir/temp
 
     fi
 

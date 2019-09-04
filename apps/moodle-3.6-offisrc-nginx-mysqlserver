@@ -15,7 +15,6 @@ checkTagExist nginx-enable-php-ssl.success
 appPath=/var/www/html
 appVersion=3.6.5
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
