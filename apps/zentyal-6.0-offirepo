@@ -30,7 +30,7 @@ passwd -l root
 
 
 echo "Adding descriptions" | log
-descriptionAppend "Zentyal Admin URI: https://${SERVERIP}:8443"
+descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
 descriptionAppend "Zentyal Admin User: admin"
 descriptionAppend "Zentyal Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

@@ -86,7 +86,7 @@ echo "Adding descriptions" | log
 descriptionAppend "Mattermost db user: ${mmuser_name}"
 descriptionAppend "Mattermost db password: ${mmuser_password}"
 descriptionAppend " "
-descriptionAppend "Mattermost web UI and initial setup: https://${SERVERIP}"
+descriptionAppend "Mattermost web UI and initial setup: https://${CWM_SERVERIP}"
 descriptionAppend " "
 
 tagScript success

@@ -67,11 +67,11 @@ sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" $phpIniPath
 # modify www.conf settings
 sed -i '/env\[PATH\]/s/^;//g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 # Add Server IP to Trusted Servers
-sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${SERVERIP}',/" $appPath/config/config.php
+sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${CWM_SERVERIP}',/" $appPath/config/config.php
 systemctl restart php$phpVersion-fpm.service
 
 echo "Adding descriptions" | log
-descriptionAppend "Nextcloud URL: https://${SERVERIP}/"
+descriptionAppend "Nextcloud URL: https://${CWM_SERVERIP}/"
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
 descriptionAppend " "

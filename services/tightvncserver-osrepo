@@ -56,7 +56,7 @@ systemctl start vncserver@1
 echo "Adding descriptions" | log
 descriptionAppend "Please connect via VNC Client"
 descriptionAppend " "
-descriptionAppend "Computer Address: ${SERVERIP}"
+descriptionAppend "Computer Address: ${CWM_SERVERIP}"
 descriptionAppend "Ubuntu user: root"
 descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
 descriptionAppend " "

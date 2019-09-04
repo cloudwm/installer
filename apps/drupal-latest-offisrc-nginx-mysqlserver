@@ -74,7 +74,7 @@ vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
 rm index.nginx-debian.html
 chown -R www-data:www-data .
 cat << EOF >> ${appPath}/sites/default/settings.php
-\$settings['trusted_host_patterns'] = ['^${SERVERIP}$'];
+\$settings['trusted_host_patterns'] = ['^${CWM_SERVERIP}$'];
 EOF
 
 echo "Setting nginx config" | log
@@ -99,7 +99,7 @@ sleep 5
 waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "Drupal Admin URI: https://${SERVERIP}/user/login"
+descriptionAppend "Drupal Admin URI: https://${CWM_SERVERIP}/user/login"
 descriptionAppend "Drupal Admin User: admin"
 descriptionAppend "Drupal Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

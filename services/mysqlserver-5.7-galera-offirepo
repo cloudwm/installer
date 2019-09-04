@@ -35,7 +35,7 @@ echo "Restarting mysql.service" | log
 systemctl restart mysql.service
 
 echo "Adding descriptions" | log
-descriptionAppend "mySQL Server Hostname: ${SERVERIP}"
+descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "

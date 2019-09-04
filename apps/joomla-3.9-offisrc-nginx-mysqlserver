@@ -71,7 +71,7 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
 echo "adding descriptions" | log
-descriptionAppend "Joomla Admin Web Interface: https://${SERVERIP}/administrator"
+descriptionAppend "Joomla Admin Web Interface: https://${CWM_SERVERIP}/administrator"
 descriptionAppend "Joomla Admin Username: admin"
 descriptionAppend "Joomla Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

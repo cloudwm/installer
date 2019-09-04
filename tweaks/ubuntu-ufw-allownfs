@@ -9,9 +9,9 @@ checkTagExist ufw.success
 
 echo "Check if LAN VLAN exists, open only LAN VLAN subnets in the firewall." | log
 
-if [ ! -z "$LANNICIDS" ]; then
+if [ ! -z "$CWM_LANNICIDS" ]; then
 
-    for ip in $LANNICIDS; do
+    for ip in $CWM_LANNICIDS; do
 
 	    ipvar="ip$ip"
 	    subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`

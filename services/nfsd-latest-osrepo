@@ -38,7 +38,7 @@ descriptionAppend "On client, install basic NFS support:"
 descriptionAppend "# sudo apt install nfs-common"
 descriptionAppend " "
 descriptionAppend "On client, connect assigned folder to NFS folder:"
-descriptionAppend "# sudo mount ${SERVERIP}:/storage MY_ASSIGNED_FOLDER"
+descriptionAppend "# sudo mount ${CWM_SERVERIP}:/storage MY_ASSIGNED_FOLDER"
 descriptionAppend " "
 
 tagScript success
