@@ -55,7 +55,7 @@ else
 
 fi
 
-if [ "$success" -lt 0 ]; then 
+if [ "$success" -gt 0 ]; then 
 
     echo "Test passed $success times. Test Passed. (0)" | log
     tagScript success    
