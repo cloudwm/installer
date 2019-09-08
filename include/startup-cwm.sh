@@ -25,7 +25,7 @@ export ADMINEMAIL=$CWM_EMAIL
 export ADMINPASSWORD="$CWM_PASSWORD"
 export CWM_WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
 export CWM_LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
-# DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
+# export CWM_DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
 export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
 
 var=0
