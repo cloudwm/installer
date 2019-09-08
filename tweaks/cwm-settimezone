@@ -8,7 +8,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 # for cwm-based installations, otherwise it's ignored.
-if [ ! -f "$CWMCONFIGFILE" ]; then
+if [ ! -f "$CWM_CONFIGFILE" ]; then
 
     tagScript skipped
     exit 0

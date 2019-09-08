@@ -9,7 +9,7 @@ if [ -z "$1" ]; then
     if [ ! -f "./installer.conf" ]; then 
 
 		echo "installer.conf file not found." | log
-		echo "Usage: ./installer installer.config.file.conf"  | log
+		echo "Usage: ./installer installer.config.file.conf"  | log 1
 		exit 1
     fi
 	
@@ -19,7 +19,7 @@ else
 
 	if [ ! -f "$1" ]; then
 
-		echo "$1 file not found." | log
+		echo "$1 file not found." | log 1
 		exit 1
 
 	fi
@@ -51,11 +51,11 @@ for run in "${execute[@]}"; do
 			continue;
 		;;
 		127)
-			echo "Error. ${run} not found. dying. (127)" | log
+			echo "Error. ${run} not found. dying. (127)" | log 1
 			exit 1;
 		;;
 		*)
-			echo "Exit Code not configured. Dying. ($scriptExitCode)" | log
+			echo "Exit Code not configured. Dying. ($scriptExitCode)" | log 1
 			exit 1
 		;;
 	esac

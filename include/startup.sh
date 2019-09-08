@@ -45,7 +45,7 @@ function checkTempDir() {
 function log() {
 
     rootDir=$(rootDir)
-    logScriptName=`basename $0`
+    logScriptName=$(basename $0)
 
     if [ -z "$logDir" ]; then
 
@@ -55,11 +55,15 @@ function log() {
 
     if [ ! -d "$logDir" ]; then 
 
-	    mkdir $logDir
+	    mkdir -p $logDir
 
     fi
 
-    while IFS= read -r line; do printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"; done | tee -a $logDir/$(date '+%Y-%m-%d').log
+    while IFS= read -r line; do 
+
+        printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"; 
+
+    done | tee -a $logDir/$(date '+%Y-%m-%d').log ${1:+${CWM_ERRORFILE}}
 
 }
 
@@ -67,10 +71,14 @@ function checkRootUser() {
 
     echo "Checking if user is root ... " | log
 
-    [ $(id -u) != '0' ] && { echo "Error: You must be root to run this script. exiting (1)."; exit 1; }
+    if [ $(id -u) != '0' ]; then
+
+        echo "Error: You must be root to run this script. exiting (1)." | log 1
+        exit 1
+
+    fi
 
     echo "Found user $(id -u)." | log
-
 
 }
 
@@ -87,7 +95,7 @@ function checkOs {
 
     if [[ "$OS $OSVersion" != *"Ubuntu"*"18" ]]; then
 
-        echo "$OS $OSVersion is not supported, exiting. (1)" | log
+        echo "$OS $OSVersion is not supported, exiting. (1)" | log 1
         exit 1
         
     fi
@@ -180,8 +188,7 @@ function checkTagExist() {
     rootDir=$(rootDir)
     if [ ! -f "$rootDir/temp/$1" ]; then
 
-	    echo "checkTagExist: Tag temp/$1 doesn't exist." | log
-	    echo "execution stopped, exiting (1). " | log
+	    echo "checkTagExist: Tag temp/$1 doesn't exist, exiting (1)." | log 1
         exit 1;
 
     else
@@ -226,7 +233,7 @@ function waitOrStop() {
 
     if [ $waitExitCode -ne $exitCode ]; then
 
-	    echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log
+	    echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log 1
         exit 1;
 
     fi
@@ -241,7 +248,7 @@ function checkPackageInstalled() {
 
 	    if [ -z "$package" ]; then
 	
-	        echo "Package $1 is not installed. exiting (1)." | log
+	        echo "Package $1 is not installed. exiting (1)." | log 1
 	        exit 1;
 
 	    fi
@@ -259,7 +266,7 @@ function curlDownload() {
     # check if url is given
     if [ -z "$1" ]; then
 
-        echo "No download url is provided. Exiting (1)."
+        echo "No download url is provided. Exiting (1)." | log 1
         return 1
         
     fi
@@ -279,7 +286,7 @@ function curlDownload() {
 
     if [ $exitCode -ne 0 ] || [ $httpResponse -ne 200 ]; then
 
-        echo "Download failed with exitCode:$exitCode and httpResponse:$httpResponse"
+        echo "Download failed with exitCode:$exitCode and httpResponse:$httpResponse" | log 1
         return 1
         
     fi

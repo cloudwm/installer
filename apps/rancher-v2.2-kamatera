@@ -9,7 +9,7 @@ fi
 checkTagExist docker-latest-offirepo.success
 
 if [[ -z "$CWM_LANNICIDS" ]]; then 
-    echo "No LAN found, exiting." | log
+    echo "No LAN found, exiting." | log 1
     exit 1
 fi
 
@@ -18,7 +18,7 @@ engineInstallUrl=https://releases.rancher.com/install-docker/18.09.sh
 kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.2/docker-machine-driver-kamatera_v1.0.2_linux_amd64.tar.gz
 
 RANCHER_VERSION=v2.2.8
-vlan=`cat ${CWMCONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
+vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 rancherDomain="rancher.${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Installing Jq" | log

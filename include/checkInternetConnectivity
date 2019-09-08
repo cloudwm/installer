@@ -63,7 +63,7 @@ if [ "$success" -gt 0 ]; then
     
 else
 
-    echo "Test passed $success times. Test Failed. (1)" | log
+    echo "Test passed $success times. Test Failed. (1)" | log 1
     tagScript failed
     exit 1
 

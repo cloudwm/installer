@@ -11,7 +11,7 @@ appPath=/var/www/html
 
 if [ ! -d "$appPath" ]; then
 
-    echo "Web server directory doesn't exist, exiting." | log
+    echo "Web server directory doesn't exist, exiting." | log 1
     exit 1
 
 fi

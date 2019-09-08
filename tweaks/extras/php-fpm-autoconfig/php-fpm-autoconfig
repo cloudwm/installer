@@ -4,7 +4,7 @@
 service=$(systemctl | grep fpm | awk '{print $1}')
 
 if [[ -z "$service" ]]; then
-    echo "php-fpm is not installed"
+    echo "php-fpm is not installed" | tee -a /root/guest.errlog
     exit 1
 fi
 

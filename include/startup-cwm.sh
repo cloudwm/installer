@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # skip cwm related steps if config file not found
-if [ ! -f "$CWMCONFIGFILE" ]; then
+if [ ! -f "$CWM_CONFIGFILE" ]; then
     echo "Missing CWM config file."
     # exit 1
     return 0
 fi
 
 # parse cwm config into global params
-CONFIG=`cat $CWMCONFIGFILE`
+CONFIG=`cat $CWM_CONFIGFILE`
 STD_IFS=$IFS
 IFS=$'\n'
 for d in $CONFIG; do
@@ -23,9 +23,9 @@ IFS=$STD_IFS
 # additional cwm global params
 export ADMINEMAIL=$CWM_EMAIL
 export ADMINPASSWORD="$CWM_PASSWORD"
-export CWM_WANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
-export CWM_LANNICIDS=`cat $CWMCONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
-# export CWM_DISKS=`cat $CWMCONFIGFILE | grep ^disk.*size=.* | wc -l`
+export CWM_WANNICIDS=`cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+export CWM_LANNICIDS=`cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+# export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
 export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
 
 var=0
@@ -51,7 +51,7 @@ done
 # fail install if cwm api key or secret is missing
 if [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
 
-    echo "No CWM API Client ID or Secret is set. Exiting."
+    echo "No CWM API Client ID or Secret is set. Exiting." | log 1
     exit 1
 
 fi
@@ -134,14 +134,14 @@ function setServerDescriptionTXT() {
 
 function getServerIP() {
 
-    if [ ! -f "$CWMCONFIGFILE" ]; then
+    if [ ! -f "$CWM_CONFIGFILE" ]; then
 
         hostname -I | awk '{print $1}'
         return 0
 
     fi
     
-    IPS=`cat $CWMCONFIGFILE | grep ^ip.*=* | cut -f 2 -d"i" | cut -f 2 -d"p"`
+    IPS=`cat $CWM_CONFIGFILE | grep ^ip.*=* | cut -f 2 -d"i" | cut -f 2 -d"p"`
 
     if [ ! -z "$CWM_WANNICIDS" ]; then
 
@@ -165,14 +165,14 @@ function getServerIP() {
 
 function getServerIPAll() {
 
-    if [ ! -f "$CWMCONFIGFILE" ]; then
+    if [ ! -f "$CWM_CONFIGFILE" ]; then
 
         hostname -I
         return 0
         
     fi
         
-    echo `cat $CWMCONFIGFILE | grep ^ip.*=* | cut -f 2 -d"="`
+    echo `cat $CWM_CONFIGFILE | grep ^ip.*=* | cut -f 2 -d"="`
 
 }
 
