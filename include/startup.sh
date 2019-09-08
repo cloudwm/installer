@@ -171,7 +171,7 @@ function untag() {
 
     echo "Un-Tagging temp/$1" | log
     rootDir=$(rootDir)
-    rm $rootDir/temp/$1
+    rm -f $rootDir/temp/$1
 
 }
 

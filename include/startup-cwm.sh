@@ -192,7 +192,8 @@ function jsonize() {
 }
 
 function apt () {
-    if [ -f "$rootDir/temp/apt-fast.success" ]; then
+    
+    if [ -x "$(command -v apt-fast)" ]; then
 
         command apt-fast "$@"
 
@@ -201,6 +202,7 @@ function apt () {
         command apt "$@"
 
     fi
+
 }
 
 CWM_SERVERIP="$(getServerIP)"
