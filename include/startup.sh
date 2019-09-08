@@ -268,7 +268,7 @@ function curlDownload() {
     if [ -z "$1" ]; then
 
         echo "No download url is provided. Exiting (1)." | log 1
-        return 1
+        exit 1
         
     fi
 
@@ -287,8 +287,8 @@ function curlDownload() {
 
     if [ $exitCode -ne 0 ] || [ $httpResponse -ne 200 ]; then
 
-        echo "Download failed with exitCode:$exitCode and httpResponse:$httpResponse" | log 1
-        return 1
+        echo "Download failed (exit:$exitCode,http:$httpResponse): $1" | log 1
+        exit 1
         
     fi
 
