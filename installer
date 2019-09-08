@@ -40,19 +40,22 @@ for run in "${execute[@]}"; do
     case "$scriptExitCode" in
 		0)
 			echo "Done. (0)" | log
-			continue;
+			continue
+		;;
+		1)
+			exit 1
 		;;
 		98)
 			echo "Exit Code 98. Script already executed, can run only once. Continuing. (98)" | log
-			continue;
+			continue
 		;;
 		99)
 			echo "Exit Code 99. Continuing. (99)" | log
-			continue;
+			continue
 		;;
 		127)
 			echo "Error. ${run} not found. dying. (127)" | log 1
-			exit 1;
+			exit 1
 		;;
 		*)
 			echo "Exit Code not configured. Dying. ($scriptExitCode)" | log 1
