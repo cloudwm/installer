@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+if [[ -z "$CWM_LANNICIDS" ]]; then 
+
+    echo "No vLAN found, exiting." | log 1
+    tagScript failed
+    exit 1
+
+fi
+
+tagScript success
+
+exit 0
