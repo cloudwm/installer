@@ -262,7 +262,8 @@ function checkPackageInstalled() {
 function curlDownload() {
 
     checkPackageInstalled curl
-    
+    curlBaseParams=(--fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90)    
+
     # check if url is given
     if [ -z "$1" ]; then
 
@@ -274,12 +275,12 @@ function curlDownload() {
     # allow for nameless and nameful downloads
     if [ -z "$2" ]; then 
 
-        httpResponse=$(curl --fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --remote-name)
+        httpResponse=$(curl "${curlBaseParams[@]}" --url $1 --remote-name)
         local exitCode=$?
 
     else
 
-        httpResponse=$(curl --fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90 --url $1 --output $2)
+        httpResponse=$(curl "${curlBaseParams[@]}" --url $1 --output $2)
         local exitCode=$?
 
     fi
@@ -290,8 +291,6 @@ function curlDownload() {
         return 1
         
     fi
-
-    return 0
 
 }
 

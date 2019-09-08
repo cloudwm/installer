@@ -3,7 +3,6 @@
 # skip cwm related steps if config file not found
 if [ ! -f "$CWM_CONFIGFILE" ]; then
     echo "Missing CWM config file."
-    # exit 1
     return 0
 fi
 
@@ -67,7 +66,7 @@ function updateServerDescription() {
     local exitCode=$?
     if [ $exitCode -ne 0 ]; then
 
-        echo "Error updating server description" | log
+        echo "Error updating server description" | log 1
         return 1
 
     fi
@@ -83,7 +82,7 @@ function getServerDescription() {
     local exitCode=$?
     if [ $exitCode -ne 0 ]; then
 
-        echo "Error retrieving server overview"
+        echo "Error retrieving server overview" | log 1
         return 1
 
     fi
