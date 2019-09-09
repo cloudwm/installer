@@ -9,7 +9,7 @@ fi
 
 if [[ -z "$CWM_LANNICIDS" ]]; then 
 
-    echo "No vLAN found, exiting." | log 1
+    echo "No private LAN found, exiting." | log 1
     tagScript failed
     exit 1
 
