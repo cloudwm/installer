@@ -45,12 +45,11 @@ if [[ ! -z $(grep $scriptName $rcLocalFile) ]]; then
 else
     echo "Installing $scriptName in rc.local" | log
     # remove exit status set by default or script
-    sed -i -e '/if \[ \$exitCode/s/.*//' $rcLocalFile
     sed -i -e '/exit 0/s/.*//' $rcLocalFile
     # place command script
-    echo "bash $installerPath/$scriptName; ((exitCode+=\$?));" >> $rcLocalFile
+    echo "bash $installerPath/$scriptName" >> $rcLocalFile
+    echo "if [ \$? -ne 0 ]; then exit 1; fi;" >> $rcLocalFile
     # reposition exit status into /etc/rc.local
-    echo "if [ \$exitCode -ne 0 ]; then exit 1; fi;" >> $rcLocalFile
     echo "exit 0" >> $rcLocalFile
 fi
 
