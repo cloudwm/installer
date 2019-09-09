@@ -35,14 +35,11 @@ if [[ ! -z $(grep $scriptName $rcLocalFile) ]]; then
     echo "$0 is already installed in rc.local" | log
 else
     echo "Installing $scriptName in rc.local" | log
-    # remove exit status set by default or script
+    # remove "exit 0" set by default in /etc/rc.local/
     sed -i -e '/exit 0/s/.*//' $rcLocalFile
-    sed -i -e '/exit \${exitCode/s/.*//' $rcLocalFile
-    # place command script
     echo "bash $installerPath/$scriptName" >> $rcLocalFile
-    echo "if [ \$? -ne 0 ]; then exitCode=1; fi;" >> $rcLocalFile
-    # reposition exit status after script
-    echo "exit \${exitCode:-0}" >> $rcLocalFile
+    # return exit 0 to /etc/rc.local
+    echo "exit 0" >> $rcLocalFile
 fi
 
 tagScript success
