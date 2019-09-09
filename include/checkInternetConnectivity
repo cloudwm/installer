@@ -7,7 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-success=0
 curlBaseParams=(--connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30)
 domains=(www.cloudwm.com www.google.com www.yahoo.com)
 
@@ -17,9 +16,9 @@ for domain in "${domains[@]}"; do
 
     echo "Trying to fetch $domain" | log
     curl "${curlBaseParams[@]}" --url "http://$domain/" > /dev/null
-    errorCode=$?
-
-    if [ $errorCode -ne 0 ]; then
+    status=$?
+    ((exitCode+=$status))
+    if [ $status -ne 0 ]; then
 
         echo "Failed." | log
         continue
@@ -27,18 +26,17 @@ for domain in "${domains[@]}"; do
     fi
 
     echo "Succeed." | log
-    ((success++))
 
 done
 
-if [ $success -ne ${#domains[@]} ]; then 
+if [ $exitCode -ne 0 ]; then 
 
-    echo "Test passed $success of ${#domains[@]} times. Test Failed. (1)" | log 1
+    echo "Test didn't pass ${#domains[@]} times. Test Failed. (1)" | log 1
     tagScript failed
     exit 1
 
 fi
 
-echo "Test passed $success of ${#domains[@]} times. Test Passed. (0)" | log
+echo "Test passed ${#domains[@]} times. Test Passed. (0)" | log
 tagScript success    
 exit 0
