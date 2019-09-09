@@ -13,7 +13,7 @@ function disableAfterRun(){
 }
 
 ### basic check php-fpm existence
-if [[ ! -z "$service" ]]; then
+if [[ -z "$service" ]]; then
     echo "php-fpm is not installed" | tee -a /root/guest.errlog
     disableAfterRun
     exit 1
