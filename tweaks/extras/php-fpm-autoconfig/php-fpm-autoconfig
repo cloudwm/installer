@@ -1,10 +1,21 @@
 #!/bin/bash
 
-### basic check php-fpm existence
+scriptName=$(basename $BASH_SOURCE)
+rcLocalFile=/etc/rc.local
 service=$(systemctl | grep fpm | awk '{print $1}')
 
+function disableAfterRun(){
+
+    # disable script after first run	
+    sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
+    sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck
+
+}
+
+### basic check php-fpm existence
 if [[ ! -z "$service" ]]; then
     echo "php-fpm is not installed" | tee -a /root/guest.errlog
+    disableAfterRun
     exit 1
 fi
 
@@ -111,10 +122,6 @@ else
     sed -i "s/$currentmem/$overridemem/g" $ini
 fi
 
-# disable script after first run
-scriptName=$(basename $BASH_SOURCE)
-rcLocalFile=/etc/rc.local	
-sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
-sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck
+disableAfterRun
 
 exit 0
