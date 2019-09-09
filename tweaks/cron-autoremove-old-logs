@@ -14,7 +14,8 @@ minSpaceLeftKbytes=1000000
 minLogSizeKbytes=10000
 
 if [ -f "$cronFilename" ]; then
-    exit 0
+    echo "cron file already installed. Skipping." | log
+    exit 99
 fi
 
 cat << EOF > ${cronFilename}

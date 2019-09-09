@@ -20,7 +20,7 @@ if [ -f "$appPath/index.html" ]; then
 
     echo "index.html file exists. Skipping." | log
     tagScript success
-    exit 0
+    exit 99
 
 fi
 

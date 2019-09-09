@@ -43,6 +43,7 @@ for run in "${execute[@]}"; do
 			continue
 		;;
 		1)
+			# error log message provided by script
 			exit 1
 		;;
 		98)

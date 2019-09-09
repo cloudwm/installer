@@ -2,8 +2,8 @@
 
 # skip cwm related steps if config file not found
 if [ ! -f "$CWM_CONFIGFILE" ]; then
-    echo "Missing CWM config file."
-    return 0
+    echo "Missing CWM config file. Skipping." | log
+    exit 99
 fi
 
 # parse cwm config into global params
