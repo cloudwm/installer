@@ -10,7 +10,7 @@ fi
 # for cwm-based installations, otherwise it's ignored.
 if [ ! -f "$CWM_CONFIGFILE" ]; then
 
-    "CWM config file not found. Skipping." | log
+    echo "CWM config file not found. Skipping." | log
     tagScript skipped
     exit 99
 
