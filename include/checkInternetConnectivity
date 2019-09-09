@@ -13,7 +13,7 @@ domains=(www.cloudwm.com www.google.com www.yahoo.com)
 
 echo "Checking internet connectivity" | log
 
-for domain in "${domains}"; do
+for domain in "${domains[@]}"; do
 
     echo "Trying to fetch $domain" | log
     curl "${curlBaseParams[@]}" --url "http://$domain/" > /dev/null
@@ -31,14 +31,14 @@ for domain in "${domains}"; do
 
 done
 
-if [ $success -eq 0 ]; then 
+if [ $success -ne ${#domains[@]} ]; then 
 
-    echo "Test passed $success times. Test Failed. (1)" | log 1
+    echo "Test passed $success of ${#domains[@]} times. Test Failed. (1)" | log 1
     tagScript failed
     exit 1
 
 fi
 
-echo "Test passed $success times. Test Passed. (0)" | log
+echo "Test passed $success of ${#domains[@]} times. Test Passed. (0)" | log
 tagScript success    
 exit 0
