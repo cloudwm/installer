@@ -46,7 +46,7 @@ else
     echo "Installing $scriptName in rc.local" | log
     # remove exit status set by default or script
     sed -i -e '/exit 0/s/.*//' $rcLocalFile
-    sed -i -e '/exit \$exitCode/s/.*//' $rcLocalFile
+    sed -i -e '/exit \${exitCode/s/.*//' $rcLocalFile
     # place command script
     echo "bash $installerPath/$scriptName" >> $rcLocalFile
     echo "if [ \$? -ne 0 ]; then exitCode=1; fi;" >> $rcLocalFile
