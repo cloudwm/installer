@@ -183,7 +183,7 @@ function getServerIPAll() {
 # "arg3":'$NON_QUOTED_VAR',
 # "arg4":"'"$QOUTED_VAR"'"
 # }'
-# curl -X POST -H "Content-Type: application/json" --url "$URL" -d $(jsonize "$JSON_STRING")
+# curl -X POST -H "Content-Type: application/json" --url "$URL" -d "$(jsonize "$JSON_STRING")"
 function jsonize() {
 
     echo $1 | sed s'/, "/,"/g' | sed s'/{ /{/g' | sed s'/ }/}/g'

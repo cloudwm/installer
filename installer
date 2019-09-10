@@ -8,8 +8,7 @@ if [ -z "$1" ]; then
 
     if [ ! -f "./installer.conf" ]; then 
 
-		echo "installer.conf file not found." | log
-		echo "Usage: ./installer installer.config.file.conf"  | log 1
+		echo -e "installer.conf file not found.\n Usage: ./installer installer.config.file.conf" | log 1
 		exit 1
     fi
 	

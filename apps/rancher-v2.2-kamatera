@@ -122,7 +122,7 @@ PLANE_JSON_STRING='{
 "name":"Kamatera Control Plane",
 "useInternalIpAddress":true
 }'
-curl --url "https://${rancherDomain}/v3/nodetemplates" -d $(jsonize "$PLANE_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$PLANE_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 #Kamatera Worker
 WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
@@ -146,7 +146,7 @@ WORKER_JSON_STRING='{
 "name":"Kamatera Worker",
 "useInternalIpAddress":true
 }'
-curl --url "https://${rancherDomain}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
 echo "Adding descriptions" | log
 descriptionAppend "Rancher web UI: https://${rancherDomain}"
