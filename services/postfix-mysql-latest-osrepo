@@ -24,7 +24,7 @@ checkPackageInstalled postfix
 checkPackageInstalled postfix-mysql 
 
 # Copy Prebuilt config
-cp $rootDir/tweaks/extras/postfix-mysql/master.cf  /etc/postfix/master.cf
+cp $rootDir/tweaks/extras/postfix-mysql/master.cf  /etc/postfix/
 
 systemctl restart postfix
 

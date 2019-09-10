@@ -7,48 +7,38 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-if [ -f "$CWMCONFIGFILE" ]; then
+# for cwm-based installations, otherwise it's ignored.
+if [ ! -f "$CWM_CONFIGFILE" ]; then
 
-    case  $ZONE  in
-        IL| IL-JR|IL-TA|IL-RH|IL-PT)
-            echo "Setting timezone for Israel" | log
-            timedatectl set-timezone "Asia/Jerusalem" | log
-        ;;
-        EU)
-            echo "Setting timezone for Amsterdam" | log
-            timedatectl set-timezone "Europe/Amsterdam" | log
-        ;;
-        EU-LO)
-            echo "Setting timezone for London" | log
-            timedatectl set-timezone "Europe/London" | log
-        ;;
-        EU-FR)
-            echo "Setting timezone for Frankfurt" | log
-            timedatectl set-timezone "Europe/Berlin" | log
-        ;;
-        US-NY2)
-            echo "Setting timezone for New York" | log
-            timedatectl set-timezone "America/New_York" | log
-        ;;
-        US-TX)
-            echo "Setting timezone for Austin" | log
-            timedatectl set-timezone "America/Chicago" | log
-        ;;
-        US-SC)
-            echo "Setting timezone for Santa-Clara" | log
-            timedatectl set-timezone "America/Los_Angeles" | log
-        ;;
-        CA-TR)
-            echo "Setting timezone for Toronto" | log
-            timedatectl set-timezone "America/Toronto" | log
-        ;;
-        AS)
-            echo "Setting timezone for Hong Kong" | log
-            timedatectl set-timezone "Asia/Hong_Kong" | log
-        ;;
-    esac
+    echo "CWM config file not found. Skipping." | log
+    tagScript skipped
+    exit 99
 
 fi
+
+declare -A timezones
+timezones[IL]="Asia/Jerusalem"
+timezones[IL-JR]="Asia/Jerusalem"
+timezones[IL-TA]="Asia/Jerusalem"
+timezones[IL-RH]="Asia/Jerusalem"
+timezones[IL-PT]="Asia/Jerusalem"
+timezones[EU]="Europe/Amsterdam"
+timezones[EU-LO]="Europe/London"
+timezones[EU-FR]="Europe/Berlin"
+timezones[US-NY2]="America/New_York"
+timezones[US-TX]="America/Chicago"
+timezones[US-SC]="America/Los_Angeles"
+timezones[CA-TR]="America/Toronto"
+timezones[AS]="Asia/Hong_Kong"
+
+if [ ! ${timezones[$CWM_ZONE]} ]; then
+
+    echo "timezone $CWM_ZONE not set. Exiting." | log 1
+    exit 1
+
+fi
+
+timedatectl set-timezone $(echo ${timezones[$CWM_ZONE]}) | log
 
 tagScript success
 

@@ -10,7 +10,6 @@ checkTagExist php.success
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 checkPackageInstalled php$phpVersion-cli
 rootDir=$(rootDir)
-checkTempDir
 
 echo "install wp cli for wordpress" | log
 
@@ -24,7 +23,7 @@ mv wp-cli.phar /usr/local/bin/wp
 echo "check binary existence of wp cli" | log
 
 if [ ! -f "/usr/local/bin/wp" ]; then
-	echo "Failed installing wp-cli"
+	echo "Failed installing wp-cli" | log 1
 	exit 1
 fi
 

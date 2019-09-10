@@ -31,7 +31,7 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 
 echo "Adding descriptions" | log
-descriptionAppend "Rocket.chat web UI: https://${SERVERIP}"
+descriptionAppend "Rocket.chat web UI: https://${CWM_SERVERIP}"
 descriptionAppend " "
 descriptionAppend "Rocket.chat application directories:"
 descriptionAppend "/snap/rocketchat-server/"

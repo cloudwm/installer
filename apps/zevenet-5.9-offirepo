@@ -11,7 +11,6 @@ appVersion=5.9.\*
 freePort=4444
 aptSourceList=/etc/apt/sources.list.d/zevenet.list
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Backup ip settings" | log
 cp /etc/network/interfaces $rootDir/temp/interfaces
@@ -56,7 +55,7 @@ echo "Tweaking configurations" | log
 cp -f $rootDir/temp/interfaces /etc/network/interfaces
 sed -i '1 i\#zenmodified' /etc/network/interfaces
 # Configre zevenet virtual ip
-sed -i 's/\;\;/\;'"${SERVERIP}"\;'/g' $appPath/config/if_eth0_conf
+sed -i 's/\;\;/\;'"${CWM_SERVERIP}"\;'/g' $appPath/config/if_eth0_conf
 # Configure free port not blocked by system
 sed -i "s/^server\!bind\!1\!port = [0-9]\+$/server\!bind\!1\!port = ${freePort}/" $appPath/app/cherokee/etc/cherokee/cherokee.conf
 # Generate and apply random zapi key
@@ -70,7 +69,7 @@ sleep 5
 rm -f /etc/motd
 
 echo "Adding descriptions" | log
-descriptionAppend "Zevenet Admin URI: https://${SERVERIP}:${freePort}"
+descriptionAppend "Zevenet Admin URI: https://${CWM_SERVERIP}:${freePort}"
 descriptionAppend "Zevenet Admin User: root"
 descriptionAppend "Zevenet Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

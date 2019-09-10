@@ -12,7 +12,6 @@ checkTagExist cwm-settimezone.success
 appVersion=2.6.1
 appPackage=openvpn-as-$appVersion-Ubuntu18.amd_64.deb
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Downloading binary" | log
 cd $rootDir/temp

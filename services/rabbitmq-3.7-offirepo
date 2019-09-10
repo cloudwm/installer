@@ -47,7 +47,7 @@ systemctl enable rabbitmq-server
 systemctl start rabbitmq-server
 
 echo "Adding descriptions" | log
-descriptionAppend "RabbitMQ web UI: https://${SERVERIP}"
+descriptionAppend "RabbitMQ web UI: https://${CWM_SERVERIP}"
 descriptionAppend "RabbitMQ admin user: admin"
 descriptionAppend "RabbitMQ admin password: ${ADMINPASSWORD}"
 descriptionAppend " "

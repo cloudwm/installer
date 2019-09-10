@@ -59,7 +59,7 @@ StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
 User=rocket
-Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${SERVERIP} PORT=${app_port}
+Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_SERVERIP} PORT=${app_port}
 ExecStart=/usr/local/bin/node ${app_path}/Rocket.Chat/main.js
 
 [Install]
@@ -80,14 +80,14 @@ printf "Application and services loading is in progress, process will take a cou
 
 echo "Configuring nginx" | log
 cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat-nginx-config /etc/nginx/sites-available/rocketchat.conf
-# sed -i "s/SERVERIP/${SERVERIP}/g" /etc/nginx/sites-available/rocketchat.conf
+# sed -i "s/SERVERIP/${CWM_SERVERIP}/g" /etc/nginx/sites-available/rocketchat.conf
 ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
-descriptionAppend "Rocket.chat web UI: https://${SERVERIP}"
+descriptionAppend "Rocket.chat web UI: https://${CWM_SERVERIP}"
 descriptionAppend " "
 
 tagScript success

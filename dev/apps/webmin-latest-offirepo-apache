@@ -34,13 +34,13 @@ echo "Enable Apache SSL + proxy" | log
 a2enmod proxy_http
 a2enmod ssl
 cp $rootDir/tweaks/extras/webmin-apache/webmin.conf /etc/apache2/sites-available/webmin.conf
-sed -i "/ServerName/s/SERVERIP/${SERVERIP}/g" /etc/apache2/sites-available/webmin.conf
+sed -i "/ServerName/s/SERVERIP/${CWM_SERVERIP}/g" /etc/apache2/sites-available/webmin.conf
 a2ensite webmin.conf
 systemctl reload apache2
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Webmin web interface: https://${SERVERIP}"
+descriptionAppend "Webmin web interface: https://${CWM_SERVERIP}"
 descriptionAppend "Webmin admin user: root"
 descriptionAppend "Webmin admin password: ${ADMINPASSWORD}"
 descriptionAppend " "

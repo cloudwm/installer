@@ -36,7 +36,7 @@ function checkTempDir() {
 
     if [ ! -d "$rootDir/temp" ]; then
 
-	    mkdir $rootDir/temp
+	    mkdir -p $rootDir/temp
 
     fi
 
@@ -45,7 +45,7 @@ function checkTempDir() {
 function log() {
 
     rootDir=$(rootDir)
-    logScriptName=`basename $0`
+    logScriptName=$(basename $0)
 
     if [ -z "$logDir" ]; then
 
@@ -55,11 +55,15 @@ function log() {
 
     if [ ! -d "$logDir" ]; then 
 
-	    mkdir $logDir
+	    mkdir -p $logDir
 
     fi
 
-    while IFS= read -r line; do printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"; done | tee -a $logDir/$(date '+%Y-%m-%d').log
+    while IFS= read -r line; do 
+
+        printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"; 
+
+    done | tee -a $logDir/$(date '+%Y-%m-%d').log ${1:+${CWM_ERRORFILE}}
 
 }
 
@@ -67,10 +71,14 @@ function checkRootUser() {
 
     echo "Checking if user is root ... " | log
 
-    [ $(id -u) != '0' ] && { echo "Error: You must be root to run this script. exiting (1)."; exit 1; }
+    if [ $(id -u) != '0' ]; then
+
+        echo "Error: You must be root to run this script. exiting (1)." | log 1
+        exit 1
+
+    fi
 
     echo "Found user $(id -u)." | log
-
 
 }
 
@@ -87,7 +95,7 @@ function checkOs {
 
     if [[ "$OS $OSVersion" != *"Ubuntu"*"18" ]]; then
 
-        echo "$OS $OSVersion is not supported, exiting. (1)" | log
+        echo "$OS $OSVersion is not supported, exiting. (1)" | log 1
         exit 1
         
     fi
@@ -171,7 +179,7 @@ function untag() {
 
     echo "Un-Tagging temp/$1" | log
     rootDir=$(rootDir)
-    rm $rootDir/temp/$1
+    rm -f $rootDir/temp/$1
 
 }
 
@@ -180,8 +188,7 @@ function checkTagExist() {
     rootDir=$(rootDir)
     if [ ! -f "$rootDir/temp/$1" ]; then
 
-	    echo "checkTagExist: Tag temp/$1 doesn't exist." | log
-	    echo "execution stopped, exiting (1). " | log
+	    echo "checkTagExist: Tag temp/$1 doesn't exist, exiting (1)." | log 1
         exit 1;
 
     else
@@ -220,12 +227,13 @@ function backupFile() {
 
 function waitOrStop() {
 
-    exitCode=$?
+    # exitCode=$?
+    exitCode=${PIPESTATUS[0]}
     waitExitCode=$1
 
-    if [ "$waitExitCode" != "$exitCode" ]; then
+    if [ $waitExitCode -ne $exitCode ]; then
 
-	    echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log
+	    echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log 1
         exit 1;
 
     fi
@@ -240,7 +248,7 @@ function checkPackageInstalled() {
 
 	    if [ -z "$package" ]; then
 	
-	        echo "Package $1 is not installed. exiting (1)." | log
+	        echo "Package $1 is not installed. exiting (1)." | log 1
 	        exit 1;
 
 	    fi
@@ -248,6 +256,163 @@ function checkPackageInstalled() {
     fi
 
     unset package
+
+}
+
+function curlDownload() {
+
+    checkPackageInstalled curl
+    curlBaseParams=(--fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90)    
+
+    # check if url is given
+    if [ -z "$1" ]; then
+
+        echo "No download url is provided. Exiting (1)." | log 1
+        exit 1
+        
+    fi
+
+    # allow for nameless and nameful downloads
+    if [ -z "$2" ]; then 
+
+        httpResponse=$(curl "${curlBaseParams[@]}" --url $1 --remote-name)
+        local exitCode=$?
+
+    else
+
+        httpResponse=$(curl "${curlBaseParams[@]}" --url $1 --output $2)
+        local exitCode=$?
+
+    fi
+
+    if [ $exitCode -ne 0 ] || [ $httpResponse -ne 200 ]; then
+
+        echo "Download failed (exit:$exitCode,http:$httpResponse): $1" | log 1
+        exit 1
+        
+    fi
+
+}
+
+function createSwapFile() {
+
+    # 1:filename, 2:megabytes, 3:path
+
+    # if path is given, know how to handle it when creating swap
+    if [ ! -z $3 ]; then
+
+        if [ -d $3 ]; then
+
+            # path exists
+            createDir=0
+
+        else
+
+            # new path
+            createDir=1
+
+        fi
+
+    else
+
+        # path not given
+        createDir=2
+
+    fi
+
+    if [ -z $1 ]; then
+
+        # (>&2 echo "error: no filename given to swap file")
+        echo "error: no filename given to swap file" | log
+        return 1
+
+    fi
+
+    if [[ $createDir -eq 2 && -e $1 ]] || [[ $createDir -eq 0 && -e "$3/$1" ]]; then
+
+        echo "error: a file with this name already exists" | log
+        return 1
+
+    fi
+
+    if [ -z $2 ]; then
+
+        echo "error: swap size (in MB) must be provided" | log
+        return 1
+
+    fi
+
+    if [[ $2 =~ '^[0-9]+$' ]] || [[ $2 -le 0 ]]; then
+
+        echo "error: swap size must be a number greater than 0" | log
+        return 1
+
+    fi
+
+    diskSizeMb=`df --output=avail -m "$PWD" | sed '1d;s/[^0-9]//g'`
+    swapSizeAllowed=$((diskSizeMb/2))
+
+    if [ $2 -gt $swapSizeAllowed ]; then
+
+        echo "error: maximum swap size (in MB) can be $swapSizeAllowed" | log
+        return 1
+
+    fi
+
+    # create swap in existing directory
+    if [ $createDir -eq 0 ]; then
+
+        swapFile="$3/$1"
+
+    fi
+
+    # create new directory for swap
+    if [ $createDir -eq 1 ]; then
+
+        mkdir -p $3
+        swapFile="$3/$1"
+
+    fi
+
+    # create swap in current path
+    if [ $createDir -eq 2 ]; then
+
+        swapFile="$1"
+
+    fi
+
+    # generate swap file and mount it
+    dd if=/dev/zero of=$swapFile bs=1M count=$2
+    mkswap $swapFile >/dev/null || { echo 'mkswap failed' ; return 1; }
+    swapon $swapFile >/dev/null || { echo 'swapon failed' ; return 1; }
+    chmod 600 $swapFile >/dev/null || { echo 'chmod swapfile failed' ; return 1; }
+
+    if [ ! -e $swapFile ]; then
+
+        echo "error: did not complete swap creation properly"
+        return 1
+
+    fi
+
+    echo "$swapFile"
+    return 0
+
+}
+
+function removeSwapFile() {
+
+    # 1: filename given when created swap with createSwapFile()
+    if [ ! -e $1 ]; then
+
+        echo "error: a swapfile with this name was not found. did nothing" | log
+        return 1
+
+    fi
+
+    swapoff $1
+    rm -f $1
+
+    return 0
 
 }
 

@@ -15,7 +15,6 @@ currentDate=`date +"%Y-%m-%d %H:%M:%S"`
 appPath=/var/www/html
 appVersion=3-9-10
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Installing Joomla" | log
 echo "Downloading Joomla from original repo" | log
@@ -72,7 +71,7 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
 echo "adding descriptions" | log
-descriptionAppend "Joomla Admin Web Interface: https://${SERVERIP}/administrator"
+descriptionAppend "Joomla Admin Web Interface: https://${CWM_SERVERIP}/administrator"
 descriptionAppend "Joomla Admin Username: admin"
 descriptionAppend "Joomla Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "
