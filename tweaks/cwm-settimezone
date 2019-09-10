@@ -31,6 +31,13 @@ timezones[US-SC]="America/Los_Angeles"
 timezones[CA-TR]="America/Toronto"
 timezones[AS]="Asia/Hong_Kong"
 
+if [ ! ${timezones[$CWM_ZONE]} ]; then
+
+    echo "timezone $CWM_ZONE not set. Exiting." | log 1
+    exit 1
+
+fi
+
 timedatectl set-timezone $(echo ${timezones[$CWM_ZONE]}) | log
 
 tagScript success
