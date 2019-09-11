@@ -53,15 +53,15 @@ function log() {
 
     fi
 
-    if [ ! -d "$logDir" ]; then 
+    if [ ! -d "$logDir" ]; then
 
 	    mkdir -p $logDir
 
     fi
 
-    while IFS= read -r line; do 
+    while IFS= read -r line; do
 
-        printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"; 
+        printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line";
 
     done | tee -a $logDir/$(date '+%Y-%m-%d').log ${1:+${CWM_ERRORFILE}}
 
@@ -97,7 +97,7 @@ function checkOs {
 
         echo "$OS $OSVersion is not supported, exiting. (1)" | log 1
         exit 1
-        
+
     fi
 
     echo "Found supported OS: $OS $OSVersion" | log
@@ -208,7 +208,7 @@ function backupFile() {
 
         fileDirectory=`dirname $1`
 
-        if [ ! -d "$rootDir/temp/backup/$fileDirectory" ]; then 
+        if [ ! -d "$rootDir/temp/backup/$fileDirectory" ]; then
 
 	        mkdir -p $rootDir/temp/backup/$fileDirectory
 
@@ -242,38 +242,32 @@ function waitOrStop() {
 
 function checkPackageInstalled() {
 
-    if [ ! -z "$1" ]; then
+    dpkg-query -W "$1"
+    local exitCode=$?
+    if [ $exitCode -ne 0 ]; then
 
-	    package=`dpkg -l $1 | grep "ii.*$1 "`
-
-	    if [ -z "$package" ]; then
-	
-	        echo "Package $1 is not installed. exiting (1)." | log 1
-	        exit 1;
-
-	    fi
+        echo "Package $1 is not installed. exiting (1)." | log 1
+        exit 1;
 
     fi
-
-    unset package
 
 }
 
 function curlDownload() {
 
     checkPackageInstalled curl
-    curlBaseParams=(--fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90)    
+    curlBaseParams=(--fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 90)
 
     # check if url is given
     if [ -z "$1" ]; then
 
         echo "No download url is provided. Exiting (1)." | log 1
         exit 1
-        
+
     fi
 
     # allow for nameless and nameful downloads
-    if [ -z "$2" ]; then 
+    if [ -z "$2" ]; then
 
         httpResponse=$(curl "${curlBaseParams[@]}" --url $1 --remote-name)
         local exitCode=$?
@@ -289,7 +283,7 @@ function curlDownload() {
 
         echo "Download failed (exit:$exitCode,http:$httpResponse): $1" | log 1
         exit 1
-        
+
     fi
 
 }

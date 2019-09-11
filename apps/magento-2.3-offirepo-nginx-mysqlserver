@@ -24,8 +24,7 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Installing Composer for machine" | log
-#DEV
-apt install omposesdfdfr -y | log
+apt install composer -y | log
 waitOrStop 0
 checkPackageInstalled composer
 
