@@ -91,7 +91,7 @@ systemctl restart kibana.service
 echo "Adding descriptions" | log
 descriptionAppend "Elasticsearch admin user: admin"
 descriptionAppend "Elasticsearch admin password: ${ADMINPASSWORD}"
-descriptionAppend "Elasticsearch (Kibana) web interface: https://${SERVERIP}"
+descriptionAppend "Elasticsearch (Kibana) web interface: https://${CWM_SERVERIP}"
 descriptionAppend " "
 descriptionAppend "Elasticsearch configuration: /etc/elasticsearch/"
 descriptionAppend "Kibana configuration: /etc/kibana/kibana.yml"

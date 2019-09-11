@@ -10,7 +10,6 @@ checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Adding hostname to /etc/hosts" | log
 echo "127.0.0.1   `hostname`" >> /etc/hosts
@@ -24,7 +23,7 @@ waitOrStop 0
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Please proceed to http://${SERVERIP}/  to finish the installation"
+descriptionAppend "Please proceed to http://${CWM_SERVERIP}/  to finish the installation"
 descriptionAppend " "
 
 tagScript success

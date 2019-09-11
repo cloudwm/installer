@@ -8,21 +8,13 @@ fi
 
 checkTagExist docker-latest-offirepo.success
 
-if [[ -z "$LANNICIDS" ]]; then 
-    echo "No LAN found, exiting." | log
-    exit 1
-fi
-
 rootDir=$(rootDir)
-checkTempDir
 engineInstallUrl=https://releases.rancher.com/install-docker/18.09.sh
 kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.2/docker-machine-driver-kamatera_v1.0.2_linux_amd64.tar.gz
 
 RANCHER_VERSION=v2.2.8
-clientId=`cat ${CWMCONFIGFILE} | grep apiClientId | cut -d '=' -f 2`
-secret=`cat ${CWMCONFIGFILE} | grep apiSecret | cut -d '=' -f 2`
-vlan=`cat ${CWMCONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
-rancherDomain="rancher.${SERVERIP//./-}.cloud-xip.io"
+vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
+rancherDomain="rancher.${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Installing Jq" | log
 apt install -y jq
@@ -63,10 +55,10 @@ docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/ra
 curlBaseParams=( --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
 echo "Waiting for Rancher to intialize" | log
-HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${SERVERIP}:443 --insecure`
+HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_SERVERIP}:443 --insecure`
 until [ "$HTTPD" == "200" ]; do
     sleep 3
-    HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${SERVERIP}:443 --insecure`
+    HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_SERVERIP}:443 --insecure`
 done
 sleep 15
 
@@ -114,12 +106,12 @@ PLANE_JSON_STRING='{
 "engineRegistryMirror":[],
 "engineStorageDriver":"overlay2",
 "kamateraConfig":{
-"apiClientId":"'"${clientId}"'",
-"apiSecret":"'"${secret}"'",
+"apiClientId":"'"${CWM_APICLIENTID}"'",
+"apiSecret":"'"${CWM_APISECRET}"'",
 "billing":"hourly",
 "cpu":"2B",
 "createServerCommandId":"0",
-"datacenter":"'"${ZONE}"'",
+"datacenter":"'"${CWM_ZONE}"'",
 "diskSize":"30",
 "image":"ubuntu_server_18.04_64-bit",
 "privateNetworkIp":"",
@@ -130,7 +122,7 @@ PLANE_JSON_STRING='{
 "name":"Kamatera Control Plane",
 "useInternalIpAddress":true
 }'
-curl --url "https://${rancherDomain}/v3/nodetemplates" -d $(jsonize "$PLANE_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$PLANE_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 #Kamatera Worker
 WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
@@ -138,12 +130,12 @@ WORKER_JSON_STRING='{
 "engineRegistryMirror":[],
 "engineStorageDriver":"overlay2",
 "kamateraConfig":{
-"apiClientId":"'"${clientId}"'",
-"apiSecret":"'"${secret}"'",
+"apiClientId":"'"${CWM_APICLIENTID}"'",
+"apiSecret":"'"${CWM_APISECRET}"'",
 "billing":"hourly",
 "cpu":"2B",
 "createServerCommandId":"0",
-"datacenter":"'"${ZONE}"'",
+"datacenter":"'"${CWM_ZONE}"'",
 "diskSize":"50",
 "image":"ubuntu_server_18.04_64-bit",
 "privateNetworkIp":"",
@@ -154,7 +146,7 @@ WORKER_JSON_STRING='{
 "name":"Kamatera Worker",
 "useInternalIpAddress":true
 }'
-curl --url "https://${rancherDomain}/v3/nodetemplates" -d $(jsonize "$WORKER_JSON_STRING") -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
 echo "Adding descriptions" | log
 descriptionAppend "Rancher web UI: https://${rancherDomain}"

@@ -11,6 +11,9 @@ checkOs
 checkRootUser
 runOnceCheck
 
+# Kubernetes default installation directory
+KUBEDIR=/opt/kubernetes/
+
 echo "Updating OS to the latest version" | log
 apt-get update -y | log
 waitOrStop 0

@@ -8,7 +8,6 @@ fi
 
 aptSourceList=/etc/apt/sources.list.d/zentyal.list
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Add Zentyal 6.0 repository" | log
 curlDownload http://keys.zentyal.org/zentyal-6.0-archive.asc
@@ -31,7 +30,7 @@ passwd -l root
 
 
 echo "Adding descriptions" | log
-descriptionAppend "Zentyal Admin URI: https://${SERVERIP}:8443"
+descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
 descriptionAppend "Zentyal Admin User: admin"
 descriptionAppend "Zentyal Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

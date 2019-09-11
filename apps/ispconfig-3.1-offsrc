@@ -27,7 +27,7 @@ systemctl start mysql.service
 
 echo "adding descriptions" | log
 
-descriptionAppend "ISPConfig Admin Web Interface: https://${SERVERIP}:8080/"
+descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"
 descriptionAppend "ISPConfig Admin Username: admin"
 descriptionAppend "ISPConfig Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

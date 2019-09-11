@@ -42,7 +42,7 @@ systemctl restart jenkins
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Initial setup URL: https://${SERVERIP}:${assignedPort}"
+descriptionAppend "Initial setup URL: https://${CWM_SERVERIP}:${assignedPort}"
 descriptionAppend "Unlock key: $unlockkey"
 descriptionAppend " "
 descriptionAppend "If main page is blank after initial setup, restart the server:"

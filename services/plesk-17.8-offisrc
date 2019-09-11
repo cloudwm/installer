@@ -18,7 +18,7 @@ waitOrStop 0
 echo "Configuring Plesk" | log
 email=`cat /root/guest.conf | grep email | cut -d '=' -f 2`
 hostname=`hostname -I | tr '.' '-' | awk '{ print "plesk."$1".cloud-xip.io"}'`
-plesk bin init_conf --init -default-ip ${SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${email} -hostname ${hostname}
+plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${email} -hostname ${hostname}
 waitOrStop 0
 
 echo "Checking Plesk Configuration" | log
@@ -26,7 +26,7 @@ plesk bin init_conf -c
 waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "Plesk Address: ${SERVERIP}:8443"
+descriptionAppend "Plesk Address: ${CWM_SERVERIP}:8443"
 descriptionAppend "Plesk user: root"
 descriptionAppend "Plesk password: ${ADMINPASSWORD}"
 descriptionAppend " "

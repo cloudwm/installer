@@ -7,67 +7,36 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-success=0
+curlBaseParams=(--connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30)
+domains=(www.cloudwm.com www.google.com www.yahoo.com)
+
 echo "Checking internet connectivity" | log
-echo "Trying to fetch www.cloudwm.com" | log
-curl "http://www.cloudwm.com/"  --connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 > /dev/null
 
-errorCode=$?
+for domain in "${domains[@]}"; do
 
-if [ $errorCode -gt 0 ]; then
+    echo "Trying to fetch $domain" | log
+    curl "${curlBaseParams[@]}" --url "http://$domain/" > /dev/null
+    status=$?
+    ((exitCode+=$status))
+    if [ $status -ne 0 ]; then
 
-    echo "Failed." | log
+        echo "Failed." | log
+        continue
 
-
-else 
-
-    echo "Succeed." | log
-    ((success++))
-
-fi
-
-
-echo "Trying to fetch www.google.com" | log
-curl "http://www.google.com/"  --connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 > /dev/null
-errorCode=$?
-
-if [ $errorCode -gt 0 ]; then
-
-    echo "Failed." | log
-
-
-else
+    fi
 
     echo "Succeed." | log
-    ((success++))
 
-fi
+done
 
-echo "Trying to fetch www.yahoo.com" | log
-curl "http://www.yahoo.com/"  --connect-timeout 10 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 > /dev/null
-errorCode=$?
+if [ $exitCode -ne 0 ]; then 
 
-if [ $errorCode -gt 0 ]; then
-
-    echo "Failed." | log
-
-else
-
-    echo "Succeed." | log
-    ((success++))
-
-fi
-
-if [ "$success" -gt 0 ]; then 
-
-    echo "Test passed $success times. Test Passed. (0)" | log
-    tagScript success    
-    exit 0
-    
-else
-
-    echo "Test passed $success times. Test Failed. (1)" | log
+    echo "Test didn't pass ${#domains[@]} times. Test Failed. (1)" | log 1
     tagScript failed
     exit 1
 
 fi
+
+echo "Test passed ${#domains[@]} times. Test Passed. (0)" | log
+tagScript success    
+exit 0

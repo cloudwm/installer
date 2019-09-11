@@ -15,7 +15,6 @@ checkTagExist nginx-enable-php-ssl.success
 appPath=/var/www/html
 appVersion=3.6.5
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
@@ -61,7 +60,7 @@ systemctl restart nginx.service
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Moodle web UI: https://${SERVERIP}"
+descriptionAppend "Moodle web UI: https://${CWM_SERVERIP}"
 descriptionAppend "Moodle admin user: admin"
 descriptionAppend "Moodle admin password: ${ADMINPASSWORD}"
 descriptionAppend " "

@@ -8,7 +8,6 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Installing Google Chrome latest stable" | log
 cd $rootDir/temp

@@ -15,7 +15,6 @@ appPath=/var/www/html
 appVersion=1.33.0
 appArchive=mediawiki-$appVersion.tar.gz
 rootDir=$(rootDir)
-checkTempDir
 
 echo "Installing MediaWiki" | log
 
@@ -47,7 +46,7 @@ EOF
 
 echo "Installing MediaWiki" | log
 cd $appPath
-php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath="" --server https://${SERVERIP} "MediaWiki" "admin"
+php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath="" --server https://${CWM_SERVERIP} "MediaWiki" "admin"
 echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php 
 
 echo "Creating nginx configuration" | log
@@ -64,7 +63,7 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
 echo "Adding descriptions" | log
-descriptionAppend "Mediawiki web UI: https://${SERVERIP}"
+descriptionAppend "Mediawiki web UI: https://${CWM_SERVERIP}"
 descriptionAppend "Mediawiki admin user: admin"
 descriptionAppend "Mediawiki admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
