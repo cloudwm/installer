@@ -13,9 +13,7 @@ useradd --system minio-user --shell /sbin/nologin
 
 echo "Download Minio Binary" | log
 cd $rootDir/temp
-# curl -O https://dl.minio.io/server/minio/release/linux-amd64/minio
 curlDownload https://dl.minio.io/server/minio/release/linux-amd64/minio
-waitOrStop 0
 
 echo "Install minio binary" | log
 mv $rootDir/temp/minio /usr/local/bin
@@ -34,9 +32,7 @@ echo "MINIO_OPTS=\"-C /etc/minio --certs-dir /etc/minio/certs --address :443\"" 
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 echo "Adding Systemd Service" | log
-# curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
 curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
-waitOrStop 0
 mv minio.service /etc/systemd/system
 
 echo "Generating self-signed certificate" | log

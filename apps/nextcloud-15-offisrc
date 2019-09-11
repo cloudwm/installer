@@ -50,8 +50,7 @@ systemctl restart nginx.service
 
 echo "Tweaking app and runtime settings" | log
 # installing image preview functionality
-#DEV
-# apt install php-imagick -y
+apt install php-imagick -y
 waitOrStop 0
 checkPackageInstalled php-imagick
 phpIniPath=/etc/php/$phpVersion/fpm/php.ini

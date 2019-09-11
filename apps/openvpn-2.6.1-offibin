@@ -15,9 +15,7 @@ rootDir=$(rootDir)
 
 echo "Downloading binary" | log
 cd $rootDir/temp
-# curl -O http://swupdate.openvpn.org/as/openvpn-as-2.6.1-Ubuntu18.amd_64.deb | log
 curlDownload http://swupdate.openvpn.org/as/$appPackage
-waitOrStop 0
 
 echo "Installing application" | log
 

@@ -10,8 +10,7 @@ appPath=/var/www/html
 nginxVersion=1.14.\*
 
 echo "install nginx from apt" | log
-#DEV
-apt install -y pppnginx-full=$nginxVersion | log
+apt install -y nginx-full=$nginxVersion | log
 waitOrStop 0
 
 checkPackageInstalled nginx-full

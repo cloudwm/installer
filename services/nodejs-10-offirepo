@@ -10,9 +10,7 @@ rootDir=$(rootDir)
 
 echo "Downloading Node.js repository" | log
 
-# curl -sL https://deb.nodesource.com/setup_10.x | sudo bash - | log
 curlDownload https://deb.nodesource.com/setup_10.x
-waitOrStop 0
 bash setup_10.x | log
 waitOrStop 0
 
