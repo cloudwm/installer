@@ -13,12 +13,15 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
+# appVersion=3.6.5
 appVersion=3.7.2
+appBranch=stable37
 rootDir=$(rootDir)
 
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
-curlDownload https://download.moodle.org/stable36/moodle-$appVersion.tgz
+# curlDownload https://download.moodle.org/stable36/moodle-$appVersion.tgz
+curlDownload https://download.moodle.org/$appBranch/moodle-$appVersion.tgz
 waitOrStop 0
 tar -xzvf moodle-$appVersion.tgz
 waitOrStop 0
