@@ -241,11 +241,22 @@ function waitOrStop() {
 
 function checkPackageInstalled() {
 
-    dpkg-query -W "$1"
-    local exitCode=$?
-    if [ $exitCode -ne 0 ]; then
+    notInstalled=()
+    for package in "$@"; do
 
-        echo "Package $1 is not installed. exiting (1)." | log 1
+        dpkg-query -W ${package/=*/}
+        local exitCode=$?
+        if [ $exitCode -ne 0 ]; then
+
+            notInstalled+=($package)
+
+        fi
+
+    done
+
+    if [ ${#notInstalled[@]} -ne 0 ]; then
+
+        echo "Packages not installed: ${notInstalled[@]}. exiting (1)." | log 1
         exit 1;
 
     fi

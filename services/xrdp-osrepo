@@ -10,7 +10,7 @@ rootDir=$(rootDir)
 
 echo "Installing xRDP service" | log
 apt install -y xrdp
-waitOrStop 0
+checkPackageInstalled xrdp
 
 echo "Restart xRDP service" | log
 systemctl restart xrdp

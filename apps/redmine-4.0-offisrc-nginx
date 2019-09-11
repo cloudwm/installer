@@ -15,8 +15,9 @@ rootDir=$(rootDir)
 appPath=/var/www/redmine
 
 echo "Installing Dependencies" | log
-apt install build-essential libmysqlclient-dev imagemagick libmagickwand-dev -y
-waitOrStop 0
+packages=(build-essential libmysqlclient-dev imagemagick libmagickwand-dev)
+apt install -y "${packages[@]}"
+checkPackageInstalled "${packages[@]}"
 
 echo "Cloning stable version from repository" | log
 mkdir -p /var/www

@@ -18,8 +18,6 @@ debconf-set-selections <<< "postfix postfix/main_mailer_type select Internet Sit
 debconf-set-selections <<< "postfix postfix/protocols select ipv4"                      
 debconf-set-selections <<< "postfix postfix/root_address string root"                   
 apt install postfix postfix-mysql -y | log
-waitOrStop 0
-
 checkPackageInstalled postfix
 checkPackageInstalled postfix-mysql 
 

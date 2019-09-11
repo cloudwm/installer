@@ -8,15 +8,16 @@ fi
 
 checkTagExist httpd.success
 
-apt install -y dirmngr gnupg apt-transport-https ca-certificates
-waitOrStop 0
+packages=(dirmngr gnupg apt-transport-https ca-certificates)
+apt install -y "${packages[@]}"
+checkPackageInstalled "${packages[@]}"
 
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 561F9B9CAC40B2F7
 add-apt-repository 'deb https://oss-binaries.phusionpassenger.com/apt/passenger bionic main'
 apt update
 
 apt install libnginx-mod-http-passenger -y
-waitOrStop 0
+checkPackageInstalled libnginx-mod-http-passenger
 
 tag passenger.success
 tagScript success

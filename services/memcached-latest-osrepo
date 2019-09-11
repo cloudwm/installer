@@ -7,9 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing from repo" | log
-
-apt-get install -y memcached libmemcached-tools sasl2-bin | log
-waitOrStop 0
+packages=(memcached libmemcached-tools sasl2-bin)
+apt-get install -y "${packages[@]}" | log
+checkPackageInstalled "${packages[@]}"
 
 echo "Hardening security with SASL user" | log
 

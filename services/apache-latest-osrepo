@@ -10,8 +10,6 @@ appPath=/var/www/html
 
 echo "Install apache from apt" | log
 apt install apache2 -y | log
-waitOrStop 0
-
 checkPackageInstalled apache2
 
 echo "Changing ownership of $appPath to www-data user" | log

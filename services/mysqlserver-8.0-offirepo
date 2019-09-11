@@ -22,7 +22,6 @@ debconf-set-selections <<< "mysql-community-server mysql-community-server/root-p
 debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
 apt update
 apt install -y mysql-server | log
-waitOrStop 0
 checkPackageInstalled mysql-server
 
 echo "Set ~/.my.cnf root password for quick cli work" | log

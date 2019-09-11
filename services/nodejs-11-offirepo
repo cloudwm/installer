@@ -17,9 +17,7 @@ waitOrStop 0
 echo "Install Node.js" | log
 
 apt-get install -y nodejs build-essential | log
-waitOrStop 0
-
-checkPackageInstalled nodejs
+checkPackageInstalled nodejs build-essential
 
 echo "Copying files for testing" | log
 

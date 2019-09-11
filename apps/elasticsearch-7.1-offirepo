@@ -20,8 +20,9 @@ echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /e
 apt update
 
 echo "Installing Elasticsearch and Kibana web UI" | log
-apt install -y elasticsearch=$elasticVersion kibana=$kibanaVersion | log
-waitOrStop 0
+packages=(elasticsearch=$elasticVersion kibana=$kibanaVersion)
+apt install -y "${packages[@]}" | log
+checkPackageInstalled "${packages[@]}"
 
 echo "Tweaking Elasticsearch configuration" | log
 elasticPort=8881

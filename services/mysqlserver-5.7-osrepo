@@ -13,7 +13,6 @@ export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-server-5.7 mysql-server/root_password password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-server-5.7 mysql-server/root_password_again password ${ADMINPASSWORD}"
 apt install mysql-server-5.7 -y | log
-waitOrStop 0
 checkPackageInstalled mysql-server-5.7
 
 echo "Set ~/.my.cnf root password for quick cli work" | log

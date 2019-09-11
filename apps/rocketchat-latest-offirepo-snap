@@ -12,7 +12,7 @@ rootDir=$(rootDir)
 
 echo "Installing snap and then rocket.chat" | log
 apt install snapd -y
-waitOrStop 0
+checkPackageInstalled snapd
 snap install rocketchat-server 
 waitOrStop 0
 
