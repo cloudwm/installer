@@ -227,8 +227,7 @@ function backupFile() {
 
 function waitOrStop() {
 
-    # exitCode=$?
-    exitCode=${PIPESTATUS[0]}
+    local exitCode=${PIPESTATUS[0]}
     waitExitCode=$1
 
     if [ $waitExitCode -ne $exitCode ]; then
