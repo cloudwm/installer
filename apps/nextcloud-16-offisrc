@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-appVersion=16.0.3
+appVersion=16.0.4
 appPath=/var/www/html
 rootDir=$(rootDir)
 
