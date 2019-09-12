@@ -9,8 +9,6 @@ fi
 echo "install spamassassin from apt" | log
 
 apt install spamassassin -y | log
-waitOrStop 0
-
 checkPackageInstalled spamassassin
 
 tagScript success

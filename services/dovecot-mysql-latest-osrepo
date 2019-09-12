@@ -9,15 +9,9 @@ fi
 checkTagExist mysqld.success
 
 echo "install dovecot from apt" | log
-
-apt install dovecot-imapd dovecot-pop3d dovecot-mysql dovecot-sieve dovecot-lmtpd -y | log
-waitOrStop 0
-
-checkPackageInstalled dovecot-imapd 
-checkPackageInstalled dovecot-pop3d
-checkPackageInstalled dovecot-mysql
-checkPackageInstalled dovecot-sieve
-checkPackageInstalled dovecot-lmtpd 
+packages=(dovecot-imapd dovecot-pop3d dovecot-mysql dovecot-sieve dovecot-lmtpd)
+apt install -y "${packages[@]}" | log
+checkPackageInstalled "${packages[@]}"
 
 tagScript success
 exit 0

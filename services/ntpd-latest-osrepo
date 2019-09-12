@@ -9,8 +9,6 @@ fi
 echo "install NTP from apt" | log
 
 apt install ntp ntpdate -y | log
-waitOrStop 0
-
 checkPackageInstalled ntp
 checkPackageInstalled ntpdate
 

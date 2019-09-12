@@ -11,7 +11,6 @@ app_owner=www-data
 
 echo "Installing pure-ftpd" | log
 apt install pure-ftpd -y | log
-waitOrStop 0
 checkPackageInstalled pure-ftpd
 
 # Creating home folder, in case that it wasn't created by web server

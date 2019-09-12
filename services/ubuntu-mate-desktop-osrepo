@@ -10,7 +10,7 @@ rootDir=$(rootDir)
 
 echo "Installing Ubuntu Mate Desktop" | log
 apt install -y ubuntu-mate-desktop
-waitOrStop 0
+checkPackageInstalled ubuntu-mate-desktop
 
 echo "Add Mate Session to root user" | log
 echo mate-session > /root/.xsession

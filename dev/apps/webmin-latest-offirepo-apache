@@ -15,7 +15,6 @@ echo "Install app from official repository" | log
 echo "deb http://download.webmin.com/download/repository sarge contrib" > /etc/apt/sources.list.d/webmin.list
 # curl -fsSL http://www.webmin.com/jcameron-key.asc | apt-key add -
 curlDownload http://www.webmin.com/jcameron-key.asc
-waitOrStop 0
 apt-key add jcameron-key.asc
 apt update
 apt install -y software-properties-common apt-transport-https webmin

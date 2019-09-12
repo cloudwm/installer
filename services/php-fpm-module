@@ -12,7 +12,6 @@ phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 
 echo "Installing php$phpVersion-fpm" | log
 apt install php$phpVersion-fpm -y | log
-waitOrStop 0
 checkPackageInstalled php$phpVersion-fpm
 
 echo "Configuring php-fpm to listen on correct socket" | log

@@ -10,19 +10,19 @@ fi
 rootDir=$(rootDir)
 checkTagExist nginx.success
 checkTagExist nginx-enable-ssl.success
-elasticVersion="7.1.1"
-kibanaVersion="7.1.1"
+elasticVersion="7.3.1"
+kibanaVersion="7.3.1"
 
 echo "Adding repo to apt" | log
 curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch
-waitOrStop 0
 apt-key add GPG-KEY-elasticsearch
 echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list
 apt update
 
 echo "Installing Elasticsearch and Kibana web UI" | log
-apt install -y elasticsearch=$elasticVersion kibana=$kibanaVersion | log
-waitOrStop 0
+packages=(elasticsearch=$elasticVersion kibana=$kibanaVersion)
+apt install -y "${packages[@]}" | log
+checkPackageInstalled "${packages[@]}"
 
 echo "Tweaking Elasticsearch configuration" | log
 elasticPort=8881

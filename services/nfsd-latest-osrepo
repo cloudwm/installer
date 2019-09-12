@@ -9,8 +9,6 @@ fi
 echo "Install NFS server from apt" | log
 
 apt install nfs-kernel-server -y | log
-waitOrStop 0
-
 checkPackageInstalled nfs-kernel-server
 
 echo "Create default Storage directory" | log

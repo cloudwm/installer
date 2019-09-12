@@ -9,8 +9,6 @@ fi
 # install ufw 
 echo "Installing ufw" | log
 apt install ufw -y | log
-waitOrStop 0
-
 checkPackageInstalled ufw
 
 ufw --force enable | log

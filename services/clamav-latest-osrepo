@@ -9,8 +9,6 @@ fi
 echo "install clamav from apt" | log
 
 apt install clamav clamav-daemon -y | log
-waitOrStop 0
-
 checkPackageInstalled clamav
 checkPackageInstalled clamav-daemon
 

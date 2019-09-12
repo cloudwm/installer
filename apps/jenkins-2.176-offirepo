@@ -11,21 +11,19 @@ packageVersion=2.176.\*
 assignedPort="9090"
 
 echo "Setting jenkins repository and key" | log
-# curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | apt-key add -
 curlDownload https://pkg.jenkins.io/debian-stable/jenkins.io.key
-waitOrStop 0
 apt-key add jenkins.io.key
 echo "deb https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list
 
 echo "Installing openjdk" | log
 apt update
 apt install -y openjdk-8-jre-headless
-waitOrStop 0
+checkPackageInstalled openjdk-8-jre-headless
 
 echo "Installing jenkins" | log
 apt update
 apt install -y jenkins=$packageVersion
-waitOrStop 0
+checkPackageInstalled jenkins
 
 echo "Tweaking server settings" | log
 sed -i 's/HTTP_PORT=8080/HTTP_PORT='"${assignedPort}"'/g' /etc/default/jenkins

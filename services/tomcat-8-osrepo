@@ -10,9 +10,9 @@ rootDir=$(rootDir)
 appPath=/etc/tomcat8
 
 echo "Installing main application" | log
-apt install -y tomcat8 tomcat8-admin tomcat8-docs tomcat8-examples
-waitOrStop 0
-checkPackageInstalled tomcat8
+packages=(tomcat8 tomcat8-admin tomcat8-docs tomcat8-examples)
+apt install -y "${packages[@]}"
+checkPackageInstalled "${packages[@]}"
 
 echo "Enabling service" | log
 systemctl enable tomcat8

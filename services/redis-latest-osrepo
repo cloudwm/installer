@@ -10,8 +10,6 @@ fi
 echo "Installing redis" | log
 
 apt install redis -y | log
-waitOrStop 0
-
 checkPackageInstalled redis
 
 descriptionAppend "Redis IP Address: ${CWM_SERVERIP}"
