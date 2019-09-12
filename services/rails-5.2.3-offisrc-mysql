@@ -18,12 +18,12 @@ rootDir=$(rootDir)
 echo "Installing Yarn for package management" | log
 cd $rootDir/temp
 curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg
-waitOrStop 0
 apt-key add pubkey.gpg
 echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
 apt update
-apt install -y software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn mysql-client libmysqlclient-dev
-waitOrStop 0
+packages=(software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn mysql-client libmysqlclient-dev)
+apt install -y "${packages[@]}"
+checkPackageInstalled "${packages[@]}"
 
 echo "Installing Bundler and Rails" | log
 gem install bundler

@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-appVersion=2.3.1
+appVersion=2.3.2
 rootDir=$(rootDir)
 
 echo "Creating Magento Database" | log
@@ -25,7 +25,6 @@ EOF
 
 echo "Installing Composer for machine" | log
 apt install composer -y | log
-waitOrStop 0
 checkPackageInstalled composer
 
 echo "Downloading Magento ${appVersion} from github repo" | log
@@ -33,7 +32,6 @@ mkdir -p $appPath
 cd $rootDir/temp
 # curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
 curlDownload https://codeload.github.com/magento/magento2/tar.gz/$appVersion $appVersion.tar.gz
-waitOrStop 0
 mv $appVersion.tar.gz $appPath
 
 echo "Extracting Magento to ${appPath}" | log

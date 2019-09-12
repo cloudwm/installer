@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-appVersion=15.0.10
+appVersion=15.0.11
 appPath=/var/www/html
 rootDir=$(rootDir)
 
@@ -51,7 +51,6 @@ systemctl restart nginx.service
 echo "Tweaking app and runtime settings" | log
 # installing image preview functionality
 apt install php-imagick -y
-waitOrStop 0
 checkPackageInstalled php-imagick
 phpIniPath=/etc/php/$phpVersion/fpm/php.ini
 # modify memory limit

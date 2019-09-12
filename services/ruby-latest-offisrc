@@ -12,7 +12,9 @@ rubyInstallPath=/opt/ruby-$rubyVersion
 rootDir=$(rootDir)
 
 echo "Installing dependencies" | log
-apt install -y autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev
+packages=(autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev)
+apt install -y "${packages[@]}"
+checkPackageInstalled "${packages[@]}"
 
 echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp

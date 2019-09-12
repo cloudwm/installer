@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 apt install -y update-motd | log
-waitOrStop 0
+checkPackageInstalled update-motd
 
 rootDir=$(rootDir)
 

@@ -18,8 +18,7 @@ apt update
 echo "Install mongodb from apt" | log
 
 apt-get install -y glibc-source mongodb-org | log
-waitOrStop 0
-checkPackageInstalled mongodb-org
+checkPackageInstalled glibc-source mongodb-org
 
 echo "Enabling authorization" | log
 

@@ -9,9 +9,7 @@ fi
 appVersion=5:18.09.\*
 
 echo "Downloading docker repository and key" | log
-# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 curlDownload https://download.docker.com/linux/ubuntu/gpg
-waitOrStop 0
 apt-key add gpg
 
 add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
@@ -25,7 +23,6 @@ EOF
 chmod a+x /usr/sbin/policy-rc.d
 
 apt-get install -y docker-ce=$appVersion
-waitOrStop 0
 checkPackageInstalled docker-ce
 
 rm -f /usr/sbin/policy-rc.d

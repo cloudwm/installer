@@ -9,7 +9,7 @@ fi
 
 echo "Installing update-motd" | log
 apt install -y update-motd
-waitOrStop 0
+checkPackageInstalled update-motd
 
 echo "Removing 10-help-text" | log
 rm -f /etc/update-motd.d/10-help-text

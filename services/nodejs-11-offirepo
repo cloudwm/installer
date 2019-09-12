@@ -10,19 +10,14 @@ rootDir=$(rootDir)
 
 echo "Downloading Node.js repository" | log
 
-# curl -sL https://deb.nodesource.com/setup_11.x | sudo bash - | log
-# waitOrStop 0
 curlDownload https://deb.nodesource.com/setup_11.x
-waitOrStop 0
 bash setup_11.x | log
 waitOrStop 0
 
 echo "Install Node.js" | log
 
 apt-get install -y nodejs build-essential | log
-waitOrStop 0
-
-checkPackageInstalled nodejs
+checkPackageInstalled nodejs build-essential
 
 echo "Copying files for testing" | log
 

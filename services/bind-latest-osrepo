@@ -7,8 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 apt-get -y install bind9 dnsutils 
-waitOrStop 0
-
 checkPackageInstalled bind9
 checkPackageInstalled dnsutils
 

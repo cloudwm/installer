@@ -15,7 +15,6 @@ apt update
 
 echo "Installing Redis" | log
 apt install -y redis=$appVersion | log
-waitOrStop 0
 checkPackageInstalled redis
 
 echo "Enabling Redis service" | log

@@ -9,8 +9,6 @@ fi
 echo "Installing Ruby from apt" | log
 
 apt install -y ruby-full | log
-waitOrStop 0
-
 checkPackageInstalled ruby
 
 tag ruby.success

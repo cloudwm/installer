@@ -18,10 +18,7 @@ echo "Installing DokuWiki" | log
 
 echo "Downloading DokuWiki from original repo" | log
 cd $rootDir/temp
-# curl -O https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz
-# curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz | log
 curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-$versionFilename.tgz
-waitOrStop 0
 
 mkdir -p $appPath
 mv dokuwiki-$versionFilename.tgz $appPath

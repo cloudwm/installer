@@ -13,7 +13,6 @@ echo "Installing Google Chrome latest stable" | log
 cd $rootDir/temp
 appFilename=google-chrome-stable_current_amd64.deb
 curlDownload https://dl.google.com/linux/direct/$appFilename
-waitOrStop 0
 dpkg -i $appFilename
 rm $appFilename
 

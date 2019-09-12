@@ -12,14 +12,13 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-appVersion=16.0.3
+appVersion=16.0.4
 appPath=/var/www/html
 rootDir=$(rootDir)
 
 echo "Downloading NextCloud 15" | log
 mkdir -p $appPath
 cd $rootDir/temp
-# curl -O https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
 curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
 tar -xjvf nextcloud-$appVersion.tar.bz2 -C $appPath/ --strip 1
 waitOrStop 0
@@ -51,7 +50,6 @@ systemctl restart nginx.service
 echo "Tweaking app and runtime settings" | log
 # installing image preview functionality
 apt install php-imagick -y
-waitOrStop 0
 checkPackageInstalled php-imagick
 phpIniPath=/etc/php/$phpVersion/fpm/php.ini
 # modify memory limit

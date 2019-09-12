@@ -15,7 +15,7 @@ app_path=/opt/rocket
 
 echo "Installing and tweaking nodejs requirements" | log
 apt install graphicsmagick -y
-waitOrStop 0
+checkPackageInstalled graphicsmagick
 npm install -g inherits n
 n 8.11.3
 

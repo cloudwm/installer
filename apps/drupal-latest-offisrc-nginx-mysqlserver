@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-versionFilename=8.7.6
+versionFilename=8.7.7
 rootDir=$(rootDir)
 drupaluser_password="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')"
 
@@ -26,14 +26,12 @@ EOF
 
 echo "Installing Composer for machine" | log
 apt install composer  -y | log
-waitOrStop 0
 checkPackageInstalled composer
 
 echo "Downloading latest Drupal" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.gz
-waitOrStop 0
 
 echo "Extracting Drupal to $appPath" | log
 tar -xzvf drupal-$versionFilename.tar.gz -C $appPath/ --strip 1

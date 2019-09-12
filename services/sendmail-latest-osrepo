@@ -9,8 +9,6 @@ fi
 # install sendmail for local mail delivery
 echo "Installing sendmail" | log
 apt install sendmail -y | log
-waitOrStop 0
-
 checkPackageInstalled sendmail
 
 tag sendmail.success

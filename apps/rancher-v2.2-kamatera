@@ -18,7 +18,6 @@ rancherDomain="rancher.${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Installing Jq" | log
 apt install -y jq
-waitOrStop 0
 checkPackageInstalled jq
 
 echo "Enabling certbot for Rancher" | log
