@@ -10,7 +10,7 @@ rootDir=$(rootDir)
 
 echo "Installing lubuntu Desktop" | log
 apt install -y lubuntu-desktop
-waitOrStop 0
+checkPackageInstalled lubuntu-desktop
 
 echo "Add LXDE Session to root user" | log
 echo lxsession -s Lubuntu > /root/.xsession
