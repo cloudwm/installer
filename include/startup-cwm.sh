@@ -50,7 +50,7 @@ done
 # fail install if cwm api key or secret is missing
 if [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
 
-    echo "No CWM API Client ID or Secret is set. Exiting." | log 1
+    echo "No CWM API Client ID or Secret is set. Exiting." | tee -a ${CWM_ERRORFILE}
     exit 1
 
 fi
