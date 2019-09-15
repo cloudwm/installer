@@ -1,0 +1,51 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ntpd.success
+checkTagExist cwm-settimezone.success
+
+appVersion=2.7.5
+appPackage=openvpn-as-latest-ubuntu18.amd_64.deb
+rootDir=$(rootDir)
+
+echo "Downloading binary" | log
+cd $rootDir/temp
+apt install -y ca-certificates net-tools
+curlDownload  https://openvpn.net/downloads/openvpn-as-bundled-clients-latest.deb
+curlDownload  https://openvpn.net/downloads/$appPackage
+
+echo "Installing application" | log
+
+dpkg -i openvpn-as-bundled-clients-latest.deb | log
+rm -f openvpn-as-bundled-clients-latest.deb
+
+dpkg -i $appPackage | log
+rm -f $appPackage
+
+echo "Configuring first user" | log
+
+echo "openvpn:$ADMINPASSWORD" | chpasswd
+
+echo "Adding descriptions" | log
+
+admin_ui=`grep "Admin" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
+client_ui=`grep "Client" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
+
+descriptionAppend "OpenVPN Management Interface URL: ${admin_ui}"
+descriptionAppend "OpenVPN Username: openvpn"
+descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
+descriptionAppend " "
+descriptionAppend "OpenVPN Client Interface URL: $client_ui"
+descriptionAppend " "
+descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
+descriptionAppend "OpenVPN Commandline tools: /usr/local/openvpn_as/scripts"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
