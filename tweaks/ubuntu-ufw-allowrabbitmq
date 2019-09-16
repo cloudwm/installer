@@ -6,27 +6,21 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist ufw.success
+ports=(4369 5671:5672/tcp 15672 25672 35672:35862/tcp 15674 15675 1883 8883 61613:61614/tcp)
 
-# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for mySQL.
-# if not, open 3306 to WAN.
-
+# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall
 if [ ! -z "$CWM_LANNICIDS" ]; then
 
     for ip in $CWM_LANNICIDS; do
 
-        ipvar="ip$ip"
+        # ipvar="ip$ip" WRONG!
         subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
 
-        ufw allow in to $subnet port 4369
-        ufw allow in to $subnet port 5671:5672/tcp
-        ufw allow in to $subnet port 25672
-        ufw allow in to $subnet port 35672:35862/tcp
-        ufw allow in to $subnet port 15672
-        ufw allow in to $subnet port 61613:61614/tcp
-        ufw allow in to $subnet port 1883
-        ufw allow in to $subnet port 8883
-        ufw allow in to $subnet port 15674
-        ufw allow in to $subnet port 15675
+        for port in "${ports[@]}"; do
+        
+            ufw allow in to $subnet port $port
+
+        done
 
         unset ipvar
         unset subnet
@@ -35,16 +29,11 @@ if [ ! -z "$CWM_LANNICIDS" ]; then
 
 else
 
-    ufw allow 4369 | log 
-    ufw allow 5671:5672/tcp | log
-    ufw allow 25672 | log
-    ufw allow 35672:35862/tcp | log
-    ufw allow 15672 | log
-    ufw allow 61613:61614/tcp | log
-    ufw allow 1883 | log
-    ufw allow 8883 | log
-    ufw allow 15674 | log
-    ufw allow 15675 | log
+    for port in "${ports[@]}"; do
+    
+        ufw allow $port
+
+    done
 
 fi
 
