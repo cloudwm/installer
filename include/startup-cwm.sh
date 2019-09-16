@@ -22,30 +22,10 @@ IFS=$STD_IFS
 # additional cwm global params
 export ADMINEMAIL=$CWM_EMAIL
 export ADMINPASSWORD="$CWM_PASSWORD"
-export CWM_WANNICIDS=`cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
-export CWM_LANNICIDS=`cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"`
+export CWM_WANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
+export CWM_LANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
 # export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
 export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
-
-var=0
-for nicid in $CWM_WANNICIDS; do
-
-    var=$((var+1))
-    nicvar=ip${nicid}
-    export `echo CWM_WANIP$var`=`echo ${!nicvar}`
-    unset nicvar
-
-done
-
-var=0
-for nicid in $CWM_LANNICIDS; do
-
-    var=$((var+1))
-    nicvar=ip${nicid}
-    export `echo CWM_LANIP$var`=`echo ${!nicvar}`
-    unset nicvar
-
-done
 
 # fail install if cwm api key or secret is missing
 if [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
@@ -140,24 +120,20 @@ function getServerIP() {
 
     fi
     
-    IPS=`cat $CWM_CONFIGFILE | grep ^ip.*=* | cut -f 2 -d"i" | cut -f 2 -d"p"`
-
     if [ ! -z "$CWM_WANNICIDS" ]; then
 
-        index=`echo $CWM_WANNICIDS | awk '{print $1;}'`
-        index=$((index+1))
-        echo $IPS | awk -v a="$index" '{print $a;}' | cut -f 2 -d"="
+        local mainip=$(echo "CWM_IP${CWM_WANNICIDS[0]}") 
+        echo "${!mainip}"
         return 0
 
     fi
 
     if [ ! -z "$CWM_LANNICIDS" ]; then
 
-        index=`echo $CWM_LANNICIDS | awk '{print $1;}'`
-        index=$((index+1))
-        echo $IPS | awk -v a="$index" '{print $a;}' | cut -f 2 -d"="
+        local mainip=$(echo "CWM_IP${CWM_LANNICIDS[0]}") 
+        echo "${!mainip}"
         return 0
-
+        
     fi
 
 }
