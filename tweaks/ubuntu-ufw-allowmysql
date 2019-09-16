@@ -12,17 +12,14 @@ checkTagExist ufw.success
 
 if [ ! -z "$CWM_LANNICIDS" ]; then
 
-    for ip in $CWM_LANNICIDS; do
+    for nicid in ${CWM_LANNICIDS[@]}; do
 
-        ipvar="ip$ip"
-        subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
-
-        ufw allow in to $subnet port 3306
-
-        unset ipvar
-        unset subnet
+        subnet=$(echo "CWM_IP$nicid") 
+        ufw allow in to ${!subnet} port 3306
     
     done
+
+    unset subnet
 
 else
 

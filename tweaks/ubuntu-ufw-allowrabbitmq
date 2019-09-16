@@ -7,30 +7,38 @@ fi
 
 checkTagExist ufw.success
 ports=(4369 5671:5672/tcp 15672 25672 35672:35862/tcp 15674 15675 1883 8883 61613:61614/tcp)
+numeric='^[0-9]+$'
 
 # Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall
 if [ ! -z "$CWM_LANNICIDS" ]; then
 
-    for ip in $CWM_LANNICIDS; do
+    for nicid in ${CWM_LANNICIDS[@]}; do
 
-        # ipvar="ip$ip" WRONG!
-        subnet=`ip -o -f inet addr show | awk '/scope global/ {print $4}' | grep ${!ipvar}`
+        subnet=$(echo "CWM_IP$nicid") 
 
         for port in "${ports[@]}"; do
-        
-            ufw allow in to $subnet port $port
+
+            if ! [[ $port =~ $numeric  ]]; then
+
+                ufw allow in to ${!subnet} from any port ${port/\/*/} proto ${port/*\//}
+                continue
+
+            fi
+
+            ufw allow in to ${!subnet} port $port
+
+            #TODO: ufw deny wan
 
         done
 
-        unset ipvar
-        unset subnet
-    
     done
+
+    unset subnet
 
 else
 
     for port in "${ports[@]}"; do
-    
+
         ufw allow $port
 
     done
