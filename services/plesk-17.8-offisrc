@@ -15,9 +15,8 @@ sh plesk-installer install plesk 17.8.11
 waitOrStop 0
 
 echo "Configuring Plesk" | log
-email=`cat /root/guest.conf | grep email | cut -d '=' -f 2`
-hostname=`hostname -I | tr '.' '-' | awk '{ print "plesk."$1".cloud-xip.io"}'`
-plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${email} -hostname ${hostname}
+pleskDomain="plesk.${CWM_SERVERIP//./-}.cloud-xip.io"
+plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${ADMINEMAIL} -hostname ${pleskDomain}
 waitOrStop 0
 
 echo "Checking Plesk Configuration" | log

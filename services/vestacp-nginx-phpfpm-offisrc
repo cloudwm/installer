@@ -10,13 +10,12 @@ rootDir=$(rootDir)
 
 echo "Running VestaCP Official Installer" | log
 curlDownload http://vestacp.com/pub/vst-install.sh
-email=`cat /root/guest.conf | grep email | cut -d '=' -f 2`
-hostname=`hostname -I | tr '.' '-' | awk '{ print "vesta."$1".cloud-xip.io"}'`
-bash vst-install.sh -n yes -w yes -a no -k yes -v yes -j no -i yes -b yes -q no -x yes -z yes -t yes -c yes -o yes -m yes -g no -y no -p ${ADMINPASSWORD} -e ${email} -s ${hostname} | log
+vestaDomain="vesta.${CWM_SERVERIP//./-}.cloud-xip.io"
+bash vst-install.sh -n yes -w yes -a no -k yes -v yes -j no -i yes -b yes -q no -x yes -z yes -t yes -c yes -o yes -m yes -g no -y no -p ${ADMINPASSWORD} -e ${ADMINEMAIL} -s ${vestaDomain} | log
 waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "VestaCP Address: https://${hostname}:8083"
+descriptionAppend "VestaCP Address: https://${vestaDomain}:8083"
 descriptionAppend "VestaCP user: admin"
 descriptionAppend "VestaCP password: ${ADMINPASSWORD}"
 descriptionAppend " "
