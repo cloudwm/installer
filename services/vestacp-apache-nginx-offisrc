@@ -11,6 +11,34 @@ rootDir=$(rootDir)
 echo "Running VestaCP Official Installer" | log
 curlDownload http://vestacp.com/pub/vst-install.sh
 vestaDomain="vesta.${CWM_SERVERIP//./-}.cloud-xip.io"
+
+## NOTICE: Use ONLY short arguments. Short and long arguments are NOT identical.
+#
+#   -a, --apache            Install Apache        [yes|no]  default: yes
+#   -n, --nginx             Install Nginx         [yes|no]  default: yes
+#   -w, --phpfpm            Install PHP-FPM       [yes|no]  default: no
+#   -v, --vsftpd            Install Vsftpd        [yes|no]  default: yes
+#   -j, --proftpd           Install ProFTPD       [yes|no]  default: no
+#   -k, --named             Install Bind          [yes|no]  default: yes
+#   -m, --mysql             Install MySQL         [yes|no]  default: yes
+#   -g, --postgresql        Install PostgreSQL    [yes|no]  default: no
+#   -d, --mongodb           Install MongoDB       [yes|no]  unsupported
+#   -x, --exim              Install Exim          [yes|no]  default: yes
+#   -z, --dovecot           Install Dovecot       [yes|no]  default: yes
+#   -c, --clamav            Install ClamAV        [yes|no]  default: yes
+#   -t, --spamassassin      Install SpamAssassin  [yes|no]  default: yes
+#   -i, --iptables          Install Iptables      [yes|no]  default: yes
+#   -b, --fail2ban          Install Fail2ban      [yes|no]  default: yes
+#   -o, --softaculous       Install Softaculous   [yes|no]  default: yes
+#   -q, --quota             Filesystem Quota      [yes|no]  default: no
+#   -l, --lang              Default language                default: en
+#   -y, --interactive       Interactive install   [yes|no]  default: yes
+#   -s, --hostname          Set hostname
+#   -e, --email             Set admin email
+#   -p, --password          Set admin password
+#   -f, --force             Force installation
+#   -h, --help              Print this help
+
 bash vst-install.sh -n yes -w no -a yes -k yes -v yes -j no -i yes -b yes -q no -x yes -z yes -t yes -c yes -o yes -m yes -g no -y no -p ${ADMINPASSWORD} -e ${ADMINEMAIL} -s ${vestaDomain} |log
 waitOrStop 0
 
