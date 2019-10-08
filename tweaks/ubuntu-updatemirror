@@ -11,8 +11,23 @@ echo "Updating Ubuntu mirrors for Kamatera install" | log
 mzone=$(echo ${CWM_ZONE,,} | sed 's/-ny2/-ny/ ; s/as/hk/')
 mirrorDomain="ubuntu.mirrors.$mzone-try-kamatera-cloud-now-for-free.kamatera.com"
 officialDomain="archive.ubuntu.com"
-backupFile /etc/apt/sources.list
-sed -i 's/'"${officialDomain}"'/'"${mirrorDomain}"'/g' /etc/apt/sources.list
+
+# backupFile /etc/apt/sources.list
+# sed -i 's/'"${officialDomain}"'/'"${mirrorDomain}"'/g' /etc/apt/sources.list
+
+cp /etc/apt/sources.list /etc/apt/sources.list.d/kamatera.list
+sed -i 's/'"${officialDomain}"'/'"${mirrorDomain}"'/g' /etc/apt/sources.list.d/kamatera.list
+cat << EOF > /etc/apt/preferences.d/kamatera-pin-600
+
+Package: *
+Pin: origin ${mirrorDomain}
+Pin-Priority: 610
+
+Package: *
+Pin: origin ${officialDomain}
+Pin-Priority: 600
+
+EOF
 
 tagScript success
 
