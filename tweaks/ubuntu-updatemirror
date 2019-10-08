@@ -23,7 +23,8 @@ sed -i 's/'"${officialDomain}"'/'"${mirrorDomain}"'/g' /etc/apt/sources.list.d/k
 
 # modify source.list to use official mirrors
 backupFile /etc/apt/sources.list
-sed -i 's/'"${officialFullDomain}"'/'"${officialMirrors}"'/g' /etc/apt/sources.list
+# sed -i 's/'"${officialFullDomain}"'/'"${officialMirrors}"'/g' /etc/apt/sources.list
+sed -n 's/'"${officialFullDomain}"'/'"${officialMirrors}"'/gp' /etc/apt/sources.list >> /etc/apt/sources.list
 
 # prioritize kamatera over official package sources but not over third party sources
 cat << EOF > /etc/apt/preferences.d/kamatera-pin-600
