@@ -11,12 +11,21 @@ echo "Updating Ubuntu mirrors for Kamatera install" | log
 mzone=$(echo ${CWM_ZONE,,} | sed 's/-ny2/-ny/ ; s/as/hk/')
 mirrorDomain="ubuntu.mirrors.$mzone-try-kamatera-cloud-now-for-free.kamatera.com"
 officialDomain="archive.ubuntu.com"
+officialFullDomain="http://archive.ubuntu.com/ubuntu"
+officialMirrors="mirror://mirrors.ubuntu.com/mirrors.txt"
 
 # backupFile /etc/apt/sources.list
 # sed -i 's/'"${officialDomain}"'/'"${mirrorDomain}"'/g' /etc/apt/sources.list
 
+# create kamatera alternative source.list from official source file
 cp /etc/apt/sources.list /etc/apt/sources.list.d/kamatera.list
 sed -i 's/'"${officialDomain}"'/'"${mirrorDomain}"'/g' /etc/apt/sources.list.d/kamatera.list
+
+# modify source.list to use official mirrors
+backupFile /etc/apt/sources.list
+sed -i 's/'"${officialFullDomain}"'/'"${officialMirrors}"'/g' /etc/apt/sources.list
+
+# prioritize kamatera over official package sources but not over third party sources
 cat << EOF > /etc/apt/preferences.d/kamatera-pin-600
 
 Package: *
