@@ -21,11 +21,11 @@ cat << EOF > /etc/apt/preferences.d/kamatera-pin-600
 
 Package: *
 Pin: origin ${mirrorDomain}
-Pin-Priority: 610
+Pin-Priority: 410
 
 Package: *
 Pin: origin ${officialDomain}
-Pin-Priority: 600
+Pin-Priority: 400
 
 EOF
 
