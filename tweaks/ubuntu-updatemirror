@@ -32,6 +32,8 @@ echo -e "#Kamatera Mirrors (1st priority)\n$kamateraMirrors\n\n$ubuntuMirrors" >
 
 # EOF
 
+apt update
+
 tagScript success
 
 exit 0
