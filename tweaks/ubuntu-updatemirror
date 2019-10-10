@@ -19,19 +19,6 @@ kamateraMirrors=$(sed -n 's/'"${officialDomain}"'/'"${mirrorDomain}"'/gp' /etc/a
 ubuntuMirrors=$(sed 's/'"${officialFullDomain}"'/'"${officialMirrors}"'/g' /etc/apt/sources.list)
 echo -e "#Kamatera Mirrors (1st priority)\n$kamateraMirrors\n\n$ubuntuMirrors" > /etc/apt/sources.list
 
-# prioritize kamatera over official package sources but not over third party sources
-# cat << EOF > /etc/apt/preferences.d/kamatera-pin-600
-
-# Package: *
-# Pin: origin ${mirrorDomain}
-# Pin-Priority: 510
-
-# Package: *
-# Pin: origin ${officialDomain}
-# Pin-Priority: 500
-
-# EOF
-
 apt update
 
 tagScript success
