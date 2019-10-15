@@ -9,10 +9,17 @@ fi
 
 echo "Updating Ubuntu mirrors for Kamatera install" | log
 mzone=$(echo ${CWM_ZONE,,} | sed 's/-ny2/-ny/ ; s/as/hk/')
-mirrorDomain="ubuntu.mirrors.$mzone-try-kamatera-cloud-now-for-free.kamatera.com"
 officialDomain="archive.ubuntu.com"
+mirrorDomain="ubuntu.mirrors.$mzone-try-kamatera-cloud-now-for-free.kamatera.com"
+officialFullDomain="http:\/\/archive.ubuntu.com\/ubuntu"
+officialMirrors="mirror:\/\/mirrors.ubuntu.com\/mirrors.txt"
+
 backupFile /etc/apt/sources.list
-sed -i 's/'"${officialDomain}"'/'"${mirrorDomain}"'/g' /etc/apt/sources.list
+kamateraMirrors=$(sed -n 's/'"${officialDomain}"'/'"${mirrorDomain}"'/gp' /etc/apt/sources.list)
+ubuntuMirrors=$(sed 's/'"${officialFullDomain}"'/'"${officialMirrors}"'/g' /etc/apt/sources.list)
+echo -e "#Kamatera Mirrors (1st priority)\n$kamateraMirrors\n\n$ubuntuMirrors" > /etc/apt/sources.list
+
+apt update
 
 tagScript success
 
