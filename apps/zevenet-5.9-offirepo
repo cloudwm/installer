@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 appPath=/usr/local/zevenet
-appVersion=5.9.\*
+appVersion=5.10.\*
 freePort=4444
 aptSourceList=/etc/apt/sources.list.d/zevenet.list
 rootDir=$(rootDir)
@@ -29,15 +29,18 @@ checkPackageInstalled "${packages[@]}"
 
 echo "Installing dependencies manually" | log
 cd $rootDir/temp
-libnftnl=libnftnl11_1.1.2-2_amd64.deb
+# libnftnl=libnftnl11_1.1.2-2_amd64.deb
+libnftnl=libnftnl11_1.1.4-1_amd64.deb
 curlDownload http://ftp.debian.org/debian/pool/main/libn/libnftnl/$libnftnl $libnftnl
 dpkg -i $libnftnl
 rm -rf $libnftnl
-libnftables=libnftables0_0.9.0-2_amd64.deb
+# libnftables=libnftables0_0.9.0-2_amd64.deb
+libnftables=libnftables0_0.9.2-2_amd64.deb
 curlDownload http://ftp.debian.org/debian/pool/main/n/nftables/$libnftables $libnftables
 dpkg -i $libnftables
 rm -rf $libnftables
-nftlb=nftlb_0.3-1_amd64.deb
+# nftlb=nftlb_0.3-1_amd64.deb
+nftlb=nftlb_0.5-1build2_amd64.deb
 curlDownload http://archive.ubuntu.com/ubuntu/pool/universe/n/nftlb/$nftlb $nftlb
 dpkg -i $nftlb
 rm -rf $nftlb
