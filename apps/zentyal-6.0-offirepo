@@ -16,6 +16,10 @@ echo "deb http://archive.zentyal.org/zentyal 6.0 main" >> $aptSourceList
 apt update | log
 waitOrStop 0
 
+echo "Modifying hostname to fit max 64 chars requirement" | log
+savedHostname=$(hostname)
+hostnamectl set-hostname ${savedHostname::32}
+
 echo "Installing Zentyal 6.0" | log
 debconf-set-selections <<< "zentyal-core zentyal-core/port string 8443"
 apt install zentyal zentyal-network -y | log
