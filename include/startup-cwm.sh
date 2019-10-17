@@ -57,7 +57,7 @@ function updateServerDescription() {
 
 function getServerDescription() {
 
-    description=`curl --location -f --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${CWM_APICLIENTID}" -H "AuthSecret: ${CWM_APISECRET}" "https://$CWM_URL/svc/server/$CWM_UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")'`
+    description=$(curl --location -f --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${CWM_APICLIENTID}" -H "AuthSecret: ${CWM_APISECRET}" "https://$CWM_URL/svc/server/$CWM_UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")')
     
     local exitCode=$?
     if [ $exitCode -ne 0 ]; then
@@ -73,7 +73,7 @@ function getServerDescription() {
 
 function appendServerDescription() {
 
-    description=`getServerDescription`
+    description=$(getServerDescription)
     fulltext=$(echo -e "$description\\n$1")
     updateServerDescription "$fulltext"
 
@@ -86,11 +86,11 @@ function appendServerDescriptionTXT() {
 
     if [ -f "$file" ]; then
 
-        fileContent=`cat $file`
+        fileContent=$(cat $file)
 
     fi
 
-    description=`getServerDescription`
+    description=$(getServerDescription)
     fulltext=$(echo -e "$description\\n\\n$fileContent")
     updateServerDescription "$fulltext"
 
@@ -103,7 +103,7 @@ function setServerDescriptionTXT() {
 
     if [ -f "$file" ]; then
 
-        fileContent=`cat $file`
+        fileContent=$(cat $file)
 
     fi
 
