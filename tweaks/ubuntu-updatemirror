@@ -8,9 +8,8 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Updating Ubuntu mirrors for Kamatera install" | log
-mzone=$(echo ${CWM_ZONE,,} | sed 's/-ny2/-ny/ ; s/as/hk/')
 officialDomain="archive.ubuntu.com"
-mirrorDomain="ubuntu.mirrors.$mzone-try-kamatera-cloud-now-for-free.kamatera.com"
+mirrorDomain="mirror.${CWM_ZONE}.kamatera.com"
 officialFullDomain="http:\/\/archive.ubuntu.com\/ubuntu"
 officialMirrors="mirror:\/\/mirrors.ubuntu.com\/mirrors.txt"
 
