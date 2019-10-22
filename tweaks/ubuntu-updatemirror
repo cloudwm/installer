@@ -9,7 +9,7 @@ fi
 
 echo "Updating Ubuntu mirrors for Kamatera install" | log
 officialDomain="archive.ubuntu.com"
-mirrorDomain="mirror.${CWM_ZONE}.kamatera.com"
+mirrorDomain="mirror.${CWM_ZONE,,}.kamatera.com"
 officialFullDomain="http:\/\/archive.ubuntu.com\/ubuntu"
 officialMirrors="mirror:\/\/mirrors.ubuntu.com\/mirrors.txt"
 
