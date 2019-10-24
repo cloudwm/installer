@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Tweaking ssl config file to overcome known issues" | log
+sslConf=/etc/ssl/openssl.cnf
+backupFile $sslConf
+sed -i '/.rnd/s/^/#/g' $sslConf
+
+tagScript success
+
+exit 0
