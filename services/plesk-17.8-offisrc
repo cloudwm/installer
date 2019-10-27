@@ -16,7 +16,11 @@ waitOrStop 0
 
 echo "Configuring Plesk" | log
 pleskDomain="plesk.${CWM_SERVERIP//./-}.cloud-xip.io"
-plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${ADMINEMAIL} -hostname ${pleskDomain} | log
+plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${ADMINEMAIL} | log
+waitOrStop 0
+
+echo "Updating hostname" | log
+plesk bin server_pref --update -hostname ${pleskDomain}
 waitOrStop 0
 
 echo "Checking Plesk Configuration" | log
@@ -24,7 +28,8 @@ plesk bin init_conf -c | log
 waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "Plesk Address: ${CWM_SERVERIP}:8443"
+descriptionAppend "Plesk ip address: ${CWM_SERVERIP}:8443"
+descriptionAppend "Plesk domain address: ${pleskDomain}"
 descriptionAppend "Plesk user: root"
 descriptionAppend "Plesk password: ${ADMINPASSWORD}"
 descriptionAppend " "
