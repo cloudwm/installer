@@ -10,8 +10,8 @@ fi
 rootDir=$(rootDir)
 checkTagExist nginx.success
 checkTagExist nginx-enable-ssl.success
-elasticVersion="7.4.0"
-kibanaVersion="7.4.0"
+elasticVersion="7.4.2"
+kibanaVersion="7.4.2"
 
 echo "Adding repo to apt" | log
 curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch
