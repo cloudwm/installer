@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rubyVersion=2.6.3
+rubyVersion=2.6.5
 rubyInstallPath=/opt/ruby-$rubyVersion
 rootDir=$(rootDir)
 
