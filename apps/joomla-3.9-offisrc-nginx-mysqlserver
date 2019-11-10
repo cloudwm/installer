@@ -13,7 +13,7 @@ checkTagExist nginx-enable-php-ssl.success
 
 currentDate=`date +"%Y-%m-%d %H:%M:%S"`
 appPath=/var/www/html
-appVersion=3-9-12
+appVersion=3-9-13
 rootDir=$(rootDir)
 
 echo "Installing Joomla" | log

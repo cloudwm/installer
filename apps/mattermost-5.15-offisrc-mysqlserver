@@ -9,7 +9,7 @@ fi
 
 checkTagExist mysqld.success
 
-appVersion=5.16.2
+appVersion=5.16.3
 appPath=/opt/mattermost
 mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
