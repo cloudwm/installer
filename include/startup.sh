@@ -420,5 +420,9 @@ function removeSwapFile() {
 
 }
 
+function noWhitespace() {
+    echo "$1" | tr -d '[[:space:]]'
+}
+
 # Run Startup Functions
 checkTempDir

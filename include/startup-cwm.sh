@@ -111,6 +111,30 @@ function setServerDescriptionTXT() {
 
 }
 
+function updateServerDescriptionTXT() {
+    
+    rootDir=$(rootDir)
+    details=$rootDir/DESCRIPTION.TXT
+    description=$(getServerDescription)
+
+    uploadText=$description
+    if [[ $(noWhitespace "$CWM_GUESTDESCRIPTION") != $(noWhitespace "$description") ]]; then
+
+        uploadText=$CWM_GUESTDESCRIPTION
+
+    fi
+
+    if [[ -f "$details" ]]; then
+
+        fileContent=$(cat $details)
+        uploadText=$(echo -e "$uploadText\\n\\n$fileContent")
+
+    fi
+
+    updateServerDescription "$uploadText"
+
+}
+
 function getServerIP() {
 
     if [ ! -f "$CWM_CONFIGFILE" ]; then
