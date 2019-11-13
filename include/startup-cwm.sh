@@ -118,7 +118,7 @@ function updateServerDescriptionTXT() {
     description=$(getServerDescription)
 
     uploadText=$description
-    if [[ $(noWhitespace "$CWM_GUESTDESCRIPTION") != $(noWhitespace "$description") ]]; then
+    if [[ ! -z "$CWM_GUESTDESCRIPTION" && $(noWhitespace "$CWM_GUESTDESCRIPTION") != $(noWhitespace "$description") ]]; then
 
         uploadText=$CWM_GUESTDESCRIPTION
 
