@@ -133,7 +133,7 @@ function bannerFiglet() {
 function descriptionAppend() {
 
     rootDir=$(rootDir)
-    echo $1 >> $rootDir/DESCRIPTION.TXT
+    echo "$1" >> $rootDir/DESCRIPTION.TXT
     echo "Adding to system description file: $1" | log
     chmod 600 $rootDir/DESCRIPTION.TXT
 
@@ -418,6 +418,10 @@ function removeSwapFile() {
 
     return 0
 
+}
+
+function noWhitespace() {
+    echo "$1" | tr -d '[[:space:]]'
 }
 
 # Run Startup Functions

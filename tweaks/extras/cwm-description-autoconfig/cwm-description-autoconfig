@@ -12,7 +12,7 @@ fi
 sleep 15
 
 echo "Updating description in CWM backend" | log
-appendServerDescriptionTXT
+updateServerDescriptionTXT
 
 # disable script after first run
 scriptName=$(basename $BASH_SOURCE)
