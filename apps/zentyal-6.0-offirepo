@@ -31,10 +31,7 @@ chpasswd <<< "admin:${ADMINPASSWORD}"
 passwd -l root
 
 echo "Fix DNS Resolver" | log
-echo "nameserver 8.8.8.8" >> /etc/resolv.conf.d/base
-echo "nameserver 8.8.4.4" >> /etc/resolv.conf.d/base
-resolvconf -u
-systemctl disable --now resolvconf.service 
+sed '/gateway/a dns-nameservers 8.8.8.8 8.8.4.4' -i /etc/network/interfaces
 
 echo "Adding descriptions" | log
 descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
