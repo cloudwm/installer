@@ -30,6 +30,9 @@ useradd admin -s /bin/bash -m -g users -G sudo
 chpasswd <<< "admin:${ADMINPASSWORD}"
 passwd -l root
 
+echo "Fix DNS Resolver" | log
+echo "nameserver 8.8.8.8" >> /etc/resolv.conf 
+echo "nameserver 8.8.4.4" >> /etc/resolv.conf 
 
 echo "Adding descriptions" | log
 descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
