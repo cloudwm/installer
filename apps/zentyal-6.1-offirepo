@@ -13,6 +13,9 @@ echo "Add Zentyal 6.0 repository" | log
 curlDownload http://keys.zentyal.org/zentyal-6.0-archive.asc
 apt-key add zentyal-6.0-archive.asc
 echo "deb http://archive.zentyal.org/zentyal 6.0 main" >> $aptSourceList
+curlDownload http://keys.zentyal.org/zentyal-6.1-packages.asc
+apt-key add zentyal-6.1-packages.asc
+echo "deb http://packages.zentyal.org/zentyal 6.1 main extra" >> $aptSourceList
 apt update | log
 waitOrStop 0
 
