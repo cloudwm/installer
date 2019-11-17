@@ -33,9 +33,6 @@ passwd -l root
 echo "Fixing DNS Resolver" | log
 sed '/gateway/a dns-nameservers 8.8.8.8 8.8.4.4' -i /etc/network/interfaces
 
-echo "Ensuring conntrack modules are enabled" | log 
-modprobe ip_conntrack
-
 echo "Adding descriptions" | log
 descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
 descriptionAppend "Zentyal Admin User: admin"
