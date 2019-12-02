@@ -9,8 +9,6 @@ fi
 runOnceCheck
 checkTagExist phpmyadmin.success
 
-rootDir=$(rootDir)
-
 echo "Changing ownership of phpmyadmin to nginx"
 chown -R www-data:www-data /var/www/html/phpmyadmin
 
@@ -22,8 +20,8 @@ fi
 
 echo "change description to include https URL" | log
 
-if [ -f "$rootDir/DESCRIPTION.TXT" ]; then
-    sed -i -e 's/phpMyAdmin URL: http:/phpMyAdmin URL: https:/' $rootDir/DESCRIPTION.TXT
+if [ -f "$CWM_DESCFILE" ]; then
+    sed -i -e 's/phpMyAdmin URL: http:/phpMyAdmin URL: https:/' $CWM_DESCFILE
 fi
 
 tagScript success

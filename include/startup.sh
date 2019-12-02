@@ -132,10 +132,9 @@ function bannerFiglet() {
 
 function descriptionAppend() {
 
-    rootDir=$(rootDir)
-    echo "$1" >> $rootDir/DESCRIPTION.TXT
+    echo "$1" >> $CWM_DESCFILE
     echo "Adding to system description file: $1" | log
-    chmod 600 $rootDir/DESCRIPTION.TXT
+    chmod 600 $CWM_DESCFILE
 
 }
 
