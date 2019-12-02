@@ -16,6 +16,14 @@ appVersion=17.0.1
 appPath=/var/www/html
 rootDir=$(rootDir)
 
+ndisk="$(lsblk)"
+if [[ $ndisk == *"sdb"* ]]; then
+   echo "Another disk found,installing on sdb" | log
+   mkdir -p /var/www/html
+   echo "/dev/sdb1 /var/www/html ext4 defaults 0 0" >> /etc/fstab
+   mount -a
+fi
+
 echo "Downloading NextCloud 15" | log
 mkdir -p $appPath
 cd $rootDir/temp
