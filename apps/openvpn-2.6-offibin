@@ -28,8 +28,8 @@ echo "openvpn:$ADMINPASSWORD" | chpasswd
 
 echo "Adding descriptions" | log
 
-admin_ui=`grep "Admin" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
-client_ui=`grep "Client" $(rootDir)/temp/*.log | rev | cut -d ' ' -f 1 | rev`
+admin_ui=`grep "Admin" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev`
+client_ui=`grep "Client" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev`
 
 descriptionAppend "OpenVPN Management Interface URL: ${admin_ui}"
 descriptionAppend "OpenVPN Username: openvpn"
