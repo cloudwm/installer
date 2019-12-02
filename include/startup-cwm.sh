@@ -81,12 +81,9 @@ function appendServerDescription() {
 
 function appendServerDescriptionTXT() {
 
-    rootDir=$(rootDir)
-    file=$rootDir/DESCRIPTION.TXT
+    if [ -f "$CWM_DESCFILE" ]; then
 
-    if [ -f "$file" ]; then
-
-        fileContent=$(cat $file)
+        fileContent=$(cat $CWM_DESCFILE)
 
     fi
 
@@ -98,12 +95,9 @@ function appendServerDescriptionTXT() {
 
 function setServerDescriptionTXT() {
 
-    rootDir=$(rootDir)
-    file=$rootDir/DESCRIPTION.TXT
+    if [ -f "$CWM_DESCFILE" ]; then
 
-    if [ -f "$file" ]; then
-
-        fileContent=$(cat $file)
+        fileContent=$(cat $CWM_DESCFILE)
 
     fi
 
@@ -113,8 +107,6 @@ function setServerDescriptionTXT() {
 
 function updateServerDescriptionTXT() {
     
-    rootDir=$(rootDir)
-    details=$rootDir/DESCRIPTION.TXT
     description=$(getServerDescription)
 
     uploadText=$description
@@ -124,9 +116,9 @@ function updateServerDescriptionTXT() {
 
     fi
 
-    if [[ -f "$details" ]]; then
+    if [[ -f "$CWM_DESCFILE" ]]; then
 
-        fileContent=$(cat $details)
+        fileContent=$(cat $CWM_DESCFILE)
         uploadText=$(echo -e "$uploadText\\n\\n$fileContent")
 
     fi
