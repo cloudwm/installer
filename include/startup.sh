@@ -44,18 +44,11 @@ function checkTempDir() {
 
 function log() {
 
-    rootDir=$(rootDir)
     logScriptName=$(basename $0)
 
-    if [ -z "$logDir" ]; then
+    if [ ! -d "$CWM_LOGDIR" ]; then
 
-	    logDir="$rootDir/temp"
-
-    fi
-
-    if [ ! -d "$logDir" ]; then
-
-	    mkdir -p $logDir
+	    mkdir -p $CWM_LOGDIR
 
     fi
 
@@ -63,7 +56,7 @@ function log() {
 
         printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line";
 
-    done | tee -a $logDir/$(date '+%Y-%m-%d').log ${1:+${CWM_ERRORFILE}}
+    done | tee -a $CWM_LOGDIR/$(date '+%Y-%m-%d').log ${1:+${CWM_ERRORFILE}}
 
 }
 
@@ -132,10 +125,9 @@ function bannerFiglet() {
 
 function descriptionAppend() {
 
-    rootDir=$(rootDir)
-    echo "$1" >> $rootDir/DESCRIPTION.TXT
+    echo "$1" >> $CWM_DESCFILE
     echo "Adding to system description file: $1" | log
-    chmod 600 $rootDir/DESCRIPTION.TXT
+    chmod 600 $CWM_DESCFILE
 
 }
 

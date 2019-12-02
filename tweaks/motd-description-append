@@ -6,12 +6,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
 descriptionMotd=/etc/update-motd.d/98-description
 
-if [ -f "$rootDir/DESCRIPTION.TXT" ]; then
+if [ -f "$CWM_DESCFILE" ]; then
 
-    echo "Adding $rootDir/DESCRIPTION.TXT to $descriptionMotd file" | log
+    echo "Adding $CWM_DESCFILE to $descriptionMotd file" | log
 
     apt install -y update-motd | log
     checkPackageInstalled update-motd
@@ -19,7 +18,7 @@ if [ -f "$rootDir/DESCRIPTION.TXT" ]; then
     echo "#!/bin/sh" >> $descriptionMotd
     echo "echo \"=== System Description =======================================================\"" >> $descriptionMotd
     echo "echo \" \""  >> $descriptionMotd
-    echo "cat $rootDir/DESCRIPTION.TXT" >> $descriptionMotd
+    echo "cat $CWM_DESCFILE" >> $descriptionMotd
     echo "echo \" \""  >> $descriptionMotd
     echo "echo \"==============================================================================\""  >> $descriptionMotd
     echo "echo \" \""  >> $descriptionMotd
