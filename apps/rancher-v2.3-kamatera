@@ -49,7 +49,7 @@ systemctl restart nginx
 echo "Creating Rancher admin" | log
 mkdir -p /var/lib/rancher 
 systemctl start docker.service
-docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
+docker run -d --name rancher --restart unless-stopped -p 8000:80 -p 8443:443 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
 
 curlBaseParams=( --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
