@@ -34,7 +34,7 @@ cp $rootDir/tweaks/extras/rancher/rancher.conf /etc/nginx/sites-available/
 ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
 systemctl restart nginx
 # creating certbot
-certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain}
+certbot certonly --no-redirect --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} 
 
 echo "Creating nginx configuration" | log
 # copy ssl configs to nginx folders
@@ -49,7 +49,7 @@ systemctl restart nginx
 echo "Creating Rancher admin" | log
 mkdir -p /var/lib/rancher 
 systemctl start docker.service
-docker run -d --name rancher --restart unless-stopped -p 8000:80 -p 8443:443 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
+docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
 
 curlBaseParams=( --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
