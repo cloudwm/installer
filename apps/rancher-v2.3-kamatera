@@ -30,11 +30,13 @@ unlink /etc/nginx/sites-enabled/default-ssl
 # copy configs to nginx folders
 cp $rootDir/tweaks/extras/rancher/letsencrypt.conf /etc/nginx/snippets/
 cp $rootDir/tweaks/extras/rancher/rancher.conf /etc/nginx/sites-available/
-# symlink sites
+# symlink certbot routing
 ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
 systemctl restart nginx
 # creating certbot
 certbot certonly --no-redirect --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} 
+# remove certbot routing
+unlink /etc/nginx/sites-enabled/rancher.conf
 
 echo "Creating nginx configuration" | log
 # copy ssl configs to nginx folders
