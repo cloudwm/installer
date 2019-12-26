@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-appVersion=5:18.09.\*
+appVersion=5:19.03.\*
 
 echo "Downloading docker repository and key" | log
 curlDownload https://download.docker.com/linux/ubuntu/gpg
