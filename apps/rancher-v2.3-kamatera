@@ -7,18 +7,35 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist docker-latest-offirepo.success
+checkTagExist certbot-nginx.success
 
 rootDir=$(rootDir)
-engineInstallUrl=https://releases.rancher.com/install-docker/18.09.sh
+engineInstallUrl=https://releases.rancher.com/install-docker/19.03.sh
 kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.4/docker-machine-driver-kamatera_v1.0.4_linux_amd64.tar.gz
 
-RANCHER_VERSION=v2.3.2
+RANCHER_VERSION=v2.3.3
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 rancherDomain="rancher.${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Installing Jq" | log
 apt install -y jq
 checkPackageInstalled jq
+
+echo "(Re)Generating dhparam key file" | log
+dhParamFile=/etc/ssl/certs/dhparam.pem
+if [ -e $dhParamFile ]; then 
+    rm -f $dhParamFile
+fi
+openssl dhparam -out $dhParamFile 2048; 
+
+echo "Verifying certbot renewal systemd timer" | log
+systemctl list-timers | grep certbot
+waitOrStop 0
+cat /lib/systemd/system/certbot.timer
+waitOrStop 0
+if ! cat /lib/systemd/system/certbot.service | grep "service nginx reload"; then
+    sed -i 's/-q renew/-q renew --deploy-hook "service nginx reload"/' /lib/systemd/system/certbot.service
+fi
 
 echo "Enabling certbot for Rancher" | log
 mkdir -p /var/lib/letsencrypt/.well-known
@@ -29,21 +46,27 @@ unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 # copy configs to nginx folders
 cp $rootDir/tweaks/extras/rancher/letsencrypt.conf /etc/nginx/snippets/
-cp $rootDir/tweaks/extras/rancher/rancher.conf /etc/nginx/sites-available/
-# symlink sites
-ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
+cp $rootDir/tweaks/extras/rancher/register.conf /etc/nginx/sites-available/
+# symlink certbot routing
+ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/register.conf
 systemctl restart nginx
 # creating certbot
-certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain}
+certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} 
+# remove certbot routing
+unlink /etc/nginx/sites-enabled/register.conf
 
 echo "Creating nginx configuration" | log
 # copy ssl configs to nginx folders
-cp $rootDir/tweaks/extras/rancher/rancher-ssl.conf /etc/nginx/sites-available/
-# symlink sites
-ln -s /etc/nginx/sites-available/rancher-ssl.conf /etc/nginx/sites-enabled/rancher-ssl.conf
+cp $rootDir/tweaks/extras/rancher/rancher.conf /etc/nginx/sites-available/
+cp $rootDir/tweaks/extras/rancher/http2_proxy.conf /etc/nginx/snippets/
+cp $rootDir/tweaks/extras/rancher/ssl.conf /etc/nginx/snippets/
 # add keys to ssl configs
-sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rancherDomain}/privkey.pem|" /etc/nginx/sites-available/rancher-ssl.conf
-sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rancherDomain}/fullchain.pem|" /etc/nginx/sites-available/rancher-ssl.conf
+cp $rootDir/tweaks/extras/rancher/letsencrypt_certs.conf /etc/nginx/snippets/
+sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rancherDomain}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rancherDomain}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${rancherDomain}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+# symlink sites
+ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
 systemctl restart nginx
 
 echo "Creating Rancher admin" | log
