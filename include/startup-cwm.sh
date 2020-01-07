@@ -28,7 +28,7 @@ export CWM_LANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"
 export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
 
 # fail install if cwm api key or secret is missing
-if [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
+if [ -z "$CWM_NO_API_KEY" ] && [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
 
     echo "No CWM API Client ID or Secret is set. Exiting." | tee -a ${CWM_ERRORFILE}
     exit 1
