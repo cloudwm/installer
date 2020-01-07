@@ -23,6 +23,12 @@ else
 
 	fi
 
+	if [ ! -z "$2" ] && [ "$2" == "nospecialkey" ]; then
+	
+		export CWM_NO_API_KEY=1
+
+	fi
+
 	. $1
 
 fi
