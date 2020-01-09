@@ -136,7 +136,7 @@ PLANE_JSON_STRING='{
 "datacenter":"'"${CWM_ZONE}"'",
 "diskSize":"30",
 "image":"ubuntu_server_18.04_64-bit_optimized",
-"privateNetworkIp":"",
+"privateNetworkIp":"auto",
 "privateNetworkName":"'"${vlan}"'",
 "ram":"2048",
 "type":"kamateraConfig"
@@ -160,7 +160,7 @@ WORKER_JSON_STRING='{
 "datacenter":"'"${CWM_ZONE}"'",
 "diskSize":"50",
 "image":"ubuntu_server_18.04_64-bit_optimized",
-"privateNetworkIp":"",
+"privateNetworkIp":"auto",
 "privateNetworkName":"'"${vlan}"'",
 "ram":"4096",
 "type":"kamateraConfig"
