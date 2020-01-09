@@ -2,6 +2,12 @@
 
 installerDir=$(dirname "`readlink -f $0`")
 
+if [ ! -z "$2" ] && [ "$2" == "nospecialkey" ]; then
+
+	export CWM_NO_API_KEY=1
+
+fi
+
 . include/startup.sh
 
 if [ -z "$1" ]; then
