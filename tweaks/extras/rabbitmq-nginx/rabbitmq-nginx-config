@@ -1,26 +1,28 @@
 upstream rabbitmq {
-  server localhost:15672;
+  server localhost:15671;
 }
 
 server {
     listen 80;
     server_name _;
-
+    include snippets/letsencrypt.conf;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
     server_name _;
-    ssl_certificate      /etc/ssl/certs/server.crt;
-    ssl_certificate_key  /etc/ssl/private/server.key;
+    ssl_certificate      /path/to/your.crt;
+    ssl_certificate_key  /path/to/your.key;
+    ssl_trusted_certificate /path/to/your.chain;
+    include snippets/letsencrypt.conf;
 
     access_log /var/log/nginx/rabbitmq-access.log;
     error_log /var/log/nginx/rabbitmq-error.log;
 
     location / {
 
-        proxy_pass http://rabbitmq$request_uri;
+        proxy_pass https://rabbitmq$request_uri;
 
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
