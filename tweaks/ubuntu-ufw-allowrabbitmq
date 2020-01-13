@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist ufw.success
-ports=(4369 5671:5672/tcp 15672 25672 35672:35862/tcp 15674 15675 1883 8883 61613:61614/tcp)
+ports=(4369 5671:5672/tcp 15671 15672 25672 35672:35862/tcp 15674 15675 1883 8883 61613:61614/tcp)
 numeric='^[0-9]+$'
 
 # Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall
