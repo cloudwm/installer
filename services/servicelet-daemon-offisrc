@@ -4,33 +4,27 @@
 # cwm servicelet daemon installer
 #
 
-GUEST_CONF="/root/guest.conf"
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+if [ ! -f "${CWM_CONFIGFILE}" ]; then
+    echo "missing guest configuration file, aborting" | log 1
+    exit 1
+fi
+
 DAEMON_URL="https://github.com/cloudwm/servicelet/releases/download/0.2-beta/serviceletd.zip"
-DAEMON_PATH="/opt/servicelet/serviceletd"
-DAEMON_SETTINGS_PATH="/opt/servicelet/servicelet.ini"
-DAEMON_SOCKET="/tmp/slet.sock"
-SERVICE_PATH="/opt/servicelet/service.py"
-SERVICE_LOG_PATH="/opt/servicelet/service.log"
+SERVICELET_PATH=/opt/servicelet
+DAEMON_PATH=$SERVICELET_PATH/serviceletd
+DAEMON_SETTINGS_PATH=$SERVICELET_PATH/servicelet.ini
+DAEMON_SOCKET=/tmp/slet.sock
+SERVICE_PATH=$SERVICELET_PATH/service.py
+SERVICE_LOG_PATH=$SERVICELET_PATH/service.log
 USER_GROUP="slet"
 CWM_TARGET_URL="https://www.cloudwm.com"
 
-# read vm uuid
-function vm_uuid() {
-    if ! sed -E 's/^VMware//;s/([ -])//g;s/^(.{8})(.{4})(.{4})(.{4})/\1-\2-\3-\4-/' /sys/class/dmi/id/product_serial; then
-        return 1
-    fi
-    return 0
-}
-
-#  read api client id from guest configuration file
-function api_client_id() {
-    grep 'apiClientId' "${GUEST_CONF}" | sed 's/^.*=//'
-}
-
-#  read api client secret from guest configuration file
-function api_secret() {
-    grep 'apiSecret' "${GUEST_CONF}" | sed 's/^.*=//'
-}
 
 # create user and group if not exists
 function create_user() {
@@ -81,47 +75,47 @@ function daemon_cleanup() {
 
 # write daemon configuration and install on system
 function daemon_install() {
-    if ! apt install -y unzip; then
-        echo "unzip installation failed" | log 1
-        return 1
-    fi
-    if ! mkdir -p "$(dirname "${DAEMON_PATH}")"; then
+    
+    apt install -y unzip
+    checkPackageInstalled unzip
+
+    if ! mkdir -p $SERVICELET_PATH; then
         echo "failed to create service path" | log 1
         return 1
     fi
+
     local zipPath="${DAEMON_PATH}.zip"
-    local unzipPath=$(dirname "${DAEMON_PATH}")"/"
+    local unzipPath=$SERVICELET_PATH/
     curlDownload "${DAEMON_URL}" "${zipPath}"
     if ! unzip "${zipPath}" -d "${unzipPath}"; then
         echo "failed to unzip daemon" | log 1
         return 1
     fi
     rm -f "${zipPath}"
+
     if ! chmod u+x "${DAEMON_PATH}"; then
         echo "failed to set execute permission to server" | log 1
         return 1
     fi
-    local uuid=
-    if ! uuid=$(vm_uuid); then
-        echo "could not detect uuid" | log 1
-        return 1
-    fi
+    
     # write configuration
-    {
-        echo "[servicelet]"
-        echo "id = ${uuid}"
-        echo "host = ${CWM_TARGET_URL}"
-        echo "service = ${SERVICE_PATH}"
-        echo "logPath = ${SERVICE_LOG_PATH}"
-        echo "apiKey = $(api_client_id)"
-        echo "apiSecret = $(api_secret)"
-        echo "socket = ${DAEMON_SOCKET}"
-        echo "pullInterval = 15"
-        echo "clientTimeout = 20"
-        echo "runAs = ${USER_GROUP}"
-    } >"${DAEMON_SETTINGS_PATH}"
+cat << EOF > ${DAEMON_SETTINGS_PATH}
+[servicelet]
+id = ${CWM_UUID}
+host = ${CWM_TARGET_URL}
+service = ${SERVICE_PATH}
+logPath = ${SERVICE_LOG_PATH}
+apiKey = ${CWM_APICLIENTID}
+apiSecret = ${CWM_APISECRET}
+socket = ${DAEMON_SOCKET}
+pullInterval = 15
+clientTimeout = 20
+runAs = ${USER_GROUP}
+EOF 
+
     touch "${SERVICE_LOG_PATH}"
-    chown -R "${USER_GROUP}:${USER_GROUP}" /opt/servicelet
+    chown -R "${USER_GROUP}:${USER_GROUP}" $SERVICELET_PATH
+
     # install daemon
     if ! "${DAEMON_PATH}" install; then
         echo "service installation failed" | log 1
@@ -139,18 +133,8 @@ function daemon_install() {
     fi
 
     return 0
+
 }
-
-if [ ! -f "${GUEST_CONF}" ]; then
-    echo "missing guest configuration file, aborting" | log 1
-    exit 1
-fi
-
-if [ -f "include/startup.sh" ]; then
-    . include/startup.sh
-elif [ -f "../include/startup.sh" ]; then
-    . ../include/startup.sh
-fi
 
 # remove existing daemon (if exists)
 daemon_cleanup
@@ -163,5 +147,7 @@ if ! daemon_install; then
     echo "service installation failed, aborting" | log 1
     exit 1
 fi
+
+tagScript success
 
 exit 0
