@@ -1,0 +1,64 @@
+#!/bin/bash
+
+#
+# cwm scheduler servicelet installer
+#
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# todo: move to single conf location
+CLI_PATH="/opt/servicelet/cloudcli"
+SERVICE_PATH="/opt/servicelet/service.py"
+SCHEMA_PATH="/opt/servicelet/schema.json"
+USER_GROUP="slet"
+CLOUDCLI_URL="https://cloudcli.cloudwm.com/binaries/latest/cloudcli-linux-amd64.tar.gz"
+
+export DEBIAN_FRONTEND=noninteractive
+
+# install pip
+if ! apt install -y python3-pip; then
+    echo "pip installation failed" | log 1
+    exit 1
+fi
+
+# install python crontab package
+if ! pip3 install croniter; then
+    echo "python crontab installation failed"
+fi
+
+if ! mkdir -p "$(dirname "${CLI_PATH}")"; then
+    # note: sanity check, daemon should be installed
+    echo "failed to create target path, aborting" | log 1
+    exit 1
+fi
+
+curlDownload "https://raw.githubusercontent.com/cloudwm/scheduler/master/schema.json" "${SCHEMA_PATH}"
+curlDownload "https://raw.githubusercontent.com/cloudwm/scheduler/master/service.py" "${SERVICE_PATH}"
+curlDownload "${CLOUDCLI_URL}" "${CLI_PATH}.tar.gz"
+if ! tar xvzf "${CLI_PATH}.tar.gz" -C $(dirname "${CLI_PATH}"); then
+    ecoh "failed to download cloudcli, aborting" | log 1
+    exit 1
+fi
+rm -f "${CLI_PATH}.tar.gz"
+
+if ! chown -R "${USER_GROUP}:${USER_GROUP}" "$(dirname "${CLI_PATH}")"; then
+    echo "failed to set service ownership, aborting" | log 1
+    exit 1
+fi
+
+if ! chmod u+x "${SERVICE_PATH}"; then
+    echo "failed to set service permission, aborting" | log 1
+    exit 1
+fi
+
+# update service schema
+if ! "${SERVICE_PATH}" --schema; then
+    echo "schema update failed, aborting" | log 1
+    exit 1
+fi
+
+exit 0
