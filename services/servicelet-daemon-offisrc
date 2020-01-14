@@ -111,7 +111,7 @@ socket = ${DAEMON_SOCKET}
 pullInterval = 15
 clientTimeout = 20
 runAs = ${USER_GROUP}
-EOF 
+EOF
 
     touch "${SERVICE_LOG_PATH}"
     chown -R "${USER_GROUP}:${USER_GROUP}" $SERVICELET_PATH
