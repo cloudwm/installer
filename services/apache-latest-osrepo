@@ -21,7 +21,7 @@ systemctl enable apache2.service
 
 echo "Adding descriptions" | log
 descriptionAppend "Apache Root Directory: ${appPath}"
-descriptionAppend "Apache Config Location: /etc/apache2/"
+descriptionAppend "Apache config files location: /etc/apache2/"
 descriptionAppend " "
 
 tag apache2.success

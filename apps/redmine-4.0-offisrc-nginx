@@ -67,8 +67,8 @@ descriptionAppend "Redmine Web UI: https://${CWM_SERVERIP}"
 descriptionAppend "Redmine Initial username: admin"
 descriptionAppend "Redmine Initial password: admin"
 descriptionAppend " "
-descriptionAppend "Redmine Application directory: ${appPath}"
-descriptionAppend "Redmine Config location: ${appPath}/config/"
+descriptionAppend "Redmine application directory: ${appPath}"
+descriptionAppend "Redmine config files location: ${appPath}/config/"
 descriptionAppend " "
 
 tagScript success

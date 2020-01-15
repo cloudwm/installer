@@ -93,8 +93,8 @@ descriptionAppend "Elasticsearch Username: admin"
 descriptionAppend "Elasticsearch Password: ${ADMINPASSWORD}"
 descriptionAppend "Elasticsearch (Kibana) Web UI: https://${CWM_SERVERIP}"
 descriptionAppend " "
-descriptionAppend "Elasticsearch config location: /etc/elasticsearch/"
-descriptionAppend "Kibana config location: /etc/kibana/kibana.yml"
+descriptionAppend "Elasticsearch config files location: /etc/elasticsearch/"
+descriptionAppend "Kibana config file: /etc/kibana/kibana.yml"
 descriptionAppend " "
 
 tagScript success
