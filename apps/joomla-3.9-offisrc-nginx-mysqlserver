@@ -70,9 +70,9 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
 echo "adding descriptions" | log
-descriptionAppend "Joomla Admin Web Interface: https://${CWM_SERVERIP}/administrator"
-descriptionAppend "Joomla Admin Username: admin"
-descriptionAppend "Joomla Admin Password: ${ADMINPASSWORD}"
+descriptionAppend "Joomla Admin Web UI: https://${CWM_SERVERIP}/administrator"
+descriptionAppend "Joomla Username: admin"
+descriptionAppend "Joomla Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success

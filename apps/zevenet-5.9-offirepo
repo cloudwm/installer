@@ -70,9 +70,9 @@ sleep 5
 rm -f /etc/motd
 
 echo "Adding descriptions" | log
-descriptionAppend "Zevenet Admin URI: https://${CWM_SERVERIP}:${freePort}"
-descriptionAppend "Zevenet Admin User: root"
-descriptionAppend "Zevenet Admin Password: ${ADMINPASSWORD}"
+descriptionAppend "Zevenet Web UI: https://${CWM_SERVERIP}:${freePort}"
+descriptionAppend "Zevenet Username: root"
+descriptionAppend "Zevenet Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Zevenet API Key: ${zapi_key}"
 descriptionAppend "Zevenet API Reference: https://www.zevenet.com/zapidoc_ce_v4.0/"

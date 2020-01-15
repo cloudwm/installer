@@ -53,9 +53,9 @@ echo "Misc. cleanups" | log
 rm $WP_PATH/index.nginx-debian.html
 
 echo "Adding descriptions" | log
-descriptionAppend "Wordpress Login: https://${CWM_SERVERIP}/wp-login.php"
-descriptionAppend "Wordpress Admin Username: admin"
-descriptionAppend "Wordpress Admin password: ${ADMINPASSWORD}"
+descriptionAppend "Wordpress Admin Web UI: https://${CWM_SERVERIP}/wp-login.php"
+descriptionAppend "Wordpress Username: admin"
+descriptionAppend "Wordpress Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success

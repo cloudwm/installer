@@ -56,7 +56,7 @@ EOF
 chown www-data:www-data $appPath/data/pages/start.txt
 
 echo "Adding descriptions" | log
-descriptionAppend "DokuWiki web UI: https://${CWM_SERVERIP}"
+descriptionAppend "DokuWiki Web UI: https://${CWM_SERVERIP}"
 descriptionAppend " "
 
 tagScript success

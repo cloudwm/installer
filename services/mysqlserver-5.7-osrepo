@@ -63,9 +63,12 @@ echo "Restarting mysql.service" | log
 systemctl restart mysql.service
 
 echo "Adding descriptions" | log
-descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"
+descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "mySQL Server config global files location: /etc/mysql/"
+descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
 descriptionAppend " "
 
 tag mysql-server-5.7.success

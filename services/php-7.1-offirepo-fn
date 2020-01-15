@@ -28,7 +28,7 @@ systemctl stop apache2.service
 systemctl disable apache2.service
 
 echo "Adding descriptions" | log
-descriptionAppend "PHP configuration location: /etc/php/"
+descriptionAppend "PHP config files location: /etc/php/"
 descriptionAppend " "
 
 tag php.success

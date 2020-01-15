@@ -44,10 +44,12 @@ echo "Generating self-signed certificate" | log
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.key -out /etc/ssl/certs/server.crt -days 1024 -nodes -subj '/CN=localhost'
 
 echo "Adding descriptions" | log
-descriptionAppend "Rails app location: /var/www/myapp/"
-descriptionAppend "Rails app configuration: /var/www/myapp/config/"
+descriptionAppend "Rails Root directory: /var/www/myapp/"
+descriptionAppend "Rails config files location: /var/www/myapp/config/"
+descriptionAppend " "
 descriptionAppend "Rails run non-HTTPS server:"
 descriptionAppend "# rails s -b ${CWM_SERVERIP} -p 80"
+descriptionAppend " "
 descriptionAppend "Rails run HTTPS server:"
 descriptionAppend "# rails s -b 'ssl://${CWM_SERVERIP}?key=/etc/ssl/private/server.key&cert=/etc/ssl/certs/server.crt' -p 443"
 descriptionAppend " "

@@ -28,10 +28,10 @@ plesk bin init_conf -c | log
 waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "Plesk ip address: ${CWM_SERVERIP}:8443"
-descriptionAppend "Plesk domain address: ${pleskDomain}:8443"
-descriptionAppend "Plesk user: root"
-descriptionAppend "Plesk password: ${ADMINPASSWORD}"
+descriptionAppend "Plesk Web UI: ${CWM_SERVERIP}:8443"
+descriptionAppend "Plesk Domain Address: ${pleskDomain}:8443"
+descriptionAppend "Plesk Username: root"
+descriptionAppend "Plesk Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 

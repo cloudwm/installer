@@ -44,8 +44,8 @@ echo "Adding descriptions" | log
 descriptionAppend "Memcached config file: /etc/memcached.conf"
 descriptionAppend " "
 descriptionAppend "Memcached SASL config file: /etc/sasl2/memcached.conf"
-descriptionAppend "Memcached SASL username: ${fullname}"
-descriptionAppend "Memcached SASL password: ${ADMINPASSWORD}"
+descriptionAppend "Memcached SASL Username: ${fullname}"
+descriptionAppend "Memcached SASL Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
