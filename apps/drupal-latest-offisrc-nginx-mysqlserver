@@ -97,9 +97,9 @@ sleep 5
 waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "Drupal Admin URI: https://${CWM_SERVERIP}/user/login"
-descriptionAppend "Drupal Admin User: admin"
-descriptionAppend "Drupal Admin Password: ${ADMINPASSWORD}"
+descriptionAppend "Drupal Web UI: https://${CWM_SERVERIP}/user/login"
+descriptionAppend "Drupal Username: admin"
+descriptionAppend "Drupal Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success

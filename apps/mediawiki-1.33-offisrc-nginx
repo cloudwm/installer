@@ -61,9 +61,9 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
 echo "Adding descriptions" | log
-descriptionAppend "Mediawiki web UI: https://${CWM_SERVERIP}"
-descriptionAppend "Mediawiki admin user: admin"
-descriptionAppend "Mediawiki admin password: ${ADMINPASSWORD}"
+descriptionAppend "Mediawiki Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Mediawiki Username: admin"
+descriptionAppend "Mediawiki Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Mediawiki settings file: ${appPath}/LocalSettings.php"
 descriptionAppend " "

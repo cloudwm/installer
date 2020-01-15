@@ -81,7 +81,7 @@ sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${CWM_SERVERIP}',/" $appPath
 systemctl restart php$phpVersion-fpm.service
 
 echo "Adding descriptions" | log
-descriptionAppend "Nextcloud URL: https://${CWM_SERVERIP}/"
+descriptionAppend "Nextcloud Web UI: https://${CWM_SERVERIP}/"
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
 descriptionAppend " "

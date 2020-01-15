@@ -54,14 +54,14 @@ systemctl enable vncserver@1.service
 systemctl start vncserver@1
 
 echo "Adding descriptions" | log
-descriptionAppend "Please connect via VNC Client"
+descriptionAppend "Connect using VNC Client"
 descriptionAppend " "
-descriptionAppend "Computer Address: ${CWM_SERVERIP}"
-descriptionAppend "Ubuntu user: root"
-descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
+descriptionAppend "VNC GUI Address: {CWM_SERVERIP}:5901"
+descriptionAppend "VNC Password: ${VNC_PASSWORD}"
 descriptionAppend " "
-descriptionAppend "VNC Port: 5901"
-descriptionAppend "VNC password: ${VNC_PASSWORD}"
+descriptionAppend "SSH Console Address: ${CWM_SERVERIP}"
+descriptionAppend "Username: root"
+descriptionAppend "Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 

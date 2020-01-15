@@ -78,6 +78,9 @@ descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "
+descriptionAppend "mySQL Server config global files location: /etc/mysql/"
+descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
+descriptionAppend " "
 
 tag mysql-server-8.0.success
 tag mysqld.success

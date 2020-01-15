@@ -89,11 +89,11 @@ systemctl start rabbitmq-server
 systemctl restart rabbitmq-server
 
 echo "Adding descriptions" | log
-descriptionAppend "RabbitMQ web UI: https://${rabbitmqDomain}"
-descriptionAppend "RabbitMQ admin user: admin"
-descriptionAppend "RabbitMQ admin password: ${ADMINPASSWORD}"
+descriptionAppend "RabbitMQ Web UI: https://${rabbitmqDomain}"
+descriptionAppend "RabbitMQ Username: admin"
+descriptionAppend "RabbitMQ Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "RabbitMQ config location: /etc/rabbitmq/"
+descriptionAppend "RabbitMQ config files location: /etc/rabbitmq/"
 descriptionAppend " "
 
 tagScript success

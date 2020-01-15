@@ -60,14 +60,15 @@ systemctl restart nginx.service
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Moodle web UI: https://${CWM_SERVERIP}"
-descriptionAppend "Moodle admin user: admin"
-descriptionAppend "Moodle admin password: ${ADMINPASSWORD}"
+descriptionAppend "Moodle Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Moodle Username: admin"
+descriptionAppend "Moodle Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "Moodle db user: moodleuser"
-descriptionAppend "Moodle db password: ${ADMINPASSWORD}"
-descriptionAppend "(On initial setup, enter db user and password in the matching fields. Other fields should remain as is.)"
+descriptionAppend "Moodle Database Username: moodleuser"
+descriptionAppend "Moodle Database Password: ${ADMINPASSWORD}"
+descriptionAppend "(On initial setup, enter database user and password in the matching fields. Other fields should remain as is.)"
 descriptionAppend " "
 
 tagScript success
+
 exit 0

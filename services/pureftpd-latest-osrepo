@@ -35,13 +35,13 @@ echo 1 > /etc/pure-ftpd/conf/TLS
 systemctl restart pure-ftpd.service | log
 
 echo "Adding descriptions" | log
-descriptionAppend "Pure-FTPd Hostname: ${CWM_SERVERIP}"
+descriptionAppend "Pure-FTPd Address: ${CWM_SERVERIP}"
 descriptionAppend "Pure-FTPd Username: ftpuser"
 descriptionAppend "Pure-FTPd Password: ${ftpuser_password}"
 descriptionAppend " "
 descriptionAppend "Pure-FTPd main storage folder: ${app_path}/"
 descriptionAppend " "
-descriptionAppend "Pure-FTPd config location: /etc/pure-ftpd/conf/"
+descriptionAppend "Pure-FTPd config files location: /etc/pure-ftpd/conf/"
 descriptionAppend " "
 descriptionAppend "To list all modified configurations at once:"
 descriptionAppend "# head /etc/pure-ftpd/conf/*"

@@ -19,11 +19,11 @@ echo "Restart xRDP service" | log
 systemctl restart xrdp
 
 echo "Adding descriptions" | log
-descriptionAppend "Please connect via Microsoft Remote Desktop"
+descriptionAppend "Connect using Microsoft Remote Desktop Client (RDP Client)"
 descriptionAppend " "
-descriptionAppend "Computer Address: ${CWM_SERVERIP}"
-descriptionAppend "Ubuntu user: root"
-descriptionAppend "Ubuntu password: ${ADMINPASSWORD}"
+descriptionAppend "Desktop Address: ${CWM_SERVERIP}"
+descriptionAppend "Username: root"
+descriptionAppend "Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
