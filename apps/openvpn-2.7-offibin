@@ -36,14 +36,14 @@ echo "Adding descriptions" | log
 admin_ui=`grep "Admin" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | head -1`
 client_ui=`grep "Client" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | head -1`
 
-descriptionAppend "OpenVPN Management Interface URL: ${admin_ui}"
+descriptionAppend "OpenVPN Management Web UI: ${admin_ui}"
 descriptionAppend "OpenVPN Username: openvpn"
 descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
-descriptionAppend "OpenVPN Client Interface URL: $client_ui"
+descriptionAppend "OpenVPN Client Web UI: $client_ui"
 descriptionAppend " "
 descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
-descriptionAppend "OpenVPN Commandline tools: /usr/local/openvpn_as/scripts"
+descriptionAppend "OpenVPN Command-line tools: /usr/local/openvpn_as/scripts"
 descriptionAppend " "
 
 tagScript success

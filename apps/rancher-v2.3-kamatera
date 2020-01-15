@@ -171,9 +171,9 @@ WORKER_JSON_STRING='{
 curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
 echo "Adding descriptions" | log
-descriptionAppend "Rancher web UI: https://${rancherDomain}"
-descriptionAppend "Rancher web UI user: admin"
-descriptionAppend "Rancher web UI password: ${ADMINPASSWORD}"
+descriptionAppend "Rancher Web UI: https://${rancherDomain}"
+descriptionAppend "Rancher Username: admin"
+descriptionAppend "Rancher Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success

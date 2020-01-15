@@ -43,9 +43,9 @@ bash vst-install.sh -n yes -w no -a yes -k yes -v yes -j no -i yes -b yes -q no 
 waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "VestaCP Address: https://${vestaDomain}:8083"
-descriptionAppend "VestaCP user: admin"
-descriptionAppend "VestaCP password: ${ADMINPASSWORD}"
+descriptionAppend "VestaCP Web UI: https://${vestaDomain}:8083"
+descriptionAppend "VestaCP Username: admin"
+descriptionAppend "VestaCP Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success

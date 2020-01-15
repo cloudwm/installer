@@ -63,11 +63,12 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
 echo "Adding descriptions" | log
-descriptionAppend "Redmine URI: https://${CWM_SERVERIP}"
-descriptionAppend "First time credentials: admin/admin"
+descriptionAppend "Redmine Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Redmine Initial username: admin"
+descriptionAppend "Redmine Initial password: admin"
 descriptionAppend " "
-descriptionAppend "Redmine application directory: ${appPath}"
-descriptionAppend "Redmine configuration: ${appPath}/config/"
+descriptionAppend "Redmine Application directory: ${appPath}"
+descriptionAppend "Redmine Config location: ${appPath}/config/"
 descriptionAppend " "
 
 tagScript success

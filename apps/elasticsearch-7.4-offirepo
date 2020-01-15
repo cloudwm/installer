@@ -89,12 +89,12 @@ systemctl restart kibana.service
 
 
 echo "Adding descriptions" | log
-descriptionAppend "Elasticsearch admin user: admin"
-descriptionAppend "Elasticsearch admin password: ${ADMINPASSWORD}"
-descriptionAppend "Elasticsearch (Kibana) web interface: https://${CWM_SERVERIP}"
+descriptionAppend "Elasticsearch Username: admin"
+descriptionAppend "Elasticsearch Password: ${ADMINPASSWORD}"
+descriptionAppend "Elasticsearch (Kibana) Web UI: https://${CWM_SERVERIP}"
 descriptionAppend " "
-descriptionAppend "Elasticsearch configuration: /etc/elasticsearch/"
-descriptionAppend "Kibana configuration: /etc/kibana/kibana.yml"
+descriptionAppend "Elasticsearch config location: /etc/elasticsearch/"
+descriptionAppend "Kibana config location: /etc/kibana/kibana.yml"
 descriptionAppend " "
 
 tagScript success

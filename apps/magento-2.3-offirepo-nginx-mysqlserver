@@ -92,10 +92,10 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 
 echo "Adding descriptions" | log
-descriptionAppend "Magento Admin URI: https://${CWM_SERVERIP}${ADMIN_URI}"
-descriptionAppend "Magento Admin Email: ${ADMINEMAIL}"
-descriptionAppend "Magento Admin User: admin"
-descriptionAppend "Magento Admin Password: ${ADMINPASSWORD}" 
+descriptionAppend "Magento Admin Web UI: https://${CWM_SERVERIP}${ADMIN_URI}"
+descriptionAppend "Magento Email: ${ADMINEMAIL}"
+descriptionAppend "Magento Username: admin"
+descriptionAppend "Magento Password: ${ADMINPASSWORD}" 
 descriptionAppend " "
 
 tagScript success
