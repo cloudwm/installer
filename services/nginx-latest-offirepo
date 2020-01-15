@@ -22,10 +22,11 @@ if [ -d "$appPath" ]; then
 fi
 
 echo "Adding descriptions" | log
-descriptionAppend "NGINX configuration location: /etc/nginx/"
-
+descriptionAppend "NGiNX Address: ${CWM_SERVERIP}"
+descriptionAppend " "
+descriptionAppend "NGiNX config files location: /etc/nginx/"
 if [ -d "$appPath" ]; then
-    descriptionAppend "NGINX root Directory: $appPath/"
+    descriptionAppend "NGiNX root Directory: $appPath/"
 fi
 descriptionAppend " "
 
