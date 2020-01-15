@@ -23,8 +23,8 @@ echo "Restarting service to implement changes" | log
 service php7.2-fpm restart
 
 echo "Adding descriptions" | log
-descriptionAppend "PHP configuration location: /etc/php/"
-descriptionAppend "PHP-FPM configuration location: /etc/php/7.2/fpm/"
+descriptionAppend "PHP config files location: /etc/php/"
+descriptionAppend "PHP-FPM config files location: /etc/php/7.2/fpm/"
 descriptionAppend " "
 
 tag php.success

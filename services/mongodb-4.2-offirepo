@@ -38,10 +38,11 @@ mongo --eval "${command}" | log
 
 echo "Adding descriptions" | log
 
-descriptionAppend "MongoDB config file: /etc/mongod.conf"
 descriptionAppend "MongoDB Address: ${CWM_SERVERIP}"
 descriptionAppend "MongoDB Username: admin"
 descriptionAppend "MongoDB Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "MongoDB config file: /etc/mongod.conf"
 descriptionAppend " "
 
 echo "Adding dependency tags" | log
