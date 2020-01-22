@@ -47,8 +47,9 @@ waitOrStop 0
 sleep 5
 
 echo "Adding descriptions" | log
-access_key=`cat /minio/.minio.sys/config/config.json | grep accessKey | sed -e 's/"accessKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
-secret_key=`cat /minio/.minio.sys/config/config.json | grep secretKey | sed -e 's/"secretKey"://g' | awk '{$1=$1};1'  | tr -d '",'`
+apt install jq -y
+access_key=$(cat /minio/.minio.sys/config/config.json | jq '.credentials._[]|select(.key|test("access_key")).value' | tr -d '"')
+secret_key=$(cat /minio/.minio.sys/config/config.json | jq '.credentials._[]|select(.key|test("secret_key")).value' | tr -d '"')
 
 descriptionAppend "Minio Web UI: https://${CWM_SERVERIP}"
 descriptionAppend "Minio Access key: $access_key"
