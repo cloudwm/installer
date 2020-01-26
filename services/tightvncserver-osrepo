@@ -56,7 +56,7 @@ systemctl start vncserver@1
 echo "Adding descriptions" | log
 descriptionAppend "Connect using VNC Client"
 descriptionAppend " "
-descriptionAppend "VNC GUI Address: {CWM_SERVERIP}:5901"
+descriptionAppend "VNC GUI Address: ${CWM_SERVERIP}:5901"
 descriptionAppend "VNC Password: ${VNC_PASSWORD}"
 descriptionAppend " "
 descriptionAppend "SSH Console Address: ${CWM_SERVERIP}"
