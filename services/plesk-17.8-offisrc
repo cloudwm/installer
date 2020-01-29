@@ -7,6 +7,11 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
+pleskDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+
+echo "Preparing FQDN for installation process" | log
+sed -i "2i${CWM_SERVERIP} ${pleskDomain}" /etc/hosts
+hostnamectl set-hostname ${pleskDomain}
 
 echo "Running Plesk Official Installer" | log
 curlDownload https://autoinstall.plesk.com/plesk-installer
@@ -15,7 +20,6 @@ sh plesk-installer install plesk 17.8.11 | log
 waitOrStop 0
 
 echo "Configuring Plesk" | log
-pleskDomain="plesk.${CWM_SERVERIP//./-}.cloud-xip.io"
 plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${ADMINEMAIL} | log
 waitOrStop 0
 
