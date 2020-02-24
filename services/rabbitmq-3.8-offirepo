@@ -9,7 +9,7 @@ fi
 checkTagExist nginx.success
 
 rootDir=$(rootDir)
-erlangVersion=1:22.1.\*
+erlangVersion=1:22.2.\*
 rabbitmqVersion=3.8.\*
 rabbitmqDomain="rabbitmq.${CWM_SERVERIP//./-}.cloud-xip.io"
 
