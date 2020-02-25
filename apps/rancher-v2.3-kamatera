@@ -51,7 +51,8 @@ cp $rootDir/tweaks/extras/rancher/register.conf /etc/nginx/sites-available/
 ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/register.conf
 systemctl restart nginx
 # creating certbot
-certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} 
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} --test-cert
+waitOrStop 0
 # remove certbot routing
 unlink /etc/nginx/sites-enabled/register.conf
 
@@ -74,7 +75,7 @@ mkdir -p /var/lib/rancher
 systemctl start docker.service
 docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
 
-curlBaseParams=( --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
+curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
 echo "Waiting for Rancher to intialize" | log
 HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_SERVERIP}:443 --insecure`
