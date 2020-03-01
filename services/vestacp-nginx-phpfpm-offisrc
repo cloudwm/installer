@@ -10,7 +10,7 @@ rootDir=$(rootDir)
 
 echo "Running VestaCP Official Installer" | log
 curlDownload http://vestacp.com/pub/vst-install.sh
-vestaDomain="vesta.${CWM_SERVERIP//./-}.cloud-xip.io"
+vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 
 ## NOTICE: Use ONLY short arguments. Short and long arguments are NOT identical.
 #
