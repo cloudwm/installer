@@ -11,7 +11,7 @@ checkTagExist nginx.success
 rootDir=$(rootDir)
 erlangVersion=1:22.2.\*
 rabbitmqVersion=3.8.\*
-rabbitmqDomain="rabbitmq.${CWM_SERVERIP//./-}.cloud-xip.io"
+rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Adding RabbitMQ repository" | log
 apt-key adv --keyserver "hkps.pool.sks-keyservers.net" --recv-keys "0x6B73A36E6026DFCA"
