@@ -50,7 +50,7 @@ ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/
 systemctl restart nginx
 
 # creating certbot
-certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rabbitmqDomain}
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rabbitmqDomain}
 waitOrStop 0
 unlink /etc/nginx/sites-enabled/register.conf
 cp $rootDir/tweaks/extras/rabbitmq-nginx/rabbitmq-nginx.conf /etc/nginx/sites-available/
