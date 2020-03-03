@@ -9,7 +9,7 @@ fi
 checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
-appVersion=2.7.5
+appVersion=2.8.2
 appPackage=openvpn-as-latest-ubuntu18.amd_64.deb
 rootDir=$(rootDir)
 
@@ -27,20 +27,19 @@ rm -f openvpn-as-bundled-clients-latest.deb
 dpkg -i $appPackage | log
 rm -f $appPackage
 
+apt -y --fix-broken install 
+
 echo "Configuring first user" | log
 
 echo "openvpn:$ADMINPASSWORD" | chpasswd
 
 echo "Adding descriptions" | log
 
-admin_ui=`grep "Admin" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | head -1`
-client_ui=`grep "Client" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | head -1`
-
-descriptionAppend "OpenVPN Management Web UI: ${admin_ui}"
+descriptionAppend "OpenVPN Management Web UI:  https://${CWM_SERVERIP}:943/admin"
 descriptionAppend "OpenVPN Username: openvpn"
 descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
-descriptionAppend "OpenVPN Client Web UI: $client_ui"
+descriptionAppend "OpenVPN Client Web UI: https://${CWM_SERVERIP}:943/"
 descriptionAppend " "
 descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
 descriptionAppend "OpenVPN Command-line tools: /usr/local/openvpn_as/scripts"
