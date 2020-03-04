@@ -25,7 +25,7 @@ mv dokuwiki-$versionFilename.tgz $appPath
 
 echo "Extracting DokuWiki to ${appPath}/" | log
 tar -xzvf $appPath/dokuwiki-$versionFilename.tgz -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f $appPath/dokuwiki-$versionFilename.tgz
 
 echo "Setting directory permissions" | log

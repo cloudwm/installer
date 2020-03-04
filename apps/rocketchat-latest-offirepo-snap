@@ -14,7 +14,7 @@ echo "Installing snap and then rocket.chat" | log
 apt install snapd -y
 checkPackageInstalled snapd
 snap install rocketchat-server 
-waitOrStop 0
+waitOrStop 0 "Failed to install snap application"
 
 echo "Adding Loading in Progress screen" | log
 nginxErrorPage=/usr/share/nginx/html/customerror_50x.html

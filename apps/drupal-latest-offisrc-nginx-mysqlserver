@@ -35,7 +35,7 @@ curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.g
 
 echo "Extracting Drupal to $appPath" | log
 tar -xzvf drupal-$versionFilename.tar.gz -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f drupal-$versionFilename.tar.gz
 
 echo "Setting misc definitions & permissions for Drupal" | log
@@ -51,14 +51,14 @@ echo "Create temp swap for composer processes" | log
 sysctl vm.swappiness=80
 # create swap file and moint as partition
 swapFilename=$(createSwapFile swapfile 900 $rootDir/_swap)
+waitOrStop 0 "Failed to create swap file"
 sleep 5
-waitOrStop 0
 
 echo "Installing Drush" | log
 cd $appPath
 export COMPOSER_HOME=/root
 composer require drush/drush -v | log
-waitOrStop 0
+waitOrStop 0 "Failed to install Drush"
 
 echo "Creating Website" | log
 cd $appPath
@@ -93,8 +93,8 @@ echo "Remove temp swap" | log
 sysctl vm.swappiness=10
 # mount off and remove swap file 
 removeSwapFile $swapFilename
+waitOrStop 0 "Failed to remove swap file"
 sleep 5
-waitOrStop 0
 
 echo "Adding descriptions" | log
 descriptionAppend "Drupal Web UI: https://${CWM_SERVERIP}/user/login"

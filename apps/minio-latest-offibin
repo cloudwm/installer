@@ -44,7 +44,7 @@ chown -R minio-user:minio-user /etc/minio/certs
 echo "Starting Minio service" | log
 systemctl enable minio.service
 systemctl start minio.service
-waitOrStop 0
+waitOrStop 0 "Minio Service did not start"
 sleep 5
 
 echo "Adding descriptions" | log
@@ -56,7 +56,7 @@ sed -i 's/minioadmin/'"${secret_key}"'/' $minioConfigFile
 # access_key=$(jq '.credentials._[]|select(.key == "access_key").value' ${minioConfigFile} | tr -d '"')
 # secret_key=$(jq '.credentials._[]|select(.key == "secret_key").value' ${minioConfigFile} | tr -d '"')
 systemctl restart minio.service
-waitOrStop 0
+waitOrStop 0 "Minio service did not restart"
 
 descriptionAppend "Minio Web UI: https://${CWM_SERVERIP}"
 descriptionAppend "Minio Access key: $access_key"

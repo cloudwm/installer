@@ -224,7 +224,7 @@ function waitOrStop() {
 
     if [ $waitExitCode -ne $exitCode ]; then
 
-	    echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log 1
+	    echo "ExitCode $exitCode (expecting $waitExitCode). ${2:-Undefined error.}" | log 1
         exit 1;
 
     fi

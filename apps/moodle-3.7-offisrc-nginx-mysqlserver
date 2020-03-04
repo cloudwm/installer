@@ -21,7 +21,7 @@ echo "Downloading and extracting application" | log
 cd $rootDir/temp
 curlDownload https://download.moodle.org/$appBranch/moodle-$appVersion.tgz
 tar -xzvf moodle-$appVersion.tgz
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 mkdir -p $appPath
 mv moodle $appPath
 rm -f moodle-$appVersion.tgz

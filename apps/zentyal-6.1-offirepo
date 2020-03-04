@@ -17,7 +17,7 @@ curlDownload http://keys.zentyal.org/zentyal-6.1-packages.asc
 apt-key add zentyal-6.1-packages.asc
 echo "deb http://packages.zentyal.org/zentyal 6.1 main extra" >> $aptSourceList
 apt update | log
-waitOrStop 0
+waitOrStop 0 "Couldn't update source list"
 
 echo "Modifying hostname to fit max 64 chars requirement" | log
 savedHostname=$(hostname)

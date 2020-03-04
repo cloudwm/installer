@@ -26,7 +26,7 @@ curlDownload https://downloads.joomla.org/cms/joomla3/$appVersion/joomla_$appVer
 echo "Extracting Joomla to ${appPath}/" | log
 mkdir -p $appPath/
 tar -xzvf joomla.tgz -C $appPath/ | log
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f joomla.tgz
 
 echo "Creating Joomla Database" | log
@@ -41,7 +41,7 @@ cp $rootDir/tweaks/extras/joomla-nginx/configuration.php $appPath/configuration.
 sed -i "s/Password/${ADMINPASSWORD}/g" $appPath/configuration.php
 sed -i "s/some@mail.com/${ADMINEMAIL}/g" $appPath/configuration.php
 mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
-waitOrStop 0
+waitOrStop 0 "Failed to create database"
 
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);

@@ -30,9 +30,9 @@ openssl dhparam -out $dhParamFile 2048;
 
 echo "Verifying certbot renewal systemd timer" | log
 systemctl list-timers | grep certbot
-waitOrStop 0
+waitOrStop 0 "Cron timers not found (1of2)"
 cat /lib/systemd/system/certbot.timer
-waitOrStop 0
+waitOrStop 0 "Cron timers not found (2of2)"
 if ! cat /lib/systemd/system/certbot.service | grep "service nginx reload"; then
     sed -i 's/-q renew/-q renew --deploy-hook "service nginx reload"/' /lib/systemd/system/certbot.service
 fi
@@ -52,7 +52,7 @@ ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/register
 systemctl restart nginx
 # creating certbot
 execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain}
-waitOrStop 0
+waitOrStop 0 "Letsencrypt certificates not created"
 # remove certbot routing
 unlink /etc/nginx/sites-enabled/register.conf
 

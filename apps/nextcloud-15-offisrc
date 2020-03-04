@@ -22,7 +22,7 @@ cd $rootDir/temp
 # curl -O https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
 curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
 tar -xjvf nextcloud-$appVersion.tar.bz2 -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f nextcloud-$appVersion.tar.bz2
 chown -R www-data:www-data $appPath
 

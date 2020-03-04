@@ -21,7 +21,7 @@ mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://www.phpbb.com/files/release/$appArchive
 tar -xjvf $appArchive  -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f $appArchive
 chown -R www-data:www-data $appPath
 
