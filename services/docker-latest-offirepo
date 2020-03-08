@@ -13,7 +13,7 @@ curlDownload https://download.docker.com/linux/ubuntu/gpg
 apt-key add gpg
 
 add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
-waitOrStop 0
+waitOrStop 0 "Repository not added"
 
 echo "Install docker-ce" | log
 cat > /usr/sbin/policy-rc.d <<EOF

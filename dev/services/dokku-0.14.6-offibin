@@ -19,7 +19,7 @@ echo "Installing application" | log
 cd $rootDir/temp
 curl -O https://raw.githubusercontent.com/dokku/dokku/v0.14.6/bootstrap.sh
 DOKKU_TAG=v0.14.6 bash bootstrap.sh
-waitOrStop 0
+waitOrStop 0 "Failed to install application"
 
 echo "Adding descriptions" | log
 

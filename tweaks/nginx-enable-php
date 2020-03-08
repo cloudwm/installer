@@ -13,8 +13,7 @@ phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 
 sed -i 's/listen = \/run\/php\/php'"${phpVersion}"'-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 service php$phpVersion-fpm restart
-
-# waitOrStop 0
+waitOrStop 0 "Restart fpm service failed"
 
 phpfpmconfig="\        location ~ \\.php$ {\n                include snippets\/fastcgi-php.conf\;\n                fastcgi_pass 127.0.0.1:9000\;\n        }\n"
 
@@ -22,8 +21,7 @@ sed -i '/\/var\/www\/html\;/a '"${phpfpmconfig}"'' /etc/nginx/sites-available/de
 sed -i -e 's/index index.html/index index.php index.html/' /etc/nginx/sites-available/default
 
 service nginx restart
-
-# waitOrStop 0
+waitOrStop 0 "Restart nginx service failed"
 
 tagScript success
 

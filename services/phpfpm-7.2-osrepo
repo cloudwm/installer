@@ -21,6 +21,7 @@ waitOrStop 0
 
 echo "Restarting service to implement changes" | log
 service php7.2-fpm restart
+waitOrStop 0 "Restarting fpm service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "PHP config files location: /etc/php/"

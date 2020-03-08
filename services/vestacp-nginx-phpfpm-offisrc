@@ -7,10 +7,11 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
+vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Running VestaCP Official Installer" | log
 curlDownload http://vestacp.com/pub/vst-install.sh
-vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+waitOrStop 0 "File not downloaded from official source"
 
 ## NOTICE: Use ONLY short arguments. Short and long arguments are NOT identical.
 #
@@ -40,7 +41,7 @@ vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 #   -h, --help              Print this help
 
 bash vst-install.sh -n yes -w yes -a no -k yes -v yes -j no -i yes -b yes -q no -x yes -z yes -t yes -c yes -o yes -m yes -g no -y no -p ${ADMINPASSWORD} -e ${ADMINEMAIL} -s ${vestaDomain} | log
-waitOrStop 0
+waitOrStop 0 "Failed to install application"
 
 echo "Adding descriptions" | log
 descriptionAppend "VestaCP Web UI: https://${vestaDomain}:8083"
