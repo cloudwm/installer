@@ -29,6 +29,7 @@ ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
+waitOrStop 0 "Reload nginx service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Rocket.chat Web UI: https://${CWM_SERVERIP}"
