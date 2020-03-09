@@ -9,6 +9,8 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing xRDP service" | log
+apt install -y xserver-xorg-core
+apt install -y xserver-xorg-input-all
 apt install -y xrdp
 checkPackageInstalled xrdp
 
