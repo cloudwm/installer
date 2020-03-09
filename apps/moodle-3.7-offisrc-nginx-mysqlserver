@@ -20,8 +20,9 @@ rootDir=$(rootDir)
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
 curlDownload https://download.moodle.org/$appBranch/moodle-$appVersion.tgz
+waitOrStop 0 "File not downloaded from official source"
 tar -xzvf moodle-$appVersion.tgz
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 mkdir -p $appPath
 mv moodle $appPath
 rm -f moodle-$appVersion.tgz
@@ -57,6 +58,7 @@ ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 

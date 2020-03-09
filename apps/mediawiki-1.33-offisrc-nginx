@@ -21,12 +21,13 @@ echo "Installing MediaWiki" | log
 echo "Downloading MediaWiki from original repo" | log
 cd $rootDir/temp
 curlDownload https://releases.wikimedia.org/mediawiki/${appVersion:: -2}/$appArchive
+waitOrStop 0 "File not downloaded from official source"
 mkdir -p $appPath
 mv $appArchive $appPath 
 
 echo "Extracting MediaWiki to $appPath/" | log
 tar -xzvf $appPath/$appArchive -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f $appPath/$appArchive
 
 echo "Setting directory permissions" | log
@@ -45,6 +46,7 @@ EOF
 echo "Installing MediaWiki" | log
 cd $appPath
 php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath="" --server https://${CWM_SERVERIP} "MediaWiki" "admin"
+waitOrStop 0 "Application install procedure failed"
 echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php 
 
 echo "Creating nginx configuration" | log
@@ -59,6 +61,7 @@ ln -s /etc/nginx/sites-available/mediawiki.conf /etc/nginx/sites-enabled/mediawi
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Mediawiki Web UI: https://${CWM_SERVERIP}"

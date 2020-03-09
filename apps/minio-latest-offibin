@@ -15,6 +15,7 @@ useradd --system minio-user --shell /sbin/nologin
 echo "Download Minio Binary" | log
 cd $rootDir/temp
 curlDownload https://dl.minio.io/server/minio/release/linux-amd64/minio
+waitOrStop 0 "File not downloaded from official source"
 
 echo "Install minio binary" | log
 mv $rootDir/temp/minio /usr/local/bin
@@ -34,17 +35,19 @@ setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 echo "Adding Systemd Service" | log
 curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
+waitOrStop 0 "File not downloaded from github"
 mv minio.service /etc/systemd/system
 
 echo "Generating self-signed certificate" | log
 mkdir -p /etc/minio/certs/
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/minio/certs/private.key -out /etc/minio/certs/public.crt -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
 chown -R minio-user:minio-user /etc/minio/certs
 
 echo "Starting Minio service" | log
 systemctl enable minio.service
 systemctl start minio.service
-waitOrStop 0
+waitOrStop 0 "Minio Service did not start"
 sleep 5
 
 echo "Adding descriptions" | log
@@ -56,7 +59,7 @@ sed -i 's/minioadmin/'"${secret_key}"'/' $minioConfigFile
 # access_key=$(jq '.credentials._[]|select(.key == "access_key").value' ${minioConfigFile} | tr -d '"')
 # secret_key=$(jq '.credentials._[]|select(.key == "secret_key").value' ${minioConfigFile} | tr -d '"')
 systemctl restart minio.service
-waitOrStop 0
+waitOrStop 0 "Minio service did not restart"
 
 descriptionAppend "Minio Web UI: https://${CWM_SERVERIP}"
 descriptionAppend "Minio Access key: $access_key"

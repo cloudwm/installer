@@ -19,6 +19,7 @@ adduser xrdp ssl-cert
 
 echo "Restart xRDP service" | log
 systemctl restart xrdp
+waitOrStop 0 "Restart xrdp service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Connect using Microsoft Remote Desktop Client (RDP Client)"

@@ -11,8 +11,9 @@ rootDir=$(rootDir)
 echo "Downloading Node.js repository" | log
 
 curlDownload https://deb.nodesource.com/setup_13.x
+waitOrStop 0 "Setup script not downloaded from official source"
 bash setup_13.x | log
-waitOrStop 0
+waitOrStop 0 "Failed to install application"
 
 echo "Install Node.js" | log
 

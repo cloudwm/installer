@@ -9,11 +9,11 @@ fi
 echo "Downloading docker-machine from source repository" | log
 base=https://github.com/docker/machine/releases/download/v0.16.0
 curl -L --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30 --url $base/docker-machine-$(uname -s)-$(uname -m) >/tmp/docker-machine
-waitOrStop 0
+waitOrStop 0 "File not downloaded from Github"
 
 echo "Installing docker-machine in /usr/local/bin/docker-machine" | log
 install /tmp/docker-machine /usr/local/bin/docker-machine
-waitOrStop 0
+waitOrStop 0 "Failed to install application binary to system"
 
 echo "Downloading docker-machine bash auto-complete strings" | log
 mkdir -p /tmp/complete
@@ -23,7 +23,7 @@ for i in docker-machine-prompt.bash docker-machine-wrapper.bash docker-machine.b
 do
     # wget "$base/contrib/completion/bash/${i}" -P /etc/bash_completion.d
     curl --url $base/contrib/completion/bash/${i} -LO --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 2 --max-time 30
-    waitOrStop 0
+    waitOrStop 0 "Auto complete failed to install"
 done
 mv /tmp/complete/* /etc/bash_completion.d/
 
@@ -34,9 +34,9 @@ echo "Downloading CWM/Kamatera docker-machine-driver" | log
 base=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.5/docker-machine-driver-kamatera_v1.0.5_linux_amd64.tar.gz
 # curl -o /tmp/docker-machine-driver-kamatera.tar.gz $base -L
 curlDownload $base /tmp/docker-machine-driver-kamatera.tar.gz
-
+waitOrStop 0 "Kamatera driver not downloaded from Github"
 tar -xvf /tmp/docker-machine-driver-kamatera.tar.gz -C /tmp/
-waitOrStop 0
+waitOrStop 0 "Failed to extract Kamatera driver archive"
 chmod +x /tmp/docker-machine-driver-kamatera
 mv /tmp/docker-machine-driver-kamatera /usr/local/bin/
 

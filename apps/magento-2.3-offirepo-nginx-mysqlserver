@@ -32,11 +32,12 @@ mkdir -p $appPath
 cd $rootDir/temp
 # curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
 curlDownload https://codeload.github.com/magento/magento2/tar.gz/$appVersion $appVersion.tar.gz
+waitOrStop 0 "File not downloaded from official source"
 mv $appVersion.tar.gz $appPath
 
 echo "Extracting Magento to ${appPath}" | log
 tar -xzvf $appPath/$appVersion.tar.gz -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f $appPath/$appVersion.tar.gz
 
 echo "Setting permissions for Magento" | log
@@ -50,7 +51,7 @@ echo "Installing Composer dependencies for Magento" | log
 cd $appPath
 export COMPOSER_HOME=/root
 composer install -v | log
-waitOrStop 0
+waitOrStop 0 "Failed to install composer dependencies"
 
 echo "Installing Magento" | log
 $appPath/bin/magento setup:install --base-url-secure=https://${CWM_SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=$(cat /etc/timezone) --use-rewrites=1 --use-secure=1 --use-secure-admin=1 | log
@@ -70,10 +71,10 @@ echo "Disabling sign static files and forcing cache refresh" | log
 cd $appPath
 bin/magento config:set dev/static/sign 0
 curl ${CWM_SERVERIP} > /dev/null
-waitOrStop 0
+waitOrStop 0 "Website failed to respond"
 bin/magento setup:static-content:deploy -f
 bin/magento cache:clean
-waitOrStop 0
+waitOrStop 0 "Cleanup actions failed"
 
 echo "Setting nginx config" | log
 # main magento config
@@ -90,6 +91,7 @@ ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Magento Admin Web UI: https://${CWM_SERVERIP}${ADMIN_URI}"

@@ -16,6 +16,7 @@ sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mongod.conf
 echo "Restaring service" | log
 
 systemctl restart mongod.service
+waitOrStop 0 "Restart mongod service failed"
 
 tagScript success
 

@@ -29,7 +29,7 @@ ln -s /etc/nginx/sites-available/wordpress /etc/nginx/sites-enabled/wordpress
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 service nginx restart
-waitOrStop 0
+waitOrStop 0 "Nginx failed to restart" 
 
 echo "Creating mysql user and permissions" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -40,11 +40,11 @@ EOF
 
 echo "Downloading wordpress and installing" | log
 wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
-waitOrStop 0
+waitOrStop 0 "Application failed to download"
 wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
-waitOrStop 0
+waitOrStop 0 "Failed to create database"
 wp core multisite-install --url=https://${CWM_SERVERIP} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
-waitOrStop 0
+waitOrStop 0 "Failed to install application"
 
 echo "Fixing app permissions" | log
 chown -R www-data:www-data ${WP_PATH}

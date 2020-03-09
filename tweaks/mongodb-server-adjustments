@@ -31,6 +31,7 @@ update-rc.d zero-readahead defaults
 echo "Restaring service" | log
 
 systemctl restart mongod.service
+waitOrStop 0 "Restart mongod service failed"
 
 tagScript success
 

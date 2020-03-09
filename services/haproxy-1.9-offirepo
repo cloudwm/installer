@@ -23,6 +23,7 @@ checkPackageInstalled haproxy
 
 echo "Generating self signed certificate for SSL needs" | log
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.pem -out /etc/ssl/private/server.pem -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
 
 echo "Open port for stats web ui" | log
 ufw allow 8404
@@ -33,6 +34,7 @@ cp -f $rootDir/tweaks/extras/haproxy/haproxy.cfg /etc/haproxy/
 pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
 sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
 service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "HAProxy Address: ${CWM_SERVERIP}"

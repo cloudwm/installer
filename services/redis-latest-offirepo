@@ -10,7 +10,7 @@ appVersion=5:5.0.\*
 
 echo "Adding Redis to apt" | log
 add-apt-repository ppa:chris-lea/redis-server -y | log
-waitOrStop 0
+waitOrStop 0 "Repository not added to source list"
 apt update
 
 echo "Installing Redis" | log
