@@ -88,6 +88,7 @@ ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Remove temp swap" | log
 # set vm swappiness to recommended optimal case

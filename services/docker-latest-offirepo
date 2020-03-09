@@ -10,6 +10,7 @@ appVersion=5:19.03.\*
 
 echo "Downloading docker repository and key" | log
 curlDownload https://download.docker.com/linux/ubuntu/gpg
+waitOrStop 0 "Key not downloaded from official source"
 apt-key add gpg
 
 add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"

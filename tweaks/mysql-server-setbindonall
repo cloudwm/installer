@@ -16,6 +16,7 @@ sed -i '/^bind-address\t= /{h;s/=.*/= 0.0.0.0/};${x;/^$/{s//bind-address\t= 0.0.
 echo "Restaring mysql daemon" | log
 
 systemctl restart mysql.service | log
+waitOrStop 0 "Restart mysql service failed"
 
 tagScript success
 

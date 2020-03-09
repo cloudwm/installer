@@ -32,6 +32,7 @@ mkdir -p $appPath
 cd $rootDir/temp
 # curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
 curlDownload https://codeload.github.com/magento/magento2/tar.gz/$appVersion $appVersion.tar.gz
+waitOrStop 0 "File not downloaded from official source"
 mv $appVersion.tar.gz $appPath
 
 echo "Extracting Magento to ${appPath}" | log
@@ -90,6 +91,7 @@ ln -s /etc/nginx/sites-available/magento /etc/nginx/sites-enabled/magento
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Magento Admin Web UI: https://${CWM_SERVERIP}${ADMIN_URI}"

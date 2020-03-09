@@ -11,6 +11,7 @@ rootDir=$(rootDir)
 
 echo "Add Zentyal 6.0 repository" | log
 curlDownload http://keys.zentyal.org/zentyal-6.0-archive.asc
+waitOrStop 0 "Key not downloaded from official source"
 apt-key add zentyal-6.0-archive.asc
 echo "deb http://archive.zentyal.org/zentyal 6.0 main" >> $aptSourceList
 apt update | log

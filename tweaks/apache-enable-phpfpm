@@ -28,6 +28,7 @@ if [ -f "$rootDir/temp/apache-enable-ssl.success" ]; then
 fi
 
 systemctl restart apache2.service
+waitOrStop 0 "Restart apache service failed"
 
 tagScript success
 

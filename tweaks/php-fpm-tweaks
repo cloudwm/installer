@@ -34,6 +34,8 @@ if [ -f "$rootDir/temp/nginx.success" ]; then
 fi
 
 systemctl restart $service
+waitOrStop 0 "Restart service failed"
+
 
 tagScript success
 

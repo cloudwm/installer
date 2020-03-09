@@ -31,6 +31,7 @@ sed -i 's/Connector port="8080"/Connector port="9090"/g' $appPath/server.xml
 
 echo "Restarting service" | log
 systemctl restart tomcat8
+waitOrStop 0 "Restart tomcat service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Apache Tomcat8 Web UI: ${CWM_SERVERIP}:9090"

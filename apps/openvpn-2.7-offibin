@@ -17,14 +17,19 @@ echo "Downloading binary" | log
 cd $rootDir/temp
 apt install -y ca-certificates net-tools
 curlDownload  https://openvpn.net/downloads/openvpn-as-bundled-clients-latest.deb
+waitOrStop 0 "File not downloaded from official source (1/2)"
 curlDownload  https://openvpn.net/downloads/$appPackage
+waitOrStop 0 "File not downloaded from official source (2/2)"
 
 echo "Installing application" | log
 
 dpkg -i openvpn-as-bundled-clients-latest.deb | log
-rm -f openvpn-as-bundled-clients-latest.deb
+waitOrStop 0 "Application failed to install (1/2)"
 
 dpkg -i $appPackage | log
+waitOrStop 0 "Application failed to install (2/2)"
+
+rm -f openvpn-as-bundled-clients-latest.deb
 rm -f $appPackage
 
 apt -y --fix-broken install

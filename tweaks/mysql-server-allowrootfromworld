@@ -18,6 +18,7 @@ EOF
 echo "Restaring mysql daemon" | log
 
 systemctl restart mysql.service | log
+waitOrStop 0 "Restart mysql service failed"
 
 tagScript success
 

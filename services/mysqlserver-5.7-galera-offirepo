@@ -33,6 +33,7 @@ checkPackageInstalled mysql-wsrep-server-5.7
 
 echo "Restarting mysql.service" | log
 systemctl restart mysql.service
+waitOrStop 0 "Restart mysql service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"

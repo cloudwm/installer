@@ -12,6 +12,7 @@ checkTagExist apache2.success
 echo "Restarting apache service" | log
 systemctl restart apache2.service
 systemctl enable apache2.service
+waitOrStop 0 "Restart apache service failed"
 
 tagScript success
 

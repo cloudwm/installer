@@ -19,6 +19,7 @@ echo "Installing DokuWiki" | log
 echo "Downloading DokuWiki from original repo" | log
 cd $rootDir/temp
 curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-$versionFilename.tgz
+waitOrStop 0 "File not downloaded from official sources"
 
 mkdir -p $appPath
 mv dokuwiki-$versionFilename.tgz $appPath
@@ -45,6 +46,7 @@ ln -s /etc/nginx/sites-available/dokuwiki /etc/nginx/sites-enabled/dokuwiki
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Creating Welcome Message" | log
 cat << EOF > ${appPath}/data/pages/start.txt

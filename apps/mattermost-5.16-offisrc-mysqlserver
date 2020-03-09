@@ -26,7 +26,10 @@ echo "Downloading and extracting application" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://releases.mattermost.com/$appVersion/mattermost-$appVersion-linux-amd64.tar.gz
+waitOrStop 0 "File not downloaded from official source"
 tar -xvzf mattermost*.gz
+waitOrStop 0 "Failed to extract archive"
+
 cd mattermost
 mv * $appPath/
 mkdir -p $appPath/data
@@ -64,8 +67,10 @@ WantedBy=mysql.service
 EOF
 
 systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
 systemctl enable mattermost.service
 systemctl start mattermost.service
+waitOrStop 0 "Restart mattermost service failed"
 
 echo "Setting HTTPS support" | log
 mkdir -p $appPath/ssl/private
@@ -73,6 +78,7 @@ mkdir -p $appPath/ssl/certs
 serverKey=$appPath/ssl/private/server.key
 serverCert=$appPath/ssl/certs/server.crt
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout ${serverKey} -out ${serverCert} -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
 chown -R mattermost:mattermost $appPath/ssl
 $appPath/bin/mattermost config set ServiceSettings.TLSKeyFile $serverKey
 $appPath/bin/mattermost config set ServiceSettings.TLSCertFile $serverCert 
@@ -81,6 +87,7 @@ $appPath/bin/mattermost config set ServiceSettings.ConnectionSecurity TLS
 $appPath/bin/mattermost config set ServiceSettings.Forward80To443 true
 setcap cap_net_bind_service=+ep $appPath/bin/mattermost
 systemctl restart mattermost.service
+waitOrStop 0 "Restart mattermost service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Mattermost Database Username: ${mmuser_name}"

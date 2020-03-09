@@ -29,6 +29,7 @@ echo "Install main app" | log
 mongo_url="mongodb://admin:${ADMINPASSWORD}@localhost:27017/rocketchat?authSource=admin"
 app_port=3000
 curlDownload https://releases.rocket.chat/latest/download $app_path/rocket.chat.tgz
+waitOrStop 0 "File not downloaded from official source"
 chown -R rocket:rocket $app_path/rocket.chat.tgz
 
 su rocket << EOF
@@ -68,8 +69,10 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl start rocketchat
+waitOrStop 0 "Reload systemctl failed"
 systemctl enable rocketchat
+systemctl start rocketchat
+waitOrStop 0 "Start rocketchat service failed"
 
 echo "Adding Loading in Progress screen" | log
 nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
@@ -85,6 +88,7 @@ ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
+waitOrStop 0 "Reload nginx service failed"
 
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
 descriptionAppend "Rocket.chat web UI: https://${CWM_SERVERIP}"

@@ -22,6 +22,7 @@ cd $rootDir/temp
 # curl -Lo joomla.tgz https://downloads.joomla.org/cms/joomla3/3-9-1/joomla_3-9-1-stable-full_package-tar-gz?format=gz | log
 # NOTICE: there's been a change of route paths between older 3-9-1 and 3-9-10, not just different versions
 curlDownload https://downloads.joomla.org/cms/joomla3/$appVersion/joomla_$appVersion-stable-full_package.tar.gz?format=gz joomla.tgz
+waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Joomla to ${appPath}/" | log
 mkdir -p $appPath/
@@ -58,6 +59,7 @@ phpiniPath=/etc/php/$phpVersion/fpm/php.ini
 sed -i '/upload_tmp_dir/s/^;//' $phpiniPath
 sed -i '/upload_tmp_dir/s/=/= \"\/tmp\"/' $phpiniPath
 systemctl restart php$phpVersion-fpm.service
+waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Setting nginx config" | log
 # Copy Joomla vhost from extras
@@ -68,6 +70,7 @@ ln -s /etc/nginx/sites-available/joomla /etc/nginx/sites-enabled/joomla
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "adding descriptions" | log
 descriptionAppend "Joomla Admin Web UI: https://${CWM_SERVERIP}/administrator"
