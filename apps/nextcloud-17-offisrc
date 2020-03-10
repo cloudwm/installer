@@ -44,8 +44,8 @@ EOF
 echo "Installing application" | log
 cd $appPath
 sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" 
-waitOrStop 0 "Application failed to install"
 --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
+waitOrStop 0 "Application failed to install"
 sudo -u www-data php occ db:convert-filecache-bigint --no-interaction
 
 echo "Configuring nginx" | log
