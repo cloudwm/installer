@@ -51,12 +51,12 @@ echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php
 
 echo "Creating nginx configuration" | log
 #copy configs to nginx folder
-cp -f $rootDir/tweaks/extras/mediawiki-nginx/mediawiki-nginx-config /etc/nginx/sites-available/mediawiki.conf
+cp -f $rootDir/tweaks/extras/mediawiki-nginx/mediawiki.conf /etc/nginx/sites-available/
 # specific configs supplied by nginx for mediawiki
 mkdir -p /etc/nginx/config
 cp -f $rootDir/tweaks/extras/mediawiki-nginx/mediawiki-locations.conf /etc/nginx/config/
 # Symlink mediawiki vhost
-ln -s /etc/nginx/sites-available/mediawiki.conf /etc/nginx/sites-enabled/mediawiki.conf
+ln -s /etc/nginx/sites-available/mediawiki.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl

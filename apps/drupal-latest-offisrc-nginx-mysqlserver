@@ -78,12 +78,12 @@ EOF
 
 echo "Setting nginx config" | log
 #main drupal config
-cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
+cp $rootDir/tweaks/extras/drupal-nginx/drupal.conf /etc/nginx/sites-available/
 # specific configs supplied by nginx for drupal
 mkdir -p /etc/nginx/config
-cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/drupal-locations.conf
+cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/
 # Symlink drupal vhost
-ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
+ln -s /etc/nginx/sites-available/drupal.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl

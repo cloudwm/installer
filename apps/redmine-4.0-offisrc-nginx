@@ -55,7 +55,7 @@ waitOrStop 0 "Application bundle not installed"
 chown -R www-data: $appPath/
 
 echo "Connecting app to nginx" | log
-cp -f $rootDir/tweaks/extras/redmine-nginx/redmine.nginx /etc/nginx/sites-available/redmine.conf
+cp -f $rootDir/tweaks/extras/redmine-nginx/redmine /etc/nginx/sites-available/
 sed -i "s|_appPath_|${appPath}|g" /etc/nginx/sites-available/redmine.conf
 ln -s /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
