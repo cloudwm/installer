@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist nginx.success
-checkTagExist certbot-osrepo.success
+checkTagExist certbot-nginx.success
 
 rootDir=$(rootDir)
 certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
