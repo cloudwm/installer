@@ -43,6 +43,7 @@ waitOrStop 0 "Restart nginx service failed"
 descriptionAppend "SSL certificates location: /etc/ssl/"
 descriptionAppend " "
 
+tag ssl-ready.success
 tagScript success
 
 exit 0

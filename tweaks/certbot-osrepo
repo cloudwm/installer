@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing certbot" | log
+apt install software-properties-common -y
+add-apt-repository universe
+add-apt-repository ppa:certbot/certbot -y
+apt update
+apt install certbot -y
+checkPackageInstalled certbot
+
+# tag ssl-ready.success
+tagScript success
+
+exit 0

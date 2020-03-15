@@ -226,6 +226,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
     touch $rootDir/temp/globals-set.success
+    
 fi
 
 if [ -f "$rootDir/temp/global-domain-set.success" ]; then

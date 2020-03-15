@@ -53,12 +53,12 @@ cat << EOF > ${appPath}/data/pages/start.txt
 ====== You are almost done ======
 
 
-Please proceed to [[https://${CWM_SERVERIP}/install.php|this link]] for additional configuration
+Please proceed to [[https://${CWM_DISPLAYED_ADDRESS}/install.php|this link]] for additional configuration
 EOF
 chown www-data:www-data $appPath/data/pages/start.txt
 
 echo "Adding descriptions" | log
-descriptionAppend "DokuWiki Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "DokuWiki Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 
 tagScript success

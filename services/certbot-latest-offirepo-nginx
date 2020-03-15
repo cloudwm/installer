@@ -8,6 +8,7 @@ fi
 
 checkTagExist nginx.success
 
+echo "Installing certbot for nginx" | log
 add-apt-repository ppa:certbot/certbot -y | log
 apt install python-certbot-nginx -y | log
 checkPackageInstalled python-certbot-nginx

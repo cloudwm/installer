@@ -8,6 +8,8 @@ fi
 
 runOnceCheck
 checkTagExist nginx.success
+checkTagExist ssl-ready.success
+
 
 echo "Enabling PHP in default-ssl config file" | log
 
