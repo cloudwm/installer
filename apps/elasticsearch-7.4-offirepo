@@ -9,7 +9,7 @@ fi
 
 rootDir=$(rootDir)
 checkTagExist nginx.success
-checkTagExist nginx-enable-ssl-letsencypt.success
+checkTagExist ssl-ready.success
 elasticVersion="7.4.2"
 kibanaVersion="7.4.2"
 
