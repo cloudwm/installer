@@ -42,7 +42,7 @@ waitOrStop 0 "Restart jenkins service failed"
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Jenkins Web UI: https://${CWM_SERVERIP}:${assignedPort}"
+descriptionAppend "Jenkins Web UI: https://${CWM_DISPLAYED_ADDRESS}:${assignedPort}"
 descriptionAppend "Jenkins Unlock key: $unlockkey"
 descriptionAppend " "
 descriptionAppend "If main page is blank after initial setup, restart the server:"

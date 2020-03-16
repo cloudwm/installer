@@ -28,7 +28,7 @@ ln -s /etc/nginx/sites-available/wordpress.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
-service nginx restart
+service nginx reload
 waitOrStop 0 "Nginx failed to restart" 
 
 echo "Creating mysql user and permissions" | log
