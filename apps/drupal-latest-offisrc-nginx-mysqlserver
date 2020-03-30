@@ -51,7 +51,7 @@ echo "Create temp swap for composer processes" | log
 #increase vm swappiness to allow swap to dominate process
 sysctl vm.swappiness=80
 # create swap file and moint as partition
-swapFilename=$(createSwapFile swapfile 900 $rootDir/_swap)
+swapFilename=$(createSwapFile swapfile 750 $rootDir/_swap)
 waitOrStop 0 "Failed to create swap file"
 sleep 5
 
