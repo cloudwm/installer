@@ -21,7 +21,7 @@ echo "Enabling Redis service" | log
 systemctl enable redis-server.service
 
 echo "Adding descriptions" | log
-descriptionAppend "Redis IP Address: ${CWM_SERVERIP}"
+descriptionAppend "Redis IP Address: ${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 
 tag redis.success

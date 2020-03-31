@@ -32,7 +32,7 @@ systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Rocket.chat Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Rocket.chat Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 descriptionAppend "Rocket.chat application directories:"
 descriptionAppend "/snap/rocketchat-server/"

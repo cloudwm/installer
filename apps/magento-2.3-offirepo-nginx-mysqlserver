@@ -54,7 +54,7 @@ composer install -v | log
 waitOrStop 0 "Failed to install composer dependencies"
 
 echo "Installing Magento" | log
-$appPath/bin/magento setup:install --base-url-secure=https://${CWM_SERVERIP}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=$(cat /etc/timezone) --use-rewrites=1 --use-secure=1 --use-secure-admin=1 | log
+$appPath/bin/magento setup:install --base-url-secure=https://${CWM_DISPLAYED_ADDRESS}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD} --language=en_US --currency=USD --timezone=$(cat /etc/timezone) --use-rewrites=1 --use-secure=1 --use-secure-admin=1 | log
 
 ADMIN_URI=`grep "Admin URI:" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | head -1`
 # ADMIN_URI=`php /var/www/html/bin/magento info:adminuri | rev | cut -d ' ' -f 1 | rev`
@@ -70,7 +70,7 @@ chmod u+x bin/magento
 echo "Disabling sign static files and forcing cache refresh" | log
 cd $appPath
 bin/magento config:set dev/static/sign 0
-curl ${CWM_SERVERIP} > /dev/null
+curl https://${CWM_DISPLAYED_ADDRESS} --insecure -o /dev/null
 waitOrStop 0 "Website failed to respond"
 bin/magento setup:static-content:deploy -f
 bin/magento cache:clean
@@ -81,10 +81,10 @@ echo "Setting nginx config" | log
 cp $rootDir/tweaks/extras/magento-nginx/magento.conf /etc/nginx/sites-available/
 # specific configs supplied by magento install, included by main magento config
 mkdir -p /etc/nginx/config
-cp $appPath/nginx.conf.sample /etc/nginx/config/magento.conf.sample
+cp $appPath/nginx.conf.sample /etc/nginx/config/magento.sample.conf
 # tweak locations in magento config to allow for user themes and folders
 tweakFilePath=$rootDir/tweaks/extras/magento-nginx/magento-locations.conf
-perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/config/magento.conf.sample "$tweakFilePath"
+perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/config/magento.sample.conf "$tweakFilePath"
 # Symlink magento vhost
 ln -s /etc/nginx/sites-available/magento.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
@@ -94,7 +94,7 @@ systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Magento Admin Web UI: https://${CWM_SERVERIP}${ADMIN_URI}"
+descriptionAppend "Magento Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}${ADMIN_URI}"
 descriptionAppend "Magento Email: ${ADMINEMAIL}"
 descriptionAppend "Magento Username: admin"
 descriptionAppend "Magento Password: ${ADMINPASSWORD}" 

@@ -6,8 +6,13 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist ssl-ready.success
+
 rootDir=$(rootDir)
 minioConfigFile=/minio/.minio.sys/config/config.json
+certsLetsencrypt=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
+certsMinio=/etc/minio/certs
+certsUpdateService=/opt/update-certs.sh
 
 echo "Adding Minio user" | log
 useradd --system minio-user --shell /sbin/nologin
@@ -30,7 +35,8 @@ chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/minio/\"" >> /etc/default/minio
 ips=$(getServerIPAll)
 echo "MINIO_PUBLIC_IPS=${ips// /,}" >> /etc/default/minio
-echo "MINIO_OPTS=\"-C /etc/minio --certs-dir /etc/minio/certs --address :443\"" >> /etc/default/minio
+echo "MINIO_OPTS=\"-C /etc/minio --certs-dir $certsMinio --address :443\"" >> /etc/default/minio
+# echo "MINIO_DOMAIN=${CWM_DISPLAYED_ADDRESS}" >> /etc/default/minio 
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 echo "Adding Systemd Service" | log
@@ -38,11 +44,24 @@ curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-
 waitOrStop 0 "File not downloaded from github"
 mv minio.service /etc/systemd/system
 
-echo "Generating self-signed certificate" | log
-mkdir -p /etc/minio/certs/
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/minio/certs/private.key -out /etc/minio/certs/public.crt -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
-chown -R minio-user:minio-user /etc/minio/certs
+echo "Generating certificates" | log
+mkdir -p $certsMinio/
+cp ${certsLetsencrypt}/fullchain.pem ${certsMinio}/public.crt
+cp ${certsLetsencrypt}/privkey.pem ${certsMinio}/private.key
+chown -R minio-user:minio-user $certsMinio
+
+cat << EOF > ${certsUpdateService}
+
+certbot -q renew
+cp ${certsLetsencrypt}/fullchain.pem ${certsMinio}/public.crt
+cp ${certsLetsencrypt}/privkey.pem ${certsMinio}/private.key
+chown -R minio-user:minio-user $certsMinio
+
+EOF
+chmod +x ${certsUpdateService}
+backupFile /lib/systemd/system/certbot.service
+sed -i '\|ExecStart|s|-q renew|-q renew --post-hook "/bin/bash '${certsUpdateService}'"|' /lib/systemd/system/certbot.service
+systemctl daemon-reload
 
 echo "Starting Minio service" | log
 systemctl enable minio.service
@@ -61,7 +80,7 @@ sed -i 's/minioadmin/'"${secret_key}"'/' $minioConfigFile
 systemctl restart minio.service
 waitOrStop 0 "Minio service did not restart"
 
-descriptionAppend "Minio Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Minio Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Minio Access key: $access_key"
 descriptionAppend "Minio Secret key: $secret_key"
 descriptionAppend " "

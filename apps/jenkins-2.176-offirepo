@@ -6,7 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# packageVersion="2.176.1"
 packageVersion=2.176.\*
 assignedPort="9090"
 
@@ -42,7 +41,7 @@ waitOrStop 0 "Restart jenkins service failed"
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Initial setup URL: https://${CWM_SERVERIP}:${assignedPort}"
+descriptionAppend "Initial setup URL: https://${CWM_DISPLAYED_ADDRESS}:${assignedPort}"
 descriptionAppend "Unlock key: $unlockkey"
 descriptionAppend " "
 descriptionAppend "If main page is blank after initial setup, restart the server:"

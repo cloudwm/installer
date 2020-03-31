@@ -45,7 +45,7 @@ EOF
 
 echo "Installing MediaWiki" | log
 cd $appPath
-php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath="" --server https://${CWM_SERVERIP} "MediaWiki" "admin"
+php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath="" --server https://${CWM_DISPLAYED_ADDRESS} "MediaWiki" "admin"
 waitOrStop 0 "Application install procedure failed"
 echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php 
 
@@ -64,7 +64,7 @@ systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Mediawiki Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Mediawiki Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Mediawiki Username: admin"
 descriptionAppend "Mediawiki Password: ${ADMINPASSWORD}"
 descriptionAppend " "

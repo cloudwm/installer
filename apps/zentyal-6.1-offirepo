@@ -42,7 +42,7 @@ echo "Ensuring conntrack modules are enabled" | log
 echo ip_conntrack | sudo tee -a /etc/modules
 
 echo "Adding descriptions" | log
-descriptionAppend "Zentyal Web UI: https://${CWM_SERVERIP}:8443"
+descriptionAppend "Zentyal Web UI: https://${CWM_DISPLAYED_ADDRESS}:8443"
 descriptionAppend "Zentyal Username: admin"
 descriptionAppend "Zentyal Password: ${ADMINPASSWORD}"
 descriptionAppend " "
