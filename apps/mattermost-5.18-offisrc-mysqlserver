@@ -28,7 +28,10 @@ echo "Downloading and extracting application" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://releases.mattermost.com/$appVersion/mattermost-$appVersion-linux-amd64.tar.gz
+waitOrStop 0 "File not downloaded from official source"
 tar -xvzf mattermost*.gz
+waitOrStop 0 "Failed to extract archive"
+
 cd mattermost
 mv * $appPath/
 mkdir -p $appPath/data
@@ -66,6 +69,7 @@ WantedBy=mysql.service
 EOF
 
 systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
 systemctl enable mattermost.service
 systemctl start mattermost.service
 waitOrStop 0 "Starting mattermost service failed"
