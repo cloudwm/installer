@@ -44,9 +44,9 @@ cat << EOF > ${certsUpdateService}
 certbot -q renew
 cd ${certsArchivePath}
 rm ${certGeneratedName}
-cat `find "$(pwd)" -type f -name "*fullchain*"` `find "$(pwd)" -type f -name "*privk*"` > ${certGeneratedName}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
 cd ${certsPath}
-ln -s haproxy-fullcert.pem ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
 service haproxy reload
 
 EOF
