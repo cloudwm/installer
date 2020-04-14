@@ -37,7 +37,14 @@ pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
 sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
 sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
 sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
-# service haproxy reload
+
+echo "Generating proper haproxy certificate" | log
+cd ${certsArchivePath}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
 
 cat << EOF > ${certsUpdateService}
 
