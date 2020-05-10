@@ -24,7 +24,7 @@ if [[ $ndisk == *"sdb"* ]]; then
    mount -a
 fi
 
-echo "Downloading NextCloud 15" | log
+echo "Downloading NextCloud ${appVersion}" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
