@@ -9,22 +9,29 @@ fi
 checkTagExist php.success
 checkTagExist nginx.success
 checkTagExist mysqld.success
-checkTagExist nginx-enable-php-ssl.success
+checkTagExist ssl-ready.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-appVersion=15.0.11
+appVersion=18.0.0
 appPath=/var/www/html
 rootDir=$(rootDir)
 
-echo "Downloading NextCloud 15" | log
+ndisk="$(lsblk)"
+if [[ $ndisk == *"sdb"* ]]; then
+   echo "Another disk found,installing on sdb" | log
+   mkdir -p /var/www/html
+   echo "/dev/sdb1 /var/www/html ext4 defaults 0 0" >> /etc/fstab
+   mount -a
+fi
+
+echo "Downloading NextCloud ${appVersion}" | log
 mkdir -p $appPath
 cd $rootDir/temp
-# curl -O https://download.nextcloud.com/server/releases/latest-15.tar.bz2 | log
 curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
 waitOrStop 0 "File not downloaded from official source"
 tar -xjvf nextcloud-$appVersion.tar.bz2 -C $appPath/ --strip 1
 waitOrStop 0 "Failed to extract application archive"
-rm -f nextcloud-$appVersion.tar.bz2
+rm -f nextcloud-$appVersion.tar.bz2 
 chown -R www-data:www-data $appPath
 
 echo "Preparing database" | log
@@ -36,13 +43,15 @@ EOF
 
 echo "Installing application" | log
 cd $appPath
+rm index.nginx-debian.html
 sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
 waitOrStop 0 "Application failed to install"
 sudo -u www-data php occ db:convert-filecache-bigint --no-interaction
+sudo -u www-data php occ db:add-missing-indices
 
 echo "Configuring nginx" | log
 # Copy Virtual Host
-cp $rootDir/tweaks/extras/nextcloud15-nginx/nextcloud.conf /etc/nginx/sites-available/
+cp $rootDir/tweaks/extras/nextcloud-nginx/nextcloud.conf /etc/nginx/sites-available/
 # Symlink nextcloud vhost
 ln -s /etc/nginx/sites-available/nextcloud.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
@@ -56,8 +65,12 @@ echo "Tweaking app and runtime settings" | log
 apt install php-imagick -y
 checkPackageInstalled php-imagick
 phpIniPath=/etc/php/$phpVersion/fpm/php.ini
+phpIniAutoconfig=$rootDir/autoconfig/php-fpm-autoconfig/php.ini
+
 # modify memory limit
-sed -i '/memory_limit/s/[0-9]\+/512/g' $phpIniPath
+# sed -i '/memory_limit/s/[0-9]\+/512/g' $phpIniPath
+sed -i '/memory_limit/s/^#//g' $phpIniAutoconfig
+sed -i '/memory_limit/s/[0-9]\+/512/g' $phpIniAutoconfig
 # modify php.ini opcache settings
 sed -i '/opcache.enable=/s/^;//g' $phpIniPath
 sed -i '/opcache.memory_consumption=/s/^;//g' $phpIniPath
@@ -69,12 +82,12 @@ sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" $phpIniPath
 # modify www.conf settings
 sed -i '/env\[PATH\]/s/^;//g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 # Add Server IP to Trusted Servers
-sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${CWM_SERVERIP}',/" $appPath/config/config.php
+sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${CWM_DISPLAYED_ADDRESS}',/" $appPath/config/config.php
 systemctl restart php$phpVersion-fpm.service
 waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Nextcloud URL: https://${CWM_SERVERIP}/"
+descriptionAppend "Nextcloud Web UI: https://${CWM_DISPLAYED_ADDRESS}/"
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
 descriptionAppend " "

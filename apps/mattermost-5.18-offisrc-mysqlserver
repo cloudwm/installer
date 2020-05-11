@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist mysqld.success
+checkTagExist ssl-ready.success
+
+appVersion=5.18.2
+appPath=/opt/mattermost
+rootDir=$(rootDir)
+certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
+mmuser_name="mmuser"
+mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
+
+echo "Preparing database for application" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE USER '${mmuser_name}'@'127.0.0.1' IDENTIFIED BY '${mmuser_password}';
+CREATE DATABASE mattermost;
+GRANT ALL PRIVILEGES ON mattermost.* TO '${mmuser_name}'@'127.0.0.1';
+EOF
+
+echo "Downloading and extracting application" | log
+mkdir -p $appPath
+cd $rootDir/temp
+curlDownload https://releases.mattermost.com/$appVersion/mattermost-$appVersion-linux-amd64.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+tar -xvzf mattermost*.gz
+waitOrStop 0 "Failed to extract archive"
+
+cd mattermost
+mv * $appPath/
+mkdir -p $appPath/data
+
+echo "Preparing system users for application" | log
+useradd --system --user-group mattermost
+chown -R mattermost:mattermost $appPath
+chmod -R g+w $appPath
+$appPath/bin/mattermost config set SqlSettings.DriverName mysql
+dataSource="${mmuser_name}:${mmuser_password}@tcp(127.0.0.1:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s"
+$appPath/bin/mattermost config set SqlSettings.DataSource $dataSource
+chown mattermost:mattermost $appPath/config/config.json
+
+echo "Setting up application as a system service" | log
+cat << EOF > /lib/systemd/system/mattermost.service
+[Unit]
+Description=Mattermost
+After=network.target
+After=mysql.service
+Requires=mysql.service
+
+[Service]
+Type=notify
+ExecStart=${appPath}/bin/mattermost
+TimeoutStartSec=3600
+Restart=always
+RestartSec=10
+WorkingDirectory=${appPath}
+User=mattermost
+Group=mattermost
+LimitNOFILE=49152
+
+[Install]
+WantedBy=mysql.service
+EOF
+
+systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
+systemctl enable mattermost.service
+systemctl start mattermost.service
+waitOrStop 0 "Starting mattermost service failed"
+
+echo "Setting HTTPS support" | log
+$appPath/bin/mattermost config set ServiceSettings.TLSKeyFile $certsPath/privkey.pem
+$appPath/bin/mattermost config set ServiceSettings.TLSCertFile $certsPath/cert.pem
+$appPath/bin/mattermost config set ServiceSettings.ListenAddress :443
+$appPath/bin/mattermost config set ServiceSettings.Forward80To443 true
+$appPath/bin/mattermost config set ServiceSettings.ConnectionSecurity TLS
+$appPath/bin/mattermost config set ServiceSettings.UseLetsEncrypt true
+setcap cap_net_bind_service=+ep $appPath/bin/mattermost
+systemctl restart mattermost.service
+waitOrStop 0 "Restart mattermost service failed"
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Mattermost Database Username: ${mmuser_name}"
+descriptionAppend "Mattermost Database Password: ${mmuser_password}"
+descriptionAppend " "
+descriptionAppend "Mattermost Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "# Open Web UI to set Admin Username and Password"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

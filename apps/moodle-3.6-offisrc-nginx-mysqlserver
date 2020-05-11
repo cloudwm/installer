@@ -53,7 +53,7 @@ if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
 fi
 
 echo "Creating nginx configurations" | log
-cp -f $rootDir/tweaks/extras/moodle-nginx/moodle-nginx-config /etc/nginx/sites-available/moodle.conf
+cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
 ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl

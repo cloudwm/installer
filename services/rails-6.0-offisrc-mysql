@@ -47,9 +47,9 @@ echo "Adding descriptions" | log
 descriptionAppend "Rails app location: /var/www/myapp/"
 descriptionAppend "Rails app configuration: /var/www/myapp/config/"
 descriptionAppend "Rails run non-HTTPS server:"
-descriptionAppend "# rails s -b ${CWM_SERVERIP} -p 80"
+descriptionAppend "# rails s -b ${CWM_DISPLAYED_ADDRESS} -p 80"
 descriptionAppend "Rails run HTTPS server:"
-descriptionAppend "# rails s -b 'ssl://${CWM_SERVERIP}?key=/etc/ssl/private/server.key&cert=/etc/ssl/certs/server.crt' -p 443"
+descriptionAppend "# rails s -b 'ssl://${CWM_DISPLAYED_ADDRESS}?key=/etc/ssl/private/server.key&cert=/etc/ssl/certs/server.crt' -p 443"
 descriptionAppend " "
 
 tag rails.success

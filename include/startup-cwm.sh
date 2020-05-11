@@ -6,35 +6,6 @@ if [ ! -f "$CWM_CONFIGFILE" ]; then
     return 0
 fi
 
-# parse cwm config into global params
-CONFIG=`cat $CWM_CONFIGFILE`
-STD_IFS=$IFS
-IFS=$'\n'
-for d in $CONFIG; do
-
-    key=$(echo $d | cut -f1 -d"=")
-    value=$(echo $d | cut -f2 -d"=")
-    export "CWM_${key^^}"="$value"
-
-done
-IFS=$STD_IFS
-
-# additional cwm global params
-export ADMINEMAIL=$CWM_EMAIL
-export ADMINPASSWORD="$CWM_PASSWORD"
-export CWM_WANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
-export CWM_LANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
-# export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
-export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
-
-# fail install if cwm api key or secret is missing
-if [ -z "$CWM_NO_API_KEY" ] && [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
-
-    echo "No CWM API Client ID or Secret is set. Exiting." | tee -a ${CWM_ERRORFILE}
-    exit 1
-
-fi
-
 # Function: updateServerDescription
 # Purpose: Update CWM Server's Overview->Description text field.
 # Usage: updateServerDescription "Some kind of description"
@@ -226,4 +197,48 @@ return $ok
 
 }
 
-CWM_SERVERIP="$(getServerIP)"
+rootDir=$(rootDir)
+
+if [ ! -f "$rootDir/temp/globals-set.success" ]; then
+
+    # parse cwm config into global params
+    CONFIG=`cat $CWM_CONFIGFILE`
+    STD_IFS=$IFS
+    IFS=$'\n'
+    for d in $CONFIG; do
+
+        key=$(echo $d | cut -f1 -d"=")
+        value=$(echo $d | cut -f2 -d"=")
+        export "CWM_${key^^}"="$value"
+
+    done
+    IFS=$STD_IFS
+
+    # additional cwm global params
+    export ADMINEMAIL=$CWM_EMAIL
+    export ADMINPASSWORD="$CWM_PASSWORD"
+    export CWM_WANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
+    export CWM_LANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
+    # export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
+    export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
+    export CWM_SERVERIP="$(getServerIP)"
+    export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
+    export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
+
+    touch $rootDir/temp/globals-set.success
+    
+fi
+
+if [ -f "$rootDir/temp/global-domain-set.success" ]; then
+
+    export CWM_DISPLAYED_ADDRESS=${CWM_DOMAIN}
+
+fi
+
+# fail install if cwm api key or secret is missing
+if [ -z "$CWM_NO_API_KEY" ] && [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
+
+    echo "No CWM API Client ID or Secret is set. Exiting." | tee -a ${CWM_ERRORFILE}
+    exit 1
+
+fi

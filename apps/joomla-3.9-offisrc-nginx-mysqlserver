@@ -63,9 +63,9 @@ waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Setting nginx config" | log
 # Copy Joomla vhost from extras
-cp $rootDir/tweaks/extras/joomla-nginx/joomla-vhost /etc/nginx/sites-available/joomla
+cp $rootDir/tweaks/extras/joomla-nginx/joomla.conf /etc/nginx/sites-available/
 # Symlink magento vhost
-ln -s /etc/nginx/sites-available/joomla /etc/nginx/sites-enabled/joomla
+ln -s /etc/nginx/sites-available/joomla.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
@@ -73,7 +73,7 @@ systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
 echo "adding descriptions" | log
-descriptionAppend "Joomla Admin Web UI: https://${CWM_SERVERIP}/administrator"
+descriptionAppend "Joomla Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/administrator"
 descriptionAppend "Joomla Username: admin"
 descriptionAppend "Joomla Password: ${ADMINPASSWORD}"
 descriptionAppend " "

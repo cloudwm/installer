@@ -12,7 +12,7 @@ echo "Installing redis" | log
 apt install redis -y | log
 checkPackageInstalled redis
 
-descriptionAppend "Redis IP Address: ${CWM_SERVERIP}"
+descriptionAppend "Redis IP Address: ${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 
 tag redis.success

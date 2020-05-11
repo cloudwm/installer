@@ -22,7 +22,7 @@ checkPackageInstalled "${packages[@]}"
 echo "Cloning stable version from repository" | log
 mkdir -p /var/www
 cd /var/www/
-git clone https://github.com/redmine/redmine.git -b 4.0-stable | log
+git clone https://github.com/redmine/redmine.git -b 4.1-stable | log
 waitOrStop 0 "File not downloaded from Github"
 
 echo "Creating Database and user" | log
@@ -55,15 +55,16 @@ waitOrStop 0 "Application bundle not installed"
 chown -R www-data: $appPath/
 
 echo "Connecting app to nginx" | log
-cp -f $rootDir/tweaks/extras/redmine-nginx/redmine.nginx /etc/nginx/sites-available/redmine.conf
+cp -f $rootDir/tweaks/extras/redmine-nginx/redmine /etc/nginx/sites-available/
 sed -i "s|_appPath_|${appPath}|g" /etc/nginx/sites-available/redmine.conf
 ln -s /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Redmine Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Redmine Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Redmine Initial username: admin"
 descriptionAppend "Redmine Initial password: admin"
 descriptionAppend " "

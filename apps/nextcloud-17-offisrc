@@ -9,7 +9,7 @@ fi
 checkTagExist php.success
 checkTagExist nginx.success
 checkTagExist mysqld.success
-checkTagExist nginx-enable-php-ssl.success
+checkTagExist ssl-ready.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 appVersion=17.0.1
@@ -24,7 +24,7 @@ if [[ $ndisk == *"sdb"* ]]; then
    mount -a
 fi
 
-echo "Downloading NextCloud 15" | log
+echo "Downloading NextCloud ${appVersion}" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
@@ -43,15 +43,16 @@ EOF
 
 echo "Installing application" | log
 cd $appPath
+rm index.nginx-debian.html
 sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
 waitOrStop 0 "Application failed to install"
 sudo -u www-data php occ db:convert-filecache-bigint --no-interaction
 
 echo "Configuring nginx" | log
 # Copy Virtual Host
-cp $rootDir/tweaks/extras/nextcloud15-nginx/nextcloud15-nginx-config /etc/nginx/sites-available/nextcloud15
+cp $rootDir/tweaks/extras/nextcloud-nginx/nextcloud.conf /etc/nginx/sites-available/
 # Symlink nextcloud vhost
-ln -s /etc/nginx/sites-available/nextcloud15 /etc/nginx/sites-enabled/nextcloud15
+ln -s /etc/nginx/sites-available/nextcloud.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
@@ -80,12 +81,12 @@ sed -i "s/;opcache.revalidate_freq=2/opcache.revalidate_freq=1/g" $phpIniPath
 # modify www.conf settings
 sed -i '/env\[PATH\]/s/^;//g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 # Add Server IP to Trusted Servers
-sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${CWM_SERVERIP}',/" $appPath/config/config.php
+sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${CWM_DISPLAYED_ADDRESS}',/" $appPath/config/config.php
 systemctl restart php$phpVersion-fpm.service
 waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Nextcloud Web UI: https://${CWM_SERVERIP}/"
+descriptionAppend "Nextcloud Web UI: https://${CWM_DISPLAYED_ADDRESS}/"
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
 descriptionAppend " "

@@ -73,17 +73,17 @@ vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
 rm index.nginx-debian.html
 chown -R www-data:www-data .
 cat << EOF >> ${appPath}/sites/default/settings.php
-\$settings['trusted_host_patterns'] = ['^${CWM_SERVERIP}$'];
+\$settings['trusted_host_patterns'] = ['^${CWM_DISPLAYED_ADDRESS}$'];
 EOF
 
 echo "Setting nginx config" | log
 #main drupal config
-cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
+cp $rootDir/tweaks/extras/drupal-nginx/drupal.conf /etc/nginx/sites-available/
 # specific configs supplied by nginx for drupal
 mkdir -p /etc/nginx/config
-cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/drupal-locations.conf
+cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/
 # Symlink drupal vhost
-ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
+ln -s /etc/nginx/sites-available/drupal.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
@@ -99,7 +99,7 @@ waitOrStop 0 "Failed to remove swap file"
 sleep 5
 
 echo "Adding descriptions" | log
-descriptionAppend "Drupal Web UI: https://${CWM_SERVERIP}/user/login"
+descriptionAppend "Drupal Web UI: https://${CWM_DISPLAYED_ADDRESS}/user/login"
 descriptionAppend "Drupal Username: admin"
 descriptionAppend "Drupal Password: ${ADMINPASSWORD}"
 descriptionAppend " "

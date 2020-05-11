@@ -39,9 +39,9 @@ chmod 0700  $appPath/inc/
 
 echo "Creating nginx configuration" | log
 #copy configs to nginx folder
-cp $rootDir/tweaks/extras/dokuwiki-nginx/dokuwiki-nginx-config /etc/nginx/sites-available/dokuwiki
+cp $rootDir/tweaks/extras/dokuwiki-nginx/dokuwiki.conf /etc/nginx/sites-available/
 # Symlink DokuWiki vhost
-ln -s /etc/nginx/sites-available/dokuwiki /etc/nginx/sites-enabled/dokuwiki
+ln -s /etc/nginx/sites-available/dokuwiki.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
@@ -53,12 +53,12 @@ cat << EOF > ${appPath}/data/pages/start.txt
 ====== You are almost done ======
 
 
-Please proceed to [[https://${CWM_SERVERIP}/install.php|this link]] for additional configuration
+Please proceed to [[https://${CWM_DISPLAYED_ADDRESS}/install.php|this link]] for additional configuration
 EOF
 chown www-data:www-data $appPath/data/pages/start.txt
 
 echo "Adding descriptions" | log
-descriptionAppend "DokuWiki Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "DokuWiki Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 
 tagScript success

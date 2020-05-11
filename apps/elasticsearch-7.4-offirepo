@@ -9,7 +9,7 @@ fi
 
 rootDir=$(rootDir)
 checkTagExist nginx.success
-checkTagExist nginx-enable-ssl.success
+checkTagExist ssl-ready.success
 elasticVersion="7.4.2"
 kibanaVersion="7.4.2"
 
@@ -53,15 +53,15 @@ echo "Creating basic auth to secure Kibana web UI" | log
 echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" > /etc/nginx/htpasswd.users
 
 echo "Setting nginx configuration" | log
-nginxConfigPath=/etc/nginx/sites-available/kibana.conf
+nginxConfigPath=/etc/nginx/sites-available
 # copy readymade config to nginx sites
-cp -f $rootDir/tweaks/extras/elasticsearch-nginx/elasticsearch-nginx-config $nginxConfigPath
+cp -f $rootDir/tweaks/extras/elasticsearch-nginx/kibana.conf $nginxConfigPath/
 # place elasticPort for elasticsearch upstream
-sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath
+sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath/kibana.conf
 # place kibanaPort for kibana upstream
-sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath
+sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath/kibana.conf
 # link site to enable
-ln -s $nginxConfigPath /etc/nginx/sites-enabled/
+ln -s $nginxConfigPath/kibana.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 service nginx reload
@@ -95,7 +95,7 @@ waitOrStop 0 "Restart kibana service failed"
 echo "Adding descriptions" | log
 descriptionAppend "Elasticsearch Username: admin"
 descriptionAppend "Elasticsearch Password: ${ADMINPASSWORD}"
-descriptionAppend "Elasticsearch (Kibana) Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Elasticsearch (Kibana) Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 descriptionAppend "Elasticsearch config files location: /etc/elasticsearch/"
 descriptionAppend "Kibana config file: /etc/kibana/kibana.yml"
