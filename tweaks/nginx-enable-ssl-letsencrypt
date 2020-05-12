@@ -80,7 +80,7 @@ echo "Symlink to sites-enabled" | log
 ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/
 
 echo "Restart NGINX service" | log
-systemctl restart nginx.service
+service nginx reload
 waitOrStop 0 "Failed restart nginx after install"
 
 descriptionAppend "SSL certificates location: $certsPath/"
