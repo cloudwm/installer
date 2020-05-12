@@ -17,7 +17,6 @@ checkPackageInstalled "${packages[@]}"
 
 echo "Configuring php-fpm to listen on correct socket" | log
 sed -i 's/listen = \/run\/php\/php7.2-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/7.2/fpm/pool.d/www.conf
-waitOrStop 0
 
 echo "Restarting service to implement changes" | log
 service php7.2-fpm restart

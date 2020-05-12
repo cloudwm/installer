@@ -30,11 +30,11 @@ cp $rootDir/tweaks/letsencrypt-nginx-route.conf /etc/nginx/snippets/
 cp $rootDir/tweaks/letsencrypt-nginx-register.conf /etc/nginx/sites-available/
 ln -s /etc/nginx/sites-available/letsencrypt-nginx-register.conf /etc/nginx/sites-enabled/
 systemctl restart nginx.service
-waitOrStop 0
+waitOrStop 0 "Failed restart nginx after certification"
 
 echo "Generating letsencrypt certificates with certbot" | log
 execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} --test-cert
-waitOrStop 0
+waitOrStop 0 "Failed letsencrypt certificate generation"
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 tag global-domain-set.success
 unlink /etc/nginx/sites-enabled/letsencrypt-nginx-register.conf
@@ -81,7 +81,7 @@ ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/
 
 echo "Restart NGINX service" | log
 systemctl restart nginx.service
-waitOrStop 0
+waitOrStop 0 "Failed restart nginx after install"
 
 descriptionAppend "SSL certificates location: $certsPath/"
 descriptionAppend " "

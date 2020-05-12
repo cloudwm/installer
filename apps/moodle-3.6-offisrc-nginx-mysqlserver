@@ -62,7 +62,7 @@ waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Moodle web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Moodle web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Moodle admin user: admin"
 descriptionAppend "Moodle admin password: ${ADMINPASSWORD}"
 descriptionAppend " "
