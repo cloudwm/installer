@@ -45,7 +45,9 @@ waitOrStop 0 "Failed to install application"
 
 echo "Adding letsencrypt certificates" | log
 v-add-letsencrypt-domain 'admin' $HOSTNAME '' 'yes'
+waitOrStop 0 "Letsencrypt not installed"
 v-update-host-certificate admin $HOSTNAME
+waitOrStop 0 "Certificate not applied to app"
 echo "UPDATE_HOSTNAME_SSL='yes'" >> /usr/local/vesta/conf/vesta.conf
 
 echo "Adding descriptions" | log
