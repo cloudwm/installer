@@ -43,11 +43,6 @@ waitOrStop 0 "File not downloaded from official source"
 bash vst-install.sh -n yes -w yes -a no -k yes -v yes -j no -i yes -b yes -q no -x yes -z yes -t yes -c yes -o yes -m yes -g no -y no -p ${ADMINPASSWORD} -e ${ADMINEMAIL} -s ${vestaDomain} | log
 waitOrStop 0 "Failed to install application"
 
-echo "Adding letsencrypt certificates" | log
-v-add-letsencrypt-domain 'admin' $HOSTNAME '' 'yes'
-v-update-host-certificate admin $HOSTNAME
-echo "UPDATE_HOSTNAME_SSL='yes'" >> /usr/local/vesta/conf/vesta.conf
-
 echo "Adding descriptions" | log
 descriptionAppend "VestaCP Web UI: https://${vestaDomain}:8083"
 descriptionAppend "VestaCP Username: admin"
