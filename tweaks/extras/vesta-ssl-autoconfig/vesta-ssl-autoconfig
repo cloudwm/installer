@@ -12,7 +12,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Adding letsencrypt certificates" | log
-systemctl start vesta.service
+systemctl stop vesta.service
 waitOrStop 0 "Vesta start failed"
 /usr/local/vesta/bin/v-add-letsencrypt-domain 'admin' $HOSTNAME '' 'yes'
 waitOrStop 0 "Letsencrypt install failed"
