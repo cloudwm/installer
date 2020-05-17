@@ -1,5 +1,6 @@
 #!/bin/bash
 
+sleep 10
 cd /opt/installer
 rm -f temp/globals-set.success
 
