@@ -21,7 +21,7 @@ fi
 echo "change description to include https URL" | log
 
 if [ -f "$CWM_DESCFILE" ]; then
-    sed -i -e 's/phpMyAdmin URL: http:/phpMyAdmin URL: https:/' $CWM_DESCFILE
+    sed -i -e 's/phpMyAdmin Web UI: http:/phpMyAdmin Web UI: https:/' $CWM_DESCFILE
 fi
 
 tagScript success
