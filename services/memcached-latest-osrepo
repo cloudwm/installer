@@ -38,6 +38,7 @@ chown memcache:memcache /etc/sasl2/memcached-sasldb2
 echo "Enabling Service" | log
 
 systemctl start memcached.service
+waitOrStop 0 "Starting memcached service failed"
 
 echo "Adding descriptions" | log
 

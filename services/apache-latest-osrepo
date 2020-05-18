@@ -17,6 +17,7 @@ chown -R www-data:www-data $appPath
 
 echo "Enabling apache service" | log
 systemctl start apache2.service
+waitOrStop 0 "Starting apache service failed"
 systemctl enable apache2.service
 
 echo "Adding descriptions" | log

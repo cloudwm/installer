@@ -15,6 +15,7 @@ kibanaVersion="7.1.1"
 
 echo "Adding repo to apt" | log
 curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch
+waitOrStop 0 "File not downloaded from official source"
 apt-key add GPG-KEY-elasticsearch
 echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list
 apt update
@@ -52,18 +53,19 @@ echo "Creating basic auth to secure Kibana web UI" | log
 echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" > /etc/nginx/htpasswd.users
 
 echo "Setting nginx configuration" | log
-nginxConfigPath=/etc/nginx/sites-available/kibana.conf
+nginxConfigPath=/etc/nginx/sites-available
 # copy readymade config to nginx sites
-cp -f $rootDir/tweaks/extras/elasticsearch-nginx/elasticsearch-nginx-config $nginxConfigPath
+cp -f $rootDir/tweaks/extras/elasticsearch-nginx/kibana.conf $nginxConfigPath/
 # place elasticPort for elasticsearch upstream
-sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath
+sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath/kibana.conf
 # place kibanaPort for kibana upstream
-sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath
+sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath/kibana.conf
 # link site to enable
-ln -s $nginxConfigPath /etc/nginx/sites-enabled/
+ln -s $nginxConfigPath/kibana.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 service nginx reload
+waitOrStop 0 "Reload nginx service failed"
 
 echo "Tweaking optimal performance settings" | log
 # reduce vm swappiness to minimum
@@ -80,13 +82,15 @@ cat << EOF > /etc/systemd/system/elasticsearch.service.d/override.conf
 LimitMEMLOCK=infinity
 EOF
 systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
 
 echo "Starting and enabling services"
 systemctl enable elasticsearch.service
 systemctl enable kibana.service
 systemctl restart elasticsearch.service
+waitOrStop 0 "Restart elasticsearch service failed"
 systemctl restart kibana.service
-
+waitOrStop 0 "Restart kibana service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Elasticsearch admin user: admin"

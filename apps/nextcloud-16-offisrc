@@ -20,8 +20,9 @@ echo "Downloading NextCloud 15" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://download.nextcloud.com/server/releases/nextcloud-$appVersion.tar.bz2
+waitOrStop 0 "File not downloaded from official source"
 tar -xjvf nextcloud-$appVersion.tar.bz2 -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f nextcloud-$appVersion.tar.bz2 
 chown -R www-data:www-data $appPath
 
@@ -35,17 +36,19 @@ EOF
 echo "Installing application" | log
 cd $appPath
 sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
+waitOrStop 0 "Application failed to install"
 sudo -u www-data php occ db:convert-filecache-bigint --no-interaction
 
 echo "Configuring nginx" | log
 # Copy Virtual Host
-cp $rootDir/tweaks/extras/nextcloud15-nginx/nextcloud15-nginx-config /etc/nginx/sites-available/nextcloud15
+cp $rootDir/tweaks/extras/nextcloud15-nginx/nextcloud.conf /etc/nginx/sites-available/
 # Symlink nextcloud vhost
-ln -s /etc/nginx/sites-available/nextcloud15 /etc/nginx/sites-enabled/nextcloud15
+ln -s /etc/nginx/sites-available/nextcloud.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Tweaking app and runtime settings" | log
 # installing image preview functionality
@@ -67,6 +70,7 @@ sed -i '/env\[PATH\]/s/^;//g' /etc/php/$phpVersion/fpm/pool.d/www.conf
 # Add Server IP to Trusted Servers
 sed -i "s/0 => 'localhost',/0 => 'localhost', 1 => '${CWM_SERVERIP}',/" $appPath/config/config.php
 systemctl restart php$phpVersion-fpm.service
+waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Nextcloud URL: https://${CWM_SERVERIP}/"

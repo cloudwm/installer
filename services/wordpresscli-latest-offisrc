@@ -15,6 +15,7 @@ echo "install wp cli for wordpress" | log
 
 cd $rootDir/temp
 curlDownload https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+waitOrStop 0 "CLI binary not downloaded from github"
 chmod +x wp-cli.phar
 mv wp-cli.phar /usr/local/bin/wp
 

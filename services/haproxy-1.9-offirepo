@@ -7,7 +7,13 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist ssl-ready.success
+
 rootDir=$(rootDir)
+certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
+certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
+certsUpdateService=/opt/update-certs.sh
+certGeneratedName="haproxy-fullcert.pem"
 
 echo "Installing dependencies" | log
 apt install software-properties-common -y | log
@@ -21,9 +27,6 @@ echo "Installing main application" | log
 apt install haproxy=1.9.\* -y | log
 checkPackageInstalled haproxy
 
-echo "Generating self signed certificate for SSL needs" | log
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.pem -out /etc/ssl/private/server.pem -days 1024 -nodes -subj '/CN=localhost'
-
 echo "Open port for stats web ui" | log
 ufw allow 8404
 
@@ -32,12 +35,41 @@ backupFile /etc/haproxy/haproxy.cfg
 cp -f $rootDir/tweaks/extras/haproxy/haproxy.cfg /etc/haproxy/
 pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
 sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
+sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
+sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
+
+echo "Generating proper haproxy certificate" | log
+cd ${certsArchivePath}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
+
+cat << EOF > ${certsUpdateService}
+
+certbot -q renew
+cd ${certsArchivePath}
+rm ${certGeneratedName}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
 service haproxy reload
 
+EOF
+chmod +x ${certsUpdateService}
+
+backupFile /lib/systemd/system/certbot.service
+# sed -i '\|ExecStart|s|=.*|=/bin/bash '"${certsUpdateService}"'|' /lib/systemd/system/certbot.service
+sed -i '\|ExecStart|s|-q renew|-q renew --post-hook "/bin/bash '${certsUpdateService}'"|' /lib/systemd/system/certbot.service
+systemctl daemon-reload
+service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
+
 echo "Adding descriptions" | log
-descriptionAppend "HAProxy Address: ${CWM_SERVERIP}"
+descriptionAppend "HAProxy Address: ${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
-descriptionAppend "HAProxy Stats Web UI: https://${CWM_SERVERIP}:8404/stats"
+descriptionAppend "HAProxy Stats Web UI: https://${CWM_DISPLAYED_ADDRESS}:8404/stats"
 descriptionAppend "HAProxy Stats Web UI Username: admin"
 descriptionAppend "HAProxy Stats Web UI Password: ${ADMINPASSWORD}"
 descriptionAppend " "

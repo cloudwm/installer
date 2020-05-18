@@ -8,6 +8,8 @@ fi
 
 runOnceCheck
 checkTagExist nginx.success
+checkTagExist ssl-ready.success
+
 
 echo "Enabling PHP in default-ssl config file" | log
 
@@ -16,6 +18,7 @@ sed -i -e 's/index index.html/index index.php index.html/' /etc/nginx/sites-avai
 
 # Restart NGINX service
 systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
 
 tagScript success
 

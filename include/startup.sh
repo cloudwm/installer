@@ -1,17 +1,5 @@
 #!/bin/bash
 
-if [ -f "./installer-startup.conf" ]; then
-    . installer-startup.conf
-elif [ -f "../installer-startup.conf" ]; then
-    . ../installer-startup.conf
-fi
-
-if [ -f "./include/startup-cwm.sh" ]; then
-    . ./include/startup-cwm.sh
-elif [ -f "../include/startup-cwm.sh" ]; then
-    . ../include/startup-cwm.sh
-fi
-
 function rootDir() {
 
     if [ -f "installer" ]; then
@@ -224,7 +212,7 @@ function waitOrStop() {
 
     if [ $waitExitCode -ne $exitCode ]; then
 
-	    echo "Waiting for $waitExitCode. Execution return $exitCode. exiting (1)" | log 1
+        echo "ExitCode $exitCode (expecting $waitExitCode). ${2:-Undefined error.}" | log 1
         exit 1;
 
     fi
@@ -417,4 +405,17 @@ function noWhitespace() {
 }
 
 # Run Startup Functions
+
+if [ -f "./installer-startup.conf" ]; then
+    . installer-startup.conf
+elif [ -f "../installer-startup.conf" ]; then
+    . ../installer-startup.conf
+fi
+
+if [ -f "./include/startup-cwm.sh" ]; then
+    . ./include/startup-cwm.sh
+elif [ -f "../include/startup-cwm.sh" ]; then
+    . ../include/startup-cwm.sh
+fi
+
 checkTempDir

@@ -11,6 +11,7 @@ checkTagExist apache2.success
 
 echo "Generating self-signed certificate" | log
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.key -out /etc/ssl/certs/server.crt -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
 
 echo "Creating SSL params" | log
 cat << EOF >> /etc/apache2/conf-available/ssl-params.conf
@@ -43,6 +44,7 @@ a2ensite default-ssl
 
 echo "Restarting apache service" | log
 systemctl restart apache2.service
+waitOrStop 0 "Restart apache service failed"
 
 descriptionAppend "SSL certificates location: /etc/ssl/"
 descriptionAppend " "

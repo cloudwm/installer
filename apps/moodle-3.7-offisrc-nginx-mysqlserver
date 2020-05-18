@@ -20,8 +20,9 @@ rootDir=$(rootDir)
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
 curlDownload https://download.moodle.org/$appBranch/moodle-$appVersion.tgz
+waitOrStop 0 "File not downloaded from official source"
 tar -xzvf moodle-$appVersion.tgz
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 mkdir -p $appPath
 mv moodle $appPath
 rm -f moodle-$appVersion.tgz
@@ -52,15 +53,16 @@ if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
 fi
 
 echo "Creating nginx configurations" | log
-cp -f $rootDir/tweaks/extras/moodle-nginx/moodle-nginx-config /etc/nginx/sites-available/moodle.conf
+cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
 ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Moodle Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Moodle Username: admin"
 descriptionAppend "Moodle Password: ${ADMINPASSWORD}"
 descriptionAppend " "

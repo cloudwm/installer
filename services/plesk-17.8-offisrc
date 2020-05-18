@@ -7,33 +7,33 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-pleskDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Preparing FQDN for installation process" | log
-sed -i "2i${CWM_SERVERIP} ${pleskDomain}" /etc/hosts
-hostnamectl set-hostname ${pleskDomain}
+sed -i "2i${CWM_SERVERIP} ${CWM_DOMAIN}" /etc/hosts
+hostnamectl set-hostname ${CWM_DOMAIN}
 
 echo "Running Plesk Official Installer" | log
 curlDownload https://autoinstall.plesk.com/plesk-installer
+waitOrStop 0 "File not downloaded from official source"
 chmod +x plesk-installer
 sh plesk-installer install plesk 17.8.11 | log
-waitOrStop 0
+waitOrStop 0 "Failed to install application"
 
 echo "Configuring Plesk" | log
 plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -iface eth0 -trial_license true  -ip-type shared -passwd ${ADMINPASSWORD} -email ${ADMINEMAIL} | log
-waitOrStop 0
+waitOrStop 0 "Configuration procedure failed"
 
 echo "Updating hostname" | log
-plesk bin server_pref --update -hostname ${pleskDomain} | log
-waitOrStop 0
+plesk bin server_pref --update -hostname ${CWM_DOMAIN} | log
+waitOrStop 0 "Hostname did not update"
 
 echo "Checking Plesk Configuration" | log
 plesk bin init_conf -c | log
-waitOrStop 0
+waitOrStop 0 "Configuration failed to pass test"
 
 echo "Adding descriptions" | log
 descriptionAppend "Plesk Web UI: ${CWM_SERVERIP}:8443"
-descriptionAppend "Plesk Domain Address: ${pleskDomain}:8443"
+descriptionAppend "Plesk Domain Address: ${CWM_DOMAIN}:8443"
 descriptionAppend "Plesk Username: root"
 descriptionAppend "Plesk Password: ${ADMINPASSWORD}"
 descriptionAppend " "

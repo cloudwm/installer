@@ -1,0 +1,92 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist certbot-nginx.success
+
+rootDir=$(rootDir)
+certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
+certsRoute=/etc/nginx/snippets/letsencrypt-nginx-certs.conf
+renewConf=/etc/letsencrypt/renewal/$CWM_DOMAIN.conf
+modPrivKey=$certsPath/${CWM_DOMAIN}.key
+modCert=$certsPath/${CWM_DOMAIN}.crt
+modChain=$certsPath/${CWM_DOMAIN}.chain.crt
+modFullChain=$certsPath/${CWM_DOMAIN}.fullchain.crt
+
+echo "Enabling certbot for machine" | log
+mkdir -p /var/lib/letsencrypt/.well-known
+chgrp www-data /var/lib/letsencrypt
+chmod g+s /var/lib/letsencrypt
+# remove default vhosts otherwise certification fails
+unlink /etc/nginx/sites-enabled/default
+
+echo "Preparing nginx for certbot certification" | log
+cp $rootDir/tweaks/letsencrypt-nginx-route.conf /etc/nginx/snippets/
+cp $rootDir/tweaks/letsencrypt-nginx-register.conf /etc/nginx/sites-available/
+ln -s /etc/nginx/sites-available/letsencrypt-nginx-register.conf /etc/nginx/sites-enabled/
+systemctl restart nginx.service
+waitOrStop 0 "Failed restart nginx after certification"
+
+echo "Generating letsencrypt certificates with certbot" | log
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} --test-cert
+waitOrStop 0 "Failed letsencrypt certificate generation"
+export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+tag global-domain-set.success
+unlink /etc/nginx/sites-enabled/letsencrypt-nginx-register.conf
+
+echo "Configuring certbot renewal service" | log
+mv $certsPath/privkey.pem $modPrivKey
+mv $certsPath/cert.pem $modCert
+mv $certsPath/chain.pem $modChain
+mv $certsPath/fullchain.pem $modFullChain
+sed -i "s|$certsPath/privkey.pem|$modPrivKey|" $renewConf
+sed -i "s|$certsPath/cert.pem|$modCert|" $renewConf
+sed -i "s|$certsPath/fullchain.pem|$modFullChain|" $renewConf
+sed -i "s|$certsPath/chain.pem|$modChain|" $renewConf
+
+echo "Attaching certificates to nginx configuration" | log
+cp $rootDir/tweaks/letsencrypt-nginx-certs.conf $certsRoute
+sed -i "s|/path/to/your.key|$modPrivKey|" $certsRoute
+sed -i "s|/path/to/your.crt|$modCert|" $certsRoute
+sed -i "s|/path/to/your.chain|$modChain|" $certsRoute
+
+echo "Creating an SSL vhost" | log
+cat << EOF >> /etc/nginx/sites-available/default-ssl
+server {
+	listen 443 ssl default_server;
+	listen [::]:443 ssl default_server;
+	
+	server_name _;
+
+	include snippets/letsencrypt-nginx-certs.conf;
+	include snippets/letsencrypt-nginx-route.conf;
+
+	root /var/www/html;
+
+	index index.html index.htm index.nginx-debian.html;
+
+	location / {
+		# Default Location
+	}
+}
+EOF
+
+echo "Symlink to sites-enabled" | log 
+ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/
+
+echo "Restart NGINX service" | log
+service nginx reload
+waitOrStop 0 "Failed restart nginx after install"
+
+descriptionAppend "SSL certificates location: $certsPath/"
+descriptionAppend " "
+
+tag ssl-ready.success
+tagScript success
+
+exit 0

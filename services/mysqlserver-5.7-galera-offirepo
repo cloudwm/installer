@@ -27,12 +27,12 @@ export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-wsrep-server-5.7 mysql-server/root_password password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-wsrep-server-5.7 mysql-server/root_password_again password ${ADMINPASSWORD}"
 apt install galera-3 galera-arbitrator-3 mysql-wsrep-5.7 -y
-waitOrStop 0
 checkPackageInstalled mysql-wsrep-server-5.7
 
 
 echo "Restarting mysql.service" | log
 systemctl restart mysql.service
+waitOrStop 0 "Restart mysql service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"

@@ -14,7 +14,7 @@ echo "Installing snap and then rocket.chat" | log
 apt install snapd -y
 checkPackageInstalled snapd
 snap install rocketchat-server 
-waitOrStop 0
+waitOrStop 0 "Failed to install snap application"
 
 echo "Adding Loading in Progress screen" | log
 nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
@@ -24,14 +24,15 @@ bannerFiglet "Loading in Progress\n Please Wait.\n" >> $nginxErrorPage
 printf "Application and services loading is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $nginxErrorPage
 
 echo "Configuring nginx" | log
-cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat-nginx-config /etc/nginx/sites-available/rocketchat.conf
+cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat.conf /etc/nginx/sites-available/
 ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
+waitOrStop 0 "Reload nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Rocket.chat Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Rocket.chat Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 descriptionAppend "Rocket.chat application directories:"
 descriptionAppend "/snap/rocketchat-server/"

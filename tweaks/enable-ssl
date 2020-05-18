@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} --test-cert
+waitOrStop 0 "Failed certbot certificate generation"
+export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+tag global-domain-set.success
+
+tag ssl-ready.success
+tagScript success
+
+exit 0

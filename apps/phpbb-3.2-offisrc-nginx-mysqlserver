@@ -20,8 +20,9 @@ echo "Downloading PhpBB3" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://www.phpbb.com/files/release/$appArchive
+waitOrStop 0 "File not downloaded from official source"
 tar -xjvf $appArchive  -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f $appArchive
 chown -R www-data:www-data $appPath
 
@@ -87,7 +88,7 @@ chown -R www-data:www-data $appPath
 
 echo "Adding descriptions" | log
 
-descriptionAppend "phpBB3 Web UI: https://${CWM_SERVERIP}/"
+descriptionAppend "phpBB3 Web UI: https://${CWM_DISPLAYED_ADDRESS}/"
 descriptionAppend "phpBB3 Username: admin "
 descriptionAppend "phpBB3 Password: ${ADMINPASSWORD} "
 descriptionAppend " "

@@ -16,10 +16,10 @@ checkPackageInstalled php$phpVersion-fpm
 
 echo "Configuring php-fpm to listen on correct socket" | log
 sed -i 's/listen = \/run\/php\/php'"${phpVersion}"'-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/$phpVersion/fpm/pool.d/www.conf
-waitOrStop 0
 
 echo "Restarting service to implement changes" | log
 service php$phpVersion-fpm restart
+waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "PHP-FPM config files location: /etc/php/$phpVersion/fpm/"

@@ -32,10 +32,11 @@ echo "Downloading latest Drupal" | log
 mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.gz
+waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Drupal to $appPath" | log
 tar -xzvf drupal-$versionFilename.tar.gz -C $appPath/ --strip 1
-waitOrStop 0
+waitOrStop 0 "Failed to extract application archive"
 rm -f drupal-$versionFilename.tar.gz
 
 echo "Setting misc definitions & permissions for Drupal" | log
@@ -50,15 +51,15 @@ echo "Create temp swap for composer processes" | log
 #increase vm swappiness to allow swap to dominate process
 sysctl vm.swappiness=80
 # create swap file and moint as partition
-swapFilename=$(createSwapFile swapfile 900 $rootDir/_swap)
+swapFilename=$(createSwapFile swapfile 750 $rootDir/_swap)
+waitOrStop 0 "Failed to create swap file"
 sleep 5
-waitOrStop 0
 
 echo "Installing Drush" | log
 cd $appPath
 export COMPOSER_HOME=/root
 composer require drush/drush -v | log
-waitOrStop 0
+waitOrStop 0 "Failed to install Drush"
 
 echo "Creating Website" | log
 cd $appPath
@@ -72,32 +73,33 @@ vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
 rm index.nginx-debian.html
 chown -R www-data:www-data .
 cat << EOF >> ${appPath}/sites/default/settings.php
-\$settings['trusted_host_patterns'] = ['^${CWM_SERVERIP}$'];
+\$settings['trusted_host_patterns'] = ['^${CWM_DISPLAYED_ADDRESS}$'];
 EOF
 
 echo "Setting nginx config" | log
 #main drupal config
-cp $rootDir/tweaks/extras/drupal-nginx/drupal-nginx-config /etc/nginx/sites-available/drupal
+cp $rootDir/tweaks/extras/drupal-nginx/drupal.conf /etc/nginx/sites-available/
 # specific configs supplied by nginx for drupal
 mkdir -p /etc/nginx/config
-cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/drupal-locations.conf
+cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/
 # Symlink drupal vhost
-ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/drupal
+ln -s /etc/nginx/sites-available/drupal.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Remove temp swap" | log
 # set vm swappiness to recommended optimal case
 sysctl vm.swappiness=10
 # mount off and remove swap file 
 removeSwapFile $swapFilename
+waitOrStop 0 "Failed to remove swap file"
 sleep 5
-waitOrStop 0
 
 echo "Adding descriptions" | log
-descriptionAppend "Drupal Web UI: https://${CWM_SERVERIP}/user/login"
+descriptionAppend "Drupal Web UI: https://${CWM_DISPLAYED_ADDRESS}/user/login"
 descriptionAppend "Drupal Username: admin"
 descriptionAppend "Drupal Password: ${ADMINPASSWORD}"
 descriptionAppend " "

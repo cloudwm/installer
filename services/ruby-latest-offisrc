@@ -19,11 +19,13 @@ checkPackageInstalled "${packages[@]}"
 echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp
 git clone https://github.com/rbenv/ruby-build.git | log
-waitOrStop 0
+waitOrStop 0 "File not downloaded from Github"
 PREFIX=/usr/local ./ruby-build/install.sh
+waitOrStop 0 "Ruby build tool failed"
 
 echo "Installing Ruby" | log
 ruby-build $rubyVersion $rubyInstallPath --verbose | log
+waitOrStop 0 "Failed to install application"
 
 echo "Adding Ruby path to global environment" | log
 sed -i "s|\"$|:${rubyInstallPath}/bin\"|" /etc/environment

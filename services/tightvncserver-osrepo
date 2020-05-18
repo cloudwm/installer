@@ -50,16 +50,18 @@ ExecStop=/usr/bin/vncserver -kill :%i
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
 systemctl enable vncserver@1.service
 systemctl start vncserver@1
+waitOrStop 0 "Starting vncserver service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Connect using VNC Client"
 descriptionAppend " "
-descriptionAppend "VNC GUI Address: ${CWM_SERVERIP}:5901"
+descriptionAppend "VNC GUI Address: ${CWM_DISPLAYED_ADDRESS}:5901"
 descriptionAppend "VNC Password: ${VNC_PASSWORD}"
 descriptionAppend " "
-descriptionAppend "SSH Console Address: ${CWM_SERVERIP}"
+descriptionAppend "SSH Console Address: ${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Username: root"
 descriptionAppend "Password: ${ADMINPASSWORD}"
 descriptionAppend " "

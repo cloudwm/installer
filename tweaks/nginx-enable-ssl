@@ -10,6 +10,7 @@ checkTagExist nginx.success
 
 echo "Generating self-signed certificate" | log
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.key -out /etc/ssl/certs/server.crt -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
 
 echo "Creating an SSL vhost" | log
 cat << EOF >> /etc/nginx/sites-available/default-ssl
@@ -37,10 +38,12 @@ ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/default-ss
 
 echo "Restart NGINX service" | log
 systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
 
 descriptionAppend "SSL certificates location: /etc/ssl/"
 descriptionAppend " "
 
+tag ssl-ready.success
 tagScript success
 
 exit 0

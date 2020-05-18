@@ -10,7 +10,7 @@ fi
 checkTagExist php-fpm.success
 
 rootDir=$(rootDir)
-
+service=$(systemctl | grep fpm | awk '{print $1}')
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 phpiniPath=/etc/php/$phpVersion/fpm/php.ini
 
@@ -34,6 +34,8 @@ if [ -f "$rootDir/temp/nginx.success" ]; then
 fi
 
 systemctl restart $service
+waitOrStop 0 "Restart service failed"
+
 
 tagScript success
 

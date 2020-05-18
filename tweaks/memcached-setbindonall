@@ -14,6 +14,7 @@ sed -i 's/-l 127.0.0.1/-l 0.0.0.0/' /etc/memcached.conf
 
 # Restaring memcached daemon
 systemctl restart memcached.service | log
+waitOrStop 0 "Restart memcached service failed"
 
 tagScript success
 
