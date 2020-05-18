@@ -1,0 +1,29 @@
+#!/bin/bash
+
+sleep 10
+cd /opt/installer
+rm -f temp/globals-set.success
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Adding letsencrypt certificates" | log
+/usr/local/vesta/bin/v-add-letsencrypt-domain 'admin' $HOSTNAME '' 'yes'
+waitOrStop 0 "Letsencrypt install failed"
+/usr/local/vesta/bin/v-update-host-certificate admin $HOSTNAME
+waitOrStop 0 "Certificate install failed"
+echo "UPDATE_HOSTNAME_SSL='yes'" >> /usr/local/vesta/conf/vesta.conf
+
+# disable script after first run
+scriptName=$(basename $BASH_SOURCE)
+rcLocalFile=/etc/rc.local	
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile
+sed -i '/'"${scriptName}"'/s/^/#/g' $rcLocalFile.bck
+
+tagScript success
+
+exit 0

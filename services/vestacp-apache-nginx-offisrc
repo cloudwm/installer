@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-vestaDomain="vesta.${CWM_DOMAIN}"
+vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Running VestaCP Official Installer" | log
 curlDownload http://vestacp.com/pub/vst-install.sh
@@ -42,11 +42,6 @@ waitOrStop 0 "File not downloaded from official source"
 
 bash vst-install.sh -n yes -w no -a yes -k yes -v yes -j no -i yes -b yes -q no -x yes -z yes -t yes -c yes -o yes -m yes -g no -y no -p ${ADMINPASSWORD} -e ${ADMINEMAIL} -s ${vestaDomain} |log
 waitOrStop 0 "Failed to install application"
-
-echo "Adding letsencrypt certificates" | log
-v-add-letsencrypt-domain 'admin' $HOSTNAME '' 'yes'
-v-update-host-certificate admin $HOSTNAME
-echo "UPDATE_HOSTNAME_SSL='yes'" >> /usr/local/vesta/conf/vesta.conf
 
 echo "Adding descriptions" | log
 descriptionAppend "VestaCP Web UI: https://${vestaDomain}:8083"
