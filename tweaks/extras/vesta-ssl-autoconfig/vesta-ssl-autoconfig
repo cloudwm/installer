@@ -12,7 +12,6 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Adding letsencrypt certificates" | log
-waitOrStop 0 "Vesta start failed"
 /usr/local/vesta/bin/v-add-letsencrypt-domain 'admin' $HOSTNAME '' 'yes'
 waitOrStop 0 "Letsencrypt install failed"
 /usr/local/vesta/bin/v-update-host-certificate admin $HOSTNAME
