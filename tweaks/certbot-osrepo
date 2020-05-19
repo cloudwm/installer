@@ -10,7 +10,7 @@ fi
 echo "Installing certbot" | log
 apt install software-properties-common -y
 add-apt-repository universe
-add-apt-repository ppa:certbot/certbot -y
+add-apt-repository -k hkp://keyserver.ubuntu.com:80 -y ppa:certbot/certbot
 apt update
 apt install certbot -y
 checkPackageInstalled certbot
