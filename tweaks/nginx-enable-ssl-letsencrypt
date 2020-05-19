@@ -33,7 +33,7 @@ systemctl restart nginx.service
 waitOrStop 0 "Failed restart nginx after certification"
 
 echo "Generating letsencrypt certificates with certbot" | log
-execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN}
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
 waitOrStop 0 "Failed letsencrypt certificate generation"
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 tag global-domain-set.success
