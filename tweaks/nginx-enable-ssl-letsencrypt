@@ -80,6 +80,7 @@ echo "Symlink to sites-enabled" | log
 ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/
 
 echo "Restart NGINX service" | log
+sleep 10
 service nginx reload
 waitOrStop 0 "Failed restart nginx after install"
 
