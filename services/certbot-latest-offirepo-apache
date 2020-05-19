@@ -9,7 +9,7 @@ fi
 checkTagExist apache2.success
 
 echo "Installing certbot for apache" | log
-add-apt-repository ppa:certbot/certbot -y | log
+add-apt-repository -k hkp://keyserver.ubuntu.com:80 -y ppa:certbot/certbot | log
 apt install python-certbot-apache -y | log
 checkPackageInstalled python-certbot-apache
 
