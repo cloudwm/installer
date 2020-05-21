@@ -2,7 +2,6 @@
 
 sleep 10
 cd /opt/installer
-rm -f temp/globals-set.success
 
 # Add this at the begining of all scripts.
 if [ -f "include/startup.sh" ]; then
