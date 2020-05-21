@@ -52,7 +52,7 @@ ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/register
 systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 # creating certbot
-execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain}
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} ${CWM_DEBUG:+"--test-cert"}
 waitOrStop 0 "Letsencrypt certificates not created"
 # remove certbot routing
 unlink /etc/nginx/sites-enabled/register.conf
