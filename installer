@@ -88,4 +88,5 @@ for run in "${execute[@]}"; do
 done
 
 # remove tag from startup-cwm.sh after install is completed
+echo "Removing installer leftovers" | log
 untag globals-set.success
