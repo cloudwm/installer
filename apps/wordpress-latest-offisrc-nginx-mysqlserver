@@ -49,6 +49,10 @@ waitOrStop 0 "Failed to install application"
 echo "Fixing app permissions" | log
 chown -R www-data:www-data ${WP_PATH}
 
+echo "Misc tweaks" | log
+ini=$(find /etc -type f -name "php.ini" | grep fpm)
+sed -i '/display_errors = /s/On/Off/g' $ini
+
 echo "Misc. cleanups" | log
 rm $WP_PATH/index.nginx-debian.html
 
