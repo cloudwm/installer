@@ -86,3 +86,7 @@ for run in "${execute[@]}"; do
 	esac
 
 done
+
+# remove tag from startup-cwm.sh after install is completed
+echo "Removing installer leftovers" | log
+untag globals-set.success

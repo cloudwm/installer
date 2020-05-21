@@ -225,7 +225,8 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
-    touch $rootDir/temp/globals-set.success
+    # prevent running over static conguration globals
+    tag globals-set.success
     
 fi
 
