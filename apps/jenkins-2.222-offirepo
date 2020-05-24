@@ -39,8 +39,19 @@ echo "Restarting service" | log
 systemctl restart jenkins
 waitOrStop 0 "Restart jenkins service failed"
 
-echo "Adding descriptions" | log
+echo "Setting nginx configuration" | log
+nginxConfigPath=/etc/nginx/sites-available
+# copy readymade config to nginx sites
+cp -f $rootDir/tweaks/extras/jenkins-nginx/jenkins.conf $nginxConfigPath/
+# place chosen port in config
+sed -i '/server/s/PORT_PLACEHOLDER/'"${assignedPort}"'/g' $nginxConfigPath/jenkins.conf
+ln -s $nginxConfigPath/jenkins.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
+waitOrStop 0 "Reload nginx service failed"
 
+echo "Adding descriptions" | log
 descriptionAppend "Jenkins Web UI: https://${CWM_DISPLAYED_ADDRESS}:${assignedPort}"
 descriptionAppend "Jenkins Unlock key: $unlockkey"
 descriptionAppend " "
