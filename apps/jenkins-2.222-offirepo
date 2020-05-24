@@ -52,7 +52,7 @@ service nginx reload
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Jenkins Web UI: https://${CWM_DISPLAYED_ADDRESS}:${assignedPort}"
+descriptionAppend "Jenkins Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Jenkins Unlock key: $unlockkey"
 descriptionAppend " "
 descriptionAppend "If main page is blank after initial setup, restart the server:"
