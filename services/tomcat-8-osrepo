@@ -8,6 +8,7 @@ fi
 
 rootDir=$(rootDir)
 appPath=/etc/tomcat8
+assignedPort=9090
 
 echo "Installing main application" | log
 packages=(tomcat8 tomcat8-admin tomcat8-docs tomcat8-examples)
@@ -23,18 +24,30 @@ rm -f $appPath/Catalina/localhost/manager.xml
 rm -f $appPath/Catalina/localhost/host-manager.xml
 
 echo "Setting prebuilt configs" | log
-cp $rootDir/tweaks/extras/tomcat8/tomcat-users.xml $appPath/
-cp $rootDir/tweaks/extras/tomcat8/manager.xml $appPath/Catalina/localhost/
-cp $rootDir/tweaks/extras/tomcat8/host-manager.xml $appPath/Catalina/localhost/
+cp $rootDir/tweaks/extras/tomcat8-nginx/tomcat-users.xml $appPath/
+cp $rootDir/tweaks/extras/tomcat8-nginx/manager.xml $appPath/Catalina/localhost/
+cp $rootDir/tweaks/extras/tomcat8-nginx/host-manager.xml $appPath/Catalina/localhost/
 sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/tomcat-users.xml 
-sed -i 's/Connector port="8080"/Connector port="9090"/g' $appPath/server.xml 
+sed -i 's/Connector port="8080"/Connector port="'${assignedPort}'"/g' $appPath/server.xml 
 
 echo "Restarting service" | log
 systemctl restart tomcat8
 waitOrStop 0 "Restart tomcat service failed"
 
+echo "Setting nginx configuration" | log
+nginxConfigPath=/etc/nginx/sites-available
+# copy readymade config to nginx sites
+cp -f $rootDir/tweaks/extras/tomcat8-nginx/tomcat.conf $nginxConfigPath/
+# place chosen port in config
+sed -i '/server/s/PORT_PLACEHOLDER/'"${assignedPort}"'/g' $nginxConfigPath/tomcat.conf
+ln -s $nginxConfigPath/tomcat.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
+waitOrStop 0 "Reload nginx service failed"
+
 echo "Adding descriptions" | log
-descriptionAppend "Apache Tomcat8 Web UI: ${CWM_DISPLAYED_ADDRESS}:9090"
+descriptionAppend "Apache Tomcat8 Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Apache Tomcat8 Username: admin"
 descriptionAppend "Apache Tomcat8 Password: ${ADMINPASSWORD}"
 descriptionAppend " "
