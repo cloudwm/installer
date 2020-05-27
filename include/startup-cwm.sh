@@ -109,7 +109,8 @@ function getServerIP() {
     
     if [ ! -z "$CWM_WANNICIDS" ]; then
 
-        local mainip=$(echo "CWM_IP${CWM_WANNICIDS[0]}") 
+        typeset -a "cwm_wan_ids=($CWM_WANNICIDS)"
+        local mainip=$(echo "CWM_IP${cwm_wan_ids[0]}") 
         echo "${!mainip}"
         return 0
 
@@ -117,7 +118,8 @@ function getServerIP() {
 
     if [ ! -z "$CWM_LANNICIDS" ]; then
 
-        local mainip=$(echo "CWM_IP${CWM_LANNICIDS[0]}") 
+        typeset -a "cwm_lan_ids=($CWM_LANNICIDS)"
+        local mainip=$(echo "CWM_IP${cwm_lan_ids[0]}") 
         echo "${!mainip}"
         return 0
         
@@ -217,8 +219,10 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     # additional cwm global params
     export ADMINEMAIL=$CWM_EMAIL
     export ADMINPASSWORD="$CWM_PASSWORD"
-    export CWM_WANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
-    export CWM_LANNICIDS=($(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n"))
+    mapfile -t wan_nicids < <( cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n" )
+    export CWM_WANNICIDS="$(printf '%q ' "${wan_nicids[@]}")"
+    mapfile -t lan_nicids < <( cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n" )
+    export CWM_LANNICIDS="$(printf '%q ' "${lan_nicids[@]}")"
     # export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     export CWM_SERVERIP="$(getServerIP)"
