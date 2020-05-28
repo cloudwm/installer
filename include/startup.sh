@@ -221,6 +221,7 @@ function waitOrStop() {
 
 function checkPackageInstalled() {
 
+    sleep 5
     notInstalled=()
     for package in "$@"; do
 
