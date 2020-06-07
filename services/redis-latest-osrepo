@@ -6,12 +6,13 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install Redis for local mail delivery
-echo "Installing redis" | log
+appVersion=5:4.0.\*
 
-apt install redis -y | log
+echo "Installing Redis ${appVersion}" | log
+apt install -y redis=$appVersion
 checkPackageInstalled redis
 
+echo "Adding descriptions" | log
 descriptionAppend "Redis IP Address: ${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 

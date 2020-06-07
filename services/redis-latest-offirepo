@@ -13,7 +13,7 @@ add-apt-repository ppa:chris-lea/redis-server -y | log
 waitOrStop 0 "Repository not added to source list"
 apt update
 
-echo "Installing Redis" | log
+echo "Installing Redis ${appVersion}" | log
 apt install -y redis=$appVersion | log
 checkPackageInstalled redis
 
