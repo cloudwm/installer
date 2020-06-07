@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-appVersion=2.3.2
+appVersion=2.3.4
 rootDir=$(rootDir)
 
 echo "Creating Magento Database" | log
