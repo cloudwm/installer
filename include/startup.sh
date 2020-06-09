@@ -415,7 +415,7 @@ function installPackage() {
 
         until [ $n -ge $times ]; do
 
-            apt install $package
+            apt install -y $package
             if [ $? -ne 0 ]; then
 
                 n=$(($n + 1))
@@ -427,6 +427,7 @@ function installPackage() {
                 if [ $? -ne 0 ]; then
 
                     n=$(($n + 1))
+                    echo "dpkg-query fail: $package"
                     sleep 3
 
                 else
