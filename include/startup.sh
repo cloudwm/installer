@@ -412,6 +412,7 @@ function installPackage() {
         local ok=1
         local times=3
         local n=0
+        local seconds=2
 
         until [ $n -ge $times ]; do
 
@@ -419,16 +420,17 @@ function installPackage() {
             if [ $? -ne 0 ]; then
 
                 n=$(($n + 1))
-                sleep 3
+                sleep $seconds
 
             else
-
+                
+                sleep $seconds
                 dpkg-query -W $package
                 if [ $? -ne 0 ]; then
 
                     n=$(($n + 1))
                     echo "dpkg-query fail: $package"
-                    sleep 3
+                    sleep $seconds
 
                 else
 
