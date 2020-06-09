@@ -431,7 +431,6 @@ function installPackage() {
                 if [ $exitCode -ne 0 ]; then
 
                     n=$(($n + 1))
-                    echo "dpkg-query fail: $package"
                     sleep $seconds
 
                 else
