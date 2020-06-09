@@ -417,7 +417,8 @@ function installPackage() {
         until [ $n -ge $times ]; do
 
             apt install -y $package
-            if [ $? -ne 0 ]; then
+            local exitCode=$?
+            if [ $exitCode -ne 0 ]; then
 
                 n=$(($n + 1))
                 sleep $seconds
@@ -426,7 +427,8 @@ function installPackage() {
                 
                 sleep $seconds
                 dpkg-query -W $package
-                if [ $? -ne 0 ]; then
+                local exitCode=$?
+                if [ $exitCode -ne 0 ]; then
 
                     n=$(($n + 1))
                     echo "dpkg-query fail: $package"
