@@ -405,6 +405,47 @@ function noWhitespace() {
     echo "$1" | tr -d '[[:space:]]'
 }
 
+function installPackage() {
+
+    for package in "$@"; do
+
+        local ok=1
+        local times=3
+        local n=0
+
+        until [ $n -ge $times ]; do
+
+            apt install $package
+            if [ $? -ne 0 ]; then
+
+                n=$(($n + 1))
+                sleep 3
+
+            else
+
+                dpkg-query -W $package
+                if [ $? -ne 0 ]; then
+
+                    n=$(($n + 1))
+                    sleep 3
+
+                else
+
+                    ok=0
+                    break
+
+                fi
+
+            fi
+
+        done
+
+    done
+
+    return $ok
+
+}
+
 # Run Startup Functions
 
 if [ -f "./installer-startup.conf" ]; then
