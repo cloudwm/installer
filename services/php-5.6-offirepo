@@ -7,19 +7,19 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Adding php5.6 repo" | log
-apt install -y software-properties-common
-checkPackageInstalled software-properties-common
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
 add-apt-repository -y ppa:ondrej/php | log
 apt update
 
 echo "Installing php5.6" | log
-apt install -y php5.6 | log
-checkPackageInstalled php5.6 
+installPackage php5.6 | log
+waitOrStop 0 "Failed apt install: php5.6 "
 
 echo "Installing php5.6 modules" | log
 packages=(php5.6-bcmath php5.6-bz2 php5.6-cli php5.6-common php5.6-curl php5.6-gd php5.6-intl php5.6-json php5.6-mbstring php5.6-mysql php5.6-mysqlnd php5.6-readline php5.6-soap php5.6-xml php5.6-zip php-pear php-php-gettext php-phpseclib php-tcpdf)
-apt install -y "${packages[@]}"  | log
-checkPackageInstalled "${packages[@]}"
+installPackage "${packages[@]}"  | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Disabling non-critical services" | log
 systemctl stop apache2.service

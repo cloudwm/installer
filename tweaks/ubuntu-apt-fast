@@ -11,7 +11,8 @@ echo "Applying apt-fast for concurrent downloads" | log
 export DEBIAN_FRONTEND=noninteractive
 add-apt-repository ppa:apt-fast/stable -y
 apt update -y
-apt install apt-fast -y
+installPackage apt-fast
+waitOrStop 0 "Failed apt install: apt-fast"
 
 tag apt-fast.success
 tagScript success

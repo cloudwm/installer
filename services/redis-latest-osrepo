@@ -9,8 +9,8 @@ fi
 appVersion=5:4.0.\*
 
 echo "Installing Redis ${appVersion}" | log
-apt install -y redis=$appVersion
-checkPackageInstalled redis
+installPackage redis=$appVersion
+waitOrStop 0 "Failed apt install: redis"
 
 echo "Adding descriptions" | log
 descriptionAppend "Redis IP Address: ${CWM_DISPLAYED_ADDRESS}"

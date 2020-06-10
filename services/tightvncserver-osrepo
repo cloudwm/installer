@@ -9,8 +9,8 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing VNC service" | log
-apt install -y tightvncserver
-checkPackageInstalled tightvncserver
+installPackage tightvncserver
+waitOrStop 0 "Failed apt install: tightvncserver"
 
 echo "Creating Default VNC Session" | log
 export HOME=/root

@@ -8,8 +8,8 @@ fi
 
 echo "Install NFS server from apt" | log
 
-apt install nfs-kernel-server -y | log
-checkPackageInstalled nfs-kernel-server
+installPackage nfs-kernel-server
+waitOrStop 0 "Failed apt install: nfs-kernel-server"
 
 echo "Create default Storage directory" | log
 

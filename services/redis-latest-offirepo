@@ -14,8 +14,8 @@ waitOrStop 0 "Repository not added to source list"
 apt update
 
 echo "Installing Redis ${appVersion}" | log
-apt install -y redis=$appVersion | log
-checkPackageInstalled redis
+installPackage redis=$appVersion
+waitOrStop 0 "Failed apt install: redis"
 
 echo "Enabling Redis service" | log
 systemctl enable redis-server.service

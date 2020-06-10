@@ -454,13 +454,6 @@ function installPackage() {
 
     done
 
-    if [ $ok -ne 0 ]; then
-
-        echo "Failed apt install: $@" | log 1
-        exit 1
-
-    fi
-
     return $ok
 }
 

@@ -10,8 +10,8 @@ app_path=/home/ftpuser
 app_owner=www-data
 
 echo "Installing pure-ftpd" | log
-apt install pure-ftpd -y | log
-checkPackageInstalled pure-ftpd
+installPackage pure-ftpd
+waitOrStop 0 "Failed apt install: pure-ftpd"
 
 # Creating home folder, in case that it wasn't created by web server
 mkdir -p $app_path

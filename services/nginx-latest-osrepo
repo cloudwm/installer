@@ -10,8 +10,8 @@ appPath=/var/www/html
 nginxVersion=1.14.\*
 
 echo "install nginx from apt" | log
-apt install -y nginx-full=$nginxVersion | log
-checkPackageInstalled nginx-full
+installPackage nginx-full=$nginxVersion
+waitOrStop 0 "Failed apt install: nginx-full"
 
 echo "Changing ownership of $appPath to www-data user" | log
 if [ -d "$appPath" ]; then

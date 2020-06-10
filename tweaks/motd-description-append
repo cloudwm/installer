@@ -12,8 +12,8 @@ if [ -f "$CWM_DESCFILE" ]; then
 
     echo "Adding $CWM_DESCFILE to $descriptionMotd file" | log
 
-    apt install -y update-motd | log
-    checkPackageInstalled update-motd
+    installPackage update-motd
+    waitOrStop 0 "Failed apt install: update-motd"
 
     echo "#!/bin/sh" >> $descriptionMotd
     echo "echo \"=== System Description =======================================================\"" >> $descriptionMotd

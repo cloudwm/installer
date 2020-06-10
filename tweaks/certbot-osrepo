@@ -8,12 +8,13 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing certbot" | log
-apt install software-properties-common -y
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
 add-apt-repository universe
 add-apt-repository -k hkp://keyserver.ubuntu.com:80 -y ppa:certbot/certbot
 apt update
-apt install certbot -y
-checkPackageInstalled certbot
+installPackage certbot
+waitOrStop 0 "Failed apt install: certbot"
 
 # tag ssl-ready.success
 tagScript success

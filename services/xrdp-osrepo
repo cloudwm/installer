@@ -9,10 +9,12 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing xRDP service" | log
-apt install -y xserver-xorg-core
-apt install -y xserver-xorg-input-all
-apt install -y xrdp
-checkPackageInstalled xrdp
+installPackage xserver-xorg-core
+waitOrStop 0 "Failed apt install: xserver-xorg-core"
+installPackage xserver-xorg-input-all
+waitOrStop 0 "Failed apt install: xserver-xorg-input-all"
+installPackage xrdp
+waitOrStop 0 "Failed apt install: xrdp"
 
 echo "add user xrdp into ssl-cert group" | log
 adduser xrdp ssl-cert
