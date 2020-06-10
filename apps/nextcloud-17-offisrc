@@ -61,8 +61,8 @@ waitOrStop 0 "Restart nginx service failed"
 
 echo "Tweaking app and runtime settings" | log
 # installing image preview functionality
-apt install php-imagick -y
-checkPackageInstalled php-imagick
+installPackage php-imagick
+waitOrStop 0 "Failed apt install: php-imagick"
 phpIniPath=/etc/php/$phpVersion/fpm/php.ini
 phpIniAutoconfig=$rootDir/autoconfig/php-fpm-autoconfig/php.ini
 

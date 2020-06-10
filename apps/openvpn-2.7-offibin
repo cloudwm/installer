@@ -15,7 +15,8 @@ rootDir=$(rootDir)
 
 echo "Downloading binary" | log
 cd $rootDir/temp
-apt install -y ca-certificates net-tools
+installPackage ca-certificates net-tools
+waitOrStop 0 "Failed apt install: ca-certificates net-tools"
 curlDownload  https://openvpn.net/downloads/openvpn-as-bundled-clients-latest.deb
 waitOrStop 0 "File not downloaded from official source (1/2)"
 curlDownload  https://openvpn.net/downloads/$appPackage

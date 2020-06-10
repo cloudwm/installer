@@ -12,7 +12,7 @@ fi
 
 function updateServerDescription() {
 
-    curl --location -f -X PUT --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${CWM_APICLIENTID}" -H "AuthSecret: ${CWM_APISECRET}"  "https://$CWM_URL/svc/server/$CWM_UUID/description" --data-urlencode $'description='"$1"
+    curl --location -f -X PUT --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${CWM_APICLIENTID}" -H "AuthSecret: ${CWM_APISECRET}" "https://$CWM_URL/svc/server/$CWM_UUID/description" --data-urlencode $'description='"$1"
 
     local exitCode=$?
     if [ $exitCode -ne 0 ]; then
@@ -29,7 +29,7 @@ function updateServerDescription() {
 function getServerDescription() {
 
     description=$(curl --location -f --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${CWM_APICLIENTID}" -H "AuthSecret: ${CWM_APISECRET}" "https://$CWM_URL/svc/server/$CWM_UUID/overview" | grep -Po '(?<="description":")(.*?)(?=",")')
-    
+
     local exitCode=$?
     if [ $exitCode -ne 0 ]; then
 
@@ -77,7 +77,7 @@ function setServerDescriptionTXT() {
 }
 
 function updateServerDescriptionTXT() {
-    
+
     description=$(getServerDescription)
 
     uploadText=$description
@@ -106,11 +106,11 @@ function getServerIP() {
         return 0
 
     fi
-    
+
     if [ ! -z "$CWM_WANNICIDS" ]; then
 
         typeset -a "cwm_wan_ids=($CWM_WANNICIDS)"
-        local mainip=$(echo "CWM_IP${cwm_wan_ids[0]}") 
+        local mainip=$(echo "CWM_IP${cwm_wan_ids[0]}")
         echo "${!mainip}"
         return 0
 
@@ -119,10 +119,10 @@ function getServerIP() {
     if [ ! -z "$CWM_LANNICIDS" ]; then
 
         typeset -a "cwm_lan_ids=($CWM_LANNICIDS)"
-        local mainip=$(echo "CWM_IP${cwm_lan_ids[0]}") 
+        local mainip=$(echo "CWM_IP${cwm_lan_ids[0]}")
         echo "${!mainip}"
         return 0
-        
+
     fi
 
 }
@@ -133,15 +133,15 @@ function getServerIPAll() {
 
         hostname -I
         return 0
-        
+
     fi
-        
-    echo `cat $CWM_CONFIGFILE | grep ^ip.*=* | cut -f 2 -d"="`
+
+    echo $(cat $CWM_CONFIGFILE | grep ^ip.*=* | cut -f 2 -d"=")
 
 }
 
 # Function: format string to proper JSON, ONLY works with following scheme:
-# 
+#
 # JSON_STRING='{
 # "arg1":"quoted value",
 # "arg2":nonQuotedValue,
@@ -166,36 +166,36 @@ function jsonize() {
 #         command apt "$@"
 
 #     fi
-    
+
 # }
 
 # run action multiple times and analyze its output, return fail if found
 # all params are required
 # example: execSpecial 3 'error' [COMMAND]
-function execSpecial(){
+function execSpecial() {
 
-local times=$1
-local filter=$2
-local action="${@:3}"
-local ok=1
-local n=0
-until [ $n -ge $times ]; do
+    local times=$1
+    local filter=$2
+    local action="${@:3}"
+    local ok=1
+    local n=0
+    until [ $n -ge $times ]; do
 
-    if eval $action | grep -q -E $filter; then
+        if eval $action | grep -q -E $filter; then
 
-        n=$[$n+1]
-        sleep 10
+            n=$(($n + 1))
+            sleep 10
 
-    else
+        else
 
-        ok=0
-        break
+            ok=0
+            break
 
-    fi
+        fi
 
-done
+    done
 
-return $ok
+    return $ok
 
 }
 
@@ -204,7 +204,7 @@ rootDir=$(rootDir)
 if [ ! -f "$rootDir/temp/globals-set.success" ]; then
 
     # parse cwm config into global params
-    CONFIG=`cat $CWM_CONFIGFILE`
+    CONFIG=$(cat $CWM_CONFIGFILE)
     STD_IFS=$IFS
     IFS=$'\n'
     for d in $CONFIG; do
@@ -219,9 +219,9 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     # additional cwm global params
     export ADMINEMAIL=$CWM_EMAIL
     export ADMINPASSWORD="$CWM_PASSWORD"
-    mapfile -t wan_nicids < <( cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n" )
+    mapfile -t wan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
     export CWM_WANNICIDS="$(printf '%q ' "${wan_nicids[@]}")"
-    mapfile -t lan_nicids < <( cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n" )
+    mapfile -t lan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
     export CWM_LANNICIDS="$(printf '%q ' "${lan_nicids[@]}")"
     # export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
@@ -231,7 +231,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
 
     # prevent running over static conguration globals
     tag globals-set.success
-    
+
 fi
 
 if [ -f "$rootDir/temp/global-domain-set.success" ]; then

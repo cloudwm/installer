@@ -9,8 +9,8 @@ fi
 appPath=/var/www/html
 
 echo "Install apache from apt" | log
-apt install apache2 -y | log
-checkPackageInstalled apache2
+installPackage apache2
+waitOrStop 0 "Failed apt install: apache2"
 
 echo "Changing ownership of $appPath to www-data user" | log
 chown -R www-data:www-data $appPath

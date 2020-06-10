@@ -7,11 +7,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-apt install software-properties-common -y | log
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
 add-apt-repository ppa:vbernat/haproxy-2.0 -y
 apt update
-apt install haproxy=2.0.\* -y | log
-waitOrStop 0
+installPackage haproxy=2.0.\*
+waitOrStop 0 "Failed apt install: haproxy"
 
 checkPackageInstalled haproxy
 

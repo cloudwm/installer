@@ -8,9 +8,8 @@ fi
 
 echo "install clamav from apt" | log
 
-apt install clamav clamav-daemon -y | log
-checkPackageInstalled clamav
-checkPackageInstalled clamav-daemon
+installPackage clamav clamav-daemon
+waitOrStop 0 "Failed apt install: clamav"
 
 systemctl stop clamav-daemon
 systemctl stop clamav-freshclam

@@ -18,8 +18,8 @@ vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Installing Jq" | log
-apt install -y jq
-checkPackageInstalled jq
+installPackage jq
+waitOrStop 0 "Failed apt install: jq"
 
 echo "(Re)Generating dhparam key file" | log
 dhParamFile=/etc/ssl/certs/dhparam.pem
