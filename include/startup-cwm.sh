@@ -155,19 +155,19 @@ function jsonize() {
 
 }
 
-function apt() {
+# function apt() {
 
-    if [ -x "$(command -v apt-fast)" ]; then
+#     if [ -x "$(command -v apt-fast)" ]; then
 
-        command apt-fast "$@"
+#         command apt-fast "$@"
 
-    else
+#     else
 
-        command apt "$@"
+#         command apt "$@"
 
-    fi
+#     fi
     
-}
+# }
 
 # run action multiple times and analyze its output, return fail if found
 # all params are required

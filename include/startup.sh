@@ -406,7 +406,7 @@ function noWhitespace() {
 }
 
 function installPackage() {
-
+set -x
     for package in "$@"; do
 
         local ok=1
@@ -426,7 +426,7 @@ function installPackage() {
             else
                 
                 sleep $seconds
-                dpkg-query -W $package
+                dpkg-query -W $(echo $package | cut -f1 -d"=")
                 local exitCode=$?
                 if [ $exitCode -ne 0 ]; then
 
@@ -447,7 +447,7 @@ function installPackage() {
     done
 
     return $ok
-
+set +x
 }
 
 # Run Startup Functions
