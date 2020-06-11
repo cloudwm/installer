@@ -23,8 +23,8 @@ hostnamectl set-hostname ${savedHostname::32}
 
 echo "Installing Zentyal 6.0" | log
 debconf-set-selections <<< "zentyal-core zentyal-core/port string 8443"
-apt install zentyal zentyal-network -y | log
-checkPackageInstalled zentyal zentyal-network
+installPackage zentyal zentyal-network
+waitOrStop 0 "Failed apt install: zentyal"
 
 echo "Creating admin user and disabling root" | log
 useradd admin -s /bin/bash -m -g users -G sudo

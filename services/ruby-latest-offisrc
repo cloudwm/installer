@@ -13,8 +13,8 @@ rootDir=$(rootDir)
 
 echo "Installing dependencies" | log
 packages=(autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev)
-apt install -y "${packages[@]}"
-checkPackageInstalled "${packages[@]}"
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp

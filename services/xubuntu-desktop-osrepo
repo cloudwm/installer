@@ -9,8 +9,8 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing xUbuntu Desktop" | log
-apt install -y xubuntu-desktop
-checkPackageInstalled xubuntu-desktop
+installPackage xubuntu-desktop
+waitOrStop 0 "Failed apt install: xubuntu-desktop"
 
 echo "Add XFCE4 Session to root user" | log
 echo /usr/bin/xfce4-session > /root/.xsession

@@ -8,8 +8,8 @@ fi
 
 echo "install spamassassin from apt" | log
 
-apt install spamassassin -y | log
-checkPackageInstalled spamassassin
+installPackage spamassassin
+waitOrStop 0 "Failed apt install: spamassassin"
 
 tagScript success
 exit 0

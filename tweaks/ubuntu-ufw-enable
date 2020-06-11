@@ -6,10 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# install ufw 
 echo "Installing ufw" | log
-apt install ufw -y | log
-checkPackageInstalled ufw
+installPackage ufw
+waitOrStop 0 "Failed apt install: ufw"
 
 ufw --force enable | log
 ufw allow 22 | log

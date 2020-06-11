@@ -12,8 +12,8 @@ assignedPort=9090
 
 echo "Installing main application" | log
 packages=(tomcat8 tomcat8-admin tomcat8-docs tomcat8-examples)
-apt install -y "${packages[@]}"
-checkPackageInstalled "${packages[@]}"
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Enabling service" | log
 systemctl enable tomcat8

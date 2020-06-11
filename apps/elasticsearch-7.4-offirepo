@@ -22,8 +22,8 @@ apt update
 
 echo "Installing Elasticsearch and Kibana web UI" | log
 packages=(elasticsearch=$elasticVersion kibana=$kibanaVersion)
-apt install -y "${packages[@]}" | log
-checkPackageInstalled "${packages[@]}"
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Tweaking Elasticsearch configuration" | log
 elasticPort=8881

@@ -16,16 +16,16 @@ certsUpdateService=/opt/update-certs.sh
 certGeneratedName="haproxy-fullcert.pem"
 
 echo "Installing dependencies" | log
-apt install software-properties-common -y | log
-checkPackageInstalled software-properties-common
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
 
 echo "Adding repository to OS package manager" | log
 add-apt-repository ppa:vbernat/haproxy-1.9 -y
 apt update
 
 echo "Installing main application" | log
-apt install haproxy=1.9.\* -y | log
-checkPackageInstalled haproxy
+installPackage haproxy=1.9.\* | log
+waitOrStop 0 "Failed apt install: haproxy 1.9.*"
 
 echo "Open port for stats web ui" | log
 ufw allow 8404

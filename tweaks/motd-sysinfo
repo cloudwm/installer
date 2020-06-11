@@ -6,8 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-apt install -y update-motd | log
-checkPackageInstalled update-motd
+installPackage update-motd | log
+waitOrStop 0 "Failed apt install: update-motd"
 
 rootDir=$(rootDir)
 

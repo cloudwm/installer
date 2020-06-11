@@ -22,8 +22,8 @@ apt-key add pubkey.gpg
 echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
 apt update
 packages=(software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn mysql-client libmysqlclient-dev)
-apt install -y "${packages[@]}"
-checkPackageInstalled "${packages[@]}"
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Installing Bundler and Rails" | log
 gem install bundler

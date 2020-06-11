@@ -8,8 +8,8 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing update-motd" | log
-apt install -y update-motd
-checkPackageInstalled update-motd
+installPackage update-motd
+waitOrStop "Failed apt install: update-motd"
 
 echo "Removing 10-help-text" | log
 rm -f /etc/update-motd.d/10-help-text

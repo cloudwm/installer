@@ -13,8 +13,8 @@ add-apt-repository -y ppa:nginx/stable | log
 apt update
 
 echo "Installing nginx from apt" | log
-apt install -y nginx-full | log
-checkPackageInstalled nginx-full
+installPackage nginx-full
+waitOrStop 0 "Failed apt install: nginx-full"
 
 echo "Changing ownership of $appPath to www-data user" | log
 if [ -d "$appPath" ]; then

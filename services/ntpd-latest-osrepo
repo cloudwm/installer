@@ -8,9 +8,8 @@ fi
 
 echo "install NTP from apt" | log
 
-apt install ntp ntpdate -y | log
-checkPackageInstalled ntp
-checkPackageInstalled ntpdate
+installPackage ntp ntpdate
+waitOrStop 0 "Failed apt install: ntp ntpdate"
 
 echo "Enable NTP Service" | log
 

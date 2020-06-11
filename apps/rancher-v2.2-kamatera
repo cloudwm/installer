@@ -17,8 +17,8 @@ vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 rancherDomain="rancher.${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Installing Jq" | log
-apt install -y jq
-checkPackageInstalled jq
+installPackage jq
+waitOrStop 0 "Failed apt install: jq"
 
 echo "Enabling certbot for Rancher" | log
 mkdir -p /var/lib/letsencrypt/.well-known

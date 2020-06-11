@@ -4,11 +4,11 @@ function rootDir() {
 
     if [ -f "installer" ]; then
 
-    	rootDir=$(pwd)
+        rootDir=$(pwd)
 
     elif [ -f "../installer" ]; then
 
-	    rootDir=$(dirname $(pwd))
+        rootDir=$(dirname $(pwd))
 
     fi
 
@@ -24,7 +24,7 @@ function checkTempDir() {
 
     if [ ! -d "$rootDir/temp" ]; then
 
-	    mkdir -p $rootDir/temp
+        mkdir -p $rootDir/temp
 
     fi
 
@@ -36,13 +36,13 @@ function log() {
 
     if [ ! -d "$CWM_LOGDIR" ]; then
 
-	    mkdir -p $CWM_LOGDIR
+        mkdir -p $CWM_LOGDIR
 
     fi
 
     while IFS= read -r line; do
 
-        printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line";
+        printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"
 
     done | tee -a $CWM_LOGDIR/$(date '+%Y-%m-%d').log ${1:+${CWM_ERRORFILE}}
 
@@ -63,14 +63,14 @@ function checkRootUser() {
 
 }
 
-function checkOs {
+function checkOs() {
 
     echo "Checking if OS is supported ..." | log
 
     if [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; then
 
-    	OS=Ubuntu
-    	OSVersion=$(lsb_release -sr | awk -F. '{print $1}')
+        OS=Ubuntu
+        OSVersion=$(lsb_release -sr | awk -F. '{print $1}')
 
     fi
 
@@ -96,7 +96,7 @@ function useFiglet() {
 
     if [ ! -f "/usr/bin/figlet-figlet" ]; then
 
-	    echo "Figlet not found, installing figlet." | log
+        echo "Figlet not found, installing figlet." | log
         apt install figlet -y
 
     fi
@@ -113,7 +113,7 @@ function bannerFiglet() {
 
 function descriptionAppend() {
 
-    echo "$1" >> $CWM_DESCFILE
+    echo "$1" >>$CWM_DESCFILE
     echo "Adding to system description file: $1" | log
     chmod 600 $CWM_DESCFILE
 
@@ -122,7 +122,7 @@ function descriptionAppend() {
 function tagScript() {
 
     rootDir=$(rootDir)
-    touch $rootDir/temp/`basename $0`.$1
+    touch $rootDir/temp/$(basename $0).$1
 
 }
 
@@ -132,16 +132,16 @@ function runOnceCheck() {
 
     if [ -z "$state" ]; then
 
-	    state="success"
+        state="success"
 
     fi
 
     rootDir=$(rootDir)
-    if [ -f "$rootDir/temp/`basename $0`.$state" ]; then
+    if [ -f "$rootDir/temp/$(basename $0).$state" ]; then
 
-	    echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/`basename $0`.$state to execute again." | log
-	    echo "execution stopped, exiting (98). " | log
-        exit 98;
+        echo "runOnceCheck: $0 already executed, can run only once. delete $rootDir/temp/$(basename $0).$state to execute again." | log
+        echo "execution stopped, exiting (98). " | log
+        exit 98
 
     fi
 
@@ -168,12 +168,12 @@ function checkTagExist() {
     rootDir=$(rootDir)
     if [ ! -f "$rootDir/temp/$1" ]; then
 
-	    echo "checkTagExist: Tag temp/$1 doesn't exist, exiting (1)." | log 1
-        exit 1;
+        echo "checkTagExist: Tag temp/$1 doesn't exist, exiting (1)." | log 1
+        exit 1
 
     else
 
-	    echo "checkTagExist: Tag temp/$1 exist. continuing." | log
+        echo "checkTagExist: Tag temp/$1 exist. continuing." | log
 
     fi
 
@@ -186,15 +186,15 @@ function backupFile() {
         rootDir=$(rootDir)
         echo "Backing up file $1 to $rootDir/temp/backup/"
 
-        fileDirectory=`dirname $1`
+        fileDirectory=$(dirname $1)
 
         if [ ! -d "$rootDir/temp/backup/$fileDirectory" ]; then
 
-	        mkdir -p $rootDir/temp/backup/$fileDirectory
+            mkdir -p $rootDir/temp/backup/$fileDirectory
 
         fi
 
-	    newFilename=`basename $1`.`date +%Y%m%d%H%M%S`
+        newFilename=$(basename $1).$(date +%Y%m%d%H%M%S)
         cp $1 $rootDir/temp/backup/$fileDirectory/$newFilename
 
     else
@@ -213,7 +213,7 @@ function waitOrStop() {
     if [ $waitExitCode -ne $exitCode ]; then
 
         echo "ExitCode $exitCode (expecting $waitExitCode). ${2:-Undefined error.}" | log 1
-        exit 1;
+        exit 1
 
     fi
 
@@ -238,7 +238,7 @@ function checkPackageInstalled() {
     if [ ${#notInstalled[@]} -ne 0 ]; then
 
         echo "Packages not installed: ${notInstalled[@]}. exiting (1)." | log 1
-        exit 1;
+        exit 1
 
     fi
 
@@ -334,8 +334,8 @@ function createSwapFile() {
 
     fi
 
-    diskSizeMb=`df --output=avail -m "$PWD" | sed '1d;s/[^0-9]//g'`
-    swapSizeAllowed=$((diskSizeMb/2))
+    diskSizeMb=$(df --output=avail -m "$PWD" | sed '1d;s/[^0-9]//g')
+    swapSizeAllowed=$((diskSizeMb / 2))
 
     if [ $2 -gt $swapSizeAllowed ]; then
 
@@ -368,9 +368,18 @@ function createSwapFile() {
 
     # generate swap file and mount it
     dd if=/dev/zero of=$swapFile bs=1M count=$2
-    mkswap $swapFile >/dev/null || { echo 'mkswap failed' ; return 1; }
-    swapon $swapFile >/dev/null || { echo 'swapon failed' ; return 1; }
-    chmod 600 $swapFile >/dev/null || { echo 'chmod swapfile failed' ; return 1; }
+    mkswap $swapFile >/dev/null || {
+        echo 'mkswap failed'
+        return 1
+    }
+    swapon $swapFile >/dev/null || {
+        echo 'swapon failed'
+        return 1
+    }
+    chmod 600 $swapFile >/dev/null || {
+        echo 'chmod swapfile failed'
+        return 1
+    }
 
     if [ ! -e $swapFile ]; then
 
@@ -403,6 +412,49 @@ function removeSwapFile() {
 
 function noWhitespace() {
     echo "$1" | tr -d '[[:space:]]'
+}
+
+function installPackage() {
+    for package in "$@"; do
+
+        local ok=1
+        local times=3
+        local n=0
+        local seconds=2
+
+        until [ $n -ge $times ]; do
+
+            apt install -y $package
+            local exitCode=$?
+            if [ $exitCode -ne 0 ]; then
+
+                n=$(($n + 1))
+                sleep $seconds
+
+            else
+
+                sleep $seconds
+                dpkg-query -W $(echo $package | cut -f1 -d"=")
+                local exitCode=$?
+                if [ $exitCode -ne 0 ]; then
+
+                    n=$(($n + 1))
+                    sleep $seconds
+
+                else
+
+                    ok=0
+                    break
+
+                fi
+
+            fi
+
+        done
+
+    done
+
+    return $ok
 }
 
 # Run Startup Functions

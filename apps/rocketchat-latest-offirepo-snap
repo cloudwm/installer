@@ -11,8 +11,8 @@ checkTagExist nginx.success
 rootDir=$(rootDir)
 
 echo "Installing snap and then rocket.chat" | log
-apt install snapd -y
-checkPackageInstalled snapd
+installPackage snapd
+waitOrStop 0 "Failed apt install: snapd"
 snap install rocketchat-server 
 waitOrStop 0 "Failed to install snap application"
 snap restart rocketchat-server

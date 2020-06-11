@@ -11,8 +11,8 @@ checkTagExist php.success
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 
 echo "Installing php$phpVersion-fpm" | log
-apt install php$phpVersion-fpm -y | log
-checkPackageInstalled php$phpVersion-fpm
+installPackage php$phpVersion-fpm
+waitOrStop 0 "Failed apt install: php$phpVersion-fpm"
 
 echo "Configuring php-fpm to listen on correct socket" | log
 sed -i 's/listen = \/run\/php\/php'"${phpVersion}"'-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/$phpVersion/fpm/pool.d/www.conf

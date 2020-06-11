@@ -9,19 +9,19 @@ fi
 installVersion=$(basename $0 | cut -d "-" -f 2 | cut -d "-" -f 1 )
 
 echo "Adding php${installVersion} repo" | log
-apt install -y software-properties-common
-checkPackageInstalled software-properties-common
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
 add-apt-repository -y ppa:ondrej/php | log
 apt update
 
 echo "Installing php${installVersion}" | log
-apt install -y php$installVersion | log
-checkPackageInstalled php$installVersion
+installPackage php$installVersion
+waitOrStop 0 "Failed apt install: php$installVersion"
 
 echo "Installing php${installVersion} modules" | log
 packages=(php$installVersion-bcmath php$installVersion-bz2 php$installVersion-cli php$installVersion-common php$installVersion-curl php$installVersion-gd php$installVersion-intl php$installVersion-json php$installVersion-mbstring php$installVersion-mysql php$installVersion-mysqlnd php$installVersion-readline php$installVersion-soap php$installVersion-xml php$installVersion-zip php-pear php-php-gettext php-phpseclib php-tcpdf)
-apt install -y "${packages[@]}" | log
-checkPackageInstalled "${packages[@]}"
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Disabling non-critical services" | log
 systemctl stop apache2.service

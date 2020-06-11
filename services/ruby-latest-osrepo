@@ -8,8 +8,8 @@ fi
 
 echo "Installing Ruby from apt" | log
 
-apt install -y ruby-full | log
-checkPackageInstalled ruby
+installPackage ruby-full | log
+waitOrStop 0 "Failed to install ruby-full"
 
 tag ruby.success
 tagScript success

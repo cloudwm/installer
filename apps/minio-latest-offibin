@@ -70,7 +70,8 @@ waitOrStop 0 "Minio Service did not start"
 sleep 5
 
 echo "Adding descriptions" | log
-apt install jq -y
+installPackage jq
+waitOrStop 0 "Failed apt install: jq"
 access_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')
 secret_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')
 sed -i 's/minioadmin/'"${access_key}"'/' $minioConfigFile
