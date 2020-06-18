@@ -19,7 +19,8 @@ useradd --system minio-user --shell /sbin/nologin
 
 echo "Download Minio Binary" | log
 cd $rootDir/temp
-curlDownload https://dl.minio.io/server/minio/release/linux-amd64/minio
+#curlDownload https://dl.minio.io/server/minio/release/linux-amd64/minio
+curl --insecure --remote-name --fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 15 --speed-time 300 --speed-limit 1000 --url https://dl.minio.io/server/minio/release/linux-amd64/minio
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Install minio binary" | log
