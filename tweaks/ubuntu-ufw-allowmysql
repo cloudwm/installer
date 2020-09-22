@@ -23,7 +23,7 @@ if [ ! -z "$CWM_LANNICIDS" ]; then
 
 else
 
-    ufw allow 3306 | log
+    ufw allow 3306
 
 fi
 
