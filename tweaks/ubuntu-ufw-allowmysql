@@ -27,6 +27,6 @@ else
 
 fi
 
-ufw status | log
+ufw status
 
 tagScript success
