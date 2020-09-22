@@ -23,10 +23,10 @@ if [ ! -z "$CWM_LANNICIDS" ]; then
 
 else
 
-    ufw allow 3306
+    ufw allow 3306 | log
 
 fi
 
-ufw status
+ufw status | log
 
 tagScript success
