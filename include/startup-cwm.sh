@@ -222,7 +222,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     mapfile -t wan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
     export CWM_WANNICIDS="$(printf '%q ' "${wan_nicids[@]}")"
     mapfile -t lan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
-    export CWM_LANNICIDS="$(printf '%q ' "${lan_nicids[@]}")"
+    [[ ! -z "$lan_nicids" ]] && export CWM_LANNICIDS="$(printf '%q ' "${lan_nicids[@]}")"
     # export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     export CWM_SERVERIP="$(getServerIP)"
