@@ -62,7 +62,7 @@ ADMIN_URI=`grep "Admin URI:" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | h
 
 
 echo "Verifying permissions for Magento" | log
-cd $appPath
+cd $appPath 
 find var vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
 find var vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
 chown -R www-data:www-data .
@@ -70,6 +70,7 @@ chmod u+x bin/magento
 
 echo "Disabling sign static files and forcing cache refresh" | log
 cd $appPath
+php bin/magento cache:disable config | log
 bin/magento config:set dev/static/sign 0
 curl https://${CWM_DISPLAYED_ADDRESS} --insecure -o /dev/null
 waitOrStop 0 "Website failed to respond"
