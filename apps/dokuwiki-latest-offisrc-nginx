@@ -10,7 +10,6 @@ checkTagExist nginx.success
 checkTagExist php.success
 checkTagExist nginx-enable-php-ssl.success
 
-versionFilename=2018-04-22b
 appPath=/var/www/html
 rootDir=$(rootDir)
 
@@ -18,16 +17,16 @@ echo "Installing DokuWiki" | log
 
 echo "Downloading DokuWiki from original repo" | log
 cd $rootDir/temp
-curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-$versionFilename.tgz
+curlDownload https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz
 waitOrStop 0 "File not downloaded from official sources"
 
 mkdir -p $appPath
-mv dokuwiki-$versionFilename.tgz $appPath
+mv dokuwiki-stable.tgz $appPath
 
 echo "Extracting DokuWiki to ${appPath}/" | log
-tar -xzvf $appPath/dokuwiki-$versionFilename.tgz -C $appPath/ --strip 1
+tar -xzvf $appPath/dokuwiki-stable.tgz -C $appPath/ --strip 1
 waitOrStop 0 "Failed to extract application archive"
-rm -f $appPath/dokuwiki-$versionFilename.tgz
+rm -f $appPath/dokuwiki-stable.tgz
 
 echo "Setting directory permissions" | log
 chown -R www-data.www-data $appPath/data/

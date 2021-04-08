@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 appPath=/var/www/html
-nginxVersion=1.14.\*
+nginxVersion=1.18.\*
 
 echo "install nginx from apt" | log
 installPackage nginx-full=$nginxVersion

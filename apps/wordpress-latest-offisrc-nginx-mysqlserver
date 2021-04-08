@@ -34,7 +34,8 @@ waitOrStop 0 "Nginx failed to restart"
 echo "Creating mysql user and permissions" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE wordpress_${WPID};
-GRANT all privileges on wordpress_${WPID}.* to wp_${WPID}@'localhost' identified by '${ADMINPASSWORD}';
+CREATE USER 'wp_${WPID}'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on wordpress_${WPID}.* to 'wp_${WPID}'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
@@ -43,7 +44,7 @@ wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 waitOrStop 0 "Application failed to download"
 wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
 waitOrStop 0 "Failed to create database"
-wp core multisite-install --url=https://${CWM_DISPLAYED_ADDRESS} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
+wp core install --url=https://${CWM_DISPLAYED_ADDRESS} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
 waitOrStop 0 "Failed to install application"
 
 echo "Fixing app permissions" | log

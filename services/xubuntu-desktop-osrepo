@@ -9,7 +9,7 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing xUbuntu Desktop" | log
-installPackage xubuntu-desktop
+DEBIAN_FRONTEND=noninteractive installPackage xubuntu-desktop
 waitOrStop 0 "Failed apt install: xubuntu-desktop"
 
 echo "Add XFCE4 Session to root user" | log

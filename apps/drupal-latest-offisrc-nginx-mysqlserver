@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-versionFilename=8.7.9
+versionFilename=9.1.4
 rootDir=$(rootDir)
 drupaluser_password="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')"
 
@@ -20,7 +20,8 @@ drupaluser_password="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo 
 echo "Creating Drupal Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES ON drupal.* TO 'drupaluser'@'localhost' IDENTIFIED BY '${drupaluser_password}';
+CREATE USER 'drupaluser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on drupal.* to drupaluser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
@@ -58,17 +59,17 @@ sleep 5
 echo "Installing Drush" | log
 cd $appPath
 export COMPOSER_HOME=/root
-composer require drush/drush:8.3.5 -v | log
+composer require drush/drush:10.4.0 -v | log
 waitOrStop 0 "Failed to install Drush"
 
 echo "Creating Website" | log
 cd $appPath
 # site install
 export HOME=$appPath
-echo "yes" | vendor/bin/drush site-install --db-url=mysql://drupaluser:${drupaluser_password}@localhost/drupal | log
+echo "yes" | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
 sleep 5
 # update admin password
-vendor/bin/drush upwd admin ${ADMINPASSWORD} | log
+vendor/bin/drush user:password admin "$ADMINPASSWORD" | log
 # permissions and cleanup
 rm index.nginx-debian.html
 chown -R www-data:www-data .

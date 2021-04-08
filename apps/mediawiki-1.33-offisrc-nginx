@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-appVersion=1.33.1
+appVersion=1.35.1
 appArchive=mediawiki-$appVersion.tar.gz
 rootDir=$(rootDir)
 
@@ -64,7 +64,7 @@ systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Mediawiki Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Mediawiki Web UI: https://${CWM_DISPLAYED_ADDRESS}/Special:UserLogin"
 descriptionAppend "Mediawiki Username: admin"
 descriptionAppend "Mediawiki Password: ${ADMINPASSWORD}"
 descriptionAppend " "

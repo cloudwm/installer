@@ -25,6 +25,7 @@ pure-pw mkdb
 echo "Enabling Virtual Users and MinUID for www-data" | log
 echo "/usr/sbin/nologin\r" >> /etc/shells
 echo "33" > /etc/pure-ftpd/conf/MinUID
+echo "30000 50000" > /etc/pure-ftpd/conf/PassivePortRange
 ln -s /etc/pure-ftpd/conf/PureDB /etc/pure-ftpd/auth/80puredb
 
 echo "Enabling FTP over Explicit TLS (Port 21)" | log

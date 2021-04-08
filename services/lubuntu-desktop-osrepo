@@ -9,7 +9,7 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing lubuntu Desktop" | log
-installPackage lubuntu-desktop
+DEBIAN_FRONTEND=noninteractive installPackage lubuntu-desktop
 waitOrStop 0 "Failed apt install: lubuntu-desktop"
 
 echo "Add LXDE Session to root user" | log

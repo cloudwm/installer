@@ -109,7 +109,7 @@ systemctl restart $service
 
 ### Auto set Memory limit ###
 
-recommendedlimit=$(expr $totalram / 8 )M
+recommendedlimit=$(expr $totalram / 4 )M
 
 if [ -z "$overridemem" ]; then
     echo "You have ${totalram} of RAM"

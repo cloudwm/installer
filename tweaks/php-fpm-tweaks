@@ -21,10 +21,10 @@ echo "Enabling php to display errors in screen" | log
 sed -i -e 's/display_errors = Off/display_errors = On/' $phpiniPath
 
 echo "Increasing POST max size to 101M" | log
-sed -i -e '/post_max_size/s/8M/101M/' $phpiniPath
+sed -i -e '/post_max_size/s/8M/128M/' $phpiniPath
 
 echo "Increasing max upload file size to 100M" | log
-sed -i -e '/upload_max_filesize/s/2M/100M/' $phpiniPath
+sed -i -e '/upload_max_filesize/s/2M/128M/' $phpiniPath
 
 if [ -f "$rootDir/temp/nginx.success" ]; then
 

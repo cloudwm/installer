@@ -8,6 +8,7 @@ fi
 checkTagExist ufw.success
 
 ufw allow 21 | log
+ufw allow 30000:50000/tcp | log
 ufw status | log
 
 tagScript success
