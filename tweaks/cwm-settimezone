@@ -18,7 +18,7 @@ fi
 
 declare -A timezones
 timezones[IL]="Asia/Jerusalem"
-timezones[IL-JR]="Asia/Jerusalem"
+timezones[IL-HA]="Asia/Jerusalem"
 timezones[IL-TA]="Asia/Jerusalem"
 timezones[IL-RH]="Asia/Jerusalem"
 timezones[IL-PT]="Asia/Jerusalem"
