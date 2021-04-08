@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appPath=/var/www/html
+nginxVersion=1.18.\*
+
+echo "Adding nginx repo to apt" | log
+add-apt-repository -y ppa:nginx/stable | log
+apt update
+
+echo "Installing nginx from apt" | log
+installPackage nginx-full=$nginxVersion
+waitOrStop 0 "Failed apt install: nginx-full"
+
+echo "Changing ownership of $appPath to www-data user" | log
+if [ -d "$appPath" ]; then
+    chown -R www-data:www-data $appPath
+fi
+
+echo "Adding descriptions" | log
+
+descriptionAppend "NGiNX Address: ${CWM_SERVERIP}"
+descriptionAppend " "
+descriptionAppend "NGiNX config files location: /etc/nginx/"
+if [ -d "$appPath" ]; then
+    descriptionAppend "NGiNX root Directory: $appPath/"
+fi
+descriptionAppend " "
+
+tag nginx.success
+tag httpd.success
+tagScript success
+
+exit 0

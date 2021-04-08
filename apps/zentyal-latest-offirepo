@@ -1,0 +1,52 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+aptSourceList=/etc/apt/sources.list.d/zentyal.list
+rootDir=$(rootDir)
+
+echo "Add Zentyal 7.0 repository" | log
+curlDownload http://keys.zentyal.org/zentyal-7.0-packages.asc
+waitOrStop 0 "Key not downloaded from official source"
+apt-key add zentyal-7.0-packages.asc
+echo "deb http://packages.zentyal.org/zentyal 7.0 main extra" >> $aptSourceList
+apt update | log
+waitOrStop 0 "Couldn't update source list"
+
+echo "Modifying hostname to fit max 64 chars requirement" | log
+savedHostname=$(hostname)
+hostnamectl set-hostname ${savedHostname::32}
+
+echo "Installing Zentyal 7.0" | log
+debconf-set-selections <<< "zentyal-core zentyal-core/port string 8443"
+installPackage zentyal-network
+waitOrStop 0 "Failed apt install: zentyal"
+
+echo "ReInstalling Netplan" | log
+installPackage netplan.io
+
+echo "Creating admin user and disabling root" | log
+useradd admin -s /bin/bash -m -g users -G sudo
+chpasswd <<< "admin:${ADMINPASSWORD}"
+-passwd -l root
+
+echo "Fixing DNS Resolver" | log
+sed '/gateway/a dns-nameservers 8.8.8.8 8.8.4.4' -i /etc/network/interfaces
+
+echo "Ensuring conntrack modules are enabled" | log 
+echo ip_conntrack | sudo tee -a /etc/modules
+
+echo "Adding descriptions" | log
+descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
+descriptionAppend "Zentyal Admin User: admin"
+descriptionAppend "Zentyal Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+
+tagScript success
+
+exit 0

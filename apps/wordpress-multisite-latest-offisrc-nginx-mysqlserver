@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkOs
+checkRootUser
+runOnceCheck
+
+checkTagExist nginx.success
+checkTagExist mysqld.success
+checkTagExist php.success
+checkTagExist maild.success
+checkTagExist wp-cli.success
+
+rootDir=$(rootDir)
+WP_PATH="/var/www/html"
+WPID=`shuf -i 100000-999999 -n 1`
+
+echo "Setting nginx config" | log
+cp $rootDir/tweaks/extras/wordpress-nginx/wordpress.conf /etc/nginx/sites-available/
+# Symlink wordpress vhost
+ln -s /etc/nginx/sites-available/wordpress.conf /etc/nginx/sites-enabled/
+# Remove default vhosts
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
+waitOrStop 0 "Nginx failed to restart" 
+
+echo "Creating mysql user and permissions" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE wordpress_${WPID};
+CREATE USER 'wp_${WPID}'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on wordpress_${WPID}.* to 'wp_${WPID}'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+echo "Downloading wordpress and installing" | log
+wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
+waitOrStop 0 "Application failed to download"
+wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
+waitOrStop 0 "Failed to create database"
+wp core multisite-install --url=https://${CWM_DISPLAYED_ADDRESS} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
+waitOrStop 0 "Failed to install application"
+
+echo "Fixing app permissions" | log
+chown -R www-data:www-data ${WP_PATH}
+
+echo "Misc tweaks" | log
+ini=$(find /etc -type f -name "php.ini" | grep fpm)
+sed -i '/display_errors = /s/On/Off/g' $ini
+
+echo "Misc. cleanups" | log
+rm $WP_PATH/index.nginx-debian.html
+
+echo "Adding descriptions" | log
+descriptionAppend "Wordpress Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/wp-login.php"
+descriptionAppend "Wordpress Username: admin"
+descriptionAppend "Wordpress Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

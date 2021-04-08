@@ -1,0 +1,99 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist nginx.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+appVersion=3.3.3
+appArchive=phpBB-$appVersion.tar.bz2
+appPath=/var/www/html
+rootDir=$(rootDir)
+
+echo "Downloading PhpBB3" | log
+mkdir -p $appPath
+cd $rootDir/temp
+curlDownload https://download.phpbb.com/pub/release/3.3/$appVersion/$appArchive
+waitOrStop 0 "File not downloaded from official source"
+tar -xjvf $appArchive  -C $appPath/ --strip 1
+waitOrStop 0 "Failed to extract application archive"
+rm -f $appArchive
+chown -R www-data:www-data $appPath
+
+echo "Creating PHPBB Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE phpbb3 CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'phpbbuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on phpbb3.* to phpbbuser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Installing PhpBB3" | log
+
+cat << EOF > ${appPath}/config.yml
+installer:
+    admin:
+        name: admin
+        password: ${ADMINPASSWORD}    
+        email: admin@example.org
+
+    board:
+        lang: en
+        name: My Board
+        description: My amazing new phpBB board
+
+    database:
+        dbms: mysqli 
+        dbhost: localhost         
+        dbport: ~
+        dbuser: phpbbuser
+        dbpasswd: ${ADMINPASSWORD}
+        dbname: phpbb3
+        table_prefix: phpbb_
+
+    email:
+        enabled: false
+        smtp_delivery : ~
+        smtp_host: ~
+        smtp_port: ~
+        smtp_auth: ~
+        smtp_user: ~
+        smtp_pass: ~
+
+    server:
+        cookie_secure: false
+        server_protocol: http://
+        force_server_vars: false
+        server_name: localhost
+        server_port: 80
+        script_path: /
+
+    extensions: ['phpbb/viglink']
+EOF
+
+php $appPath/install/phpbbcli.php install $appPath/config.yml 
+
+echo "Removing Install Files" | log
+
+rm -f $appPath/config.yml 
+rm -rf $appPath/install
+rm -rf $appPath/docs
+chmod 640 $appPath/config.php
+chown -R www-data:www-data $appPath
+
+echo "Adding descriptions" | log
+
+descriptionAppend "phpBB3 Web UI: https://${CWM_DISPLAYED_ADDRESS}/"
+descriptionAppend "phpBB3 Username: admin "
+descriptionAppend "phpBB3 Password: ${ADMINPASSWORD} "
+descriptionAppend " "
+
+tagScript success
+
+exit 0

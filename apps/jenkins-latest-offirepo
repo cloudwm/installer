@@ -1,0 +1,63 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+assignedPort="9090"
+
+echo "Setting jenkins repository and key" | log
+curlDownload https://pkg.jenkins.io/debian-stable/jenkins.io.key
+waitOrStop 0 "Key not downloaded from official source"
+apt-key add jenkins.io.key
+echo "deb https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list
+
+echo "Installing openjdk" | log
+apt update
+installPackage openjdk-8-jre-headless | log
+waitOrStop 0 "Failed apt install: openjdk-8-jre-headless"
+
+echo "Installing jenkins" | log
+apt update
+installPackage jenkins | log
+waitOrStop 0 "Failed apt install: jenkins"
+
+echo "Tweaking server settings" | log
+sed -i 's/HTTP_PORT=8080/HTTP_PORT='"${assignedPort}"'/g' /etc/default/jenkins
+sed -i '/JAVA_ARGS="-Djava.net.preferIPv4Stack=true"/s/^#//g' /etc/default/jenkins
+
+echo "Setting HTTPS settings" | log
+sed -i '/JENKINS_ARGS=/s/".*"/"--webroot=\/var\/cache\/$NAME\/war --httpsPort=$HTTP_PORT --httpPort=-1"/g' /etc/default/jenkins
+
+sleep 30
+unlockkey="$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
+
+echo "Restarting service" | log
+systemctl restart jenkins
+waitOrStop 0 "Restart jenkins service failed"
+
+echo "Setting nginx configuration" | log
+nginxConfigPath=/etc/nginx/sites-available
+# copy readymade config to nginx sites
+cp -f $rootDir/tweaks/extras/jenkins-nginx/jenkins.conf $nginxConfigPath/
+# place chosen port in config
+sed -i '/server/s/PORT_PLACEHOLDER/'"${assignedPort}"'/g' $nginxConfigPath/jenkins.conf
+ln -s $nginxConfigPath/jenkins.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
+waitOrStop 0 "Reload nginx service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Jenkins Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Jenkins Unlock key: $unlockkey"
+descriptionAppend " "
+descriptionAppend "If main page is blank after initial setup, restart the server:"
+descriptionAppend "# systemctl restart jenkins"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
