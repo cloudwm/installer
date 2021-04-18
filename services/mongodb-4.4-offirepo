@@ -12,9 +12,7 @@ rootDir=$(rootDir)
 echo "Adding repo to OS" | log
 
 echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-4.4.list
-curlDownload https://www.mongodb.org/static/pgp/server-4.4.asc
-gpg --import server-4.4.asc
-#apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E162F504A20CDF15827F718D4B7C549A058F8B6B
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 20691eec35216c63caf66ce1656408e390cfb1f5
 apt update
 
 echo "Install mongodb from apt" | log
