@@ -1,0 +1,56 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ntpd.success
+checkTagExist cwm-settimezone.success
+
+appVersion=2.8.7
+appPackage=openvpn-as-latest-ubuntu20.amd_64.deb
+rootDir=$(rootDir)
+
+echo "Downloading binary" | log
+cd $rootDir/temp
+installPackage ca-certificates net-tools
+waitOrStop 0 "Failed apt install: ca-certificates net-tools"
+curlDownload  https://openvpn.net/downloads/openvpn-as-bundled-clients-latest.deb
+waitOrStop 0 "File not downloaded from official source (1/2)"
+curlDownload  https://openvpn.net/downloads/$appPackage
+waitOrStop 0 "File not downloaded from official source (2/2)"
+
+echo "Installing application" | log
+dpkg -i openvpn-as-bundled-clients-latest.deb | log
+rm -f openvpn-as-bundled-clients-latest.deb
+
+dpkg -i $appPackage | log
+rm -f $appPackage
+
+apt -y --fix-broken install
+
+echo "Configuring first user" | log
+echo "openvpn:$ADMINPASSWORD" | chpasswd
+
+echo "Configuring certifications" | log
+service openvpnas stop
+ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem /usr/local/openvpn_as/etc/web-ssl/server.crt
+ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem /usr/local/openvpn_as/etc/web-ssl/server.key
+service openvpnas start
+
+echo "Adding descriptions" | log
+descriptionAppend "OpenVPN Management Web UI:  https://${CWM_DISPLAYED_ADDRESS}:943/admin"
+descriptionAppend "OpenVPN Username: openvpn"
+descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
+descriptionAppend " "
+descriptionAppend "OpenVPN Client Web UI: https://${CWM_DISPLAYED_ADDRESS}:943/"
+descriptionAppend " "
+descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
+descriptionAppend "OpenVPN Command-line tools: /usr/local/openvpn_as/scripts"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
