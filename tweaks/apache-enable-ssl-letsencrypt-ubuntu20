@@ -28,10 +28,10 @@ EOF
 
 echo "Tweaking SSL virtual host" | log
 defaultSSL=/etc/apache2/sites-available/default-ssl.conf
+cp /etc/ssl/certs/ssl-cert-snakeoil.pem ${certsPath}/fullchain.pem && cp /etc/ssl/private/ssl-cert-snakeoil.key ${certsPath}/privkey.pem
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
-#mkdir /etc/letsencrypt/live/${CWM_DOMAIN}/
-#sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
-#sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/'"${certsPath//\//\\/}"'\/privkey.pem/g' $defaultSSL
+sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
+sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/'"${certsPath//\//\\/}"'\/privkey.pem/g' $defaultSSL
 # add ServerName + fpm install placeholder
 sed -i '/<VirtualHost/{ :a N;/<\/VirtualHost>/!b a; /ServerName/!s!\([[:blank:]]*\)\(</VirtualHost>\)!\1\tServerName localhost\n\t\tServerAlias '"${CWM_DOMAIN}"'\n\t\t#FPM_INSTALL_PLACEHOLDER\n\1\2!}' $defaultSSL
 
