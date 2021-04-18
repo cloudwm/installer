@@ -1,0 +1,37 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appVersion=5:20.10.\*
+
+echo "Downloading docker repository and key" | log
+curlDownload https://download.docker.com/linux/ubuntu/gpg
+waitOrStop 0 "Key not downloaded from official source"
+apt-key add gpg
+
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
+waitOrStop 0 "Repository not added"
+
+echo "Install docker-ce" | log
+cat > /usr/sbin/policy-rc.d <<EOF
+#!/bin/sh
+exit 101
+EOF
+chmod a+x /usr/sbin/policy-rc.d
+
+apt-get install -y docker-ce=$appVersion
+checkPackageInstalled docker-ce
+
+rm -f /usr/sbin/policy-rc.d
+
+# Enable Service
+systemctl enable docker
+systemctl enable containerd
+
+tagScript success
+
+exit 0
