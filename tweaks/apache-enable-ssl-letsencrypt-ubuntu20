@@ -31,6 +31,7 @@ defaultSSL=/etc/apache2/sites-available/default-ssl.conf
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
 sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
 sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/'"${certsPath//\//\\/}"'\/privkey.pem/g' $defaultSSL
+touch ${CWM_DOMAIN}/fullchain.pem && touch ${CWM_DOMAIN}/privkey.pem
 ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem ${CWM_DOMAIN}/fullchain.pem
 ln -s /etc/ssl/private/ssl-cert-snakeoil.key ${CWM_DOMAIN}/privkey.pem
 # add ServerName + fpm install placeholder
