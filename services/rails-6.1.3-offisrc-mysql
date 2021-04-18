@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nodejs.success
+checkTagExist mysql-server-5.7.success
+checkTagExist ruby.success
+
+railsVersion=6.1.3
+export PATH=`cat /etc/environment | cut -d'"' -f 2`
+rootDir=$(rootDir)
+
+echo "Installing Yarn for package management" | log
+cd $rootDir/temp
+curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg
+apt-key add pubkey.gpg
+echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+apt update
+packages=(software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn mysql-client libmysqlclient-dev)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Installing Bundler and Rails" | log
+gem install bundler
+gem install rails -v $railsVersion
+gem update --system
+bundler update --bundler
+
+echo "Initiating demo app" | log
+mkdir -p /var/www
+cd /var/www
+export HOME=/root
+rails new myapp -d mysql
+cd myapp
+sed -i "/^ *default:/,/^\n *[^:]*:/s/password:/password: ${ADMINPASSWORD}/" config/database.yml
+rake db:create
+
+echo "Generating self-signed certificate" | log
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.key -out /etc/ssl/certs/server.crt -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Rails Root directory: /var/www/myapp/"
+descriptionAppend "Rails config files location: /var/www/myapp/config/"
+descriptionAppend " "
+descriptionAppend "Rails run non-HTTPS server:"
+descriptionAppend "# rails s -b ${CWM_DISPLAYED_ADDRESS} -p 80"
+descriptionAppend " "
+descriptionAppend "Rails run HTTPS server:"
+descriptionAppend "# rails s -b 'ssl://${CWM_DISPLAYED_ADDRESS}?key=/etc/ssl/private/server.key&cert=/etc/ssl/certs/server.crt' -p 443"
+descriptionAppend " "
+
+tag rails.success
+tagScript success
+exit 0
