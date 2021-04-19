@@ -9,7 +9,7 @@ fi
 
 checkTagExist apache2.success
 
-certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
+#certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
 
 echo "Creating SSL params" | log
 cat << EOF >> /etc/apache2/conf-available/ssl-params.conf
