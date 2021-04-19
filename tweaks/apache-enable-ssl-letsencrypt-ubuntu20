@@ -30,6 +30,8 @@ echo "Tweaking SSL virtual host" | log
 defaultSSL=/etc/apache2/sites-available/default-ssl.conf
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
 mkdir -p ${certsPath}
+cp /etc/ssl/certs/ssl-cert-snakeoil.pem ${certsPath}/fullchain.pem
+cp /etc/ssl/private/ssl-cert-snakeoil.key ${certsPath}/privkey.pem
 sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
 sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/'"${certsPath//\//\\/}"'\/privkey.pem/g' $defaultSSL
 # add ServerName + fpm install placeholder
