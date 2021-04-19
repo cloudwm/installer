@@ -9,7 +9,7 @@ fi
 
 checkTagExist apache2.success
 
-#certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
+certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
 
 echo "Creating SSL params" | log
 cat << EOF >> /etc/apache2/conf-available/ssl-params.conf
@@ -29,10 +29,9 @@ EOF
 echo "Tweaking SSL virtual host" | log
 defaultSSL=/etc/apache2/sites-available/default-ssl.conf
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
-#sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
-#sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/'"${certsPath//\//\\/}"'\/privkey.pem/g' $defaultSSL
-sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/' $defaultSSL
-sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/' $defaultSSL
+mkdir -p ${certsPath}
+sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
+sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/'"${certsPath//\//\\/}"'\/privkey.pem/g' $defaultSSL
 # add ServerName + fpm install placeholder
 sed -i '/<VirtualHost/{ :a N;/<\/VirtualHost>/!b a; /ServerName/!s!\([[:blank:]]*\)\(</VirtualHost>\)!\1\tServerName localhost\n\t\tServerAlias '"${CWM_DOMAIN}"'\n\t\t#FPM_INSTALL_PLACEHOLDER\n\1\2!}' $defaultSSL
 
@@ -47,8 +46,7 @@ echo "Restarting apache service" | log
 systemctl restart apache2.service
 waitOrStop 0 "Restart apache service failed"
 
-#descriptionAppend "SSL certificates location: ${certsPath}"
-descriptionAppend "SSL certificates location: /etc/ssl/certs/"
+descriptionAppend "SSL certificates location: ${certsPath}"
 descriptionAppend " "
 
 tagScript success
