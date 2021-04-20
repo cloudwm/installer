@@ -32,6 +32,8 @@ sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
 mkdir -p ${certsPath}
 ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem ${certsPath}/fullchain.pem
 ln -s /etc/ssl/private/ssl-cert-snakeoil.key ${certsPath}/privkey.pem
+ln -s /etc/letsencrypt/archive/${CWM_DOMAIN}/fullchain1.pem ${certsPath}/fullchain.pem
+sed -i '/SSLCertificateChainFile/s/\/etc\/letsencrypt\/archive\/${CWM_DOMAIN}\/fullchain1.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
 sed -i '/SSLCertificateFile/s/\/etc\/ssl\/certs\/ssl-cert-snakeoil.pem/'"${certsPath//\//\\/}"'\/fullchain.pem/g' $defaultSSL
 sed -i '/SSLCertificateKeyFile/s/\/etc\/ssl\/private\/ssl-cert-snakeoil.key/'"${certsPath//\//\\/}"'\/privkey.pem/g' $defaultSSL
 # add ServerName + fpm install placeholder
