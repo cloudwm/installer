@@ -8,6 +8,14 @@ fi
 
 checkTagExist ubuntu-updateos.success
 
+echo "Create temp swap for composer processes" | log
+#increase vm swappiness to allow swap to dominate process
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+sleep 5
+
 echo "Installing mysql from apt" | log
 export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password password ${ADMINPASSWORD}"
