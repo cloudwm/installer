@@ -1,0 +1,41 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing xRDP service" | log
+installPackage xserver-xorg-core
+waitOrStop 0 "Failed apt install: xserver-xorg-core"
+installPackage xserver-xorg-input-all
+waitOrStop 0 "Failed apt install: xserver-xorg-input-all"
+installPackage xrdp
+waitOrStop 0 "Failed apt install: xrdp"
+
+echo "add user xrdp into ssl-cert group" | log
+adduser xrdp ssl-cert
+
+echo "Switching to XFCE4"
+sed -i '33,34 s/^/#/' /etc/xrdp/startwm.sh
+echo startxfce4 >> /etc/xrdp/startwm.sh
+waitOrStop 0 "Failed to input XFCE4"
+
+echo "Restart xRDP service" | log
+systemctl restart xrdp
+waitOrStop 0 "Restart xrdp service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Connect using Microsoft Remote Desktop Client (RDP Client)"
+descriptionAppend " "
+descriptionAppend "Desktop Address: ${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Username: root"
+descriptionAppend "Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
