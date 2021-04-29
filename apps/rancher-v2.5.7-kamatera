@@ -1,0 +1,186 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist docker-5.20.10-offirepo.success
+checkTagExist certbot-nginx.success
+
+rootDir=$(rootDir)
+engineInstallUrl=https://releases.rancher.com/install-docker/20.10.sh
+kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.5/docker-machine-driver-kamatera_v1.0.5_linux_amd64.tar.gz
+
+RANCHER_VERSION=v2.5.7
+vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
+rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+
+echo "Installing Jq" | log
+installPackage jq
+waitOrStop 0 "Failed apt install: jq"
+
+echo "(Re)Generating dhparam key file" | log
+dhParamFile=/etc/ssl/certs/dhparam.pem
+if [ -e $dhParamFile ]; then 
+    rm -f $dhParamFile
+fi
+openssl dhparam -out $dhParamFile 2048; 
+
+echo "Verifying certbot renewal systemd timer" | log
+systemctl list-timers | grep certbot
+waitOrStop 0 "Cron timers not found (1of2)"
+cat /lib/systemd/system/certbot.timer
+waitOrStop 0 "Cron timers not found (2of2)"
+if ! cat /lib/systemd/system/certbot.service | grep "service nginx reload"; then
+    sed -i 's/-q renew/-q renew --deploy-hook "service nginx reload"/' /lib/systemd/system/certbot.service
+fi
+
+echo "Enabling certbot for Rancher" | log
+mkdir -p /var/lib/letsencrypt/.well-known
+chgrp www-data /var/lib/letsencrypt
+chmod g+s /var/lib/letsencrypt
+# remove default vhosts
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+# copy configs to nginx folders
+cp $rootDir/tweaks/extras/rancher/letsencrypt.conf /etc/nginx/snippets/
+cp $rootDir/tweaks/extras/rancher/register.conf /etc/nginx/sites-available/
+# symlink certbot routing
+ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/register.conf
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+# creating certbot
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} ${CWM_DEBUG:+"--test-cert"}
+waitOrStop 0 "Letsencrypt certificates not created"
+# remove certbot routing
+unlink /etc/nginx/sites-enabled/register.conf
+
+echo "Creating nginx configuration" | log
+# copy ssl configs to nginx folders
+cp $rootDir/tweaks/extras/rancher/rancher.conf /etc/nginx/sites-available/
+cp $rootDir/tweaks/extras/rancher/http2_proxy.conf /etc/nginx/snippets/
+cp $rootDir/tweaks/extras/rancher/ssl.conf /etc/nginx/snippets/
+# add keys to ssl configs
+cp $rootDir/tweaks/extras/rancher/letsencrypt_certs.conf /etc/nginx/snippets/
+sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rancherDomain}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rancherDomain}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${rancherDomain}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+# symlink sites
+ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Creating Rancher admin" | log
+mkdir -p /var/lib/rancher 
+systemctl start docker.service
+waitOrStop 0 "Start docker service failed"
+
+docker run -d --name rancher --restart unless-stopped -p 8000:80 --privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
+
+curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
+
+echo "Waiting for Rancher to intialize" | log
+HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_SERVERIP}:443 --insecure`
+until [ "$HTTPD" == "200" ]; do
+    sleep 3
+    HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_SERVERIP}:443 --insecure`
+done
+sleep 15
+
+echo "Getting Rancher Login Token" | log
+LOGINRESPONSE=`curl --url "https://${rancherDomain}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' "${curlBaseParams[@]}"`
+LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
+
+echo "Changing Web Interface Password" | log
+curl --url "https://${rancherDomain}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"  
+
+echo "Creating API key" | log
+APIRESPONSE=`curl --url "https://${rancherDomain}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"`
+echo "Getting API Token" | log
+APITOKEN=`echo $APIRESPONSE | jq -r .token`
+
+echo "Listing available Node drivers" | log
+NODEDRIVERS=`curl --url "https://${rancherDomain}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
+
+echo "Deactivating foreign drivers" | log
+for url in ${NODEDRIVERS}; do 
+
+    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
+
+done
+
+echo "Adding Kamatera Docker Machine Driver" | log
+curl --url "https://${rancherDomain}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
+
+echo "Listing available Kubernetes drivers" | log
+KONTAINERDRIVERS=`curl --url "https://${rancherDomain}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
+
+echo "Deactivating foreign drivers" | log
+for url in ${KONTAINERDRIVERS}; do 
+
+    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
+
+done
+
+echo "Creating Kamatera templates on Rancher" | log
+sleep 10
+# Kamatera Control Plane
+PLANE_JSON_STRING='{
+"engineInsecureRegistry":[],
+"engineInstallURL":"'"${engineInstallUrl}"'",
+"engineRegistryMirror":[],
+"engineStorageDriver":"overlay2",
+"kamateraConfig":{
+"apiClientId":"'"${CWM_APICLIENTID}"'",
+"apiSecret":"'"${CWM_APISECRET}"'",
+"billing":"hourly",
+"cpu":"2B",
+"createServerCommandId":"0",
+"datacenter":"'"${CWM_ZONE}"'",
+"diskSize":"30",
+"image":"ubuntu_server_18.04_64-bit_optimized",
+"privateNetworkIp":"auto",
+"privateNetworkName":"'"${vlan}"'",
+"ram":"2048",
+"type":"kamateraConfig"
+},
+"name":"Kamatera Control Plane",
+"useInternalIpAddress":true
+}'
+curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$PLANE_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+#Kamatera Worker
+WORKER_JSON_STRING='{
+"engineInsecureRegistry":[],
+"engineInstallURL":"'"${engineInstallUrl}"'",
+"engineRegistryMirror":[],
+"engineStorageDriver":"overlay2",
+"kamateraConfig":{
+"apiClientId":"'"${CWM_APICLIENTID}"'",
+"apiSecret":"'"${CWM_APISECRET}"'",
+"billing":"hourly",
+"cpu":"2B",
+"createServerCommandId":"0",
+"datacenter":"'"${CWM_ZONE}"'",
+"diskSize":"50",
+"image":"ubuntu_server_18.04_64-bit_optimized",
+"privateNetworkIp":"auto",
+"privateNetworkName":"'"${vlan}"'",
+"ram":"4096",
+"type":"kamateraConfig"
+},
+"name":"Kamatera Worker",
+"useInternalIpAddress":true
+}'
+curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+
+echo "Adding descriptions" | log
+descriptionAppend "Rancher Web UI: https://${rancherDomain}"
+descriptionAppend "Rancher Username: admin"
+descriptionAppend "Rancher Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
