@@ -15,13 +15,9 @@ app_path=/opt/rocket
 
 echo "Installing and tweaking nodejs requirements" | log
 installPackage graphicsmagick
-installPackage build-essential
-installPackage software-properties-common
-waitOrStop 0 "Failed to install nodejs requirements"
+waitOrStop 0 "Failed apt install: graphicsmagick"
 npm install -g inherits n
-n stable
-
-ln -s /usr/bin/node /usr/local/bin/node
+n 8.11.3
 
 echo "Creat app user" | log
 useradd -m -U -r -d $app_path rocket
@@ -86,7 +82,7 @@ bannerFiglet "Loading in Progress\n Please Wait.\n" >> $nginxErrorPage
 printf "Application and services loading is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $nginxErrorPage
 
 echo "Configuring nginx" | log
-cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat.conf /etc/nginx/sites-available/rocketchat.conf
+cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat-nginx-config /etc/nginx/sites-available/rocketchat.conf
 # sed -i "s/SERVERIP/${CWM_SERVERIP}/g" /etc/nginx/sites-available/rocketchat.conf
 ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
