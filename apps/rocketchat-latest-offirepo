@@ -95,7 +95,7 @@ systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
-descriptionAppend "Rocket.chat web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Rocket.chat web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 
 tagScript success
