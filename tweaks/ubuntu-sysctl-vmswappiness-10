@@ -15,7 +15,7 @@ backupFile /etc/sysctl.conf | log
 echo "Adding to /etc/sysctl.conf tweak values" | log
 
 echo " ">> /etc/sysctl.conf
-echo "vm.swappiness = 10" >> /etc/sysctl.conf
+echo "vm.swappiness=1" >> /etc/sysctl.conf
 
 sysctl -p
 
