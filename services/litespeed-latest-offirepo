@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Downlading LiteSpeed Reposetory"
-curlDownload http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh | bash
+wget -O - http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh | bash
 waitOrStop 0 "RPM did not update successfully"
 installPackage openlitespeed
 waitOrStop 0 "Failed to install: openlitespeed"
