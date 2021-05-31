@@ -18,6 +18,9 @@ waitOrStop 0 "Failed apt install: xserver-xorg-core"
 installPackage xserver-xorg-input-all
 waitOrStop 0 "Failed apt install: xserver-xorg-input-all"
 
+echo "Removing xorgxrdp post dependencies"
+dpkg -r xorgxrdp
+
 echo "add user xrdp into ssl-cert group" | log
 adduser xrdp ssl-cert
 
