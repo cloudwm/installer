@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downlading LiteSpeed Reposetory"
+curlDownload http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh | bash
+waitOrStop 0 "RPM did not update successfully"
+installPackage openlitespeed
+waitOrStop 0 "Failed to install: openlitespeed"
+installPackage lsphp74
+waitOrStop 0 "Failed to install: lsphp74"
+
+echo "Creating a symbolic link for PHP"
+ln -sf /usr/local/lsws/lsphp74/bin/lsphp /usr/local/lsws/fcgi-bin/lsphp5
+
+echo "Starting the LiteSpeed service"
+/usr/local/lsws/bin/lswsctrl start
+waitOrStop 0 "Failed to start LiteSpeed service"
+
+echo "Adding descriptions" | log
+descriptionAppend "LiteSpeed Web UI: https://${CWM_DISPLAYED_ADDRESS}:7080"
+descriptionAppend "LiteSpeed Web UI Username: admin"
+descriptionAppend "LiteSpeed Web UI Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
