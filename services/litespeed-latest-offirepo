@@ -21,6 +21,9 @@ echo "Starting the LiteSpeed service"
 /usr/local/lsws/bin/lswsctrl start
 waitOrStop 0 "Failed to start LiteSpeed service"
 
+echo "Adding Firewall rule for Control Panel"
+ufw allow 7080
+
 echo "Adding descriptions" | log
 descriptionAppend "LiteSpeed Web UI: https://${CWM_DISPLAYED_ADDRESS}:7080"
 descriptionAppend "LiteSpeed Web UI Username: admin"
@@ -28,3 +31,5 @@ descriptionAppend "LiteSpeed Web UI Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
+
+exit 0
