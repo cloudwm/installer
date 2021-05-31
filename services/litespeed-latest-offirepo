@@ -7,9 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Downlading LiteSpeed Reposetory"
-curlDownload https://rpms.litespeedtech.com/debian/lst_repo.gpg | apt-key add -
+curlDownload http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh | bash
 waitOrStop 0 "RPM did not update successfully"
-add-apt-repository 'deb http://rpms.litespeedtech.com/debian/ bionic main'
 installPackage openlitespeed
 waitOrStop 0 "Failed to install: openlitespeed"
 installPackage lsphp74
