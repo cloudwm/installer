@@ -11,19 +11,10 @@ rootDir=$(rootDir)
 echo "Installing xRDP service" | log
 installPackage xrdp
 waitOrStop 0 "Failed apt install: xrdp"
-installPackage xorgxrdp
-waitOrStop 0 "Failed apt install: xorgxrdp"
 installPackage xserver-xorg-core
 waitOrStop 0 "Failed apt install: xserver-xorg-core"
 installPackage xserver-xorg-input-all
 waitOrStop 0 "Failed apt install: xserver-xorg-input-all"
-
-echo "Removing xorgxrdp post dependencies"
-dpkg -r xorgxrdp
-
-echo "Installing xorgxrdp-hwe"
-installPackage xorgxrdp-hwe-18.04
-waitOrStop 0 "Failed apt install: xorgxrdp-hwe-18.04"
 
 echo "add user xrdp into ssl-cert group" | log
 adduser xrdp ssl-cert
