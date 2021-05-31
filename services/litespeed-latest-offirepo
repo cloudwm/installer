@@ -6,6 +6,16 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
+certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
+certsUpdateService=/opt/update-certs.sh
+certGeneratedName="litespeed-fullcert.pem"
+
+echo "Installing dependencies" | log
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
+
 echo "Downlading LiteSpeed Reposetory"
 wget -O - http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh | bash
 waitOrStop 0 "RPM did not update successfully"
@@ -23,6 +33,29 @@ waitOrStop 0 "Failed to start LiteSpeed service"
 
 echo "Adding Firewall rule for Control Panel"
 ufw allow 7080
+
+echo "Generating proper haproxy certificate" | log
+cd ${certsArchivePath}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+
+cat << EOF > ${certsUpdateService}
+
+certbot -q renew
+cd ${certsArchivePath}
+rm ${certGeneratedName}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+
+EOF
+chmod +x ${certsUpdateService}
+
+backupFile /lib/systemd/system/certbot.service
+sed -i '\|ExecStart|s|-q renew|-q renew --post-hook "/bin/bash '${certsUpdateService}'"|' /lib/systemd/system/certbot.service
+systemctl daemon-reload
+waitOrStop 0 "Reloading daemon failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "LiteSpeed Web UI: https://${CWM_DISPLAYED_ADDRESS}:7080"
