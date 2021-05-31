@@ -12,5 +12,6 @@ runOnceCheck
 echo "Removing /etc/update-motd.d/ unnecessary texts" | log
 rm -f /etc/update-motd.d/10-help-text
 rm -f /etc/update-motd.d/50-motd-news
+cat /dev/null > /var/log/lastlog
 
 tagScript success
