@@ -16,6 +16,10 @@ waitOrStop 0 "Failed apt install: xserver-xorg-core"
 installPackage xserver-xorg-input-all
 waitOrStop 0 "Failed apt install: xserver-xorg-input-all"
 
+echo "Installing XFCE4"
+installPackage xfce4 xfce4-goodies xorg dbus-x11 x11-xserver-utils
+waitOrStop 0 "Failed apt install: XFCE4"
+
 echo "add user xrdp into ssl-cert group" | log
 adduser xrdp ssl-cert
 
