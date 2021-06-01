@@ -7,8 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
-certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
+certsPath=/etc/letsencrypt/live/${CWM_SERVERIP}
+certsArchivePath=/etc/letsencrypt/archive/${CWM_SERVERIP}
 certsUpdateService=/opt/update-certs.sh
 certGeneratedName="litespeed-fullcert.pem"
 
@@ -34,11 +34,11 @@ waitOrStop 0 "Failed to start LiteSpeed service"
 echo "Adding Firewall rule for Control Panel"
 ufw allow 7080
 
-echo "Generating proper haproxy certificate" | log
+echo "Generating proper certificate" | log
 cd ${certsArchivePath}
 cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
 cd ${certsPath}
-ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+ln -s ../../archive/${CWM_SERVERIP}/${certGeneratedName}
 
 cat << EOF > ${certsUpdateService}
 
@@ -47,7 +47,7 @@ cd ${certsArchivePath}
 rm ${certGeneratedName}
 cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
 cd ${certsPath}
-ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+ln -s ../../archive/${CWM_SERVERIP}/${certGeneratedName}
 
 EOF
 chmod +x ${certsUpdateService}
@@ -58,7 +58,7 @@ systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "LiteSpeed Web UI: https://${CWM_DISPLAYED_ADDRESS}:7080"
+descriptionAppend "LiteSpeed Web UI: https://${CWM_SERVERIP}:7080"
 descriptionAppend "LiteSpeed Web UI Username: admin"
 descriptionAppend "LiteSpeed Web UI Password: ${ADMINPASSWORD}"
 descriptionAppend " "
