@@ -43,7 +43,7 @@ mv bundle Rocket.Chat
 cd Rocket.Chat/programs/server
 npm install
 export PORT=${app_port}
-export ROOT_URL="http://0.0.0.0:"${app_port}"/"
+export ROOT_URL=http://${CWM_SERVERIP}:${app_port}"/"
 export MONGO_URL=${mongo_url}
 EOF
 
