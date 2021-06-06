@@ -60,8 +60,8 @@ StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
 User=rocket
-Environment=MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_DOMAIN} PORT=${app_port}
-ExecStart=/usr/local/bin/node ${app_path}/Rocket.Chat/main.js
+Environment=MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_DISPLAYED_ADDRESS} PORT=${app_port}
+ExecStart=/usr/bin/node ${app_path}/Rocket.Chat/main.js
 
 [Install]
 WantedBy=multi-user.target
