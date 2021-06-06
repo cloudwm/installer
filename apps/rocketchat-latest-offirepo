@@ -17,6 +17,7 @@ echo "Installing and tweaking nodejs requirements" | log
 installPackage graphicsmagick
 installPackage build-essential
 installPackage software-properties-common
+installPackage gnupg2
 waitOrStop 0 "Failed to install nodejs requirements"
 npm install -g inherits n
 n stable
@@ -24,7 +25,7 @@ n stable
 ln -s /usr/bin/node /usr/local/bin/node
 
 echo "Creat app user" | log
-useradd -m -U -r -d $app_path rocket
+useradd -m -U -r -d $app_path rocket --shell /bin/bash
 usermod -a -G rocket www-data
 chmod 750 $app_path
 
@@ -38,12 +39,12 @@ chown -R rocket:rocket $app_path/rocket.chat.tgz
 
 su rocket << EOF
 cd ${app_path}
-tar zxf rocket.chat.tgz
+tar -xvzf rocket.chat.tgz
 mv bundle Rocket.Chat
 cd Rocket.Chat/programs/server
 npm install
 export PORT=${app_port}
-export ROOT_URL=http://${CWM_SERVERIP}:${app_port}"/"
+export ROOT_URL=http://${CWM_DOMAIN}:${app_port}"/"
 export MONGO_URL=${mongo_url}
 EOF
 
@@ -58,13 +59,11 @@ Description=Rocket.Chat server
 After=network.target remote-fs.target nss-lookup.target mongod.target nginx.target
 
 [Service]
-Restart=always
-RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
 User=rocket
-Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_SERVERIP} PORT=${app_port}
+Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_DOMAIN} PORT=${app_port}
 ExecStart=/usr/local/bin/node ${app_path}/Rocket.Chat/main.js
 
 [Install]
