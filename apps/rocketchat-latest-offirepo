@@ -6,62 +6,69 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist nginx.success
-checkTagExist mongodb.success
-checkTagExist nodejs.success
-
 rootDir=$(rootDir)
 app_path=/opt/rocket
 
-echo "Installing and tweaking nodejs requirements" | log
-installPackage graphicsmagick
-installPackage build-essential
-installPackage software-properties-common
-installPackage gnupg2
-waitOrStop 0 "Failed to install nodejs requirements"
-npm install -g inherits n
-n stable
+echo "Installing Packages" | log
+packages=(nginx gnupg2 git unzip build-essential curl software-properties-common graphicsmagick)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
-ln -s /usr/bin/node /usr/local/bin/node
+echo "Downloading Node.js repository" | log
+curlDownload https://deb.nodesource.com/setup_12.x
+waitOrStop 0 "File not downloaded from official source"
+bash setup_12.x | log
+waitOrStop 0 "Failed to install application"
 
-echo "Creat app user" | log
-useradd -m -U -r -d $app_path rocket --shell /bin/bash
+echo "Installing Node.js" | log
+apt-get install nodejs -y | log
+
+echo "Installing and configuring MongoDB"
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4
+add-apt-repository 'deb [arch=amd64] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse'
+installPackage mongodb-org
+waitOrStop 0 "Failed apt install MongoDB"
+systemctl start mongod
+systemctl enable mongod
+sed -i "s/#replication/replication/g" /etc/mongod.conf
+sed -i "/replication:/ a \    replSetName: "replica01"" /etc/mongod.conf
+systemctl restart mongod
+
+mongo << EOF
+rs.initiate()
+EOF
+
+echo "Setting permissions for RocketChat"
+useradd -m -U -r -d /opt/rocket rocket --shell /bin/bash
 usermod -a -G rocket www-data
-chmod 750 $app_path
+chmod 750 /opt/rocket
 
-echo "Install main app" | log
-
-mongo_url="mongodb://localhost:27017/rocketchat"
-app_port=3000
+echo "Downloading latest RocketChat"
+cd ${app_path}
 curlDownload https://releases.rocket.chat/latest/download $app_path/rocket.chat.tgz
 waitOrStop 0 "File not downloaded from official source"
-chown -R rocket:rocket $app_path/rocket.chat.tgz
 
 su rocket << EOF
-cd ${app_path}
 tar -xvzf rocket.chat.tgz
 mv bundle Rocket.Chat
 cd Rocket.Chat/programs/server
 npm install
 EOF
 
-ufw allow $app_port
-ufw allow 27017
-
 echo "Installing service" | log
 cat << EOF > /etc/systemd/system/rocketchat.service
 
 [Unit]
 Description=Rocket.Chat server
-After=network.target nss-lookup.target mongod.target 
+After=network.target nss-lookup.target mongod.target
 
 [Service]
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
 User=rocket
-Environment=MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_DISPLAYED_ADDRESS} PORT=${app_port}
-ExecStart=/usr/bin/node ${app_path}/Rocket.Chat/main.js
+Environment=MONGO_URL=mongodb://localhost:27017/rocketchat ROOT_URL=http://${CWM_DISPLAYED_ADDRESS} PORT=3000
+ExecStart=/usr/bin/node /opt/rocket/Rocket.Chat/main.js
 
 [Install]
 WantedBy=multi-user.target
@@ -74,24 +81,12 @@ systemctl start rocketchat
 waitOrStop 0 "Start rocketchat service failed"
 systemctl enable rocketchat
 
-echo "Adding Loading in Progress screen" | log
-nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
-useFiglet
-printf "<pre align=center>\n" > $nginxErrorPage
-bannerFiglet "Loading in Progress\n Please Wait.\n" >> $nginxErrorPage
-printf "Application and services loading is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $nginxErrorPage
-
-echo "Configuring nginx" | log
-cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat.conf /etc/nginx/sites-available/rocketchat.conf
-# sed -i "s/SERVERIP/${CWM_SERVERIP}/g" /etc/nginx/sites-available/rocketchat.conf
 ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
-unlink /etc/nginx/sites-enabled/default
-unlink /etc/nginx/sites-enabled/default-ssl
-systemctl reload nginx
-waitOrStop 0 "Reload nginx service failed"
+systemctl restart nginx
+waitOrStop 0 "Restarting NGINX failed"
 
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
-descriptionAppend "Rocket.chat web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Rocket.chat web UI: http://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
 
 tagScript success
