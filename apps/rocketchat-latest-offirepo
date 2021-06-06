@@ -31,7 +31,7 @@ chmod 750 $app_path
 
 echo "Install main app" | log
 
-mongo_url="mongodb://admin:${ADMINPASSWORD}@localhost:27017/rocketchat?authSource=admin"
+mongo_url="mongodb://localhost:27017/rocketchat"
 app_port=3000
 curlDownload https://releases.rocket.chat/latest/download $app_path/rocket.chat.tgz
 waitOrStop 0 "File not downloaded from official source"
@@ -43,9 +43,6 @@ tar -xvzf rocket.chat.tgz
 mv bundle Rocket.Chat
 cd Rocket.Chat/programs/server
 npm install
-export PORT=${app_port}
-export ROOT_URL=http://${CWM_DOMAIN}:${app_port}"/"
-export MONGO_URL=${mongo_url}
 EOF
 
 ufw allow $app_port
@@ -56,14 +53,14 @@ cat << EOF > /etc/systemd/system/rocketchat.service
 
 [Unit]
 Description=Rocket.Chat server
-After=network.target remote-fs.target nss-lookup.target mongod.target nginx.target
+After=network.target nss-lookup.target mongod.target 
 
 [Service]
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
 User=rocket
-Environment=NODE_ENV=production MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_DOMAIN} PORT=${app_port}
+Environment=MONGO_URL=${mongo_url} ROOT_URL=https://${CWM_DOMAIN} PORT=${app_port}
 ExecStart=/usr/local/bin/node ${app_path}/Rocket.Chat/main.js
 
 [Install]
