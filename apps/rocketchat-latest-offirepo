@@ -20,11 +20,10 @@ installPackage software-properties-common
 installPackage gnupg2
 waitOrStop 0 "Failed to install nodejs requirements"
 npm install -g inherits n
-n stable
 
 ln -s /usr/bin/node /usr/local/bin/node
 
-echo "Creat app user" | log
+echo "Create app user" | log
 useradd -m -U -r -d $app_path rocket --shell /bin/bash
 usermod -a -G rocket www-data
 chmod 750 $app_path
