@@ -130,8 +130,8 @@ systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
 echo "Configuring index.php"
-mv /var/www/html/pub/index.php ../
-cd $appPath
+cd /var/www/html/pub/
+mv index.php ../
 sed -i "s/\/..\/app/\/app/g" index.php
 
 echo "Adding descriptions" | log
