@@ -129,11 +129,6 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
-echo "Configuring index.php"
-cd /var/www/html/pub/
-mv index.php ../
-sed -i "s/\/..\/app/\/app/g" index.php
-
 echo "Adding descriptions" | log
 descriptionAppend "Magento Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}${ADMIN_URI}"
 descriptionAppend "Magento Email: ${ADMINEMAIL}"
