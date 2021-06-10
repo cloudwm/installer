@@ -91,9 +91,7 @@ systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Initalizing MongoDB" | log
-mongo
-rs.initiate()
-exit
+mongo < rs.initiate()
 
 echo "Verifying Services"
 systemctl start rocketchat
