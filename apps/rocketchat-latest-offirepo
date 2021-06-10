@@ -14,14 +14,9 @@ rootDir=$(rootDir)
 app_path=/opt/rocket
 
 echo "Installing and tweaking nodejs requirements" | log
-installPackage graphicsmagick
-installPackage build-essential
-installPackage software-properties-common
-installPackage gnupg2
-waitOrStop 0 "Failed to install nodejs requirements"
-npm install -g inherits n
-
-ln -s /usr/bin/node /usr/local/bin/node
+packages=(nginx gnupg2 git unzip build-essential curl software-properties-common graphicsmagick)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Create app user" | log
 useradd -m -U -r -d $app_path rocket --shell /bin/bash
