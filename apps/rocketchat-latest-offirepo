@@ -85,13 +85,13 @@ waitOrStop 0 "Reload nginx service failed"
 
 echo "Initalizing MongoDB" | log
 mongo << EOF
-  rs.initiate()
+rs.initiate()
 EOF
 
 echo "Verifying Services" | log
 systemctl daemon-reload
 waitOrStop 0 "Reload Daemon failed"
-systemctl start rocketchat
+systemctl restart rocketchat
 waitOrStop 0 "Start rocketchat service failed"
 systemctl restart mongod.service
 waitOrStop 0 "Mongo restart failed"
