@@ -24,7 +24,6 @@ usermod -a -G rocket www-data
 chmod 750 $app_path
 
 echo "Install main app" | log
-
 mongo_url="mongodb://localhost:27017/rocketchat"
 app_port=3000
 curlDownload https://releases.rocket.chat/latest/download $app_path/rocket.chat.tgz
@@ -62,12 +61,6 @@ WantedBy=multi-user.target
 
 EOF
 
-systemctl daemon-reload
-waitOrStop 0 "Reload systemctl failed"
-systemctl start rocketchat
-waitOrStop 0 "Start rocketchat service failed"
-systemctl enable rocketchat
-
 echo "Optimizing Mongo" | log
 sed -i "s/security/replication/g" /etc/mongod.conf
 sed -i "s/authorization: enabled/replSetName: "replica01"/g" /etc/mongod.conf
@@ -81,6 +74,11 @@ printf "<pre align=center>\n" > $nginxErrorPage
 bannerFiglet "Loading in Progress\n Please Wait.\n" >> $nginxErrorPage
 printf "Application and services loading is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $nginxErrorPage
 
+echo "Initalizing MongoDB" | log
+mongo <<EOF
+  rs.initiate()
+EOF
+
 echo "Configuring nginx" | log
 cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat.conf /etc/nginx/sites-available/rocketchat.conf
 sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/sites-available/rocketchat.conf
@@ -89,10 +87,6 @@ unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
-
-echo "Initalizing MongoDB" | log
-
-mongo --eval rs.initiate() | log
 
 echo "Verifying Services"
 systemctl start rocketchat
