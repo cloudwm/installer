@@ -74,11 +74,6 @@ printf "<pre align=center>\n" > $nginxErrorPage
 bannerFiglet "Loading in Progress\n Please Wait.\n" >> $nginxErrorPage
 printf "Application and services loading is in progress, process will take a couple of minutes to complete \n\nThank you for your patience.\n\nRefresh page within a couple of minutes for updated status." >> $nginxErrorPage
 
-echo "Initalizing MongoDB" | log
-mongo <<EOF
-  rs.initiate()
-EOF
-
 echo "Configuring nginx" | log
 cp -f $rootDir/tweaks/extras/rocketchat-nginx/rocketchat.conf /etc/nginx/sites-available/rocketchat.conf
 sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/sites-available/rocketchat.conf
@@ -88,11 +83,18 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
-echo "Verifying Services"
+echo "Initalizing MongoDB" | log
+mongo << EOF
+  rs.initiate()
+EOF
+
+echo "Verifying Services" | log
+systemctl daemon-reload
+waitOrStop 0 "Reload Daemon failed"
 systemctl start rocketchat
 waitOrStop 0 "Start rocketchat service failed"
-systemctl daemon-reload
-waitOrStop 0 "Reload systemctl failed"
+systemctl restart mongod.service
+waitOrStop 0 "Mongo restart failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
