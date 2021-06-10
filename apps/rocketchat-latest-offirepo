@@ -61,12 +61,6 @@ WantedBy=multi-user.target
 
 EOF
 
-echo "Optimizing Mongo" | log
-sed -i "s/security/replication/g" /etc/mongod.conf
-sed -i "s/authorization: enabled/replSetName: "replica01"/g" /etc/mongod.conf
-systemctl restart mongod
-waitOrStop 0 "Failed MongoD Restart"
-
 echo "Adding Loading in Progress screen" | log
 nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
 useFiglet
@@ -83,17 +77,23 @@ unlink /etc/nginx/sites-enabled/default-ssl
 systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
+echo "Optimizing Mongo" | log
+sed -i "s/security/replication/g" /etc/mongod.conf
+sed -i "s/authorization: enabled/replSetName: "replica01"/g" /etc/mongod.conf
+
 echo "Initalizing MongoDB" | log
-mongo << EOF
-rs.initiate()
-EOF
+MongoInit="rs.initiate()"
+mongo --eval "${MongoInit}"
+sleep 2
 
 echo "Verifying Services" | log
 systemctl daemon-reload
 waitOrStop 0 "Reload Daemon failed"
 systemctl restart rocketchat
 waitOrStop 0 "Start rocketchat service failed"
-systemctl restart mongod.service
+systemctl restart nginx
+waitOrStop 0 "Nginx restart failed"
+systemctl restart mongod
 waitOrStop 0 "Mongo restart failed"
 
 echo "Adding descriptions" | log
