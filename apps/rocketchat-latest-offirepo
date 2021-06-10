@@ -68,15 +68,24 @@ systemctl start rocketchat
 waitOrStop 0 "Start rocketchat service failed"
 systemctl enable rocketchat
 
-echo "Optimizing Mongo"
+echo "Optimizing Mongo" | log
 sed -i "s/security/replication/g" /etc/mongod.conf
 sed -i "s/authorization: enabled/replSetName: "replica01"/g" /etc/mongod.conf
 systemctl restart mongod
 waitOrStop 0 "Failed MongoD Restart"
 
+echo "Initalizing MongoDB" | log
 mongo << EOF
 rs.initiate()
+exit
 EOF
+
+echo "Verifying Services" | log
+systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
+systemctl start rocketchat
+waitOrStop 0 "Start rocketchat service failed"
+systemctl enable rocketchat
 
 echo "Adding Loading in Progress screen" | log
 nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
