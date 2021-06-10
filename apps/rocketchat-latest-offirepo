@@ -91,7 +91,8 @@ systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Initalizing MongoDB" | log
-mongo < rs.initiate()
+
+mongo --eval rs.initiate() | log
 
 echo "Verifying Services"
 systemctl start rocketchat
@@ -99,6 +100,7 @@ waitOrStop 0 "Start rocketchat service failed"
 systemctl daemon-reload
 waitOrStop 0 "Reload systemctl failed"
 
+echo "Adding descriptions" | log
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
 descriptionAppend "Rocket.chat web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend " "
