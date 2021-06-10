@@ -81,11 +81,12 @@ exit
 EOF
 
 echo "Verifying Services" | log
+systemctl restart mongod
+waitOrStop 0 "Restart MongoDB failed"
 systemctl daemon-reload
 waitOrStop 0 "Reload systemctl failed"
 systemctl start rocketchat
 waitOrStop 0 "Start rocketchat service failed"
-systemctl enable rocketchat
 
 echo "Adding Loading in Progress screen" | log
 nginxErrorPage=/usr/share/nginx/html/customerror_50x.html
