@@ -84,17 +84,9 @@ sed -i "s/authorization: enabled/replSetName: "replica01"/g" /etc/mongod.conf
 echo "Initalizing MongoDB" | log
 MongoInit="rs.initiate()"
 mongo --eval "${MongoInit}"
-sleep 2
-
-echo "Verifying Services" | log
-systemctl daemon-reload
-waitOrStop 0 "Reload Daemon failed"
+sleep 1
 systemctl restart rocketchat
 waitOrStop 0 "Start rocketchat service failed"
-systemctl restart nginx
-waitOrStop 0 "Nginx restart failed"
-systemctl restart mongod
-waitOrStop 0 "Mongo restart failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
