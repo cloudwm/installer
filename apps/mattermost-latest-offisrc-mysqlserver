@@ -71,11 +71,14 @@ systemctl enable mattermost.service
 systemctl start mattermost.service
 waitOrStop 0 "Starting mattermost service failed"
 
+echo "Allowing MatterMost App in UFW"
+ufw allow 8065
+
 echo "Adding descriptions" | log
 descriptionAppend "Mattermost Database Username: ${mmuser_name}"
 descriptionAppend "Mattermost Database Password: ${mmuser_password}"
 descriptionAppend " "
-descriptionAppend "Mattermost Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Mattermost Web UI: https://${CWM_DISPLAYED_ADDRESS}:8065"
 descriptionAppend "# Open Web UI to set Admin Username and Password"
 descriptionAppend " "
 
