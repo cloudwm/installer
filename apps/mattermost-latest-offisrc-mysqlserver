@@ -8,12 +8,10 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist mysqld.success
-checkTagExist ssl-ready.success
 
-appVersion=5.32.1
+appVersion=5.35.3
 appPath=/opt/mattermost
 rootDir=$(rootDir)
-certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
 mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
 
@@ -22,6 +20,7 @@ mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE USER '${mmuser_name}'@'127.0.0.1' IDENTIFIED BY '${mmuser_password}';
 CREATE DATABASE mattermost;
 GRANT ALL PRIVILEGES ON mattermost.* TO '${mmuser_name}'@'127.0.0.1';
+FLUSH PRIVILEGES;
 EOF
 
 echo "Downloading and extracting application" | log
@@ -50,8 +49,6 @@ cat << EOF > /lib/systemd/system/mattermost.service
 [Unit]
 Description=Mattermost
 After=network.target
-After=mysql.service
-Requires=mysql.service
 
 [Service]
 Type=notify
@@ -65,7 +62,7 @@ Group=mattermost
 LimitNOFILE=49152
 
 [Install]
-WantedBy=mysql.service
+WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
@@ -73,19 +70,6 @@ waitOrStop 0 "Reload systemctl failed"
 systemctl enable mattermost.service
 systemctl start mattermost.service
 waitOrStop 0 "Starting mattermost service failed"
-
-echo "Setting HTTPS support" | log
-cd $appPath
-bin/mattermost config set ServiceSettings.TLSKeyFile $certsPath/privkey.pem
-bin/mattermost config set ServiceSettings.TLSCertFile $certsPath/cert.pem
-bin/mattermost config set ServiceSettings.ListenAddress :443
-bin/mattermost config set ServiceSettings.Forward80To443 true
-bin/mattermost config set ServiceSettings.ConnectionSecurity TLS
-bin/mattermost config set ServiceSettings.UseLetsEncrypt true
-setcap cap_net_bind_service=+ep $appPath/bin/mattermost
-systemctl restart mattermost.service
-waitOrStop 0 "Restart mattermost service failed"
-
 
 echo "Adding descriptions" | log
 descriptionAppend "Mattermost Database Username: ${mmuser_name}"
