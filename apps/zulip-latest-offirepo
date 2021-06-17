@@ -1,0 +1,45 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+appPath=/home/zulip/deployments
+rootDir=$(rootDir)
+
+echo "Downloading Zulip from original repo" | log
+cd $rootDir/temp
+curlDownload https://www.zulip.org/dist/releases/zulip-server-latest.tar.gz
+waitOrStop 0 "File not downloaded from official sources"
+
+echo "Extracting DokuWiki to ${appPath}/" | log
+tar -xzvf zulip-server-latest.tar.gz
+waitOrStop 0 "Failed to extract application archive"
+
+echo "Installing Zulip Application"
+./zulip-server-*/scripts/setup/install --certbot \
+    --email=${ADMINEMAIL} --hostname=${CWM_DISPLAYED_ADDRESS}
+
+echo "Creating WebGUI URL"
+cd $appPath
+touch url.log
+cat << EOF > webgui.sh
+#!/bin/bash
+
+su zulip << EOF
+cd /home/zulip/deployments/next
+./manage.py generate_realm_creation_link | grep https
+EOF
+chmod +x webgui.sh
+./webgui.sh > url.log
+
+descriptionAppend "Zulip application directory: ${appPath}/"
+descriptionAppend "Zulip Web GUI:" cat $appPath/url.log
+descriptionAppend " "
+
+tagScript success
+
+exit 0

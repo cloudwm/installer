@@ -78,12 +78,13 @@ systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Optimizing Mongo" | log
-sed -i "s/security/replication/g" /etc/mongod.conf
-sed -i "s/authorization: enabled/replSetName: "replica01"/g" /etc/mongod.conf
+sed -i "s/^#  engine:/  engine: mmapv1/"  /etc/mongod.conf
+sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
+systemctl restart mongod
+waitOrStop 0 "Restarting MongoDB failed"
 
 echo "Initalizing MongoDB" | log
-MongoInit="rs.initiate()"
-mongo --eval "${MongoInit}"
+mongo --eval "printjson(rs.initiate())"
 sleep 1
 systemctl restart rocketchat
 waitOrStop 0 "Start rocketchat service failed"
