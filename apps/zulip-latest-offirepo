@@ -19,7 +19,7 @@ tar -xzvf zulip-server-latest.tar.gz
 waitOrStop 0 "Failed to extract archive"
 
 echo "Installing Zulip Application"
-./zulip-server-*/scripts/setup/install --certbot \
+./zulip-server-*/scripts/setup/install  \
     --email=${ADMINEMAIL} --hostname=${CWM_DOMAIN}
 
 echo "Creating WebGUI URL"
@@ -32,6 +32,7 @@ su zulip << EOF
 cd /home/zulip/deployments/next
 ./manage.py generate_realm_creation_link | grep https
 EOF
+
 chmod +x webgui.sh
 ./webgui.sh > url.log
 
