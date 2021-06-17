@@ -11,17 +11,16 @@ appPath=/home/zulip/deployments
 rootDir=$(rootDir)
 
 echo "Downloading Zulip from original repo" | log
+mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://www.zulip.org/dist/releases/zulip-server-latest.tar.gz
 waitOrStop 0 "File not downloaded from official sources"
-
-echo "Extracting DokuWiki to ${appPath}/" | log
 tar -xzvf zulip-server-latest.tar.gz
-waitOrStop 0 "Failed to extract application archive"
+waitOrStop 0 "Failed to extract archive"
 
 echo "Installing Zulip Application"
 ./zulip-server-*/scripts/setup/install --certbot \
-    --email=${ADMINEMAIL} --hostname=${CWM_DISPLAYED_ADDRESS}
+    --email=${ADMINEMAIL} --hostname=${CWM_DOMAIN}
 
 echo "Creating WebGUI URL"
 cd $appPath
