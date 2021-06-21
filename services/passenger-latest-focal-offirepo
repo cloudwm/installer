@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist httpd.success
+
+packages=(dirmngr gnupg apt-transport-https ca-certificates)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 561F9B9CAC40B2F7
+add-apt-repository 'deb https://oss-binaries.phusionpassenger.com/apt/passenger focal main'
+apt update
+
+installPackage libnginx-mod-http-passenger
+waitOrStop 0 "Failed apt install: libnginx-mod-http-passenger"
+
+tag passenger.success
+tagScript success
+
+exit 0
