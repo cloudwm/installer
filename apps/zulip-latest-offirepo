@@ -36,8 +36,11 @@ chmod +x webgui.sh
 ./webgui.sh > url.log
 
 descriptionAppend "Zulip application directory: ${appPath}/"
-descriptionAppend "Zulip Web GUI:" cat $appPath/url.log
+descriptionAppend "Zulip Web GUI:" | cat - /home/zulip/deployments/url.log
 descriptionAppend " "
+descriptionAppend "To create a new URL please use:"
+descriptionAppend "su zulip"
+descriptionAppend "/home/zulip/deployments/next/manage.py generate_realm_creation_link"
 
 tagScript success
 
