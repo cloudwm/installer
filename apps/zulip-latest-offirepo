@@ -36,7 +36,7 @@ chmod +x webgui.sh
 ./webgui.sh > url.log
 
 descriptionAppend "Zulip application directory: ${appPath}/"
-descriptionAppend "Zulip Web GUI:" | cat - /home/zulip/deployments/url.log
+descriptionAppend "Zulip Web GUI:" && cat /home/zulip/deployments/url.log
 descriptionAppend " "
 descriptionAppend "To create a new URL please use:"
 descriptionAppend "su zulip"
