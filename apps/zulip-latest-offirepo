@@ -27,9 +27,7 @@ touch url.log
 cat << EOF > webgui.sh
 #!/bin/bash
 
-su zulip
-cd /home/zulip/deployments/next
-./manage.py generate_realm_creation_link | grep https
+su -c "/home/zulip/deployments/next/manage.py generate_realm_creation_link" -s /bin/sh zulip | grep https
 
 EOF
 
