@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "install dovecot from apt" | log
+packages=(postfix-doc openssl getmail4 rkhunter binutils dovecot-imapd dovecot-pop3d dovecot-mysql dovecot-sieve sudo patch)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+tagScript success
+exit 0
