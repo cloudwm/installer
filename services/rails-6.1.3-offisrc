@@ -20,7 +20,7 @@ curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg
 apt-key add pubkey.gpg
 echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
 apt update
-packages=(software-properties-common zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn)
+packages=(software-properties-common ruby-railties zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn)
 installPackage "${packages[@]}"
 waitOrStop "Failed apt install: ${packages[@]}"
 
@@ -49,6 +49,8 @@ descriptionAppend "# rails new s -b ${CWM_DISPLAYED_ADDRESS} -p 80"
 descriptionAppend " "
 descriptionAppend "Rails run HTTPS server:"
 descriptionAppend "# rails new s -b 'ssl://${CWM_DISPLAYED_ADDRESS}?key=/etc/ssl/private/server.key&cert=/etc/ssl/certs/server.crt' -p 443"
+descriptionAppend " "
+descriptionAppend "Application Web UI: https://${CWM_DISPLAYED_ADDRESS}/"
 descriptionAppend " "
 
 tag rails.success
