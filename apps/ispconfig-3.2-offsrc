@@ -10,7 +10,7 @@ rootDir=$(rootDir)
 cd $rootDir/temp
 
 echo "Downloading ISPConfig installlation package" | log
-curlDownload https://git.ispconfig.org/ispconfig/ispconfig3/repository/archive.tar.gz?ref=stable-3.2 ispconfig.tar.gz
+curlDownload https://www.ispconfig.org/downloads/ISPConfig-3-stable.tar.gz ispconfig.tar.gz
 tar xfz ispconfig.tar.gz
 cd $rootDir/temp/ispconfig3*/install/
 
