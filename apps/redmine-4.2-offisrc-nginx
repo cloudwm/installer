@@ -46,7 +46,7 @@ EOF
 
 echo "Installing Bundle" | log
 cd $appPath
-gem install bundler --no-rdoc --no-ri
+gem install bundler --no-document
 bundle install --without development test postgresql sqlite
 bundle exec rake generate_secret_token
 RAILS_ENV=production bundle exec rake db:migrate
