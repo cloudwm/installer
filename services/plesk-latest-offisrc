@@ -20,7 +20,7 @@ sh plesk-installer install plesk | log
 waitOrStop 0 "Failed to install application"
 
 echo "Configuring Plesk" | log
-plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -netmask 255.255.255.0 -iface eth0 -ip-type shared true -passwd ${ADMINPASSWORD} -email ${ADMINEMAIL} | log
+plesk bin init_conf --init -default-ip ${CWM_SERVERIP} -passwd ${ADMINPASSWORD} -email ${ADMINEMAIL} | log
 waitOrStop 0 "Configuration procedure failed"
 
 echo "Updating hostname" | log
