@@ -27,6 +27,8 @@ echo "Updating hostname" | log
 plesk bin server_pref --update -hostname ${CWM_DOMAIN} | log
 waitOrStop 0 "Hostname did not update"
 
+ufw allow 8443
+
 echo "Checking Plesk Configuration" | log
 plesk bin init_conf -c | log
 waitOrStop 0 "Configuration failed to pass test"
