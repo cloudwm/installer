@@ -45,9 +45,7 @@ if [[ ! -z $(grep $scriptName $rcLocalFile) ]]; then
 else
     echo "Installing $scriptName in rc.local" | log
     # remove "exit 0" set by default in /etc/rc.local/
-    sed -i -e '/exit 0/s/.*//' $rcLocalFile
-    # remove "exit (0)" set by default in /etc/rc.local/
-    sed -i -e '/exit (0)/s/.*//' $rcLocalFile
+    sed -i -e '/exit /s/.*//' $rcLocalFile
     echo "bash $installerPath/$scriptName" >> $rcLocalFile
     # return exit 0 to /etc/rc.local
     echo "exit 0" >> $rcLocalFile
