@@ -87,6 +87,7 @@ descriptionAppend "Minio Access key: $access_key"
 descriptionAppend "Minio Secret key: $secret_key"
 descriptionAppend " "
 
+echo "Updating server description"
 updateServerDescriptionTXT
 
 tagScript success
