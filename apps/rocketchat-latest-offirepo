@@ -24,7 +24,7 @@ usermod -a -G rocket www-data
 chmod 750 $app_path
 
 echo "Install main app" | log
-mongo_url="mongodb://localhost:27017/rocketchat"
+mongo_url="mongodb://127.0.0.1:27017/rocketchat"
 app_port=3000
 curlDownload https://releases.rocket.chat/latest/download $app_path/rocket.chat.tgz
 waitOrStop 0 "File not downloaded from official source"
