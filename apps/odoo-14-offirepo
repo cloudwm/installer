@@ -30,9 +30,6 @@ waitOrStop 0 "File not downloaded from official source"
 installPackage ./wkhtmltox_0.12.6-1.bionic_amd64.deb
 waitOrStop 0 "Failed to install wkhtmltox"
 
-su postgres << EOF
-createuser -s odoo14
-su - odoo14
 git clone https://www.github.com/odoo/odoo --depth 1 --branch 14.0 /opt/odoo14/odoo
 cd /opt/odoo14
 python3 -m venv odoo-venv
@@ -40,9 +37,7 @@ source odoo-venv/bin/activate
 pip3 install wheel
 pip3 install -r odoo/requirements.txt
 deactivate
-
 mkdir -p /opt/odoo14/odoo-custom-addons
-EOF
 
 echo "Creating Odoo service"
 cat << EOF > /etc/systemd/system/odoo14.service

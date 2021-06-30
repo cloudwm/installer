@@ -78,7 +78,6 @@ systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Optimizing Mongo" | log
-sed -i "s/^#  engine:/  engine: mmapv1/"  /etc/mongod.conf
 sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
 systemctl restart mongod
 waitOrStop 0 "Restarting MongoDB failed"
@@ -86,8 +85,12 @@ waitOrStop 0 "Restarting MongoDB failed"
 echo "Initalizing MongoDB" | log
 mongo --eval "printjson(rs.initiate())"
 sleep 1
+systemctl daemon-reload
+waitOrStop 0 "Reloading daemon failed"
 systemctl restart rocketchat
 waitOrStop 0 "Start rocketchat service failed"
+systemctl restart nginx
+waitOrStop 0 "Restarting NGINX failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
