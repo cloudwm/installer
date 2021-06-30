@@ -22,9 +22,13 @@ echo "Installing postgresql" | log
 installPackage postgresql | log
 waitOrStop 0 "Failed to install postgresql"
 
-echo "Downloading wkhtmltox"
+su postgres << EOF
+createuser -s odoo14
 curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
 waitOrStop 0 "File not downloaded from official source"
+EOF
+
+su odoo14 << EOF
 git clone https://www.github.com/odoo/odoo --depth 1 --branch 14.0 /opt/odoo14/odoo
 cd /opt/odoo14
 python3 -m venv odoo-venv
@@ -33,6 +37,7 @@ pip3 install wheel
 pip3 install -r odoo/requirements.txt
 deactivate
 mkdir -p /opt/odoo14/odoo-custom-addons
+EOF
 
 echo "Creating Odoo service"
 cat << EOF > /etc/odoo14.conf
@@ -72,8 +77,6 @@ ufw allow 8069
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
 systemctl enable --now odoo14
-systemctl restart odoo14
-waitOrStop 0 "Failed to restart odoo"
 
 echo "Adding descriptions" | log
 descriptionAppend "Odoo web UI: http://${CWM_DISPLAYED_ADDRESS}:8069"
@@ -82,3 +85,4 @@ descriptionAppend " "
 tagScript success
 
 exit 0
+
