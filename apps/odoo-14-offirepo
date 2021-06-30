@@ -9,7 +9,11 @@ fi
 checkTagExist nginx.success
 
 echo "Installing dependencies" | log
-packages=(git python3-pip build-essential wget python3-dev python3-venv python3-wheel libfreetype6-dev libxml2-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools node-less libjpeg-dev zlib1g-dev libpq-dev libxslt1-dev libldap2->
+packages=(python3-pip build-essential wget python3-dev python3-venv \
+          python3-wheel libfreetype6-dev libxml2-dev libzip-dev libldap2-dev libsasl2-dev \
+          python3-setuptools node-less libjpeg-dev zlib1g-dev libpq-dev \
+          libxslt1-dev libldap2-dev libtiff5-dev libjpeg8-dev libopenjp2-7-dev \
+          liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev libxcb1-dev)
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed to install dependencies"
 
@@ -20,18 +24,19 @@ echo "Installing postgresql" | log
 installPackage postgresql | log
 waitOrStop 0 "Failed to install postgresql"
 
-su postgres << EOF
-createuser -s odoo14
+echo "Downloading wkhtmltox"
 curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
 waitOrStop 0 "File not downloaded from official source"
 installPackage ./wkhtmltox_0.12.6-1.bionic_amd64.deb
 waitOrStop 0 "Failed to install wkhtmltox"
+
+su postgres << EOF
+createuser -s odoo14
 su - odoo14
 git clone https://www.github.com/odoo/odoo --depth 1 --branch 14.0 /opt/odoo14/odoo
 cd /opt/odoo14
 python3 -m venv odoo-venv
 source odoo-venv/bin/activate
-
 pip3 install wheel
 pip3 install -r odoo/requirements.txt
 deactivate
