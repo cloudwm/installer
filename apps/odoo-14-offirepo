@@ -23,7 +23,7 @@ installPackage postgresql | log
 waitOrStop 0 "Failed to install postgresql"
 
 su postgres << EOF
-createuser odoo14
+createuser -s odoo14
 EOF
 
 echo "Downloading and installing wkhtmltox"
