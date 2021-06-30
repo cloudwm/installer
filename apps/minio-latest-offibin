@@ -87,10 +87,6 @@ descriptionAppend "Minio Access key: $access_key"
 descriptionAppend "Minio Secret key: $secret_key"
 descriptionAppend " "
 
-echo "test://$CWM_UUID" > /root/description.txt
-echo "Updating server description"
-updateServerDescriptionTXT
-
 tagScript success
 
 exit 0
