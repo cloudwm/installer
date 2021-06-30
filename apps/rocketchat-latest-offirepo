@@ -78,7 +78,8 @@ systemctl reload nginx
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Optimizing Mongo" | log
-sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
+sed -i "s/security/replication/g" /etc/mongod.conf
+sed -i "s/authorization: enabled/replSetName: replica01/g" /etc/mongod.conf
 systemctl restart mongod
 waitOrStop 0 "Restarting MongoDB failed"
 
