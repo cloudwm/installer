@@ -87,6 +87,8 @@ descriptionAppend "Minio Access key: $access_key"
 descriptionAppend "Minio Secret key: $secret_key"
 descriptionAppend " "
 
+updateServerDescriptionTXT
+
 tagScript success
 
 exit 0
