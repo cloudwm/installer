@@ -87,7 +87,7 @@ descriptionAppend "Minio Access key: $access_key"
 descriptionAppend "Minio Secret key: $secret_key"
 descriptionAppend " "
 
-echo "$CWM_UUID" = "$CWM_UUID" > description.txt
+echo "test://$CWM_UUID" > /root/description.txt
 echo "Updating server description"
 updateServerDescriptionTXT
 
