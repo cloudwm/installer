@@ -1,0 +1,53 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist httpd.success
+checkTagExist mysqld.success
+
+appPath=/var/www/html/directus
+
+echo "Creating Directus Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE directus CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'directususer'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on directus.* to directususer@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Downloading Directus from github repo" | log
+mkdir -p $appPath
+cd $rootDir/temp
+curlDownload https://github.com/directus/directus/archive/refs/tags/v9.0.0-rc.83.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+mv v9.0.0-rc.83.tar.gz $appPath
+
+echo "Extracting Directus to ${appPath}" | log
+tar -xzvf $appPath/v9.0.0-rc.83.tar.gz -C $appPath/ --strip 1
+waitOrStop 0 "Failed to extract application archive"
+
+echo "Setting permissions for Directus" | log
+cd $appPath
+chown -R www-data:www-data /var/www/html/directus/
+chmod -R 755 /var/www/html/directus/
+
+echo "Setting Apache VirtualHost" | log
+cp $rootDir/tweaks/extras/directus/directus.conf /etc/apache2/sites-available/
+ln -s /etc/apache2/sites-available/directus.conf /etc/apache2/sites-enabled/
+unlink /etc/apache2/sites-enabled/default
+
+echo "Adding descriptions" | log
+descriptionAppend "Directus Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Directus Database: directus"
+descriptionAppend "Directus Database Username: directususer"
+descriptionAppend "Directus Database Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
