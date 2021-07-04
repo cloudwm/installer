@@ -79,6 +79,7 @@ waitOrStop 0 "Reloading daemon failed"
 systemctl enable --now odoo14
 
 echo "Adding descriptions" | log
+descriptionAppend "Odoo configuration file: /etc/odoo14.conf"
 descriptionAppend "Odoo web UI: http://${CWM_DISPLAYED_ADDRESS}:8069"
 descriptionAppend " "
 
