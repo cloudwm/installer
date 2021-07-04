@@ -39,7 +39,7 @@ chmod -R 755 /var/www/html/directus/
 echo "Setting Apache VirtualHost" | log
 cp $rootDir/tweaks/extras/directus/directus.conf /etc/apache2/sites-available/
 ln -s /etc/apache2/sites-available/directus.conf /etc/apache2/sites-enabled/
-unlink /etc/apache2/sites-enabled/default
+sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/apache2/sites-enabled/directus.conf 
 
 echo "Adding descriptions" | log
 descriptionAppend "Directus Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}"
