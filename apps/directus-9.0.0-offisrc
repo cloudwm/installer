@@ -8,7 +8,6 @@ fi
 
 checkTagExist php.success
 checkTagExist httpd.success
-checkTagExist mysqld.success
 
 appPath=/var/www/html/directus
 
