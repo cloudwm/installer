@@ -6,6 +6,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+echo "Adding php7.2 repo" | log
+installPackage software-properties-common | log
+waitOrStop 0 "Failed apt install: software-properties-common"
+add-apt-repository -y ppa:ondrej/php | log
+apt update
+
 echo "Installing php7.2-fpm" | log
 installPackage php7.2-fpm
 waitOrStop 0 "Failed apt install: php7.2-fpm"
