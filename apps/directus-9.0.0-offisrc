@@ -12,12 +12,33 @@ checkTagExist mysqld.success
 
 appPath=/var/www/html/directus
 
+echo "Installing MariaDB" | log
+installPackage mariadb-server mariadb-client
+waitOrStop 0 "Failed to install MariaDB"
+systemctl stop mariadb.service
+waitOrStop 0 "Failed to stop MariaDB"
+systemctl start mariadb.service
+waitOrStop 0 "Failed to start MariaDB"
+systemctl enable mariadb.service
+waitOrStop 0 "Failed to enable MariaDB"
+
+echo "Running first setup process" | log
+mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
+n
+n
+y
+y
+y
+y
+EOF
+
 echo "Creating Directus Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-CREATE DATABASE directus CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-CREATE USER 'directususer'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
-GRANT all privileges on directus.* to directususer@localhost;
+CREATE DATABASE directus;
+CREATE USER 'directususer'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+GRANT ALL ON directus.* TO 'directususer'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
+EXIT;
 EOF
 
 echo "Downloading Directus from github repo" | log

@@ -84,8 +84,8 @@ systemctl restart mongod
 waitOrStop 0 "Restarting MongoDB failed"
 
 echo "Initalizing MongoDB" | log
-mongoinit="db.adminCommand({rs.initiate()});"
-mongo --eval "${mongoinit}" | log
+mongoinit="db.adminCommand('rs.initiate()');"
+mongo --eval "${mongoinit}"
 sleep 1
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
