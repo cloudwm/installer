@@ -40,6 +40,16 @@ echo "Setting Apache VirtualHost" | log
 cp $rootDir/tweaks/extras/directus/directus.conf /etc/apache2/sites-available/
 ln -s /etc/apache2/sites-available/directus.conf /etc/apache2/sites-enabled/
 sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/apache2/sites-enabled/directus.conf 
+unlink /etc/apache2/sites-enabled/000-default.conf
+unlink /etc/apache2/sites-enabled/default-ssl.conf
+systemctl restart apache2.service
+waitOrStop 0 "Failed to restart Apache service"
+
+echo "Enabling VirtualHost configuration"
+a2ensite directus.conf
+a2enmod rewrite
+systemctl restart apache2.service
+waitOrStop 0 "Failed to restart Apache service"
 
 echo "Adding descriptions" | log
 descriptionAppend "Directus Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}"
