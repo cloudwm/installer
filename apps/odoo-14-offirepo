@@ -22,7 +22,7 @@ echo "Installing postgresql" | log
 installPackage postgresql | log
 waitOrStop 0 "Failed to install postgresql"
 
-sudo -u postgres createuser odoo14
+sudo -u postgres psql --command "createuser -s odoo14;"
 
 echo "Downloading and installing wkhtmltox"
 curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
