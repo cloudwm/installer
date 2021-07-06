@@ -90,8 +90,9 @@ mongo --eval "printjson(rs.initiate())"
 sleep 1
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
-systemctl restart rocketchat
+systemctl start rocketchat
 waitOrStop 0 "Start rocketchat service failed"
+sleep 5
 systemctl restart nginx
 waitOrStop 0 "Restarting NGINX failed"
 
