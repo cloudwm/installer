@@ -92,8 +92,10 @@ systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
 systemctl restart nginx
 waitOrStop 0 "Restarting NGINX failed"
+systemctl enable rocketchat
+sleep 1
 systemctl start rocketchat
-sleep 10
+sleep 5
 waitOrStop 0 "Start rocketchat service failed"
 
 echo "Adding descriptions" | log
