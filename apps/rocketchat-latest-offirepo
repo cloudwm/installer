@@ -24,7 +24,7 @@ usermod -a -G rocket www-data
 chmod 750 $app_path
 
 echo "Install main app" | log
-mongo_url="mongodb://admin:${ADMINPASSWORD}@127.0.0.1:27017/rocketchat?gssapiServiceName=mongodb"
+mongo_url="mongodb://127.0.0.1:27017/rocketchat"
 app_port=3000
 curlDownload https://releases.rocket.chat/latest/download $app_path/rocket.chat.tgz
 waitOrStop 0 "File not downloaded from official source"
@@ -83,9 +83,10 @@ sed -i "s/authorization: enabled/replSetName: replica01/g" /etc/mongod.conf
 systemctl restart mongod
 waitOrStop 0 "Restarting MongoDB failed"
 
+sleep 5
+
 echo "Initalizing MongoDB" | log
-mongoinit="db.adminCommand('rs.initiate()');"
-mongo --eval "${mongoinit}"
+mongo --eval "printjson(rs.initiate())"
 sleep 1
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
