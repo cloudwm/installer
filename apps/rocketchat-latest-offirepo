@@ -90,11 +90,11 @@ mongo --eval "printjson(rs.initiate())"
 sleep 1
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
-systemctl start rocketchat
-waitOrStop 0 "Start rocketchat service failed"
-sleep 5
 systemctl restart nginx
 waitOrStop 0 "Restarting NGINX failed"
+systemctl start rocketchat
+sleep 10
+waitOrStop 0 "Start rocketchat service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Rocket.chat application directory: ${app_path}/Rocket.Chat/"
