@@ -11,34 +11,19 @@ checkTagExist httpd.success
 
 appPath=/var/www/html/directus
 
-echo "Installing MariaDB" | log
-installPackage mariadb-server mariadb-client
-waitOrStop 0 "Failed to install MariaDB"
-systemctl stop mariadb.service
-waitOrStop 0 "Failed to stop MariaDB"
-systemctl start mariadb.service
-waitOrStop 0 "Failed to start MariaDB"
-systemctl enable mariadb.service
-waitOrStop 0 "Failed to enable MariaDB"
-
-echo "Running first setup process" | log
-mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
-n
-n
-y
-y
-y
-y
-EOF
-
 echo "Creating Directus Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-CREATE DATABASE directus;
-CREATE USER 'directususer'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
-GRANT ALL ON directus.* TO 'directususer'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}' WITH GRANT OPTION;
+CREATE DATABASE directus CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'directususer'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on directus.* to directususer@localhost;
 FLUSH PRIVILEGES;
-EXIT;
 EOF
+
+echo "Verifying PHP dependencies"
+packages=(software-properties-common php7.2 libapache2-mod-php7.2 php7.2-common \
+	  php7.2-curl php7.2-intl php7.2-mbstring php7.2-xmlrpc php7.2-mysql php7.2-gd php7.2-xml php7.2-cli php7.2-zip)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed to install dependencies"
 
 echo "Downloading Directus from github repo" | log
 mkdir -p $appPath
@@ -58,8 +43,8 @@ chmod -R 755 /var/www/html/directus/
 
 echo "Setting Apache VirtualHost" | log
 cp $rootDir/tweaks/extras/directus/directus.conf /etc/apache2/sites-available/
+sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/apache2/sites-available/directus.conf
 ln -s /etc/apache2/sites-available/directus.conf /etc/apache2/sites-enabled/
-sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/apache2/sites-enabled/directus.conf 
 unlink /etc/apache2/sites-enabled/000-default.conf
 unlink /etc/apache2/sites-enabled/default-ssl.conf
 systemctl restart apache2.service
