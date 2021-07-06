@@ -221,7 +221,7 @@ function CheckDiskSpace() {
         checkdisk=$(df -h $PWD | awk '/[0-9]%/{print $(NF-2)-0}')
 
         if [ $checkdisk -lt 1 ]; then
-                echo "Not enough disk space to recreating new key and log"
+                echo "Not enough disk space to recreate new key and log"
                 exit 1
         fi
 

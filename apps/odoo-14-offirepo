@@ -22,7 +22,11 @@ echo "Installing postgresql" | log
 installPackage postgresql | log
 waitOrStop 0 "Failed to install postgresql"
 
-sudo -u postgres psql --command "createuser -s odoo14;"
+sleep 5
+
+su postgres << EOF
+createuser -s odoo14
+EOF
 
 echo "Downloading and installing wkhtmltox"
 curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
@@ -76,7 +80,11 @@ ufw allow 8069
 
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
-systemctl enable --now odoo14
+systemctl enable odoo14
+sleep 1
+systemctl start odoo14
+sleep 2
+waitOrStop 0 "Start Odoo14 service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Odoo configuration file: /etc/odoo14.conf"
