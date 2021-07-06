@@ -24,6 +24,8 @@ waitOrStop 0 "Failed to install postgresql"
 
 sleep 5
 
+echo "Creating Odoo14 user in postgres"
+export PGPASSWORD=${ADMINPASSWORD}
 su postgres << EOF
 createuser -s odoo14
 EOF
