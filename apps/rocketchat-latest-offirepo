@@ -95,7 +95,7 @@ waitOrStop 0 "Restarting NGINX failed"
 systemctl enable rocketchat
 sleep 1
 systemctl start rocketchat
-sleep 5
+sleep 2
 waitOrStop 0 "Start rocketchat service failed"
 
 echo "Adding descriptions" | log
