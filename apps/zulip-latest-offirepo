@@ -19,27 +19,13 @@ waitOrStop 0 "Failed to extract archive"
 
 echo "Installing Zulip Application"
 ./zulip-server-*/scripts/setup/install --self-signed-cert --email=${ADMINEMAIL} --hostname=${CWM_DOMAIN}
+waitOrStop 0 "Failed to install Zulip"
 
-echo "Creating WebGUI URL"
-cd $appPath
-touch webgui.sh
-touch url.log
-cat << EOF > webgui.sh
-#!/bin/bash
-
-su -c "/home/zulip/deployments/next/manage.py generate_realm_creation_link" -s /bin/sh zulip | grep https
-
-EOF
-
-echo "Setting permissions"
-chmod +x webgui.sh
-./webgui.sh > url.log
+webui=$(su -c "/home/zulip/deployments/next/manage.py generate_realm_creation_link" -s /bin/sh zulip | grep https)
 
 descriptionAppend "Zulip application directory: ${appPath}/"
+descriptionAppend "Zulip Web UI:${webui}"
 descriptionAppend " "
-descriptionAppend "To create a new URL please use:"
-descriptionAppend "su zulip"
-descriptionAppend "/home/zulip/deployments/next/manage.py generate_realm_creation_link"
 
 tagScript success
 
