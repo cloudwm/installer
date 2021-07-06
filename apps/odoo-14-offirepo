@@ -76,7 +76,7 @@ ufw allow 8069
 
 echo "Creating Odoo14 user in postgres"
 export PGPASSWORD=${ADMINPASSWORD}
-su postgres -c createuser -s odoo14
+su -c "createuser -s odoo14" -s /bin/sh postgres
 
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
