@@ -11,7 +11,9 @@ installPackage software-properties-common
 waitOrStop 0 "Failed apt install: software-properties-common"
 
 echo "Downlading LiteSpeed Reposetory"
-wget -O - http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh | bash
+curlDownload http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh
+waitOrStop 0 "File not downloaded from official source"
+bash enable_lst_debian_repo.sh
 waitOrStop 0 "RPM did not update successfully"
 installPackage openlitespeed
 waitOrStop 0 "Failed to install: openlitespeed"
