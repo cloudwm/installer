@@ -22,11 +22,6 @@ echo "Installing postgresql" | log
 installPackage postgresql | log
 waitOrStop 0 "Failed to install postgresql"
 
-sleep 5
-
-echo "Creating Odoo14 user in postgres" | log
-sudo -u postgres bash -c "createuser -s odoo14"
-
 echo "Downloading and installing wkhtmltox"
 curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
 waitOrStop 0 "File not downloaded from official source"
@@ -76,6 +71,9 @@ WantedBy=multi-user.target
 EOF
 
 ufw allow 8069
+
+echo "Creating Odoo14 user in postgres" | log
+su - postgres psql -c "createuser -s odoo14"
 
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
