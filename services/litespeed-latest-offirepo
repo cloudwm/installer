@@ -15,21 +15,34 @@ wget -O - http://rpms.litespeedtech.com/debian/enable_lst_debian_repo.sh | bash
 waitOrStop 0 "RPM did not update successfully"
 installPackage openlitespeed
 waitOrStop 0 "Failed to install: openlitespeed"
-installPackage lsphp74
+installPackage lsphp74 lsphp74-common lsphp74-mysql lsphp74-curl
 waitOrStop 0 "Failed to install: lsphp74"
 
-echo "Creating a symbolic link for PHP"
+echo "Creating a symbolic link for PHP" | log
 ln -sf /usr/local/lsws/lsphp74/bin/lsphp /usr/local/lsws/fcgi-bin/lsphp5
 
-echo "Starting the LiteSpeed service"
+echo "Starting the LiteSpeed service" | log
 /usr/local/lsws/bin/lswsctrl start
 waitOrStop 0 "Failed to start LiteSpeed service"
 
-echo "Adding Firewall rule for Control Panel"
-ufw allow 7080
+echo "Creating LiteSpeed DataBase"
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE litespeed CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'litespeeduser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on litespeed.* to litespeeduser@localhost;
+FLUSH PRIVILEGES;
+EOF
 
-echo "Installing certificates"
-execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos -w /usr/local/lsws/admin/html --email ${ADMINEMAIL} -d ${CWM_DISPLAYED_ADDRESS}
+echo "Creating admin user"
+/usr/local/lsws/admin/misc/admpass.sh << EOF
+admin
+${ADMINPASSWORD}
+${ADMINPASSWORD}
+EOF
+
+echo "Adding Firewall rule for Control Panel" | log
+ufw allow 7080
+ufw allow 8088
 
 echo "Adding descriptions" | log
 descriptionAppend "LiteSpeed Web UI: https://${CWM_DISPLAYED_ADDRESS}:7080"
@@ -40,3 +53,4 @@ descriptionAppend " "
 tagScript success
 
 exit 0
+
