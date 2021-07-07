@@ -21,6 +21,8 @@ ufw allow 993 | log
 ufw allow 995 | log
 ufw allow 8080 | log
 ufw allow 8081 | log
+ufw allow 10000 | log
+ufw allow 40110:40210/tcp | log
 
 ufw status | log
 

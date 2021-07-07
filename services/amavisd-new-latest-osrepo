@@ -15,6 +15,9 @@ echo "1;" >> /etc/amavis/conf.d/05-node_id
 echo "N" |apt install amavisd-new -y | log
 waitOrStop 0
 
+installPackage libdbi-perl libdbd-mysql-perl | log
+waitOrStop 0 "Failed to install libdbi"
+
 checkPackageInstalled amavisd-new
 
 tagScript success
