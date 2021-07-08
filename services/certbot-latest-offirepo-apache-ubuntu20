@@ -6,8 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist apache2.success
-
 echo "Installing certbot for apache" | log
 add-apt-repository -k hkp://keyserver.ubuntu.com:80 -y ppa:certbot/certbot | log
 installPackage python3-certbot-apache
