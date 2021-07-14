@@ -28,6 +28,7 @@ mv server.jar minecraft_server_1.17.1.jar
 echo "Starting MineCraft server" | log
 cd $appPath
 java -Xms1024M -Xmx2G -jar minecraft_server_1.17.1.jar nogui
+sleep 5
 sed -i "s/eula=false/eula=true/g" $appPath/eula.txt
 screen << EOF
 java -Xms1024M -Xmx2G -jar minecraft_server_1.17.1.jar nogui
