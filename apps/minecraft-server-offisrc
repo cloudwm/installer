@@ -24,11 +24,13 @@ cd $appPath
 curlDownload https://launcher.mojang.com/v1/objects/a16d67e5807f57fc4e550299cf20226194497dc2/server.jar
 waitOrStop 0 "File not downloaded from official source"
 mv server.jar minecraft_server_1.17.1.jar
-sed -i "s/eula=false/eula=true/g" $appPath/eula.txt
 
 echo "Starting MineCraft server" | log
+cd $appPath
+java -Xms1024M -Xmx2G -jar minecraft_server_1.17.1.jar nogui
+sed -i "s/eula=false/eula=true/g" $appPath/eula.txt
 screen << EOF
-java -Xms1024M -Xmx2G -jar minecraft_server_1.15.2.jar nogui
+java -Xms1024M -Xmx2G -jar minecraft_server_1.17.1.jar nogui
 EOF
 
 echo "Adding descriptions" | log
