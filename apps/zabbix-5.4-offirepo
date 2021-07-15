@@ -23,16 +23,16 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Downloading Zabbix from official repo" | log
-curlDownload https://repo.zabbix.com/zabbix/5.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.4-1+ubuntu20.04.tar.gz
+curlDownload https://repo.zabbix.com/zabbix/5.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.4-1+ubuntu20.04_all.deb
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Zabbix" | log
-tar -xzvf zabbix-release_5.4-1+ubuntu20.04.tar.gz
+dpkg -i zabbix-release_5.4-1+ubuntu20.04_all.deb
 waitOrStop 0 "Failed to extract application archive"
-apt update | log
+apt-get update | log
 
 echo "Installing Zabbix" | log
-installPackage zabbix-server-mysql zabbix-frontend-php zabbix-agent zabbix-apache-conf
+installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-agent
 waitOrStop 0 "Failed to install Zabbix"
 
 echo "Fixing Zabbix configuration" | log
@@ -55,6 +55,8 @@ ufw 10051
 ufw reload
 
 echo "Adding descriptions" | log
+descriptionAppend "Database = zabbix | DBUser = zabbixuser"
+descriptionAppend " "
 descriptionAppend "Zabbix Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/zabbix"
 descriptionAppend "Zabbix default username: Admin"
 descriptionAppend "Zabbix default password: zabbix" 
