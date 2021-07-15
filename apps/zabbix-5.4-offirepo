@@ -1,0 +1,65 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist httpd.success
+checkTagExist mysqld.success
+
+echo "Installing dependencies" | log
+installPackage php php-mbstring php-gd php-xml php-bcmath php-ldap php-mysql
+waitOrStop 0 "Failed to install dependencies"
+
+echo "Creating Zabbix Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE zabbix CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'zabbixuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on zabbix.* to zabbixuser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Downloading Zabbix from official repo" | log
+curlDownload https://repo.zabbix.com/zabbix/5.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.4-1+ubuntu20.04.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Extracting Zabbix" | log
+tar -xzvf zabbix-release_5.4-1+ubuntu20.04.tar.gz
+waitOrStop 0 "Failed to extract application archive"
+apt update | log
+
+echo "Installing Zabbix" | log
+installPackage zabbix-server-mysql zabbix-frontend-php zabbix-agent zabbix-apache-conf
+waitOrStop 0 "Failed to install Zabbix"
+
+echo "Fixing Zabbix configuration" | log
+sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
+sed -i "s/DBUser=zabbix_user/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
+sed -i "s/DBPassword=P@ssword321/DBPassword=${ADMINPASSWORD}/g" /etc/zabbix/zabbix_server.conf
+cd /usr/share/doc/zabbix-server-mysql
+zcat create.sql.gz | mysql -u zabbixuser -p ${ADMINPASSWORD}
+
+systemctl enable zabbix-server
+systemctl restart zabbix-server
+waitOrStop 0 "Failed to restart Zabbix"
+systemctl restart apache2
+waitOrStop 0 "Failed to restart Apache"
+
+echo "Adding FW rules"
+ufw allow 80/tcp
+ufw allow 10050/tcp
+ufw 10051
+ufw reload
+
+echo "Adding descriptions" | log
+descriptionAppend "Zabbix Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/zabbix"
+descriptionAppend "Zabbix default username: Admin"
+descriptionAppend "Zabbix default password: zabbix" 
+descriptionAppend " "
+
+tagScript success
+
+exit 0
