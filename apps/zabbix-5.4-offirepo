@@ -36,7 +36,7 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Zabbix configuration" | log
-zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -uzabbixuser -p'${ADMINPASSWORD}' zabbix
+zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -uroot -p'${ADMINPASSWORD}' zabbix
 sleep 5
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
@@ -63,15 +63,15 @@ ufw allow 10051
 ufw allow 3306
 ufw reload
 
+rm -rf /opt/installer/tweaks/extras/zabbix/zabbix.conf.php
 cp /opt/installer/tweaks/extras/zabbix/zabbix.conf.php /usr/share/zabbix/conf/
 sed -i "s/PASSWORDVAR/${ADMINPASSWORD}/g" /usr/share/zabbix/conf/zabbix.conf.php
 
 echo "Adding descriptions" | log
-descriptionAppend "Database = zabbix | DBUser = zabbixuser"
 descriptionAppend " "
+descriptionAppend "Database = zabbix"
+descriptionAppend "DBUser = zabbixuser"
 descriptionAppend "Zabbix Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/zabbix"
-descriptionAppend "Zabbix default username: Admin"
-descriptionAppend "Zabbix default password: zabbix" 
 descriptionAppend " "
 
 tagScript success
