@@ -37,30 +37,34 @@ EOF
 
 echo "Zabbix configuration" | log
 zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -uzabbixuser -p'${ADMINPASSWORD}' zabbix
-sleep 3
+sleep 5
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/#\sDBPassword=/DBPassword=${ADMINPASSWORD}/g" /etc/zabbix/zabbix_server.conf
 
-sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/8.0/apache2/php.ini
-sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/8.0/apache2/php.ini
-sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/php/8.0/apache2/php.ini
-
+sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/7.4/fpm/php.ini
+sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/7.4/fpm/php.ini
+sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/php/7.4/fpm/php.ini
 sed -i "s/127.0.0.1/0.0.0.0/g" /etc/mysql/mysql.conf.d/mysqld.cnf
 
 systemctl enable zabbix-server
 sleep 1
-systemctl restart zabbix-server
+systemctl stop zabbix-server
+sleep 1
+systemctl start zabbix-server
 waitOrStop 0 "Failed to restart Zabbix"
 sleep 5
 systemctl restart apache2
 waitOrStop 0 "Failed to restart Apache"
 
 echo "Adding FW rules"
-ufw allow 10050/tcp
-ufw 10051
+ufw allow 10050
+ufw allow 10051
 ufw allow 3306
 ufw reload
+
+cp /opt/installer/tweaks/extras/zabbix/zabbix.conf.php /usr/share/zabbix/conf/
+sed -i "s/PASSWORDVAR/${ADMINPASSWORD}/g" /usr/share/zabbix/conf/zabbix.conf.php
 
 echo "Adding descriptions" | log
 descriptionAppend "Database = zabbix | DBUser = zabbixuser"
