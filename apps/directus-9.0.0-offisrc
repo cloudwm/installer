@@ -10,6 +10,7 @@ checkTagExist php.success
 checkTagExist httpd.success
 
 appPath=/var/www/html/directus
+rootDir=$(rootDir)
 
 echo "Creating Directus Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF

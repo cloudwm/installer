@@ -11,6 +11,7 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 
 appPath=/var/www/
+rootDir=$(rootDir)
 
 echo "Downloading Matomo" | log
 curlDownload https://builds.matomo.org/matomo-latest.zip
@@ -37,10 +38,19 @@ echo "Resting NGINX" | log
 systemctl restart nginx
 waitOrStop 0 "Failed to restart NGINX"
 
-echo "Installing PHP Modules"
+echo "Installing PHP Modules" | log
 packages=(php-imagick php7.4-mysql php7.4-fpm php7.4-common php7.4-gd php7.4-json php7.4-curl  php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl)
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Creating VirtualHost" | log
+cp $rootDir/tweaks/extras/matomo/matomo.conf /etc/nginx/sites-available/
+sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/sites-available/matomo.conf
+ln -s /etc/nginx/sites-available/magento.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "To finalize the installation visit the Web UI"
