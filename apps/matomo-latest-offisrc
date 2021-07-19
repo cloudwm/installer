@@ -1,0 +1,52 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist nginx.success
+checkTagExist mysqld.success
+
+appPath=/var/www/
+
+echo "Downloading Matomo" | log
+curlDownload https://builds.matomo.org/matomo-latest.zip
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Extracting Matomo" | log
+installPackage unzip | log
+mkdir -p $appPath
+unzip matomo-latest.zip -d $appPath
+waitOrStop 0 "Failed to extract"
+
+echo "Setting permissions" | log
+chown www-data:www-data /var/www/matomo/ -R
+
+echo "Creating Matomo Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE matomo CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'matomouser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on matomo.* to matomouser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Resting NGINX" | log
+systemctl restart nginx
+waitOrStop 0 "Failed to restart NGINX"
+
+echo "Installing PHP Modules"
+packages=(php-imagick php7.4-mysql php7.4-fpm php7.4-common php7.4-gd php7.4-json php7.4-curl  php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Adding descriptions" | log
+descriptionAppend "To finalize the installation visit the Web UI"
+descriptionAppend "Matomo Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

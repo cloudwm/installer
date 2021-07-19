@@ -14,14 +14,6 @@ echo "Installing dependencies" | log
 installPackage php php-mbstring php-gd php-xml php-bcmath php-ldap php-mysql
 waitOrStop 0 "Failed to install dependencies"
 
-echo "Creating Zabbix Database" | log
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-CREATE DATABASE zabbix CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-CREATE USER 'zabbixuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
-GRANT all privileges on zabbix.* to zabbixuser@localhost;
-FLUSH PRIVILEGES;
-EOF
-
 echo "Downloading Zabbix from official repo" | log
 curlDownload https://repo.zabbix.com/zabbix/5.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.4-1+ubuntu20.04_all.deb
 waitOrStop 0 "File not downloaded from official source"
@@ -29,17 +21,26 @@ waitOrStop 0 "File not downloaded from official source"
 echo "Extracting Zabbix" | log
 dpkg -i zabbix-release_5.4-1+ubuntu20.04_all.deb
 waitOrStop 0 "Failed to extract application archive"
-apt-get update | log
+apt update | log
 
 echo "Installing Zabbix" | log
-installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-agent
+installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
 waitOrStop 0 "Failed to install Zabbix"
 
-echo "Fixing Zabbix configuration" | log
+echo "Creating Zabbix Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE zabbix CHARACTER SET utf8 COLLATE utf8_bin;
+CREATE USER 'zabbixuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on zabbix.* to zabbixuser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Zabbix configuration" | log
+zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -uzabbixuser -p'${ADMINPASSWORD}' zabbix
+sleep 3
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/#\sDBPassword=/DBPassword=${ADMINPASSWORD}/g" /etc/zabbix/zabbix_server.conf
-zcat /usr/share/zabbix-server-mysql/schema.sql.gz | mysql -uzabbixuser -p'${ADMINPASSWORD}' zabbix
 
 sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/8.0/apache2/php.ini
 sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/8.0/apache2/php.ini
