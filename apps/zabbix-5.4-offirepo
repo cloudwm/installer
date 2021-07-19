@@ -10,10 +10,6 @@ checkTagExist php.success
 checkTagExist httpd.success
 checkTagExist mysqld.success
 
-echo "Installing dependencies" | log
-installPackage php php-mbstring php-gd php-xml php-bcmath php-ldap php-mysql
-waitOrStop 0 "Failed to install dependencies"
-
 echo "Downloading Zabbix from official repo" | log
 curlDownload https://repo.zabbix.com/zabbix/5.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.4-1+ubuntu20.04_all.deb
 waitOrStop 0 "File not downloaded from official source"
@@ -36,7 +32,7 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Zabbix configuration" | log
-zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -uroot -p'${ADMINPASSWORD}' zabbix
+zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -u root zabbix
 sleep 5
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
