@@ -48,7 +48,6 @@ cp $rootDir/tweaks/extras/matomo/matomo.conf /etc/nginx/sites-available/
 cp $rootDir/tweaks/extras/matomo/matomo.conf /etc/nginx/conf.d/
 sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/sites-available/matomo.conf
 ln -s /etc/nginx/sites-available/matomo.conf /etc/nginx/sites-enabled/
-unlink /etc/nginx/sites-enabled/default
 systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
