@@ -38,7 +38,7 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Tweaking Zabbix & PHP configuration" | log
-zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -uroot zabbix
+zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -u root zabbix
 sleep 5
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
