@@ -34,20 +34,14 @@ GRANT all privileges on matomo.* to matomouser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
-echo "Resting NGINX" | log
-systemctl restart nginx
-waitOrStop 0 "Failed to restart NGINX"
-
 echo "Installing PHP Modules" | log
 packages=(php-imagick php7.4-mysql php7.4-fpm php7.4-common php7.4-gd php7.4-json php7.4-curl  php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl)
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Creating VirtualHost" | log
-cp $rootDir/tweaks/extras/matomo/matomo.conf /etc/nginx/sites-available/
 cp $rootDir/tweaks/extras/matomo/matomo.conf /etc/nginx/conf.d/
-sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/sites-available/matomo.conf
-ln -s /etc/nginx/sites-available/matomo.conf /etc/nginx/sites-enabled/
+sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/conf.d/matomo.conf
 systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
