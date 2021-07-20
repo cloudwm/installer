@@ -37,7 +37,10 @@ EOF
 echo "Creating VirtualHost" | log
 cp $rootDir/tweaks/extras/matomo/matomo.conf /etc/nginx/conf.d/
 sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/conf.d/matomo.conf
-sed -i "s/listen = 127.0.0.1:9000/listen = /run/php/php-fpm.sock/g" /etc/php/7.4/fpm/pool.d/www.conf
+sed -i '36d' /etc/php/7.4/fpm/pool.d/www.conf
+sed -i '35 a listen = /run/php/php-fpm.sock' /etc/php/7.4/fpm/pool.d/www.conf
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart php7.4-fpm
 waitOrStop 0 "Restart php7.4-fpm service failed"
 systemctl restart nginx
