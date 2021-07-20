@@ -29,12 +29,12 @@ waitOrStop 0 "Failed to install dependencies"
 echo "Downloading Directus from github repo" | log
 mkdir -p $appPath
 cd $rootDir/temp
-curlDownload https://github.com/directus/directus/archive/refs/tags/v9.0.0-rc.83.tar.gz
+curlDownload https://github.com/directus/directus/archive/refs/tags/v9.0.0-rc.85.tar.gz
 waitOrStop 0 "File not downloaded from official source"
-mv v9.0.0-rc.83.tar.gz $appPath
+mv v9.0.0-rc.85.tar.gz $appPath
 
 echo "Extracting Directus to ${appPath}" | log
-tar -xzvf $appPath/v9.0.0-rc.83.tar.gz -C $appPath/ --strip 1
+tar -xzvf $appPath/v9.0.0-rc.85.tar.gz -C $appPath/ --strip 1
 waitOrStop 0 "Failed to extract application archive"
 
 echo "Setting permissions for Directus" | log
