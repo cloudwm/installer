@@ -37,10 +37,11 @@ EOF
 echo "Creating VirtualHost" | log
 cp $rootDir/tweaks/extras/matomo/matomo.conf /etc/nginx/conf.d/
 sed -i "s/ServerDomain/${CWM_DISPLAYED_ADDRESS}/g" /etc/nginx/conf.d/matomo.conf
-systemctl restart nginx
-waitOrStop 0 "Restart nginx service failed"
+sed -i "s/listen = 127.0.0.1:9000/listen = /run/php/php-fpm.sock/g" /etc/php/7.4/fpm/pool.d/www.conf
 systemctl restart php7.4-fpm
 waitOrStop 0 "Restart php7.4-fpm service failed"
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Database = matomo | DBUser = matomouser"
