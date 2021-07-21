@@ -126,8 +126,8 @@ done
 
 echo "Creating Kamatera templates on Rancher" | log
 sleep 10
-# Kamatera Control Panel
-PANEL_JSON_STRING='{
+# Kamatera Control Plane
+PLANE_JSON_STRING='{
 "engineInsecureRegistry":[],
 "engineInstallURL":"'"${engineInstallUrl}"'",
 "engineRegistryMirror":[],
@@ -146,10 +146,10 @@ PANEL_JSON_STRING='{
 "ram":"2048",
 "type":"kamateraConfig"
 },
-"name":"Kamatera Control Panel",
+"name":"Kamatera Control Plane",
 "useInternalIpAddress":true
 }'
-curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$PANEL_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$PLANE_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 #Kamatera Worker
 WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
