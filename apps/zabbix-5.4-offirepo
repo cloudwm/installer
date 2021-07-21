@@ -40,7 +40,7 @@ EOF
 echo "Creating Database Tables" | log
 gunzip /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz
 sleep 2
-mysql -h localhost zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
+mysql -h localhost -uroot -p'${ADMINPASSWORD}' zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
 sleep 5
 
 echo "Tweaking Zabbix & PHP configuration" | log
