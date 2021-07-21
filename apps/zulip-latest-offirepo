@@ -19,6 +19,7 @@ waitOrStop 0 "Failed to extract archive"
 
 echo "Installing Zulip Application"
 ./zulip-server-*/scripts/setup/install --self-signed-cert --email=${ADMINEMAIL} --hostname=${CWM_DOMAIN}
+sleep 20
 waitOrStop 0 "Failed to install Zulip"
 
 webui=$(su -c "/home/zulip/deployments/next/manage.py generate_realm_creation_link" -s /bin/sh zulip | grep https)

@@ -12,9 +12,9 @@ checkTagExist mysqld.success
 
 rootDir=$(rootDir)
 
-echo "Installing dependencies" | log
-installPackage php php-mbstring php-gd php-xml php-bcmath php-ldap php-mysql
-waitOrStop 0 "Failed to install dependencies"
+echo "Installing php ldap" | log
+installPackage php7.4-ldap
+waitOrStop 0 "Failed to install ldap"
 
 echo "Downloading Zabbix from official repo" | log
 curlDownload https://repo.zabbix.com/zabbix/5.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.4-1+ubuntu20.04_all.deb
@@ -37,14 +37,10 @@ GRANT all privileges on zabbix.* to zabbixuser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
-echo "Creating Database Tables"
+echo "Creating Database Tables" | log
 gunzip /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz
 sleep 2
-mysql -h localhost <<EOF
-use zabbix;
-source /usr/share/doc/zabbix-sql-scripts/mysql/create.sql;
-EOF
-
+mysql -h localhost zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
 sleep 5
 
 echo "Tweaking Zabbix & PHP configuration" | log
@@ -54,9 +50,6 @@ sed -i "s/#\sDBPassword=/DBPassword=${ADMINPASSWORD}/g" /etc/zabbix/zabbix_serve
 sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/7.4/fpm/php.ini
 sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/7.4/fpm/php.ini
 sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/php/7.4/fpm/php.ini
-sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/8.0/apache2/php.ini
-sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/8.0/apache2/php.ini
-sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/php/8.0/apache2/php.ini
 sed -i "s/127.0.0.1/0.0.0.0/g" /etc/mysql/mysql.conf.d/mysqld.cnf
 
 echo "Adding FW rules" | log
