@@ -73,9 +73,7 @@ EOF
 ufw allow 8069
 
 echo "Creating Odoo14 user in postgres" | log
-sudo su postgres <<EOF
-createuser -s odoo14
-EOF
+su -c "createuser -s odoo14" -s /bin/sh postgres
 
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
