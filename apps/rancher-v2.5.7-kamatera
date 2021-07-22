@@ -177,6 +177,8 @@ curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$WORKER_JS
 
 echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072
+service docker restart
+waitOrStop 0 "Restart docker failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Rancher Web UI: https://${rancherDomain}"
