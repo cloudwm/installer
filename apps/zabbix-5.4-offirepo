@@ -37,6 +37,14 @@ GRANT all privileges on zabbix.* to zabbixuser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
+echo "Enabling and starting SQL"
+systemctl enable mysql.service
+systemctl stop mysql.service
+sleep 2
+systemctl start mysql.service
+sleep 5
+waitOrStop 0 "Failed to start SQL"
+
 echo "Creating Database Tables" | log
 gunzip /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz
 sleep 2
