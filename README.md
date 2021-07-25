@@ -37,4 +37,3 @@ This application is allowed to be used, modified or forked by any CWM Cloud Plat
 <br />
 Thanks and enjoy,<br />
 CWM Team<br />
-CaaB.io<br />
