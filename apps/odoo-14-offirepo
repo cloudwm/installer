@@ -73,9 +73,8 @@ EOF
 ufw allow 8069
 
 echo "Creating Odoo14 user in postgres" | log
-#su -c "createuser odoo14" -s /bin/sh postgres
 set -x
-su postgres <<EOF
+su - postgres <<EOF
 createuser -s odoo14
 EOF
 set +x
