@@ -72,12 +72,15 @@ EOF
 
 ufw allow 8069
 
+echo "Restarting postgresql" | log
+service postgresql restart
+sleep 5
+waitOrStop 0 "Failed to restart postgresql"
+
 echo "Creating Odoo14 user in postgres" | log
-set -x
 su - postgres <<EOF
 createuser -s odoo14
 EOF
-set +x
 
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
