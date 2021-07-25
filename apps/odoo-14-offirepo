@@ -72,10 +72,13 @@ EOF
 
 ufw allow 8069
 
-echo "Restarting postgresql" | log
-service postgresql restart
+echo "Enabling postgresql" | log
+systemctl enable postgresql
+systemctl stop postgresql
+sleep 2
+systemctl start postgresql
 sleep 5
-waitOrStop 0 "Failed to restart postgresql"
+waitOrStop 0 "Failed to start postgresql"
 
 echo "Creating Odoo14 user in postgres" | log
 su - postgres <<EOF
