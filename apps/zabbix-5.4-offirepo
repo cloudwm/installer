@@ -37,20 +37,6 @@ GRANT all privileges on zabbix.* to zabbixuser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
-echo "Enabling and starting SQL"
-systemctl enable mysql.service
-systemctl stop mysql.service
-sleep 2
-systemctl start mysql.service
-sleep 5
-waitOrStop 0 "Failed to start SQL"
-
-echo "Creating Database Tables" | log
-gunzip /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz
-sleep 2
-mysql -h localhost zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
-sleep 5
-
 echo "Tweaking Zabbix & PHP configuration" | log
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
@@ -69,6 +55,23 @@ ufw reload
 rm -rf /usr/share/zabbix/conf/zabbix.conf.php
 cp $rootDir/tweaks/extras/zabbix/zabbix.conf.php /usr/share/zabbix/conf/
 sed -i "s/PASSWORDVAR/${ADMINPASSWORD}/g" /usr/share/zabbix/conf/zabbix.conf.php
+
+echo "Extracting database content" | log
+gunzip /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz
+
+echo "Enabling and starting SQL" | log
+systemctl enable mysql.service
+systemctl stop mysql.service
+sleep 2
+systemctl start mysql.service
+sleep 5
+waitOrStop 0 "Failed to start SQL"
+
+echo "Importing Zabbix databse" | log
+set -x
+mysql -h localhost zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
+sleep 5
+set +x
 
 systemctl enable zabbix-server
 sleep 1
