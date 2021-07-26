@@ -9,6 +9,10 @@ fi
 aptSourceList=/etc/apt/sources.list.d/zentyal.list
 rootDir=$(rootDir)
 
+echo "Installing certbot for nginx" | log
+installPackage python3-certbot-nginx
+waitOrStop 0 "Failed apt install: python-certbot-nginx"
+
 echo "Add Zentyal 7.0 repository" | log
 curlDownload http://keys.zentyal.org/zentyal-7.0-packages.asc
 waitOrStop 0 "Key not downloaded from official source"
