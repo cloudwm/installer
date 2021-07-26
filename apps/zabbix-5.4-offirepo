@@ -69,7 +69,7 @@ waitOrStop 0 "Failed to start SQL"
 
 echo "Importing Zabbix databse" | log
 set -x
-mysql -h localhost zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
+mysql zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
 sleep 5
 set +x
 
