@@ -93,11 +93,6 @@ descriptionAppend "HAProxy examples: /usr/share/doc/haproxy/examples"
 descriptionAppend "HAProxy documentation (on-server): /usr/share/doc/haproxy/"
 descriptionAppend "HAProxy documentation (online): http://cbonte.github.io/haproxy-dconv/2.4/intro.html"
 descriptionAppend " "
-descriptionAppend "DataPlane Port: 5555"
-descriptionAppend "DataPlane default password: adminpwd"
-descriptionAppend "DataPlane Config File: /etc/haproxy/dataplaneapi.hcl"
-descriptionAppend " "
-
 
 tagScript success
 
