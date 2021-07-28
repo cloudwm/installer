@@ -67,10 +67,12 @@ service haproxy reload
 waitOrStop 0 "Reload haproxy service failed"
 
 echo "Downloading DataPlane API from Git" | log
+cd $rootDir/temp
 curlDownload https://github.com/haproxytech/dataplaneapi/releases/download/v2.3.3/dataplaneapi_2.3.3_Linux_x86_64.tar.gz
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting DataPlane & Setting Permissions" | log
+cd $rootDir/temp
 tar -xzvf dataplaneapi_2.3.3_Linux_x86_64.tar.gz
 chmod +x build/dataplaneapi
 cp build/dataplaneapi /usr/local/bin/
