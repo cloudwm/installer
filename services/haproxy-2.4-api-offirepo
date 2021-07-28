@@ -79,7 +79,6 @@ cp build/dataplaneapi /usr/local/bin/
 
 echo "Creating DataPlane Config File"
 cp -f $rootDir/tweaks/extras/haproxy/dataplaneapi.hcl /etc/haproxy/
-dataplaneapi -f /etc/haproxy/dataplaneapi.hcl
 
 echo "Adding descriptions" | log
 descriptionAppend "HAProxy Address: ${CWM_DISPLAYED_ADDRESS}"
