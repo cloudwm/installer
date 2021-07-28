@@ -179,6 +179,8 @@ echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072
 service docker restart
 waitOrStop 0 "Restart docker failed"
+service nginx restart
+waitOrStop 0 "Restart nginx failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Rancher Web UI: https://${rancherDomain}"
