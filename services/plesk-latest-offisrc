@@ -20,8 +20,7 @@ wget http://installer.plesk.com/plesk-installer -O - | sh /dev/stdin --source ht
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Adding descriptions" | log
-descriptionAppend "Plesk Web UI: ${CWM_SERVERIP}:8443"
-descriptionAppend "Plesk Domain Address: ${CWM_DOMAIN}:8443"
+descriptionAppend "Enter Plesk UI to finalize installation: ${CWM_DOMAIN}:8443"
 descriptionAppend "Plesk Username: root"
 descriptionAppend "Plesk Password: ${ADMINPASSWORD}"
 descriptionAppend " "
