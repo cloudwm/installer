@@ -79,7 +79,6 @@ cp build/dataplaneapi /usr/local/bin/
 
 echo "Creating DataPlane Config File" | log
 cp -f $rootDir/tweaks/extras/haproxy/dataplaneapi.hcl /etc/haproxy/
-sed -i "s/adminpwd/${ADMINPASSWORD}/g" /etc/haproxy/dataplaneapi.hcl
 
 systemctl reload haproxy
 waitOrStop 0 "Failed to reload HAProxy" | log
