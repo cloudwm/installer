@@ -1,0 +1,33 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing dependencies" | log
+packages=(wget gcc g++ make flex bison openssl libssl-dev \
+          perl perl-base perl-modules libperl-dev libperl4-corelibs-perl \
+          libwww-perl libaio1 libaio-dev zlib1g zlib1g-dev libcap-dev cron \
+          bzip2 zip automake autoconf libtool cmake pkg-config python \
+          libdb-dev libsasl2-dev libncurses5 libncurses5-dev libsystemd-dev \
+          bind9 dnsutils quota patch logrotate rsyslog libc6-dev libexpat1-dev \
+          libcrypt-openssl-rsa-perl curl libnuma-dev libnuma1)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed to install dependencies" | log
+
+ufw allow 2222
+
+echo "Downloading and Installing DirectAdmin" | log
+bash <(curl -Ss https://www.directadmin.com/setup.sh) auto
+waitOrStop 0 "Failed to install DirectAdmin"
+
+echo "Adding descriptions" | log
+descriptionAppend " "
+descriptionAppend "DirectAdmin web UI: http://${CWM_DISPLAYED_ADDRESS}:2222"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
