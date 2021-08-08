@@ -24,7 +24,7 @@ waitOrStop 0 "File not downloaded from official source"
 apt-key add jitsi-key.gpg.key
 apt update | log
 
-echo "Installing Jitsi"
+echo "Installing Jitsi" | log
 export DEBIAN_FRONTEND="noninteractive"
 echo "jitsi-videobridge jitsi-videobridge/jvb-hostname string jitsi.${CWM_DOMAIN}" | debconf-set-selections
 echo "jitsi-meet jitsi-meet/cert-choice select Self-signed certificate will be generated" | debconf-set-selections
