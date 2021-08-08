@@ -6,40 +6,68 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-appPath=/var/www/html/minecraft
+appPath=/opt/minecraft/survival
 
 echo "Creating directory and installing dependencies" | log
 mkdir -p $appPath
-cd $appPath
-installPackage openjdk-16-jre-headless | log
-waitOrStop 0 "Failed to install openjdk"
-installPackage screen | log
-waitOrStop 0 "Failed to install screen"
+installPackage openjdk-16-jre-headless screen default-jdk nmap | log
+waitOrStop 0 "Failed to install dependencies"
 
-echo "Adding MineCraft server port to FW" | log
-ufw allow 25565
+echo "Creating MineCraft User" | log
+useradd -m -r -d /opt/minecraft minecraft
 
 echo "Downloading server Jar file" | log
 cd $appPath
 curlDownload https://launcher.mojang.com/v1/objects/a16d67e5807f57fc4e550299cf20226194497dc2/server.jar
 waitOrStop 0 "File not downloaded from official source"
-mv server.jar minecraft_server_1.17.1.jar
+echo "eula=true" > /opt/minecraft/survival/eula.txt
+chown -R minecraft /opt/minecraft/survival/
 
-echo "Extracting EULA and Configuration files" | log
-cd $appPath
-java -Xms1024M -Xmx2G -jar minecraft_server_1.17.1.jar nogui
-sleep 5
-sed -i "s/eula=false/eula=true/g" /var/www/html/minecraft/eula.txt
+echo "Creating MineCraft Service" | log
+cat << EOF > /etc/systemd/system/minecraft@.service
+[Unit]
+Description=Minecraft Server: %i
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/minecraft/%i
+
+User=minecraft
+Group=minecraft
+
+Restart=always
+
+ExecStart=/usr/bin/screen -DmS mc-%i /usr/bin/java -Xmx2G -jar server.jar nogui
+
+ExecStop=/usr/bin/screen -p 0 -S mc-%i -X eval 'stuff "say SERVER SHUTTING DOWN IN 5 SECONDS. SAVING ALL MAPS..."\015'
+ExecStop=/bin/sleep 5
+ExecStop=/usr/bin/screen -p 0 -S mc-%i -X eval 'stuff "save-all"\015'
+ExecStop=/usr/bin/screen -p 0 -S mc-%i -X eval 'stuff "stop"\015'
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+echo "Enabling MineCraft Service" | log
+systemctl start minecraft@survival
+sleep 3
+waitOrStop 0 "Failed to start MineCraft service"
+systemctl enable minecraft@survival
+sleep 3
+
+echo "Adding FW rules"
+ufw allow 25565
 
 echo "Adding descriptions" | log
 descriptionAppend "MineCraft Server Directory: ${appPath}"
-descriptionAppend "MineCraft Server Configuration file: server.properties"
-descriptionAppend "To start a new session, go to ${appPath} and run:"
+descriptionAppend "MineCraft Server Configuration file: ${appPath}/server.properties"
+descriptionAppend "MineCraft Server Port: 25565"
 descriptionAppend " "
-descriptionAppend "screen"
-descriptionAppend "java -Xms1024M -Xmx2G -jar minecraft_server_1.17.1.jar nogui"
+descriptionAppend "To connect to your server go to the game client and connect to: ${SERVERIP}:25565"
 descriptionAppend " "
 
 tagScript success
 
 exit 0
+
