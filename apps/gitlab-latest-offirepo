@@ -7,9 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing dependencies" | log
-packages=(curl openssh-server ca-certificates tzdata perl postfix)
-installPackage "${packages[@]}" | log
-waitOrStop 0 "Failed apt install: ${packages[@]}"
+installPackage ca-certificates tzdata perl
+waitOrStop 0 "Failed to install dependencies"
 
 echo "Downloading GitLab"
 curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.deb.sh
