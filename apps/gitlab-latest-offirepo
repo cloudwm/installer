@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing dependencies" | log
+packages=(curl openssh-server ca-certificates tzdata perl postfix)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Downloading GitLab"
+curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.deb.sh
+waitOrStop 0 "File not downloaded from official source"
+bash script.deb.sh
+EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ee
+waitOrStop 0 "Failed apt install: gitlab-ee"
+
+descriptionAppend "GitLab UI: https://gitlab.${CWM_DOMAIN}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

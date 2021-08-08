@@ -1,6 +1,6 @@
 # Installer
 
-Installer is a set of scripts for installing services, apps and tweaking operating system on Ubuntu 18.04 LTS server.
+Installer is a set of scripts for installing services, apps and tweaking operating system on Ubuntu 18.04/20.04 LTS servers.
 
 It is developed to help DevOps to simplify servers automated installation.
 
