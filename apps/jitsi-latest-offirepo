@@ -32,7 +32,7 @@ installPackage jitsi-meet
 echo "${ADMINEMAIL}" | /usr/share/jitsi-meet/scripts/install-letsencrypt-cert.sh
 
 echo "Adding descriptions" | log
-descriptionAppend "Jitsi Web UI: https://${CWM_SERVERIP}"
+descriptionAppend "Jitsi Web UI: https://jitsi.${CWM_DOMAIN}"
 descriptionAppend " "
 
 tagScript success
