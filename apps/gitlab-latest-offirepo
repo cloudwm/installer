@@ -15,7 +15,6 @@ curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/s
 waitOrStop 0 "File not downloaded from official source"
 bash script.deb.sh
 EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ee
-waitOrStop 0 "Failed apt install: gitlab-ee"
 
 descriptionAppend "GitLab UI: https://gitlab.${CWM_DOMAIN}"
 descriptionAppend " "
