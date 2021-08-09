@@ -68,7 +68,7 @@ sleep 5
 waitOrStop 0 "Failed to start SQL"
 
 echo "Importing Zabbix databse" | log
-mysql --defaults-file=/root/.my.cnf -h localhost zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
+mysql -uroot -h localhost zabbix < /usr/share/doc/zabbix-sql-scripts/mysql/create.sql
 sleep 5
 
 systemctl enable zabbix-server
