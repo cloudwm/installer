@@ -17,9 +17,8 @@ bash script.deb.sh
 sleep 5
 
 echo "Installing GitLab" | log
-installPackage gitlab-ee
+EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" apt-get install gitlab-ee
 waitOrStop 0 "Failed to install gitlab-ee"
-EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}"
 
 gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
 
