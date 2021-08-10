@@ -20,8 +20,9 @@ waitOrStop 0 "Failed to install dependencies" | log
 ufw allow 2222
 
 echo "Downloading and Installing DirectAdmin" | log
-bash <(curl -Ss https://www.directadmin.com/setup.sh) auto
+curlDownload https://www.directadmin.com/setup.sh 
 waitOrStop 0 "Failed to install DirectAdmin"
+bash setup.sh
 
 echo "Adding descriptions" | log
 descriptionAppend " "
