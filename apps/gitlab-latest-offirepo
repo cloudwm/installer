@@ -26,7 +26,7 @@ descriptionAppend "GitLab UI: https://gitlab.${CWM_DOMAIN}"
 descriptionAppend " "
 descriptionAppend "Default admin account has been configured with following details:"
 descriptionAppend "Username: root"
-descriptionAppend "Password: ${gitpass}"
+descriptionAppend "${gitpass}"
 descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
 descriptionAppend " "
 
