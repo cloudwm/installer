@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
+
 echo "Installing dependencies" | log
 installPackage ca-certificates tzdata perl
 waitOrStop 0 "Failed to install dependencies"
@@ -15,8 +17,14 @@ curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/s
 waitOrStop 0 "File not downloaded from official source"
 bash script.deb.sh
 EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ee
+waitOrStop 0 "Failed to install gitlab-ee"
 
 descriptionAppend "GitLab UI: https://gitlab.${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "Default admin account has been configured with following details:"
+descriptionAppend "Username: root"
+descriptionAppend "Password: ${gitpass}"
+descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
 descriptionAppend " "
 
 tagScript success
