@@ -6,8 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
-
 echo "Installing dependencies" | log
 installPackage ca-certificates tzdata perl
 waitOrStop 0 "Failed to install dependencies"
@@ -18,6 +16,8 @@ waitOrStop 0 "File not downloaded from official source"
 bash script.deb.sh
 EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ee
 waitOrStop 0 "Failed to install gitlab-ee"
+
+gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
 
 descriptionAppend "GitLab UI: https://gitlab.${CWM_DOMAIN}"
 descriptionAppend " "
