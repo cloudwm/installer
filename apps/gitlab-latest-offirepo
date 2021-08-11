@@ -17,12 +17,21 @@ bash script.deb.sh
 sleep 5
 
 echo "Installing GitLab" | log
-EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" apt-get install gitlab-ee
+installPackage gitlab-ee
 waitOrStop 0 "Failed to install gitlab-ee"
+
+echo "Configuring domain" | log
+sed -i "s/http:\/\/gitlab.example.com/https:\/\/gitlab.${CWM_DOMAIN}/g" /etc/gitlab/gitlab.rb
+gitlab-ctl reconfigure
+sleep 10
+
+echo "Starting gitlab service" | log
+gitlab-ctl start
+waitOrStop 0 "Failed to start gitlab service"
 
 gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
 
-descriptionAppend "GitLab UI: https://gitlab.${CWM_DOMAIN}"
+descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
 descriptionAppend " "
 descriptionAppend "Default admin account has been configured with following details:"
 descriptionAppend "Username: root"
