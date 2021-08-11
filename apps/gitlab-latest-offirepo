@@ -14,12 +14,11 @@ echo "Downloading GitLab" | log
 curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
 waitOrStop 0 "File not downloaded from official source"
 bash script.deb.sh
-sleep 20
+sleep 30
 waitOrStop 0 "Failed to install GitLab"
 
 echo "Installing GitLab from apt" | log
 EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ce
-sleep 20
 waitOrStop 0 "Failed to install gitlab-ee"
 
 gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
