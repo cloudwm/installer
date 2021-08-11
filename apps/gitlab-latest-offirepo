@@ -18,6 +18,7 @@ sleep 30
 waitOrStop 0 "Failed to install GitLab"
 
 echo "Installing GitLab from apt" | log
+pkill apt
 EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ce
 waitOrStop 0 "Failed to install gitlab-ee"
 
