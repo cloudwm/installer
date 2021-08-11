@@ -22,13 +22,14 @@ sleep 20
 waitOrStop 0 "Failed to install GitLab"
 
 echo "Installing GitLab from apt" | log
-installPackage gitlab-ee
+EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ee
+sleep 20
 waitOrStop 0 "Failed to install gitlab-ee"
 
-echo "Configuring domain" | log
-sed -i "s/http:\/\/gitlab.example.com/https:\/\/gitlab.${CWM_DOMAIN}/g" /etc/gitlab/gitlab.rb
-gitlab-ctl reconfigure
-sleep 10
+#echo "Configuring domain" | log
+#sed -i "s/http:\/\/gitlab.example.com/https:\/\/gitlab.${CWM_DOMAIN}/g" /etc/gitlab/gitlab.rb
+#gitlab-ctl reconfigure
+#sleep 10
 
 gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
 
