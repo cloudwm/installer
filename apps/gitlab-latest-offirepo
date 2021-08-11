@@ -11,6 +11,7 @@ installPackage ca-certificates tzdata perl
 waitOrStop 0 "Failed to install dependencies"
 
 echo "Downloading GitLab" | log
+cd /etc/
 curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.deb.sh
 waitOrStop 0 "File not downloaded from official source"
 bash script.deb.sh
