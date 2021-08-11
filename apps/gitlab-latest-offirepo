@@ -6,30 +6,21 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
-
 echo "Installing dependencies" | log
 installPackage ca-certificates tzdata perl
 waitOrStop 0 "Failed to install dependencies"
 
 echo "Downloading GitLab" | log
-cd $(mktemp -d)
-curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.deb.sh
+curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
 waitOrStop 0 "File not downloaded from official source"
-chmod +x script.deb.sh
-./script.deb.sh
+bash script.deb.sh
 sleep 20
 waitOrStop 0 "Failed to install GitLab"
 
 echo "Installing GitLab from apt" | log
-EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ee
+EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ce
 sleep 20
 waitOrStop 0 "Failed to install gitlab-ee"
-
-#echo "Configuring domain" | log
-#sed -i "s/http:\/\/gitlab.example.com/https:\/\/gitlab.${CWM_DOMAIN}/g" /etc/gitlab/gitlab.rb
-#gitlab-ctl reconfigure
-#sleep 10
 
 gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
 
