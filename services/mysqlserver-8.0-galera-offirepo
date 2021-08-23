@@ -58,7 +58,7 @@ echo "Adding descriptions" | log
 descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
-descriptionAppend "mySQL Cluster Configuration: /etc/mysql/mysql.conf.d/mysqld.cnf
+descriptionAppend "mySQL Cluster Configuration: /etc/mysql/mysql.conf.d/mysqld.cnf"
 descriptionAppend " "
 
 tag mysql-server-8.0.success
