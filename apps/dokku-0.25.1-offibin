@@ -6,9 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist ntpd.success
-checkTagExist cwm-settimezone.success
-
 rootDir=$(rootDir)
 
 echo "Installing application" | log
