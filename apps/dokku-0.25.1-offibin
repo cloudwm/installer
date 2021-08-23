@@ -20,9 +20,12 @@ waitOrStop 0 "File not downloaded from github"
 DOKKU_TAG=v0.25.1 bash bootstrap.sh
 waitOrStop 0 "Failed to install application"
 
-echo "Adding descriptions" | log
+echo "Setting dokku domain"
+sleep 5
+dokku domains:set-global ${savedHostname::32}
 
-descriptionAppend "Please proceed to http://${CWM_SERVERIP}/  to finish the installation"
+echo "Adding descriptions" | log
+descriptionAppend "Please proceed to http://${savedHostname::32}/  to finish the installation"
 descriptionAppend " "
 
 tagScript success
