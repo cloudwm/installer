@@ -21,6 +21,7 @@ echo "Allowing Chrome to run as root" | log
 sed -i '$s/$/ --user-data-dir --test-type --no-sandbox/' /opt/google/chrome/google-chrome
 
 echo "Installing VirtualBox from apt" | log
+export DEBIAN_FRONTEND="noninteractive"
 installPackage virtualbox virtualbox-ext-pack
 waitOrStop 0 "Failed apt install VirtualBox"
 
