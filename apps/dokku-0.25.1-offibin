@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ntpd.success
+checkTagExist cwm-settimezone.success
+
+rootDir=$(rootDir)
+
+echo "Installing application" | log
+cd $rootDir/temp
+curlDownload https://raw.githubusercontent.com/dokku/dokku/v0.25.1/bootstrap.sh
+waitOrStop 0 "File not downloaded from github"
+DOKKU_TAG=v0.25.1 bash bootstrap.sh
+waitOrStop 0 "Failed to install application"
+
+echo "Adding descriptions" | log
+
+descriptionAppend "Please proceed to http://${CWM_SERVERIP}/  to finish the installation"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
