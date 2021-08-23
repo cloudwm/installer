@@ -22,6 +22,7 @@ sed -i '$s/$/ --user-data-dir --test-type --no-sandbox/' /opt/google/chrome/goog
 
 echo "Installing VirtualBox from apt" | log
 export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "virtualbox-ext-pack virtualbox-ext-pack/license select true"
 installPackage virtualbox virtualbox-ext-pack
 waitOrStop 0 "Failed apt install VirtualBox"
 
