@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing Google Chrome latest stable" | log
+cd $rootDir/temp
+appFilename=google-chrome-stable_current_amd64.deb
+curlDownload https://dl.google.com/linux/direct/$appFilename
+waitOrStop 0 "File not downloaded from official source"
+dpkg -i $appFilename
+rm $appFilename
+
+echo "Allowing Chrome to run as root" | log
+sed -i '$s/$/ --user-data-dir --test-type --no-sandbox/' /opt/google/chrome/google-chrome
+
+echo "Installing VirtualBox from apt" | log
+installPackage virtualbox virtualbox-ext-pack
+waitOrStop 0 "Failed apt install VirtualBox"
+
+tagScript success
+
+exit 0

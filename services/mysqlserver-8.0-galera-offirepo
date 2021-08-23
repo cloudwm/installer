@@ -1,0 +1,71 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ubuntu-updateos.success
+
+echo "Adding Galera Repository" | log
+apt-key adv --keyserver keyserver.ubuntu.com --recv BC19DDBA
+cat << EOF > /etc/apt/sources.list.d/galera.list
+deb https://releases.galeracluster.com/galera-4/ubuntu focal main
+deb https://releases.galeracluster.com/mysql-wsrep-8.0/ubuntu focal main
+EOF
+cat << EOF > /etc/apt/preferences.d/galera.pref
+# Prefer Codership repository
+Package: *
+Pin: origin releases.galeracluster.com
+Pin-Priority: 1001
+EOF
+apt update
+
+echo "Installing mysql from apt" | log
+export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "mysql-wsrep-8.0 mysql-server/root_password password ${ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-wsrep-8.0 mysql-server/root_password_again password ${ADMINPASSWORD}"
+installPackage galera-4 mysql-wsrep-8.0
+checkPackageInstalled mysql-wsrep-8.0
+
+echo "Tweaking MySQL wsrep settings"
+cat << EOF >> /etc/mysql/mysql.conf.d/mysqld.cnf
+default_storage_engine=InnoDB
+innodb_autoinc_lock_mode=2
+innodb_flush_log_at_trx_commit=0
+innodb_buffer_pool_size=128M
+binlog_format=ROW
+wsrep_on=ON
+wsrep_provider=/usr/lib/galera/libgalera_smm.so
+wsrep_node_name="test"
+wsrep_node_address="127.0.0.1"
+wsrep_cluster_name="galera4"
+wsrep_cluster_address="gcomm://ip1,ip2,ip3"
+wsrep_provider_options="gcache.size=128M; gcache.page_size=128M"
+wsrep_slave_threads=4
+wsrep_sst_method=rsync
+EOF
+
+echo "Restarting mysql.service" | log
+systemctl stop mysql.service
+sleep 3
+mysqld_bootstrap
+sleep 5
+waitOrStop 0 "Failed to bootsrap mysql"
+
+echo "Adding descriptions" | log
+descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"
+descriptionAppend "mySQL Server Username: root"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend "mySQL Cluster Configuration: /etc/mysql/mysql.conf.d/mysqld.cnf
+descriptionAppend " "
+
+tag mysql-server-8.0.success
+tag mysqld.success
+
+tagScript success
+
+exit 0
+
+

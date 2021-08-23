@@ -28,7 +28,9 @@ if [ ! -z "$CWM_LANNICIDS" ]; then
 
 else
 
-    ufw allow 3306,4567,4568 | log
+    ufw allow 3306 | log
+    ufw allow 4567 | log
+    ufw allow 4568 | log
     
 fi
 
