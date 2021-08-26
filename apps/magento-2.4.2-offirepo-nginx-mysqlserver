@@ -24,7 +24,7 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Installing Composer for machine" | log
-installPackage composer | log
+curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 waitOrStop 0 "Failed apt install: composer"
 
 echo "Downloading Magento ${appVersion} from github repo" | log
