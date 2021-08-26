@@ -23,9 +23,6 @@ GRANT all privileges on magentodb.* to magentouser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
-echo "Installing Composer for machine" | log
-curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
-waitOrStop 0 "Failed apt install: composer"
 
 echo "Downloading Magento ${appVersion} from github repo" | log
 mkdir -p $appPath
@@ -47,8 +44,10 @@ find var generated vendor pub/static pub/media app/etc -type d -exec chmod g+ws 
 chown -R www-data:www-data .
 chmod u+x bin/magento
 
-echo "Installing Composer dependencies for Magento" | log
+echo "Installing Composer & Composer dependencies for Magento" | log
 cd $appPath
+installPackage composer | log
+waitOrStop 0 "Failed apt install: composer"
 export COMPOSER_HOME=/root
 composer install -v | log
 waitOrStop 0 "Failed to install composer dependencies"
