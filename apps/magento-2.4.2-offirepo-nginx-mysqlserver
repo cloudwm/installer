@@ -23,7 +23,6 @@ GRANT all privileges on magentodb.* to magentouser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
-
 echo "Downloading Magento ${appVersion} from github repo" | log
 mkdir -p $appPath
 cd $rootDir/temp
@@ -45,10 +44,11 @@ chown -R www-data:www-data .
 chmod u+x bin/magento
 
 echo "Installing Composer & Composer dependencies for Magento" | log
-cd $appPath
 installPackage composer | log
 waitOrStop 0 "Failed apt install: composer"
 export COMPOSER_HOME=/root
+cd $appPath
+sed -i s/5ae2deac1c7e1b992cfa572167370de45bdd346d/3e1147d2f195ab86ba70a5c5ea5fa2284b0a40ef/g $appPath/composer.lock
 composer install -v | log
 waitOrStop 0 "Failed to install composer dependencies"
 

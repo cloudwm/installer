@@ -54,6 +54,7 @@ curlDownload https://getcomposer.org/installer composer-setup.php
 waitOrStop 0 "File not downloaded from official source"
 curlDownload https://composer.github.io/installer.sig installer.sig 
 waitOrStop 0 "File not downloaded from official source"
+sed -i s/5ae2deac1c7e1b992cfa572167370de45bdd346d/3e1147d2f195ab86ba70a5c5ea5fa2284b0a40ef/g $appPath/composer.lock
 php -r "if (hash_file('SHA384', 'composer-setup.php') === '$(cat installer.sig)') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
 php composer-setup.php --version=1.10.1
 sleep 2
