@@ -27,7 +27,6 @@ echo "Installing Caddy from apt" | log
 installPackage caddy | log
 waitOrStop 0 "Failed apt install: Caddy"
 mkdir -p $appPath
-mkdir /var/log/caddy
 chown -R caddy:caddy /var/log/caddy
 
 echo "Creating the Caddy configuration file" | log
@@ -35,6 +34,7 @@ cat /dev/null > /etc/caddy/Caddyfile
 cat << EOF > /etc/caddy/Caddyfile
 ${CWM_DOMAIN} {
     root * $appPath
+    file_server
     log {
         output file /var/log/caddy/${CWM_DOMAIN}.access.log {
                 roll_size 3MiB
