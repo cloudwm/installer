@@ -44,7 +44,7 @@ ${CWM_DOMAIN} {
         format console
     }
     encode gzip zstd
-    php_fastcgi unix//run/php/php-fpm.sock
+    php_fastcgi unix//run/php/php7.4-fpm.sock
 
     tls ${ADMINEMAIL} {
         protocols tls1.2 tls1.3
@@ -54,6 +54,7 @@ EOF
 
 echo "Changing PHP permissions" | log
 sed -i "s/www-data/caddy/g" /etc/php/7.4/fpm/pool.d/www.conf
+sed -i "s/127\.0\.0\.1\:9000/\/run\/php\/php7.4-fpm.sock/g" /etc/php/7.4/fpm/pool.d/www.conf
 
 echo "Restarting services" | log
 systemctl restart php7.4-fpm
