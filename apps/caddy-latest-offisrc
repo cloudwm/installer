@@ -1,0 +1,72 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist mysqld.success
+
+appPath=/var/www/html
+
+echo "Creating Caddy Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE caddydb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'caddyuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on caddydb.* to caddyuser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Adding caddy to source list" | log
+echo "deb [trusted=yes] https://apt.fury.io/caddy/ /" | tee -a /etc/apt/sources.list.d/caddy-fury.list
+apt update | log
+
+echo "Installing Caddy from apt" | log
+installPackage caddy | log
+waitOrStop 0 "Failed apt install: Caddy"
+mkdir -p $appPath
+mkdir /var/log/caddy
+chown -R caddy:caddy /var/log/caddy
+
+echo "Creating the Caddy configuration file" | log
+cat /dev/null > /etc/caddy/Caddyfile
+cat << EOF > /etc/caddy/Caddyfile
+${CWM_DOMAIN} {
+    root * $appPath
+    log {
+        output file /var/log/caddy/${CWM_DOMAIN}.access.log {
+                roll_size 3MiB
+                roll_keep 5
+                roll_keep_for 48h
+        }
+        format console
+    }
+    encode gzip zstd
+    php_fastcgi unix//run/php/php-fpm.sock
+
+    tls ${ADMINEMAIL} {
+        protocols tls1.2 tls1.3
+    }
+}
+EOF
+
+echo "Changing PHP permissions" | log
+sed -i "s/www-data/caddy/g" /etc/php/7.4/fpm/pool.d/www.conf
+
+echo "Restarting services" | log
+systemctl restart php7.4-fpm
+waitOrStop 0 "Failed to restart PHP"
+systemctl restart caddy
+waitOrStop 0 "Failed to restart Caddy"
+
+echo "Adding descriptions" | log
+descriptionAppend "Caddy web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Caddy configuration file: /etc/caddy/Caddyfile"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
