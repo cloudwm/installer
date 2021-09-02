@@ -10,6 +10,7 @@ checkTagExist php.success
 checkTagExist mysqld.success
 
 appPath=/var/www/html
+rootDir=$(rootDir)
 
 echo "Creating Caddy Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -34,7 +35,6 @@ cat /dev/null > /etc/caddy/Caddyfile
 cat << EOF > /etc/caddy/Caddyfile
 ${CWM_DOMAIN} {
     root * $appPath
-    file_server
     log {
         output file /var/log/caddy/${CWM_DOMAIN}.access.log {
                 roll_size 3MiB
@@ -55,6 +55,10 @@ EOF
 echo "Changing PHP permissions" | log
 sed -i "s/www-data/caddy/g" /etc/php/7.4/fpm/pool.d/www.conf
 sed -i "s/127\.0\.0\.1\:9000/\/run\/php\/php7.4-fpm.sock/g" /etc/php/7.4/fpm/pool.d/www.conf
+
+echo "Setting defualt index file"
+cp $rootDir/tweaks/extras/caddy/index.php $appPath
+sed -i "s/PASS/${ADMINPASSWORD}/g" $appPath/index.php
 
 echo "Restarting services" | log
 systemctl restart php7.4-fpm
