@@ -11,7 +11,8 @@
 <body id="wrap">
     <h2>Caddy Demo Site</h2>
     <?php echo '<p>Hello, This is the default DB connection testing page.</p>';
-
+	  echo '<p>Caddy configuration file: /etc/caddy/Caddyfile</p>';
+          echo '<p>Caddy root directory: /var/www/html</p>';
     // Define PHP variables for the MySQL connection.
     $servername = "localhost";
     $username = "caddyuser";
