@@ -13,46 +13,16 @@ appPath=/var/www/html/directus
 rootDir=$(rootDir)
 
 echo "Verifying PHP dependencies" |  log
-packages=(software-properties-common php7.2 libapache2-mod-php7.2 php7.2-common \
-          php7.2-curl php7.2-intl php7.2-mbstring php7.2-xmlrpc php7.2-mysql php7.2-gd php7.2-xml php7.2-cli php7.2-zip)
+packages=(software-properties-common php7.4 libapache2-mod-php7.4 php7.4-common \
+          php7.4-curl php7.4-intl php7.4-mbstring php7.4-xmlrpc php7.4-mysql php7.4-gd php7.4-xml php7.4-cli php7.4-zip)
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed to install dependencies"
 
-echo "Installing MariaDB" | log
-installPackage mariadb-server mariadb-client
-waitOrStop 0 "Failed to install MariaDB"
-systemctl enable mariadb.service
-sleep 2
-systemctl stop mariadb.service
-sleep 2
-systemctl start mariadb.service
-sleep 5
-waitOrStop 0 "Failed to start MariaDB"
-
-echo "Running first setup process" | log
-mysql_secure_installation  << EOF
-n
-n
-y
-y
-y
-y
-EOF
-
-echo "Tweaking PHP settings" | log
-sed -i "s/short_open_tag = Off/short_open_tag = On/g" /etc/php/7.2/apache2/php.ini
-sed -i "s/memory_limit = *M/memory_limit = 256M/g" /etc/php/7.2/apache2/php.ini
-sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/php/7.2/apache2/php.ini
-sed -i "s/upload_max_filesize = *M/upload_max_filesize = 100M/g" /etc/php/7.2/apache2/php.ini
-sed -i "s/#\date.timezone = /date.timezone = Asia\/Jerusalem/g" /etc/php/7.2/apache2/php.ini
-systemctl restart apache2.service
-waitOrStop 0 "Failed to restart Apache"
-
 echo "Creating Directus Database" | log
-mysql -h localhost <<EOF
-CREATE DATABASE directus;
-CREATE USER 'directususer'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
-GRANT ALL ON directus.* TO 'directususer'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}' WITH GRANT OPTION;
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE directus CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'directususer'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on directus.* to directususer@localhost;
 FLUSH PRIVILEGES;
 EOF
 
