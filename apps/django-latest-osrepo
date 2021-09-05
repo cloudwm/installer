@@ -26,7 +26,7 @@ echo "Creating Django project" | log
 django-admin startproject djangoproject .
 python manage.py migrate
 
-sed -i "s/ALLOWED_HOSTS = []/ALLOWED_HOSTS = ['${CWM_DOMAIN}']/g" $appPath/djangoproject/settings.py
+sed -i "s/ALLOWED_HOSTS \= \[]/ALLOWED_HOSTS \= \['${CWM_DOMAIN}']/g" $appPath/djangoproject/settings.py
 
 echo "Adding WebUI port to ufw" | log
 ufw allow 8000
