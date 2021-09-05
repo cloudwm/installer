@@ -53,7 +53,8 @@ systemctl start django.service
 waitOrStop 0 "Failed to start Django service"
 
 echo "Adding descriptions" | log
-descriptionAppend "run `manage.py createsuperuser` in your project to create a Django user."
+descriptionAppend "Django root directory: $appPath"
+descriptionAppend "run manage.py createsuperuser in $appPath to create a Django admin user."
 descriptionAppend "Django WebUI: http://${CWM_DOMAIN}:8000"
 descriptionAppend "Django Admin UI: http://${CWM_DOMAIN}:8000/admin"
 descriptionAppend " "
