@@ -55,8 +55,10 @@ systemctl start django.service
 waitOrStop 0 "Failed to start Django service"
 
 echo "Adding descriptions" | log
+descriptionAppend "Django Debug mode is on."
+descriptionAppend "Make sure to add your website CSS and index files"
 descriptionAppend "Django root directory: $appPath"
-descriptionAppend "run manage.py createsuperuser in $appPath to create a Django admin user."
+descriptionAppend "Django settings file: $appPath/djangoproject/settings.py"
 descriptionAppend "Django WebUI: http://${CWM_DOMAIN}:8000"
 descriptionAppend "Django Admin UI: http://${CWM_DOMAIN}:8000/admin"
 descriptionAppend " "
