@@ -23,8 +23,10 @@ pip install django
 waitOrStop 0 "Failed to install django from pip"
 
 echo "Creating Django project" | log
+cd $appPath
 django-admin startproject djangoproject .
-python manage.py migrate
+python3 manage.py migrate
+./manage.py shell -c "from django.contrib.auth.models import User; User.objects.create_superuser('root', '${ADMINEMAIL}', '${ADMINPASSWORD}')"
 
 sed -i "s/ALLOWED_HOSTS \= \[]/ALLOWED_HOSTS \= \['${CWM_DOMAIN}']/g" $appPath/djangoproject/settings.py
 
