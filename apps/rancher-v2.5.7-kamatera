@@ -15,7 +15,6 @@ kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/rele
 
 RANCHER_VERSION=v2.5.7
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
-rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 
 echo "Installing Jq" | log
 installPackage jq
@@ -52,7 +51,7 @@ ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/register
 systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 # creating certbot
-execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rancherDomain} ${CWM_DEBUG:+"--test-cert"}
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
 waitOrStop 0 "Letsencrypt certificates not created"
 # remove certbot routing
 unlink /etc/nginx/sites-enabled/register.conf
@@ -64,9 +63,9 @@ cp $rootDir/tweaks/extras/rancher/http2_proxy.conf /etc/nginx/snippets/
 cp $rootDir/tweaks/extras/rancher/ssl.conf /etc/nginx/snippets/
 # add keys to ssl configs
 cp $rootDir/tweaks/extras/rancher/letsencrypt_certs.conf /etc/nginx/snippets/
-sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rancherDomain}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
-sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rancherDomain}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
-sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${rancherDomain}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
 # symlink sites
 ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
 systemctl restart nginx
@@ -77,7 +76,7 @@ mkdir -p /var/lib/rancher
 systemctl start docker.service
 waitOrStop 0 "Start docker service failed"
 
-docker run -d --name rancher --restart unless-stopped -p 8000:80 -p 8443:443 --privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
+docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
 
 curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
@@ -90,19 +89,19 @@ done
 sleep 15
 
 echo "Getting Rancher Login Token" | log
-LOGINRESPONSE=`curl --url "https://${rancherDomain}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' "${curlBaseParams[@]}"`
+LOGINRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' "${curlBaseParams[@]}"`
 LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
 
 echo "Changing Web Interface Password" | log
-curl --url "https://${rancherDomain}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"  
+curl --url "https://${CWM_DOMAIN}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"  
 
 echo "Creating API key" | log
-APIRESPONSE=`curl --url "https://${rancherDomain}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"`
+APIRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"`
 echo "Getting API Token" | log
 APITOKEN=`echo $APIRESPONSE | jq -r .token`
 
 echo "Listing available Node drivers" | log
-NODEDRIVERS=`curl --url "https://${rancherDomain}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
+NODEDRIVERS=`curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
 for url in ${NODEDRIVERS}; do 
@@ -112,10 +111,10 @@ for url in ${NODEDRIVERS}; do
 done
 
 echo "Adding Kamatera Docker Machine Driver" | log
-curl --url "https://${rancherDomain}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
+curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
 
 echo "Listing available Kubernetes drivers" | log
-KONTAINERDRIVERS=`curl --url "https://${rancherDomain}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
+KONTAINERDRIVERS=`curl --url "https://${CWM_DOMAIN}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
 for url in ${KONTAINERDRIVERS}; do 
@@ -149,7 +148,7 @@ PANEL_JSON_STRING='{
 "name":"Kamatera Control Panel",
 "useInternalIpAddress":true
 }'
-curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$PANEL_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$PANEL_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 #Kamatera Worker
 WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
@@ -173,7 +172,7 @@ WORKER_JSON_STRING='{
 "name":"Kamatera Worker",
 "useInternalIpAddress":true
 }'
-curl --url "https://${rancherDomain}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
 echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072
@@ -183,7 +182,7 @@ service nginx restart
 waitOrStop 0 "Restart nginx failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Rancher Web UI: https://${rancherDomain}"
+descriptionAppend "Rancher Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Rancher Username: admin"
 descriptionAppend "Rancher Password: ${ADMINPASSWORD}"
 descriptionAppend " "
