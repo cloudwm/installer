@@ -72,15 +72,17 @@ systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
 echo "Creating Rancher admin" | log
-mkdir -p /var/lib/rancher 
+mkdir -p /var/lib/rancher
 systemctl start docker.service
 waitOrStop 0 "Start docker service failed"
 
-docker run -d --name rancher --restart unless-stopped -p 8000:80 -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
+docker run -d --name rancher --restart unless-stopped -p 8000:80 -p 8443:443 --privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
 
 curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
 echo "Waiting for Rancher to intialize" | log
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
 HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_SERVERIP}:443 --insecure`
 until [ "$HTTPD" == "200" ]; do
     sleep 3
@@ -93,7 +95,7 @@ LOGINRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3-public/localProviders/local?
 LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
 
 echo "Changing Web Interface Password" | log
-curl --url "https://${CWM_DOMAIN}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"  
+curl --url "https://${CWM_DOMAIN}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"
 
 echo "Creating API key" | log
 APIRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"`
@@ -104,20 +106,20 @@ echo "Listing available Node drivers" | log
 NODEDRIVERS=`curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
-for url in ${NODEDRIVERS}; do 
+for url in ${NODEDRIVERS}; do
 
     curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
 done
 
 echo "Adding Kamatera Docker Machine Driver" | log
-curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
+curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
 echo "Listing available Kubernetes drivers" | log
 KONTAINERDRIVERS=`curl --url "https://${CWM_DOMAIN}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.deactivate`
 
 echo "Deactivating foreign drivers" | log
-for url in ${KONTAINERDRIVERS}; do 
+for url in ${KONTAINERDRIVERS}; do
 
     curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
 
