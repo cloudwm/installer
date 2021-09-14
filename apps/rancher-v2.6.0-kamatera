@@ -63,9 +63,9 @@ cp $rootDir/tweaks/extras/rancher/http2_proxy.conf /etc/nginx/snippets/
 cp $rootDir/tweaks/extras/rancher/ssl.conf /etc/nginx/snippets/
 # add keys to ssl configs
 cp $rootDir/tweaks/extras/rancher/letsencrypt_certs.conf /etc/nginx/snippets/
-sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
-sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
-sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${CWM_SERVERIP}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${CWM_SERVERIP}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${CWM_SERVERIP}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
 # symlink sites
 ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
 systemctl restart nginx
