@@ -51,7 +51,7 @@ ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/register
 systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 # creating certbot
-execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_SERVERIP} ${CWM_DEBUG:+"--test-cert"}
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
 waitOrStop 0 "Letsencrypt certificates not created"
 # remove certbot routing
 unlink /etc/nginx/sites-enabled/register.conf
@@ -63,9 +63,9 @@ cp $rootDir/tweaks/extras/rancher/http2_proxy.conf /etc/nginx/snippets/
 cp $rootDir/tweaks/extras/rancher/ssl.conf /etc/nginx/snippets/
 # add keys to ssl configs
 cp $rootDir/tweaks/extras/rancher/letsencrypt_certs.conf /etc/nginx/snippets/
-sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${CWM_SERVERIP}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
-sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${CWM_SERVERIP}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
-sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${CWM_SERVERIP}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
+sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem|" /etc/nginx/snippets/letsencrypt_certs.conf
 # symlink sites
 ln -s /etc/nginx/sites-available/rancher.conf /etc/nginx/sites-enabled/rancher.conf
 systemctl restart nginx
