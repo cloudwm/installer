@@ -85,7 +85,7 @@ sleep 1
 
 echo "Adding descriptions" | log
 descriptionAppend ""
-descriptionAppend "Prometheus web UI:https://${CWM_DOMAIN}:9090""
+descriptionAppend "Prometheus web UI:https://${CWM_DOMAIN}:9090"
 descriptionAppend ""
 
 tagScript success
