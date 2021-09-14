@@ -58,8 +58,7 @@ unlink /etc/nginx/sites-enabled/register.conf
 
 echo "Creating nginx configuration" | log
 # copy ssl configs to nginx folders
-cp $rootDir/tweaks/extras/rancher/rancher.2.6.conf /etc/nginx/sites-available/
-mv /etc/nginx/sites-available/rancher.2.6.conf /etc/nginx/sites-available/rancher.conf
+cp $rootDir/tweaks/extras/rancher/rancher.conf /etc/nginx/sites-available/
 cp $rootDir/tweaks/extras/rancher/http2_proxy.conf /etc/nginx/snippets/
 cp $rootDir/tweaks/extras/rancher/ssl.2.6.conf /etc/nginx/snippets/
 mv /etc/nginx/snippets/ssl.2.6.conf /etc/nginx/snippets/ssl.conf
