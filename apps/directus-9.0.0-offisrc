@@ -6,17 +6,17 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist php.success
+#checkTagExist php.success
 checkTagExist httpd.success
 
 appPath=/var/www/html/directus
 rootDir=$(rootDir)
 
-echo "Verifying PHP dependencies" |  log
-packages=(software-properties-common php7.4 libapache2-mod-php7.4 php7.4-common \
+#echo "Verifying PHP dependencies" |  log
+#packages=(software-properties-common php7.4 libapache2-mod-php7.4 php7.4-common \
           php7.4-curl php7.4-intl php7.4-mbstring php7.4-xmlrpc php7.4-mysql php7.4-gd php7.4-xml php7.4-cli php7.4-zip)
-installPackage "${packages[@]}" | log
-waitOrStop 0 "Failed to install dependencies"
+#installPackage "${packages[@]}" | log
+#waitOrStop 0 "Failed to install dependencies"
 
 echo "Creating Directus Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
