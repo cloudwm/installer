@@ -28,13 +28,12 @@ EOF
 
 echo "Downloading Directus from github repo" | log
 mkdir -p $appPath
-cd $rootDir/temp
-curlDownload https://github.com/directus/directus/archive/refs/tags/v9.0.0-rc.85.tar.gz
+cd $appPath
+curlDownload https://github.com/directus/directus/archive/refs/tags/v9.0.0-rc.93.tar.gz
 waitOrStop 0 "File not downloaded from official source"
-mv v9.0.0-rc.85.tar.gz $appPath
 
 echo "Extracting Directus to ${appPath}" | log
-tar -xzvf $appPath/v9.0.0-rc.85.tar.gz -C $appPath/ --strip 1
+tar -xzvf $appPath/v9.0.0-rc.93.tar.gz
 waitOrStop 0 "Failed to extract application archive"
 
 echo "Setting permissions for Directus" | log
