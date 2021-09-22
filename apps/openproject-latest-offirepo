@@ -10,11 +10,10 @@ fi
 rootDir=$(rootDir)
 
 echo "Downloading OpenProject key and adding to source list" | log
-curlDownload https://dl.packager.io/srv/opf/openproject/key | apt-key add -
+curlDownload https://dl.packager.io/srv/opf/openproject/key
 waitOrStop "Failed to download PGP key"
-curlDownload /etc/apt/sources.list.d/openproject.list \
-  https://dl.packager.io/srv/opf/openproject/stable/11/installer/ubuntu/20.04.repo
-waitOrStop "Failed to add source list"
+apt-key add key
+echo "deb https://dl.packager.io/srv/deb/opf/openproject/stable/11/ubuntu 20.04 main" | tee /etc/apt/sources.list.d/openproject.list
 
 echo "Updating and installing OpenProject from apt" | log
 apt-get update

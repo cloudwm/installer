@@ -17,12 +17,19 @@ waitOrStop 0 "File not downloaded from official sources"
 tar -xzvf zulip-server-latest.tar.gz
 waitOrStop 0 "Failed to extract archive"
 
-echo "Installing Zulip Application"
+echo "Installing Zulip Application" | log
 ./zulip-server-*/scripts/setup/install --self-signed-cert --email=${ADMINEMAIL} --hostname=${CWM_DOMAIN}
 sleep 20
 waitOrStop 0 "Failed to install Zulip"
 
 webui=$(su -c "/home/zulip/deployments/next/manage.py generate_realm_creation_link" -s /bin/sh zulip | grep https)
+
+echo "Configuring Nginx VirtualHost" | log
+cp $rootDir/tweaks/extras/zulip/zulip.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/zulip-enterprise
+sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/nginx/sites-enabled/zulip.conf
+service nginx restart
+waitOrStop 0 "Failed to restart NGINX"
 
 descriptionAppend "Zulip application directory: ${appPath}/"
 descriptionAppend "Zulip Web UI:${webui}"
