@@ -75,6 +75,8 @@ descriptionAppend "Django root directory: $appPath"
 descriptionAppend "Django settings file: $appPath/djangoproject/settings.py"
 descriptionAppend "Django WebUI: http://${CWM_DOMAIN}:8000"
 descriptionAppend "Django Admin UI: http://${CWM_DOMAIN}:8000/admin"
+descriptionAppend "Django user:root"
+descriptionAppend "Django password:${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
