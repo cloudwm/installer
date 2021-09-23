@@ -29,12 +29,9 @@ EOF
 
 echo "Downloading Directus from github repo" | log
 mkdir -p $appPath
-cd $appPath
-curlDownload https://github.com/directus/directus/archive/refs/tags/v9.0.0-rc.94.zip
+cd /tmp && curlDownload https://github.com/directus/directus/archive/refs/tags/v9.0.0-rc.94.zip
 waitOrStop 0 "File not downloaded from official source"
-
-echo "Extracting Directus to ${appPath}" | log
-unzip $appPath/v9.0.0-rc.94.zip -d $appPath
+unzip v9.0.0-rc.94.zip -d $appPath
 waitOrStop 0 "Failed to extract application archive"
 
 echo "Setting permissions for Directus" | log
