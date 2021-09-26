@@ -23,6 +23,7 @@ waitOrStop "Failed to install OpenProject"
 echo "Setting installation variables and installing OpenProject" | log
 cp $rootDir/tweaks/extras/openproject/installer.dat /etc/openproject/
 sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/openproject/installer.dat
+export DEBIAN_FRONTEND=noninteractive
 openproject reconfigure
 
 echo "Adding descriptions" | log
