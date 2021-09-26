@@ -3,7 +3,7 @@ server/autoinstall install
 server/hostname ServerDomain
 server/ssl yes
 server/ssl_cert /etc/letsencrypt/live/ServerDomain/cert.pem
-server/ssl_ca /etc/letsencrypt/live/ServerDomain/ca.pem
+server/ssl_ca /etc/letsencrypt/live/ServerDomain/chain.pem
 server/ssl_key /etc/letsencrypt/live/ServerDomain/privkey.pem
 server/server_path_prefix /
 smtp/autoinstall no
