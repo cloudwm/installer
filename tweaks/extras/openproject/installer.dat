@@ -1,0 +1,15 @@
+postgres/autoinstall install
+server/autoinstall install
+server/hostname ServerDomain
+server/ssl yes
+server/ssl_cert /etc/letsencrypt/live/ServerDomain/cert.pem
+server/ssl_ca /etc/letsencrypt/live/ServerDomain/ca.pem
+server/ssl_key /etc/letsencrypt/live/ServerDomain/privkey.pem
+server/server_path_prefix /
+smtp/autoinstall no
+memcached/autoinstall install
+repositories/svn-install install
+repositories/git-install install
+repositories/svn-path /var/db/openproject/svn
+repositories/git-path /var/db/openproject/git
+repositories/git-http-backend /usr/lib/git-core/git-http-backend/

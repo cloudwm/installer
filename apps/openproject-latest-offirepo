@@ -15,14 +15,20 @@ waitOrStop "Failed to download PGP key"
 apt-key add key
 echo "deb https://dl.packager.io/srv/deb/opf/openproject/stable/11/ubuntu 20.04 main" | tee /etc/apt/sources.list.d/openproject.list
 
-echo "Updating and installing OpenProject from apt" | log
+echo "Updating and downloading OpenProject from apt" | log
 apt-get update
 installPackage openproject
 waitOrStop "Failed to install OpenProject"
 
+echo "Setting installation variables and installing OpenProject" | log
+cp $rootDir/tweaks/extras/openproject/installer.dat /etc/openproject/
+sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/openproject/installer.dat
+openproject reconfigure
+
 echo "Adding descriptions" | log
-descriptionAppend " "
-descriptionAppend " "
+descriptionAppend "OpenProject Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "OpenProject default user: admin"
+descriptionAppend "OpenProject default password: admin"
 
 tagScript success
 
