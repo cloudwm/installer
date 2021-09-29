@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
+sh <(curl cyberpanel.sh) -v ols -a -p ${ADMINPASSWORD}
+
+echo "Adding descriptions" | log
+descriptionAppend "CyberPanel UI: http://{CWM_DOMAIN}:8080"
+descriptionAppend "CyberPanel User: admin"
+descriptionAppend "CyberPanel Password: ${ADMINPASSWORD}"
+
+tagScript success
+
+exit 0
