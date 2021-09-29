@@ -6,8 +6,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+SERVER_OS="Ubuntu"
+
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
-sh <(curl cyberpanel.sh) -v ols -a -p ${ADMINPASSWORD}
+curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&$SERVER_OS" 2>/dev/null
+chmod +x cyberpanel.sh
+./cyberpanel.sh -v ols -a -p ${ADMINPASSWORD} $@
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: http://{CWM_DOMAIN}:8080"
