@@ -23,6 +23,13 @@ waitOrStop 0 "Failed apt install: XFCE4"
 echo "add user xrdp into ssl-cert group" | log
 adduser xrdp ssl-cert
 
+echo "Adding XRDP startup file" | log
+rm -rf /etc/xrdp/startwm.sh
+cp $rootDir/tweaks/extras/xubuntu-desktop/startwm.sh /etc/xrdp/
+chmod +x /etc/xrdp/startwm.sh
+rm -rf /etc/pam.d/gdm-password
+cp $rootDir/tweaks/extras/xubuntu-desktop/gdm-password /etc/pam.d/
+
 echo "Restart xRDP service" | log
 systemctl restart xrdp
 waitOrStop 0 "Restart xrdp service failed"
