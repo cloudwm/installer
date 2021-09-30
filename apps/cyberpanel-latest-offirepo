@@ -12,7 +12,7 @@ echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 cd /tmp
 curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&$SERVER_OS" 2>/dev/null
 chmod +x cyberpanel.sh
-$(sudo su - && /tmp/cyberpanel.sh -v ols -a -p ${ADMINPASSWORD})
+$(su - && bash /tmp/cyberpanel.sh -v ols -a -p ${ADMINPASSWORD})
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8080"
