@@ -99,11 +99,11 @@ done
 sleep 15
 
 echo "Getting Rancher Login Token" | log
-LOGINRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' "${curlBaseParams[@]}"`
+LOGINRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"${ADMINPASSWORD}"}' "${curlBaseParams[@]}"`
 LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
 
-echo "Changing Web Interface Password" | log
-curl --url "https://${CWM_DOMAIN}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"
+#echo "Changing Web Interface Password" | log
+#curl --url "https://${CWM_DOMAIN}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"
 
 echo "Creating API key" | log
 APIRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"`
@@ -194,8 +194,7 @@ waitOrStop 0 "Restart docker failed"
 echo "Adding descriptions" | log
 descriptionAppend "Rancher Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Rancher Username: admin"
-descriptionAppend "To retrieve Rancher Password run: docker logs <container_id> 2>&1 | grep 'Bootstrap Password:'"
-descriptionAppend "To reset Rancher Password run: docker exec -ti <container_id> reset-password"
+descriptionAppend "Rancher Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
