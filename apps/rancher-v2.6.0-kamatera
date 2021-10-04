@@ -182,7 +182,7 @@ WORKER_JSON_STRING='{
 }'
 curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
-docker exec -ti rancher reset-password >> /root/ranchpass
+$(docker exec -ti rancher reset-password >> /root/ranchpass)
 
 echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072
