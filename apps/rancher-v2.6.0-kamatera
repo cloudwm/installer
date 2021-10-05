@@ -80,7 +80,7 @@ waitOrStop 0 "Start docker service failed"
 
 docker run -d --name rancher --restart unless-stopped \
 	-p 80:80 -p 443:443 \
-	-e CATTLE_BOOTSTRAP_PASSWORD=admin
+	-e CATTLE_BOOTSTRAP_PASSWORD=admin \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/rancher/ssl/cert.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem \
