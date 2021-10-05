@@ -12,7 +12,6 @@ checkTagExist docker-5.20.10-offirepo.success
 rootDir=$(rootDir)
 engineInstallUrl=https://releases.rancher.com/install-docker/20.10.sh
 kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/releases/download/v1.0.5/docker-machine-driver-kamatera_v1.0.5_linux_amd64.tar.gz
-#ranchpass=$(docker exec -ti rancher reset-password | awk 'FNR==2')
 
 RANCHER_VERSION=v2.6.0
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
