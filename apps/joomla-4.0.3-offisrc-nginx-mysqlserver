@@ -1,0 +1,82 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist php.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+currentDate=`date +"%Y-%m-%d %H:%M:%S"`
+appPath=/var/www/html
+appVersion=4-0-3
+rootDir=$(rootDir)
+
+echo "Installing Joomla" | log
+echo "Downloading Joomla from original repo" | log
+cd $rootDir/temp
+curlDownload https://downloads.joomla.org/cms/joomla4/$appVersion/joomla_$appVersion-stable-full_package.tar.gz?format=gz joomla.tgz
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Extracting Joomla to ${appPath}/" | log
+mkdir -p $appPath/
+tar -xzvf joomla.tgz -C $appPath/ | log
+waitOrStop 0 "Failed to extract application archive"
+rm -f joomla.tgz
+
+echo "Creating Joomla Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE joomla CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'joomla'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT ALL ON joomla.* TO 'joomla'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+echo "Configuring Joomla for first use" | log
+cp $rootDir/tweaks/extras/joomla-nginx/configuration.php $appPath/configuration.php
+sed -i "s/Password/${ADMINPASSWORD}/g" $appPath/configuration.php
+sed -i "s/some@mail.com/${ADMINEMAIL}/g" $appPath/configuration.php
+mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
+waitOrStop 0 "Failed to create database"
+
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+INSERT INTO joomla.joomla_users VALUES (632,'Super User','admin','${ADMINEMAIL}',MD5('${ADMINPASSWORD}'),0,1,'${currentDate}','${currentDate}','0','','${currentDate}',0,'','',0);
+EOF
+
+echo "Setting permissions and cleanup" | log
+rm -rf $appPath/installation/
+rm $appPath/index.nginx-debian.html
+chown -R www-data:www-data $appPath
+
+echo "Configuring PHP to support app needs" | log
+phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
+phpiniPath=/etc/php/$phpVersion/fpm/php.ini
+sed -i '/upload_tmp_dir/s/^;//' $phpiniPath
+sed -i '/upload_tmp_dir/s/=/= \"\/tmp\"/' $phpiniPath
+systemctl restart php$phpVersion-fpm.service
+waitOrStop 0 "Restart php-fpm service failed"
+
+echo "Setting nginx config" | log
+# Copy Joomla vhost from extras
+cp $rootDir/tweaks/extras/joomla-nginx/joomla.conf /etc/nginx/sites-available/
+# Symlink magento vhost
+ln -s /etc/nginx/sites-available/joomla.conf /etc/nginx/sites-enabled/
+# Remove default vhosts
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
+echo "adding descriptions" | log
+descriptionAppend "Joomla Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/administrator"
+descriptionAppend "Joomla Username: admin"
+descriptionAppend "Joomla Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
