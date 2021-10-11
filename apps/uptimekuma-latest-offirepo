@@ -21,6 +21,9 @@ cd /var/www/uptime-kuma/
 npm run setup
 sleep 3
 
+echo "Adding FW rule" | log
+ufw allow 3001
+
 echo "Creating UpTimeKuma Service" | log
 cat << EOF > /etc/systemd/system/uptimekuma.service
 
@@ -34,8 +37,8 @@ StandardError=syslog
 SyslogIdentifier=uptimekuma
 ExecStart=/var/www/uptime-kuma/server/server.js
 Restart=always
-User=nobody
-Group=nogroup
+User=root
+Group=root
 Environment=PATH=/usr/bin/node
 Environment=NODE_ENV=production
 WorkingDirectory=/var/www/uptime-kuma/
