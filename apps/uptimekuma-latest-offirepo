@@ -56,8 +56,6 @@ waitOrStop 0 "Start UpTime-Kuma service failed"
 echo "Adding descriptions" | log
 descriptionAppend "UpTime-Kuma Directory: /var/www/uptime-kuma/"
 descriptionAppend "Uptime-Kuma web UI: http://${CWM_DISPLAYED_ADDRESS}:3001"
-descriptionAppend "UpTime-Kuma User: root"
-descriptionAppend "UpTime-Kuma Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
