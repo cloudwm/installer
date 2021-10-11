@@ -32,9 +32,13 @@ After=network.target nss-lookup.target
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=uptimekuma
-User=root
-Environment=ROOT_URL=https://${CWM_DISPLAYED_ADDRESS} PORT=3001
-ExecStart=/usr/bin/node /var/www/uptime-kuma/server/server.js
+ExecStart=/var/www/uptime-kuma/server/server.js
+Restart=always
+User=nobody
+Group=nogroup
+Environment=PATH=/usr/bin/node
+Environment=NODE_ENV=production
+WorkingDirectory=/var/www/uptime-kuma/
 
 [Install]
 WantedBy=multi-user.target
@@ -42,6 +46,7 @@ WantedBy=multi-user.target
 EOF
 
 echo "Enabling UpTime-Kuma Service" | log
+systemctl deamon-reload
 systemctl enable uptimekuma
 sleep 2
 systemctl start uptimekuma
@@ -50,7 +55,7 @@ waitOrStop 0 "Start UpTime-Kuma service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "UpTime-Kuma Directory: /var/www/uptime-kuma/"
-descriptionAppend "Uptime-Kuma web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Uptime-Kuma web UI: http://${CWM_DISPLAYED_ADDRESS}:3001"
 descriptionAppend "UpTime-Kuma User: root"
 descriptionAppend "UpTime-Kuma Password: ${ADMINPASSWORD}"
 descriptionAppend " "
