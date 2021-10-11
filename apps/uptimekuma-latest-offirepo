@@ -24,37 +24,45 @@ sleep 3
 echo "Adding FW rule" | log
 ufw allow 3001
 
-echo "Creating UpTimeKuma Service" | log
-cat << EOF > /etc/systemd/system/uptimekuma.service
+echo "Installing PM2 from NPM" | log
+npm install pm2 -g
 
-[Unit]
-Description=UpTime-Kuma Service
-After=network.target nss-lookup.target 
-
-[Service]
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=uptimekuma
-ExecStart=/var/www/uptime-kuma/server/server.js
-Restart=always
-User=root
-Group=root
-Environment=PATH=/usr/bin/node
-Environment=NODE_ENV=production
-WorkingDirectory=/var/www/uptime-kuma/
-
-[Install]
-WantedBy=multi-user.target
-
-EOF
-
-echo "Enabling UpTime-Kuma Service" | log
-systemctl deamon-reload
-systemctl enable uptimekuma
+echo "Launching Application with PM2" | log
+pm2 start /var/www/uptime-kuma/server/server.js --name uptime-kuma -- --port=3001 --hostname=${CWM_DISPLAYED_ADDRESS}
 sleep 2
-systemctl start uptimekuma
-sleep 2
-waitOrStop 0 "Start UpTime-Kuma service failed"
+pm2 startup
+
+#echo "Creating UpTimeKuma Service" | log
+#cat << EOF > /etc/systemd/system/uptimekuma.service
+
+#[Unit]
+#Description=UpTime-Kuma Service
+#After=network.target nss-lookup.target 
+
+#[Service]
+#StandardOutput=syslog
+#StandardError=syslog
+#SyslogIdentifier=uptimekuma
+#ExecStart=/var/www/uptime-kuma/server/server.js
+#Restart=always
+#User=root
+#Group=root
+#Environment=PATH=/usr/bin/node
+#Environment=NODE_ENV=production
+#WorkingDirectory=/var/www/uptime-kuma/
+
+#[Install]
+#WantedBy=multi-user.target
+
+#EOF
+
+#echo "Enabling UpTime-Kuma Service" | log
+#systemctl deamon-reload
+#systemctl enable uptimekuma
+#sleep 2
+#systemctl start uptimekuma
+#sleep 2
+#waitOrStop 0 "Start UpTime-Kuma service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "UpTime-Kuma Directory: /var/www/uptime-kuma/"
