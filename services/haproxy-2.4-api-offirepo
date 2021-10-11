@@ -80,6 +80,10 @@ cp build/dataplaneapi /usr/local/bin/
 echo "Creating DataPlane Config File" | log
 cp -f $rootDir/tweaks/extras/haproxy/dataplaneapi.hcl /etc/haproxy/
 
+cat /root/guest.conf | grep api >> /etc/default/haproxy
+sed -i "s/apiClientId/clientID/g" /etc/default/haproxy
+sed -i "s/apiSecret/secret/g" /etc/default/haproxy
+
 systemctl reload haproxy
 waitOrStop 0 "Failed to reload HAProxy" | log
 
