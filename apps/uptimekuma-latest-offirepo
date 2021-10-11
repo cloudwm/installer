@@ -1,0 +1,60 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Updating NPM" | log
+npm install npm -g
+
+echo "Cloning UpTimeKuma Git Repository" | log
+mkdir -p /var/www/
+cd /var/www/
+git clone https://github.com/louislam/uptime-kuma.git
+
+echo "Installing UpTimeKuma" | log
+cd /var/www/uptime-kuma/
+npm run setup
+sleep 3
+
+echo "Creating UpTimeKuma Service" | log
+cat << EOF > /etc/systemd/system/uptimekuma.service
+
+[Unit]
+Description=UpTime-Kuma Service
+After=network.target nss-lookup.target 
+
+[Service]
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=uptimekuma
+User=root
+Environment=ROOT_URL=https://${CWM_DISPLAYED_ADDRESS} PORT=3001
+ExecStart=/usr/bin/node /var/www/uptime-kuma/server/server.js
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+echo "Enabling UpTime-Kuma Service" | log
+systemctl enable uptimekuma
+sleep 2
+systemctl start uptimekuma
+sleep 2
+waitOrStop 0 "Start UpTime-Kuma service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "UpTime-Kuma Directory: /var/www/uptime-kuma/"
+descriptionAppend "Uptime-Kuma web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "UpTime-Kuma User: root"
+descriptionAppend "UpTime-Kuma Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
