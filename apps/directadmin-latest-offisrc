@@ -22,7 +22,8 @@ ufw allow 2222
 echo "Downloading and Installing DirectAdmin" | log
 curlDownload https://www.directadmin.com/setup.sh 
 waitOrStop 0 "Failed to install DirectAdmin"
-bash setup.sh
+echo 1 > /root/.skip_get_license
+bash setup.sh auto
 
 echo "Adding descriptions" | log
 descriptionAppend " "
