@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+echo "Updating and installing PostGreSQL" | log
+apt-get update
+installPackage postgresql postgresql-contrib
+waitOrStop 0 "Failed apt install: postgresql"
+
