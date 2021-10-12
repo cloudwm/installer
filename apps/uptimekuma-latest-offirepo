@@ -8,43 +8,23 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Updating NPM" | log
-curlDownload https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh
-bash install.sh
-waitOrStop 0 "Failed to install NVM"
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-waitOrStop 0 "Failed to install Nodejs"
+echo "Setting Hostname" | log
+hostnamectl set-hostname ${CWM_DOMAIN}
 
-echo "Cloning UpTimeKuma Git Repository" | log
-mkdir -p /var/www/
-cd /var/www/
-git clone https://github.com/louislam/uptime-kuma.git
+echo "Creating UpTime-Kuma Volume" | log
+docker volume create uptime-kuma
 
-echo "Installing UpTimeKuma" | log
-cd /var/www/uptime-kuma/
-nvm install --lts
-sleep 2
-npm run setup
-
-echo "Adding FW rule" | log
-ufw allow 3001
-
-echo "Installing PM2 from NPM" | log
-npm install pm2
-waitOrStop 0 "Failed to install PM2"
-
-echo "Launching Application with PM2" | log
-cd /var/www/uptime-kuma
-npm i -g pm2
-pm2 start npm --name uptime-kuma -- run start-server -- --port=3001 --hostname=${CWM_DISPLAYED_ADDRESS}
-sleep 2
-pm2 startup
+echo "Starting UpTime-Kuma container" | log
+docker run -d --restart=always \
+	-p 3001:3001
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/rancher/ssl/cert.pem \
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem \
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem \
+	-v uptime-kuma:/app/data --name uptime-kuma louislam/uptime-kuma:1
 
 echo "Adding descriptions" | log
-descriptionAppend "UpTime-Kuma Directory: /var/www/uptime-kuma/"
-descriptionAppend "Uptime-Kuma web UI: http://${CWM_DISPLAYED_ADDRESS}:3001"
+descriptionAppend "UpTime-Kuma Container: uptime-kuma"
+descriptionAppend "Uptime-Kuma web UI: https://${CWM_DOMAIN}:3001"
 descriptionAppend " "
 
 tagScript success

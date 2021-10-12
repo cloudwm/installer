@@ -12,10 +12,10 @@ echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod +x cloudron-setup
 bash cloudron-setup
-waitOrStop 0 "Failed to setup CloudRon"
+sleep 5
 
 echo "Adding descriptions" | log
-descriptionAppend "visit https://${CWM_DOMAIN} to finish setup"
+descriptionAppend "visit https://${CWM_DISPLAYED_ADDRESS} to finish setup"
 descriptionAppend ""
 
 tagScript success
