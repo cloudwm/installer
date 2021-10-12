@@ -15,8 +15,7 @@ echo "Creating UpTime-Kuma Volume" | log
 docker volume create uptime-kuma
 
 echo "Starting UpTime-Kuma container" | log
-docker run -d --restart=always \
-	-p 3001:3001
+docker run -d --restart=always -p 3001:3001 \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem \
