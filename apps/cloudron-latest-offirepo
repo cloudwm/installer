@@ -1,0 +1,23 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Downloading and installing CloudRon" | log
+curlDownload https://cloudron.io/cloudron-setup
+chmod +x cloudron-setup
+bash cloudron-setup
+waitOrStop 0 "Failed to setup CloudRon"
+
+echo "Adding descriptions" | log
+descriptionAppend "visit https://${CWM_DOMAIN} to finish setup"
+descriptionAppend ""
+
+tagScript success
+
+exit 0

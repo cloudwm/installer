@@ -36,42 +36,11 @@ npm install pm2
 waitOrStop 0 "Failed to install PM2"
 
 echo "Launching Application with PM2" | log
+cd /var/www/uptime-kuma
 npm i -g pm2
-pm2 start /var/www/uptime-kuma/server/server.js --name uptime-kuma -- --port=3001 --hostname=${CWM_DISPLAYED_ADDRESS}
+pm2 start npm --name uptime-kuma -- run start-server -- --port=3001 --hostname=${CWM_DISPLAYED_ADDRESS}
 sleep 2
 pm2 startup
-
-#echo "Creating UpTimeKuma Service" | log
-#cat << EOF > /etc/systemd/system/uptimekuma.service
-
-#[Unit]
-#Description=UpTime-Kuma Service
-#After=network.target nss-lookup.target 
-
-#[Service]
-#StandardOutput=syslog
-#StandardError=syslog
-#SyslogIdentifier=uptimekuma
-#ExecStart=/var/www/uptime-kuma/server/server.js
-#Restart=always
-#User=root
-#Group=root
-#Environment=PATH=/usr/bin/node
-#Environment=NODE_ENV=production
-#WorkingDirectory=/var/www/uptime-kuma/
-
-#[Install]
-#WantedBy=multi-user.target
-
-#EOF
-
-#echo "Enabling UpTime-Kuma Service" | log
-#systemctl deamon-reload
-#systemctl enable uptimekuma
-#sleep 2
-#systemctl start uptimekuma
-#sleep 2
-#waitOrStop 0 "Start UpTime-Kuma service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "UpTime-Kuma Directory: /var/www/uptime-kuma/"
