@@ -96,7 +96,7 @@ app.controller('SetupDNSController', ['$scope', '$http', '$timeout', 'Client', f
     ];
     $scope.dnsCredentials = {
         busy: false,
-        domain: '',
+        domain: 'CWMDOMAIN',
         accessKeyId: '',
         secretAccessKey: '',
         gcdnsKey: { keyFileName: '', content: '' },

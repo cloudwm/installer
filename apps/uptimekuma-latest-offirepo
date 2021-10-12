@@ -15,11 +15,12 @@ echo "Creating UpTime-Kuma Volume" | log
 docker volume create uptime-kuma
 
 echo "Starting UpTime-Kuma container" | log
-docker run -d --restart=always -p 3001:3001 \
-	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
-	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
-	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem \
-	--privileged -v uptime-kuma:/app/data --name uptime-kuma louislam/uptime-kuma:1
+docker run -d --name uptime-kuma --restart unless-stopped \
+	-p 3001:3001 \
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/uptime-kuma/ssl/cert.pem \
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/uptime-kuma/ssl/key.pem \
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/uptime-kuma/ssl/cacerts.pem \
+	--privileged -v "uptime-kuma:/app/data" "louislam/uptime-kuma:1"
 
 echo "Enabling Docker Service" | log
 systemctl enable docker
