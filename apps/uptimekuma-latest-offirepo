@@ -9,7 +9,14 @@ fi
 rootDir=$(rootDir)
 
 echo "Updating NPM" | log
-npm install npm -g
+curlDownload https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh
+bash install.sh
+waitOrStop 0 "Failed to install NVM"
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+nvm install --lts
+waitOrStop 0 "Failed to install Nodejs"
 
 echo "Cloning UpTimeKuma Git Repository" | log
 mkdir -p /var/www/
@@ -18,6 +25,7 @@ git clone https://github.com/louislam/uptime-kuma.git
 
 echo "Installing UpTimeKuma" | log
 cd /var/www/uptime-kuma/
+nvm install --lts
 npm run setup
 sleep 3
 
@@ -25,7 +33,8 @@ echo "Adding FW rule" | log
 ufw allow 3001
 
 echo "Installing PM2 from NPM" | log
-npm install pm2 -g
+npm install pm2
+waitOrStop 0 "Failed to install PM2"
 
 echo "Launching Application with PM2" | log
 pm2 start /var/www/uptime-kuma/server/server.js --name uptime-kuma -- --port=3001 --hostname=${CWM_DISPLAYED_ADDRESS}

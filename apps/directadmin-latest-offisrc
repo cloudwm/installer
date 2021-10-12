@@ -28,7 +28,8 @@ bash setup.sh auto
 
 echo "Adding descriptions" | log
 descriptionAppend "To Start DirectAdmin, purchase a license at https://www.directadmin.com/"
-descriptionAppend "After binding the license to ${CWM_DISPLAYED_ADDRESS} DirectAdmin will be accessible."
+descriptionAppend "After binding the license to ${CWM_DISPLAYED_ADDRESS}, run:"
+descriptionAppend "/usr/local/directadmin/scripts/getLicense.sh auto"
 descriptionAppend "DirectAdmin web UI: http://${CWM_DOMAIN}:2222"
 descriptionAppend "To reset Admin password run:"
 descriptionAppend "passwd admin"
