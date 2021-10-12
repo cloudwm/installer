@@ -18,6 +18,7 @@ installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed to install dependencies" | log
 
 ufw allow 2222
+hostnamectl set-hostname ${CWM_DOMAIN}
 
 echo "Downloading and Installing DirectAdmin" | log
 curlDownload https://www.directadmin.com/setup.sh 
@@ -26,9 +27,11 @@ echo 1 > /root/.skip_get_license
 bash setup.sh auto
 
 echo "Adding descriptions" | log
-descriptionAppend " "
-descriptionAppend "DirectAdmin web UI: http://${CWM_DISPLAYED_ADDRESS}:2222"
-descriptionAppend " "
+descriptionAppend "To Start DirectAdmin, purchase a license at https://www.directadmin.com/"
+descriptionAppend "After binding the license to ${CWM_DISPLAYED_ADDRESS} DirectAdmin will be accessible."
+descriptionAppend "DirectAdmin web UI: http://${CWM_DOMAIN}:2222"
+descriptionAppend "To reset Admin password run:"
+descriptionAppend "passwd admin"
 
 tagScript success
 
