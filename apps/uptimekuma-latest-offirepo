@@ -11,22 +11,20 @@ rootDir=$(rootDir)
 echo "Setting Hostname" | log
 hostnamectl set-hostname ${CWM_DOMAIN}
 
-echo "Starting and enabling docker" | log
-systemctl start docker
-waitOrStop 0 "Failed to start docker"
-systemctl enable docker
-sleep 2
-
 echo "Creating UpTime-Kuma Volume" | log
 docker volume create uptime-kuma
 
 echo "Starting UpTime-Kuma container" | log
 docker run -d --restart=always \
 	-p 3001:3001
-	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/rancher/ssl/cert.pem \
-	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem \
-	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem \
-	-v uptime-kuma:/app/data --name uptime-kuma louislam/uptime-kuma:1
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
+	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem \
+	--privileged -v uptime-kuma:/app/data --name uptime-kuma louislam/uptime-kuma:1
+
+echo "Enabling Docker Service" | log
+systemctl enable docker
+sleep 2
 
 echo "Adding descriptions" | log
 descriptionAppend "UpTime-Kuma Container: uptime-kuma"

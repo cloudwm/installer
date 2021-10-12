@@ -14,6 +14,12 @@ chmod +x cloudron-setup
 bash cloudron-setup
 sleep 5
 
+rm -rf /home/yellowtent/box/dashboard/dist/setupdns.html
+rm -rf /home/yellowtent/box/dashboard/dist/js/setupdns.html
+cp $rootDir/tweaks/extras/cloudron/setupdns.html /home/yellowtent/box/dashboard/dist/
+cp $rootDir/tweaks/extras/cloudron/setupdns.js /home/yellowtent/box/dashboard/dist/js/
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /home/yellowtent/box/dashboard/dist/setupdns.html
+
 echo "Adding descriptions" | log
 descriptionAppend "visit https://${CWM_DISPLAYED_ADDRESS} to finish setup"
 descriptionAppend ""
