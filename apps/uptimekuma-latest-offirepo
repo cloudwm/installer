@@ -11,6 +11,12 @@ rootDir=$(rootDir)
 echo "Setting Hostname" | log
 hostnamectl set-hostname ${CWM_DOMAIN}
 
+echo "Starting and enabling docker" | log
+systemctl start docker
+waitOrStop 0 "Failed to start docker"
+systemctl enable docker
+sleep 2
+
 echo "Creating UpTime-Kuma Volume" | log
 docker volume create uptime-kuma
 
