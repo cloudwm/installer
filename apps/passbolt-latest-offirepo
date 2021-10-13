@@ -14,11 +14,11 @@ installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Adding PassBolt official GnuPG key" | log
-apt-key adv --keyserver hkps://keys.gnupg.net --recv-keys 0xDE8B853FC155581D
-apt-key fingerprint 0xDE8B853FC155581D
+apt-key adv --keyserver hkps://keys.mailvelope.com --recv-keys 0xDE8B853FC155581D >/dev/null 2>&1
+apt-key fingerprint 0xDE8B853FC155581D >/dev/null 2>&1
 
 echo "Adding PassBolt repository and updating list" | log
-echo  "deb https://download.passbolt.com/ce/debian buster stable" | tee /etc/apt/sources.list.d/passbolt.list
+echo  "deb https://download.passbolt.com/ce/ubuntu focal stable" | tee /etc/apt/sources.list.d/passbolt.list
 apt-get update
 
 echo passbolt-ce-server passbolt/mysql-configuration boolean true | debconf-set-selections
