@@ -14,7 +14,7 @@ installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Adding PassBolt official GnuPG key" | log
-apt-key adv --keyserver hkps://pgp.mit.edu --recv-keys 0xDE8B853FC155581D
+apt-key adv --keyserver hkps://keys.gnupg.net --recv-keys 0xDE8B853FC155581D
 apt-key fingerprint 0xDE8B853FC155581D
 
 echo "Adding PassBolt repository and updating list" | log
