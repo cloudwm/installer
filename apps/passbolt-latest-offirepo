@@ -35,6 +35,15 @@ echo passbolt-ce-server passbolt/nginx-certificate-key-file string /etc/letsencr
 DEBIAN_FRONTEND=noninteractive installPackage passbolt-ce-server
 waitOrStop 0 "Failed apt install: passbolt-ce-server"
 
+echo "Setting NGINX VirtualHost" | log
+cp $rootDir/tweaks/extras/passbolt/passbolt.conf /etc/nginx/sites-available/
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/nginx/sites-available/passbolt.conf
+unlink /etc/nginx/sites-enabled/default
+rm -rf /etc/nginx/sites-enabled/nginx-passbolt.conf
+ln -s /etc/nginx/sites-available/passbolt.conf /etc/nginx/sites-enabled/
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
 echo "adding descriptions" | log
 descriptionAppend "PassBolt UI: https://${CWM_DOMAIN}"
 descriptionAppend " "
