@@ -1,0 +1,44 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing dependencies" | log
+packages=(apt-transport-https ca-certificates curl gnupg-agent software-properties-common)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Adding PassBolt official GnuPG key" | log
+apt-key adv --keyserver hkps://pgp.mit.edu --recv-keys 0xDE8B853FC155581D
+apt-key fingerprint 0xDE8B853FC155581D
+
+echo "Adding PassBolt repository and updating list" | log
+echo  "deb https://download.passbolt.com/ce/debian buster stable" | tee /etc/apt/sources.list.d/passbolt.list
+apt-get update
+
+echo passbolt-ce-server passbolt/mysql-configuration boolean true | debconf-set-selections
+echo passbolt-ce-server passbolt/mysql-passbolt-username string root | debconf-set-selections
+echo passbolt-ce-server passbolt/mysql-passbolt-password password ${ADMINPASSWORD} | debconf-set-selections
+echo passbolt-ce-server passbolt/mysql-passbolt-password-repeat password ${ADMINPASSWORD} | debconf-set-selections
+echo passbolt-ce-server passbolt/mysql-passbolt-dbname string passbolt | debconf-set-selections
+echo passbolt-ce-server passbolt/nginx-configuration boolean true | debconf-set-selections
+echo passbolt-ce-server passbolt/nginx-configuration-three-choices select none | debconf-set-selections
+echo passbolt-ce-server passbolt/nginx-domain string ${CWM_DOMAIN} | debconf-set-selections
+echo passbolt-ce-server passbolt/nginx-certificate-file string /etc/letsencrypt/live/${CWM_DOMAIN}/${CWM_DOMAIN}.crt
+echo passbolt-ce-server passbolt/nginx-certificate-key-file string /etc/letsencrypt/live/${CWM_DOMAIN}/${CWM_DOMAIN}.key
+
+DEBIAN_FRONTEND=noninteractive installPackage passbolt-ce-server
+waitOrStop 0 "Failed apt install: passbolt-ce-server"
+
+echo "adding descriptions" | log
+descriptionAppend "PassBolt UI: https://${CWM_DOMAIN}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
