@@ -19,7 +19,7 @@ docker volume create uptime-kuma
 echo "Creating NGINX VirtualHost" | log
 cp $rootDir/tweaks/extras/uptime-kuma/uptime-kuma.conf /etc/nginx/sites-available/
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/nginx/sites-available/uptime-kuma.conf
-ln -s /etc/nginx/sites-available/magento.conf /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/uptime-kuma.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 systemctl restart nginx
