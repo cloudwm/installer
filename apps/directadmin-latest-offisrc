@@ -33,11 +33,12 @@ ${ADMINPASSWORD}
 EOF
 
 echo "Adding descriptions" | log
-descriptionAppend "To Start DirectAdmin, purchase a license at https://www.directadmin.com/"
-descriptionAppend "After binding the license to ${CWM_DISPLAYED_ADDRESS}, run:"
-descriptionAppend "/usr/local/directadmin/scripts/getLicense.sh auto"
+descriptionAppend "To start using DirectAdmin, purchase a license at https://www.directadmin.com/"
+descriptionAppend "After purchasing and binding the license to ${CWM_DISPLAYED_ADDRESS}, run the following command:"
+descriptionAppend "'/usr/local/directadmin/scripts/getLicense.sh auto' and DirectAdmin web UI will be available."
 descriptionAppend "DirectAdmin web UI: http://${CWM_DOMAIN}:2222"
-descriptionAppend "Admin password: ${ADMINPASSWORD}"
+descriptionAppend "Username: Admin"
+descriptionAppend "Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
