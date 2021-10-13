@@ -21,14 +21,14 @@ if [ -d "$appPath" ]; then
     chown -R www-data:www-data $appPath
 fi
 
-echo "Adding descriptions" | log
-descriptionAppend "NGiNX Address: ${CWM_SERVERIP}"
-descriptionAppend " "
-descriptionAppend "NGiNX config files location: /etc/nginx/"
-if [ -d "$appPath" ]; then
-    descriptionAppend "NGiNX root Directory: $appPath/"
-fi
-descriptionAppend " "
+#echo "Adding descriptions" | log
+#descriptionAppend "NGiNX Address: ${CWM_SERVERIP}"
+#descriptionAppend " "
+#descriptionAppend "NGiNX config files location: /etc/nginx/"
+#if [ -d "$appPath" ]; then
+#    descriptionAppend "NGiNX root Directory: $appPath/"
+#fi
+#descriptionAppend " "
 
 tag nginx.success
 tag httpd.success

@@ -23,6 +23,13 @@ if [ -f "$rootDir/temp/mysqld.success" ]; then
     
 fi
 
+echo "Adding descriptions" | log
+descriptionAppend "NGiNX Address: ${CWM_SERVERIP}"
+descriptionAppend " "
+descriptionAppend "NGiNX config files location: /etc/nginx/"
+descriptionAppend " "
+
+
 tagScript success
 
 exit 0
