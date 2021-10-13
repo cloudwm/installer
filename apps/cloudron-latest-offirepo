@@ -22,8 +22,8 @@ sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /home/yellowtent/box/dashboard/dist/setupdn
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /home/yellowtent/box/dashboard/dist/js/setupdns.js
 
 echo "Adding descriptions" | log
-descriptionAppend "visit https://${CWM_DISPLAYED_ADDRESS} to finish setup"
-descriptionAppend ""
+descriptionAppend "CloudRon Web UI: ${CWM_DOMAIN}"
+descriptionAppend "SSL will be configured after the first step."
 
 tagScript success
 

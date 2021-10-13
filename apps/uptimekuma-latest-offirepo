@@ -40,7 +40,7 @@ waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "UpTime-Kuma Container: uptime-kuma"
-descriptionAppend "Uptime-Kuma web UI: https://${CWM_DOMAIN}:3001"
+descriptionAppend "Uptime-Kuma Web UI: https://${CWM_DOMAIN}"
 descriptionAppend " "
 
 tagScript success
