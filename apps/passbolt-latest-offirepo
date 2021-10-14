@@ -23,14 +23,14 @@ apt-get update
 
 echo passbolt-ce-server passbolt/mysql-configuration boolean true | debconf-set-selections
 echo passbolt-ce-server passbolt/mysql-passbolt-username string root | debconf-set-selections
-echo passbolt-ce-server passbolt/mysql-passbolt-password password ${ADMINPASSWORD} | debconf-set-selections
-echo passbolt-ce-server passbolt/mysql-passbolt-password-repeat password ${ADMINPASSWORD} | debconf-set-selections
+echo passbolt-ce-server passbolt/mysql-passbolt-password password '${ADMINPASSWORD}' | debconf-set-selections
+echo passbolt-ce-server passbolt/mysql-passbolt-password-repeat password '${ADMINPASSWORD}' | debconf-set-selections
 echo passbolt-ce-server passbolt/mysql-passbolt-dbname string passbolt | debconf-set-selections
 echo passbolt-ce-server passbolt/nginx-configuration boolean true | debconf-set-selections
 echo passbolt-ce-server passbolt/nginx-configuration-three-choices select none | debconf-set-selections
 echo passbolt-ce-server passbolt/nginx-domain string ${CWM_DOMAIN} | debconf-set-selections
-echo passbolt-ce-server passbolt/nginx-certificate-file string /etc/letsencrypt/live/${CWM_DOMAIN}/${CWM_DOMAIN}.crt
-echo passbolt-ce-server passbolt/nginx-certificate-key-file string /etc/letsencrypt/live/${CWM_DOMAIN}/${CWM_DOMAIN}.key
+echo passbolt-ce-server passbolt/nginx-certificate-file string /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem
+echo passbolt-ce-server passbolt/nginx-certificate-key-file string /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
 
 DEBIAN_FRONTEND=noninteractive installPackage passbolt-ce-server
 waitOrStop 0 "Failed apt install: passbolt-ce-server"
