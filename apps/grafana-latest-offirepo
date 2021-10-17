@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+
+rootDir=$(rootDir)
+
+echo "Adding Grafana GPG key" | log
+curlDownload https://packages.grafana.com/gpg.key
+waitOrStop 0 "Key not downloaded from official source"
+apt-key add gpg.key
+
+echo "Adding official Grafana repository" | log
+add-apt-repository "deb https://packages.grafana.com/oss/deb stable main"
+apt update
+
+echo "Installing Grafana from apt" | log
+installPackage grafana
+waitOrStop 0 "Failed to install Grafana"
+
+echo "Starting and enabling Grafana Service" | log
+systemctl start grafana-server
+sleep 2
+waitOrStop 0 "Failed to start Grafana service"
+systemctl enable grafana-server
+
+echo "Setting NGINX VirtualHost coonfiguration" | log
+cp $rootDir/tweaks/extras/grafana/grafana.conf /etc/nginx/sites-available/
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/nginx/sites-available/grafana.conf
+ln -s /etc/nginx/sites-available/grafana.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Grafana Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Grafana default User: admin"
+descriptionAppend "Grafana default Password: admin"
+
+tagScript success
+
+exit 0
