@@ -6,13 +6,16 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-SERVER_OS="Ubuntu"
+#SERVER_OS="Ubuntu"
 
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 cd /tmp
-curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&$SERVER_OS" 2>/dev/null
-chmod +x cyberpanel.sh
-$(su - && bash /tmp/cyberpanel.sh -v ols -a -p ${ADMINPASSWORD})
+curlDownload https://cyberpanel.net/install.sh
+chmod +x install.sh
+bash install.sh  -v ols -a -p ${ADMINPASSWORD}
+#curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&$SERVER_OS" 2>/dev/null
+#chmod +x cyberpanel.sh
+#$(su - && bash /tmp/cyberpanel.sh -v ols -a -p ${ADMINPASSWORD})
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8080"
