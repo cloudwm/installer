@@ -26,6 +26,9 @@ echo "Updating and installing make tools" | log
 installPackage build-essential jq
 waitOrStop 0 "Failed apt install build-essential"
 
+echo "Disabling UFW to allow dynamic ports"
+ufw disable
+
 echo "Cloning AWX-Operator GitRepo" | log
 cd /home
 git clone https://github.com/ansible/awx-operator.git
@@ -57,6 +60,7 @@ awxport=$(cat /home/awxport.txt)
 awxpass=$(cat /home/awxpass.txt)
 
 echo "Adding descriptions" | log
+descriptionAppend "Please wait 5 minutes to ensure all pods are up after reboot"
 descriptionAppend "Ansible AWX Web UI: http://${CWM_DOMAIN}:${awxport}"
 descriptionAppend "Ansible AWX Username: Admin"
 descriptionAppend "Ansible AWX Password: ${awxpass}"
