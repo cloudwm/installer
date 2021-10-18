@@ -7,11 +7,13 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+
 echo "Setting hostname" | log
 hostnamectl set-hostname ${CWM_DOMAIN}
 
 echo "Setting hostname in hosts file" | log
-echo "127.0.0.1 ${CWM_DOMAIN} localhost" >> /etc/hosts
+echo "127.0.0.1 ${CWM_DOMAIN} localhost" > /etc/hosts
 
 echo "Downloading and installing k3s" | log
 curl -sfL https://get.k3s.io | sudo bash -
@@ -40,8 +42,12 @@ export NAMESPACE=awx
 make deploy
 sleep 2
 
+echo "Creating awx-demo pod" | log
+cp $rootDir/tweaks/extras/ansible/awx-demo.yml
+kubectl create -f awx-demo.yml
+
 echo "Adding descriptions" | log
-descriptionAppend " "
+descriptionAppend "Ansible AWX Web UI: ${CWM_DOMAIN}"
 
 tagScript success
 
