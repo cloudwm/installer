@@ -43,7 +43,7 @@ make deploy
 sleep 2
 
 echo "Creating awx-demo pod" | log
-cp $rootDir/tweaks/extras/ansible/awx-demo.yml
+cp $rootDir/tweaks/extras/ansible/awx-demo.yml .
 kubectl create -f awx-demo.yml
 
 echo "Adding descriptions" | log
