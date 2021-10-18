@@ -16,6 +16,7 @@ echo "Setting hostname in hosts file" | log
 echo "127.0.0.1 ${CWM_DOMAIN} localhost" > /etc/hosts
 
 echo "Downloading and installing k3s" | log
+cd /home
 curl -sfL https://get.k3s.io | sudo bash -
 sleep 3
 waitOrStop 0 "Failed to install k3s"
@@ -26,6 +27,7 @@ installPackage build-essential jq
 waitOrStop 0 "Failed apt install build-essential"
 
 echo "Cloning AWX-Operator GitRepo" | log
+cd /home
 git clone https://github.com/ansible/awx-operator.git
 export NAMESPACE=awx
 kubectl create ns ${NAMESPACE}
@@ -45,10 +47,14 @@ sleep 2
 echo "Creating awx-demo pod" | log
 cp $rootDir/tweaks/extras/ansible/awx-demo.yml .
 kubectl create -f awx-demo.yml
-sleep 20
+sleep 60
+touch /home/awxport.txt && touch /home/awxpass.txt
 
-awxport=$(kubectl get svc -n awx | grep awx-demo-service | awk -F ":" '{print $2}' | awk -F "/" '{print $1}')
-awxpass=$(kubectl get secret awx-demo-admin-password -o jsonpath="{.data .password}" -n awx | base64 --decode)
+$(kubectl get svc -n awx | grep awx-demo-service | awk -F ":" '{print $2}' | awk -F "/" '{print $1}' > /home/awxport.txt)
+$(kubectl get secret awx-demo-admin-password -o jsonpath="{.data .password}" -n awx | base64 --decode > /home/awxpass.txt)
+
+awxport=$(cat /home/awxport.txt)
+awxpass=$(cat /home/awxpass.txt)
 
 echo "Adding descriptions" | log
 descriptionAppend "Ansible AWX Web UI: http://${CWM_DOMAIN}:${awxport}"
