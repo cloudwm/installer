@@ -45,9 +45,15 @@ sleep 2
 echo "Creating awx-demo pod" | log
 cp $rootDir/tweaks/extras/ansible/awx-demo.yml .
 kubectl create -f awx-demo.yml
+sleep 20
+
+awxport=$(kubectl get svc -n awx | grep awx-demo-service | awk -F ":" '{print $2}' | awk -F "/" '{print $1}')
+awxpass=$(kubectl get secret awx-demo-admin-password -o jsonpath="{.data .password}" -n awx | base64 --decode)
 
 echo "Adding descriptions" | log
-descriptionAppend "Ansible AWX Web UI: ${CWM_DOMAIN}"
+descriptionAppend "Ansible AWX Web UI: http://${CWM_DOMAIN}:${awxport}"
+descriptionAppend "Ansible AWX Username: Admin"
+descriptionAppend "Ansible AWX Password: ${awxpass}"
 
 tagScript success
 
