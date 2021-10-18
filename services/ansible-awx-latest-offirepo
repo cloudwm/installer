@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Setting hostname" | log
+hostnamectl set-hostname ${CWM_DOMAIN}
+
+echo "Setting hostname in hosts file" | log
+echo "127.0.0.1 ${CWM_DOMAIN} localhost" >> /etc/hosts
+
+echo "Downloading and installing k3s" | log
+curl -sfL https://get.k3s.io | sudo bash -
+sleep 3
+waitOrStop 0 "Failed to install k3s"
+chmod 644 /etc/rancher/k3s/k3s.yaml
+
+echo "Updating and installing make tools" | log
+installPackage build-essential jq
+waitOrStop 0 "Failed apt install build-essential"
+
+echo "Cloning AWX-Operator GitRepo" | log
+git clone https://github.com/ansible/awx-operator.git
+export NAMESPACE=awx
+kubectl create ns ${NAMESPACE}
+kubectl config set-context --current --namespace=$NAMESPACE
+
+echo "Performing git checkout to the latest version" | log
+cd awx-operator/
+apt update
+RELEASE_TAG=`curl -s https://api.github.com/repos/ansible/awx-operator/releases/latest | grep tag_name | cut -d '"' -f 4`
+git checkout $RELEASE_TAG
+
+echo "Deploying AWX-Operator" | log
+export NAMESPACE=awx
+make deploy
+sleep 2
+
+echo "Adding descriptions" | log
+descriptionAppend " "
+
+tagScript success
+
+exit 0
