@@ -1,0 +1,52 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Creating temporary swapfile" | log
+#increase vm swappiness to allow swap to dominate process
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+sleep 5
+
+echo "Adding ClickHouse Repository" | log
+apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4
+echo "deb http://repo.yandex.ru/clickhouse/deb/stable/ main/" | tee /etc/apt/sources.list.d/clickhouse.list
+apt update
+
+echo "Adding ClickHouse port to UFW" | log
+ufw allow 9000
+ufw allow 8123
+
+echo "Installing ClickHouse from apt" | log
+export DEBIAN_FRONTEND="noninteractive"
+installPackage clickhouse-server clickhouse-client
+waitOrStop 0 "Failed apt install: clickhouse-server"
+
+echo "Setting ClickHouse password" | log
+rm -rf /etc/clickhouse-server/users.xml
+cp $rootDir/tweaks/extras/clickhouse/users.xml /etc/clickhouse-server/users.xml
+sed -i "s/ADMINPASS/${ADMINPASSWORD}/g" /etc/clickhouse-server/users.xml
+
+echo "Starting and Enabling ClickHouse service" | log
+systemctl start clickhouse-server
+waitOrStop 0 "Failed to start ClickHouse service"
+systemctl enable clickhouse-server
+sleep 2
+
+echo "Adding descriptions" | log
+descriptionAppend "ClickHouse Address: 127.0.0.1"
+descriptionAppend "ClickHouse Password: ${ADMINPASSWORD}"
+descriptionAppend "ClickHouse Configuration files: /etc/clickhouse-server/"
+descriptionAppend " "
+descriptionAppend "To enter ClickHouse CLI: clickhouse-client --password"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
