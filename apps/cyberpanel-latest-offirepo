@@ -11,7 +11,7 @@ cd /tmp
 curlDownload https://cyberpanel.net/install.sh
 chmod +x install.sh
 export DEBIAN_FRONTEND=noninteractive
-$(bash install.sh  -v ols -a -p ${ADMINPASSWORD})
+bash install.sh -v ols -a -p ${ADMINPASSWORD}
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8080"
