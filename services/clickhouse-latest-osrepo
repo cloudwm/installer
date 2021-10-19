@@ -41,6 +41,7 @@ sleep 2
 
 echo "Adding descriptions" | log
 descriptionAppend "ClickHouse Address: 127.0.0.1"
+descriptionAppend "ClickHouse Port: 9000"
 descriptionAppend "ClickHouse Password: ${ADMINPASSWORD}"
 descriptionAppend "ClickHouse Configuration files: /etc/clickhouse-server/"
 descriptionAppend " "
