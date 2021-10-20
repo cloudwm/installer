@@ -1,0 +1,71 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing dependenices" | log
+packages=(zip unzip software-properties-common php7.4 php7.4-gd php7.4-mbstring php7.4-xml php-zip php7.4-mysql)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Installing composer" | log
+cd /tmp
+curlDownload https://getcomposer.org/installer
+waitOrStop 0 "File not downloaded from official source"
+php installer
+sleep 3
+mv composer.phar /usr/local/bin/composer
+chmod +x /usr/local/bin/composer
+
+echo "Downloading and Installing Laravel" | log
+cd /var/www
+git clone https://github.com/laravel/laravel.git
+cd /var/www/laravel
+export DEBIAN_FRONTEND=noninteractive
+composer install
+sleep 5
+
+echo "Granting Permissions" | log
+rm -rf /var/www/laravel/.env
+cp $rootDir/tweaks/extras/laravel/.env /var/www/laravel/
+chown -R www-data.www-data /var/www/laravel
+chmod -R 755 /var/www/laravel
+chmod -R 777 /var/www/laravel/storage
+
+echo "Generating ecryption key" | log
+php artisan key:generate
+
+echo "Creating Laravel Database and User" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE laraveldb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'laraveluser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on laraveldb.* to laraveluser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Setting enviroment and VirtualHost" | log
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/laravel/.env
+sed -i "s/ADMINPASS/${ADMINPASSWORD}/g" /var/www/laravel/.env
+unlink /etc/apache2/sites-enabled/000-default.conf
+cp $rootDir/tweaks/extras/laravel/laravel.conf /etc/apache2/sites-available/laravel.conf
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/laravel.conf
+ln -s /etc/apache2/sites-available/laravel.conf /etc/apache2/sites-enabled/
+
+echo "Enabling Laravel VirtualHost & Restarting Apache" | log
+a2ensite laravel.conf
+a2enmod ssl
+service apache2 restart
+waitOrStop 0 "Failed to restart Apache"
+
+echo "Adding descriptions" | log
+descriptionAppend "Laravel Web UI: https://${CWM_DOMAIN}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
