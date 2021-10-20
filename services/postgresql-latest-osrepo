@@ -6,9 +6,31 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+
+echo "Adding hostname to hosts file" | log
+echo "127.0.0.1 $(hostname) localhost" > /etc/hosts
 
 echo "Updating and installing PostGreSQL" | log
 apt-get update
 installPackage postgresql postgresql-contrib
 waitOrStop 0 "Failed apt install: postgresql"
 
+echo "Adding PostGreSQL port to UFW" | log
+ufw allow 5432
+
+echo "Starting and Enabling PostGreSQL service" | log
+systemctl restart postgresql
+sleep 2
+waitOrStop 0 "Failed to restart postgresql"
+systemctl enable postgresql
+
+echo "Adding descriptions" | log
+descriptionAppend "To connect to PostGreSQL user: sudo -i -u postgres"
+descriptionAppend "To connect to PostGreSQL CLI: psql"
+descriptionAppend "PostGreSQL listening address and port: 127.0.0.1:5432"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
