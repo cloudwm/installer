@@ -25,11 +25,24 @@ sed   -i "s/apache/nginx/" ./autoinstall.ini
 php install.php --autoinstall=autoinstall.ini
 systemctl start mysql.service
 
+echo "Installing Ioncube" | log
+set -x
+curlDownload http://downloads3.ioncube.com/loader_downloads/ioncube_loaders_lin_x86-64.tar.gz
+tar xfz ioncube_loaders_lin_x86-64.tar.gz
+mv ioncube /usr/local/
+rm -rf ioncube_loaders_lin_x86-64.tar.gz
+sed -i '1 i\zend_extension = /usr/local/ioncube/ioncube_loader_lin_7.4.so' /etc/php/7.4/fpm/php.ini
+service apache2 restart
+waitOrStop 0 "Failed to restart Apache"
+service php7.4-fpm restart
+waitOrStop 0 "Failed to restart PHP7.4-FPM"
+
 echo "Installing SoftAculous" | log
 curlDownload http://files.softaculous.com/install.sh
 chmod 755 install.sh
 bash install.sh --quick
 sleep 3
+set +x
 
 echo "adding descriptions" | log
 descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"
