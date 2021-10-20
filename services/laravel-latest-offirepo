@@ -14,11 +14,11 @@ installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Installing composer" | log
-cd /tmp
+cd /var/www/
 curlDownload https://getcomposer.org/installer
 waitOrStop 0 "File not downloaded from official source"
 php installer
-sleep 3
+sleep 1
 mv composer.phar /usr/local/bin/composer
 chmod +x /usr/local/bin/composer
 
@@ -52,6 +52,7 @@ echo "Setting enviroment and VirtualHost" | log
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/laravel/.env
 sed -i "s/ADMINPASS/${ADMINPASSWORD}/g" /var/www/laravel/.env
 unlink /etc/apache2/sites-enabled/000-default.conf
+unlink /etc/apache2/sites-enabled/default-ssl.conf
 cp $rootDir/tweaks/extras/laravel/laravel.conf /etc/apache2/sites-available/laravel.conf
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/laravel.conf
 ln -s /etc/apache2/sites-available/laravel.conf /etc/apache2/sites-enabled/
@@ -64,6 +65,9 @@ waitOrStop 0 "Failed to restart Apache"
 
 echo "Adding descriptions" | log
 descriptionAppend "Laravel Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Laravel Database: laraveldb"
+descriptionAppend "Laravel Database User: laraveluser"
+descriptionAppend "Laravel Database Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
 tagScript success
