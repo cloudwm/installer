@@ -28,7 +28,8 @@ systemctl start mysql.service
 echo "Installing SoftAculous" | log
 curlDownload http://files.softaculous.com/install.sh
 chmod 755 install.sh
-bash install.sh
+bash install.sh --quick
+sleep 3
 
 echo "adding descriptions" | log
 descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"
