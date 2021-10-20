@@ -21,9 +21,9 @@ echo "Restarting service to implement changes" | log
 service php$phpVersion-fpm restart
 waitOrStop 0 "Restart php-fpm service failed"
 
-echo "Adding descriptions" | log
-descriptionAppend "PHP-FPM config files location: /etc/php/$phpVersion/fpm/"
-descriptionAppend " "
+#echo "Adding descriptions" | log
+#descriptionAppend "PHP-FPM config files location: /etc/php/$phpVersion/fpm/"
+#descriptionAppend " "
 
 tag php-fpm.success
 

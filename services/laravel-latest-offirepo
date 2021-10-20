@@ -9,16 +9,14 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing dependenices" | log
-packages=(zip unzip software-properties-common php7.4 php7.4-gd php7.4-mbstring php7.4-xml php-zip php7.4-mysql)
-installPackage "${packages[@]}" | log
-waitOrStop 0 "Failed apt install: ${packages[@]}"
+installPackage zip unzip php7.4 php7.4-zip
+waitOrStop 0 "Failed apt install: zip unzip php7.4 php7.4-zip"
 
 echo "Installing composer" | log
 cd /var/www/
 curlDownload https://getcomposer.org/installer
 waitOrStop 0 "File not downloaded from official source"
-php installer
-sleep 1
+/usr/bin/php /var/www/installer
 mv composer.phar /usr/local/bin/composer
 chmod +x /usr/local/bin/composer
 
