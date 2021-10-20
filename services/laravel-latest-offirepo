@@ -29,6 +29,9 @@ export DEBIAN_FRONTEND=noninteractive
 composer install
 sleep 5
 
+echo "adding SQL port to UFW" | log
+ufw allow 3306
+
 echo "Granting Permissions" | log
 rm -rf /var/www/laravel/.env
 cp $rootDir/tweaks/extras/laravel/.env /var/www/laravel/

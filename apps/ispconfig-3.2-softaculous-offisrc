@@ -32,8 +32,8 @@ tar xfz ioncube_loaders_lin_x86-64.tar.gz
 mv ioncube /usr/local/
 rm -rf ioncube_loaders_lin_x86-64.tar.gz
 sed -i '1 i\zend_extension = /usr/local/ioncube/ioncube_loader_lin_7.4.so' /etc/php/7.4/fpm/php.ini
-service apache2 restart
-waitOrStop 0 "Failed to restart Apache"
+service nginx restart
+waitOrStop 0 "Failed to restart NGINX"
 service php7.4-fpm restart
 waitOrStop 0 "Failed to restart PHP7.4-FPM"
 
