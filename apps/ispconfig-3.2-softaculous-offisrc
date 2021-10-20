@@ -1,0 +1,41 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+cd $rootDir/temp
+
+echo "Downloading ISPConfig installlation package" | log
+curlDownload https://www.ispconfig.org/downloads/ISPConfig-3-stable.tar.gz ispconfig.tar.gz
+tar xfz ispconfig.tar.gz
+cd $rootDir/temp/ispconfig3*/install/
+
+echo "Installing Pure-FTPD" | log
+apt install pure-ftpd-mysql -y
+
+echo "Generating Configuration" | log
+mv $rootDir/temp/ispconfig3*/docs/autoinstall_samples/autoinstall.ini.sample  ./autoinstall.ini
+sed   -i "/^mysql_root_password/c\mysql_root_password=${ADMINPASSWORD}" ./autoinstall.ini
+sed   -i "/^ispconfig_admin_password/c\ispconfig_admin_password=${ADMINPASSWORD}" ./autoinstall.ini
+sed   -i "s/apache/nginx/" ./autoinstall.ini
+php install.php --autoinstall=autoinstall.ini
+systemctl start mysql.service
+
+echo "Installing SoftAculous" | log
+curlDownload http://files.softaculous.com/install.sh
+chmod 755 install.sh
+bash install.sh
+
+echo "adding descriptions" | log
+descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"
+descriptionAppend "ISPConfig Admin Username: admin"
+descriptionAppend "ISPConfig Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
