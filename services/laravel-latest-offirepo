@@ -13,12 +13,14 @@ installPackage zip unzip php7.4 php7.4-zip
 waitOrStop 0 "Failed apt install: zip unzip php7.4 php7.4-zip"
 
 echo "Installing composer" | log
+set -x
 cd /var/www/
 curlDownload https://getcomposer.org/installer
 waitOrStop 0 "File not downloaded from official source"
-/usr/bin/php /var/www/installer
+/usr/bin/php /var/www/installer >> /var/www/phpinstaller.txt
 mv composer.phar /usr/local/bin/composer
 chmod +x /usr/local/bin/composer
+set +x
 
 echo "Downloading and Installing Laravel" | log
 cd /var/www
