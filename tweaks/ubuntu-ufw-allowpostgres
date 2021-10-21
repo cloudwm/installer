@@ -1,0 +1,34 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ufw.success
+
+echo "Open firewall for PostgreSQL" | log
+
+# Check if LAN VLAN exists, if yes, open only LAN VLAN subnets in the firewall for PostgreSQL.
+# if not, open 5432 to WAN
+
+if [ ! -z "$CWM_LANNICIDS" ]; then
+
+    for nicid in ${CWM_LANNICIDS[@]}; do
+
+        subnet=$(echo "CWM_IP$nicid") 
+        ufw allow in to ${!subnet} port 5432
+	    
+    done
+
+    unset subnet
+
+else
+
+    ufw allow 5432 | log
+
+fi
+
+ufw status | log
+
+tagScript success
