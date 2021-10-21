@@ -16,9 +16,9 @@ if [ ! -z "$CWM_LANNICIDS" ]; then
 
     for nicid in ${CWM_LANNICIDS[@]}; do
 
-        subnet=$(echo "CWM_IP$nicid") 
+        subnet=$(echo "CWM_IP$nicid")
         ufw allow in to ${!subnet} port 5432
-	    
+
     done
 
     unset subnet
