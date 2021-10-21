@@ -28,7 +28,7 @@ systemctl enable postgresql
 echo "Adding descriptions" | log
 descriptionAppend "To connect to PostGreSQL user: sudo -i -u postgres"
 descriptionAppend "To connect to PostGreSQL CLI: psql"
-descriptionAppend "PostGreSQL listening address and port: 127.0.0.1:5432"
+descriptionAppend "PostGreSQL listening port: 5432"
 descriptionAppend " "
 
 tagScript success
