@@ -7,15 +7,18 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-cd $rootDir/temp
+
+echo "Adding hostname to hosts file" | log
+echo "127.0.0.1 $(hostname) localhost" > /etc/hosts
 
 echo "Downloading ISPConfig installlation package" | log
+cd $rootDir/temp
 curlDownload https://www.ispconfig.org/downloads/ISPConfig-3-stable.tar.gz ispconfig.tar.gz
 tar xfz ispconfig.tar.gz
 cd $rootDir/temp/ispconfig3*/install/
 
 echo "Installing Pure-FTPD" | log
-apt install pure-ftpd-mysql -y
+installPackage pure-ftpd-mysql
 
 echo "Generating Configuration" | log
 mv $rootDir/temp/ispconfig3*/docs/autoinstall_samples/autoinstall.ini.sample  ./autoinstall.ini
@@ -26,7 +29,6 @@ php install.php --autoinstall=autoinstall.ini
 systemctl start mysql.service
 
 echo "Installing Ioncube" | log
-set -x
 curlDownload http://downloads3.ioncube.com/loader_downloads/ioncube_loaders_lin_x86-64.tar.gz
 tar xfz ioncube_loaders_lin_x86-64.tar.gz
 mv ioncube /usr/local/
@@ -48,12 +50,11 @@ waitOrStop 0 "Failed to restart PHP7.4-FPM"
 echo "Installing SoftAculous" | log
 curlDownload http://files.softaculous.com/install.sh
 chmod 755 install.sh
-bash install.sh --quick
+bash install.sh --quick | log
 sleep 3
-set +x
 
 echo "adding descriptions" | log
-descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"
+descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_DOMAIN}:8080/"
 descriptionAppend "ISPConfig Admin Username: admin"
 descriptionAppend "ISPConfig Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "
