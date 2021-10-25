@@ -171,10 +171,7 @@ PANEL_JSON_STRING='{
 }'
 curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$PANEL_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 #Kamatera Worker
-for tmplt in "${tmpltarr[@]}"; do
-arr=($tmplt)
-
-WORKER_JSON_STRING="{
+WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
 "engineInstallURL":"'"${engineInstallUrl}"'",
 "engineRegistryMirror":[],
@@ -183,22 +180,20 @@ WORKER_JSON_STRING="{
 "apiClientId":"'"${CWM_APICLIENTID}"'",
 "apiSecret":"'"${CWM_APISECRET}"'",
 "billing":"hourly",
-"cpu":${arr[0]},
+"cpu":"2B",
 "createServerCommandId":"0",
 "datacenter":"'"${CWM_ZONE}"'",
-"diskSize":${arr[2]},
+"diskSize":"50",
 "image":"ubuntu_server_18.04_64-bit_optimized",
 "privateNetworkIp":"auto",
 "privateNetworkName":"'"${vlan}"'",
-"ram":${arr[1]},
+"ram":"4096",
 "type":"kamateraConfig"
 },
-"name":${arr[3]},
+"name":"Kamatera Worker",
 "useInternalIpAddress":true
-}"
-
+}'
 curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
-done
 
 echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072

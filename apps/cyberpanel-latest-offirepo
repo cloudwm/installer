@@ -9,7 +9,7 @@ fi
 rootDir=$(rootDir)
 
 echo "Downloading and installing ACME" | log
-curlDownload https://get.acme.sh
+curlDownload https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh
 waitOrStop 0 "File not downloaded from official source"
 chmod +x acme.sh
 export DEBIAN_FRONTEND=noninteractive
