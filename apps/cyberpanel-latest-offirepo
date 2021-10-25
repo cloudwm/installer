@@ -6,12 +6,14 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir=$(rootDir)
+
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
-cd /tmp
+cd $rootDir/temp
 curlDownload https://cyberpanel.net/install.sh
 chmod +x install.sh
 export DEBIAN_FRONTEND=noninteractive
-bash install.sh -v ols -a -p ${ADMINPASSWORD}
+$(bash install.sh -v ols -a -p '${ADMINPASSWORD}')
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8080"
