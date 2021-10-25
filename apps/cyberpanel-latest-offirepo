@@ -8,15 +8,26 @@ fi
 
 rootDir=$(rootDir)
 
+echo "Downloading and installing ACME" | log
+curlDownload https://get.acme.sh
+waitOrStop 0 "File not downloaded from official source"
+chmod +x acme.sh
+export DEBIAN_FRONTEND=noninteractive
+bash acme.sh
+waitOrStop 0 "Failed to install ACME"
+
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 cd /root/
 curlDownload https://cyberpanel.net/install.sh
+waitOrStop 0 "File not downloaded from official source"
 chmod +x install.sh
 export DEBIAN_FRONTEND=noninteractive
 $(bash install.sh -v ols -a -p '${ADMINPASSWORD}')
+waitOrStop 0 "Failed to install CyberPanel"
 
 echo "Adding descriptions" | log
-descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8080"
+descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8090"
+descriptionAppend "OpenLiteSpeed UI: https://${CWM_DOMAIN}:7080"
 descriptionAppend "CyberPanel User: admin"
 descriptionAppend "CyberPanel Password: ${ADMINPASSWORD}"
 
