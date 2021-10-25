@@ -197,9 +197,8 @@ WORKER_JSON_STRING="{
 "useInternalIpAddress":true
 }"
 
-done
-
 curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+done
 
 echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072
