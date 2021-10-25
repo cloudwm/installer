@@ -19,14 +19,14 @@ vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 cpuarr=("1B" "2B" "4B" "8B" "16B")
 memarr=(2048 4096 8192 16384 32768)
 dskarr=(30 50)
-tmpltarr=("${cpuarr[0]} ${memarr[0]} ${dskarr[0]} 'Kamatera_Worker_${cpuarr[0]}/${memarr[0]}/${dskarr[0]}'" \
-          "${cpuarr[1]} ${memarr[1]} ${dskarr[0]} 'Kamatera_Worker_${cpuarr[1]}/${memarr[1]}/${dskarr[0]}'" \
-          "${cpuarr[2]} ${memarr[1]} ${dskarr[0]} 'Kamatera_Worker_${cpuarr[2]}/${memarr[1]}/${dskarr[0]}'" \
-          "${cpuarr[2]} ${memarr[2]} ${dskarr[1]} 'Kamatera_Worker_${cpuarr[2]}/${memarr[2]}/${dskarr[1]}'" \
-          "${cpuarr[3]} ${memarr[2]} ${dskarr[1]} 'Kamatera_Worker_${cpuarr[3]}/${memarr[2]}/${dskarr[1]}'" \
-          "${cpuarr[3]} ${memarr[3]} ${dskarr[1]} 'Kamatera_Worker_${cpuarr[3]}/${memarr[3]}/${dskarr[1]}'" \
-          "${cpuarr[4]} ${memarr[3]} ${dskarr[1]} 'Kamatera_Worker_${cpuarr[4]}/${memarr[3]}/${dskarr[1]}'" \
-          "${cpuarr[4]} ${memarr[4]} ${dskarr[1]} 'Kamatera_Worker_${cpuarr[4]}/${memarr[4]}/${dskarr[1]}'")
+tmpltarr=("${cpuarr[0]} ${memarr[0]} ${dskarr[0]} Kamatera_Worker_${cpuarr[0]}/${memarr[0]}/${dskarr[0]}"
+          "${cpuarr[1]} ${memarr[1]} ${dskarr[0]} Kamatera_Worker_${cpuarr[1]}/${memarr[1]}/${dskarr[0]}"
+          "${cpuarr[2]} ${memarr[1]} ${dskarr[0]} Kamatera_Worker_${cpuarr[2]}/${memarr[1]}/${dskarr[0]}"
+          "${cpuarr[2]} ${memarr[2]} ${dskarr[1]} Kamatera_Worker_${cpuarr[2]}/${memarr[2]}/${dskarr[1]}"
+          "${cpuarr[3]} ${memarr[2]} ${dskarr[1]} Kamatera_Worker_${cpuarr[3]}/${memarr[2]}/${dskarr[1]}"
+          "${cpuarr[3]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[3]}/${memarr[3]}/${dskarr[1]}"
+          "${cpuarr[4]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[3]}/${dskarr[1]}"
+          "${cpuarr[4]} ${memarr[4]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[4]}/${dskarr[1]}")
 
 echo "Installing Jq" | log
 installPackage jq
@@ -171,29 +171,33 @@ PANEL_JSON_STRING='{
 }'
 curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$PANEL_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 #Kamatera Worker
+for tmplt in "${tmpltarr[@]}"; do
+arr=($tmplt)
+
 WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
-"engineInstallURL":"'"${engineInstallUrl}"'",
+"engineInstallURL":"${engineInstallUrl}",
 "engineRegistryMirror":[],
 "engineStorageDriver":"overlay2",
 "kamateraConfig":{
-"apiClientId":"'"${CWM_APICLIENTID}"'",
-"apiSecret":"'"${CWM_APISECRET}"'",
+"apiClientId":"${CWM_APICLIENTID}",
+"apiSecret":"${CWM_APISECRET}",
 "billing":"hourly",
-"cpu":"2B",
-"createServerCommandId":"0",
-"datacenter":"'"${CWM_ZONE}"'",
-"diskSize":"50",
-"image":"ubuntu_server_18.04_64-bit_optimized",
+"cpu":"'"${arr[0]}"'",
+"createServerCommandId":0,
+"datacenter":"${CWM_ZONE}",
+"diskSize":"'"${arr[2]}"'",
+"image":"ubuntu_server_20.04_64-bit_optimized",
 "privateNetworkIp":"auto",
-"privateNetworkName":"'"${vlan}"'",
-"ram":"4096",
-"type":"kamateraConfig"
-},
-"name":"Kamatera Worker",
-"useInternalIpAddress":true
-}'
+"privateNetworkName":"${vlan}",
+"ram":"'"${arr[1]}"'",
+"type":"kamateraConfig"},
+"name":"'"${arr[3]}"'",
+"useInternalIpAddress":true}'
+
 curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
+done
+
 
 echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072
