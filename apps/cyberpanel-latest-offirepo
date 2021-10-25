@@ -9,7 +9,7 @@ fi
 rootDir=$(rootDir)
 
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
-cd $rootDir/temp
+cd /root/
 curlDownload https://cyberpanel.net/install.sh
 chmod +x install.sh
 export DEBIAN_FRONTEND=noninteractive
