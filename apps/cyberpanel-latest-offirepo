@@ -9,15 +9,14 @@ fi
 rootDir=$(rootDir)
 
 echo "Downloading and installing ACME" | log
+cd /root/
 curlDownload https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh
 waitOrStop 0 "File not downloaded from official source"
 chmod +x acme.sh
-export DEBIAN_FRONTEND=noninteractive
 bash acme.sh
 waitOrStop 0 "Failed to install ACME"
 
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
-cd /root/
 curlDownload https://cyberpanel.net/install.sh
 waitOrStop 0 "File not downloaded from official source"
 chmod +x install.sh
