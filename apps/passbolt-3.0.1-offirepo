@@ -55,7 +55,7 @@ touch /var/www/passbolt/loginurl.txt
 docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /var/www/passbolt/loginurl.txt
 sleep 5
 
-dockerurl=cat /var/www/passbolt/loginurl.txt | grep https
+dockerurl=$(cat /var/www/passbolt/loginurl.txt | grep https)
 
 echo "adding descriptions" | log
 descriptionAppend "PassBolt Initial configuration: ${dockerurl}"
