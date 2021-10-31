@@ -28,10 +28,32 @@ sed -i "s/\/etc\/ssl\/certs\/certificate.crt/\/etc\/letsencrypt\/live\/${CWM_DOM
 sed -i "s/\/etc\/ssl\/certs\/certificate.key/\/etc\/letsencrypt\/live\/${CWM_DOMAIN}\/privkey.pem/g" /var/www/passbolt/conf/passbolt.conf
 docker-compose up -d
 waitOrStop 0 "Failed docker-compose"
+touch /var/www/passbolt/loginurl.txt
+docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /var/www/passbolt/loginurl.txt
+dockerurl=$(cat /var/www/passbolt/loginurl.txt | grep https)
 
+cat << EOF > /etc/systemd/system/passbolt.service
+[Unit]
+Description=PassBolt service
+After=network-online.target nss-lookup.target
+[Service]
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=passbolt
+ExecStart=/usr/bin/docker-compose -f /var/www/passbolt/docker-compose.yml up -d
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Starting and enabling services" | log
+systemctl daemon-reload
+systemctl start passbolt.service
+waitOrStop 0 "Failed to start PassBolt Service"
+systemctl enable passbolt.service
 systemctl enable docker
 
 echo "adding descriptions" | log
+descriptionAppend "PassBolt Initial configuration: ${dockerurl}"
 descriptionAppend "PassBolt UI: https://${CWM_DOMAIN}"
 descriptionAppend "PassBolt configuration files: /var/www/passbolt/"
 
