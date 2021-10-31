@@ -7,6 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
+dockerurl=cat /var/www/passbolt/loginurl.txt | grep https
 
 echo "Installing dependencies" | log
 packages=(apt-transport-https ca-certificates gnupg-agent software-properties-common docker-compose)
@@ -29,8 +30,6 @@ sed -i "s/\/etc\/ssl\/certs\/certificate.key/\/etc\/letsencrypt\/live\/${CWM_DOM
 docker-compose up -d
 waitOrStop 0 "Failed docker-compose"
 touch /var/www/passbolt/loginurl.txt
-docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /var/www/passbolt/loginurl.txt
-dockerurl=$(cat /var/www/passbolt/loginurl.txt | grep https)
 
 cat << EOF > /etc/systemd/system/passbolt.service
 [Unit]
@@ -44,6 +43,9 @@ ExecStart=/usr/bin/docker-compose -f /var/www/passbolt/docker-compose.yml up -d
 [Install]
 WantedBy=multi-user.target
 EOF
+
+sleep 5
+docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /var/www/passbolt/loginurl.txt
 
 echo "Starting and enabling services" | log
 systemctl daemon-reload
