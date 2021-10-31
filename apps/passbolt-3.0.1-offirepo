@@ -1,0 +1,40 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing dependencies" | log
+packages=(apt-transport-https ca-certificates gnupg-agent software-properties-common docker-compose)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Downloading passbolt from Git" | log
+curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/v3.0.1.tar.gz
+waitOrStop 0 "Failed to download PassBolt"
+
+echo "Extracting PassBolt" | log
+tar -xzvf v3.0.1.tar.gz
+mkdir -p /var/www/
+mv passbolt_docker-3.0.1/ passbolt/
+mv passbolt/ /var/www/
+cd /var/www/passbolt/
+sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /var/www/passbolt/env/passbolt.env
+sed -i "s/\/etc\/ssl\/certs\/certificate.crt/\/etc\/letsencrypt\/live\/${CWM_DOMAIN}\/fullchain.pem/g" /var/www/passbolt/conf/passbolt.conf
+sed -i "s/\/etc\/ssl\/certs\/certificate.key/\/etc\/letsencrypt\/live\/${CWM_DOMAIN}\/privkey.pem/g" /var/www/passbolt/conf/passbolt.conf
+docker-compose up -d
+waitOrStop 0 "Failed docker-compose"
+
+systemctl enable docker
+
+echo "adding descriptions" | log
+descriptionAppend "PassBolt UI: https://${CWM_DOMAIN}"
+descriptionAppend "PassBolt configuration files: /var/www/passbolt/"
+
+tagScript success
+
+exit 0

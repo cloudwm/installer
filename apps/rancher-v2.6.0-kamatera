@@ -187,7 +187,7 @@ WORKER_JSON_STRING='{
 "createServerCommandId":0,
 "datacenter":"${CWM_ZONE}",
 "diskSize":"'"${arr[2]}"'",
-"image":"ubuntu_server_20.04_64-bit_optimized",
+"image":"ubuntu_server_18.04_64-bit_optimized",
 "privateNetworkIp":"auto",
 "privateNetworkName":"${vlan}",
 "ram":"'"${arr[1]}"'",
