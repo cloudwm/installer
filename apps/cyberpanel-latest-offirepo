@@ -18,21 +18,23 @@ chmod +x acme.sh
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 mkdir -p /var/www/
 cd /var/www/
-touch cyberp.log
-set -x
 curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&Ubuntu"
 waitOrStop 0 "File not downloaded from official source"
 chmod +x cyberpanel.sh
 export DEBIAN_FRONTEND=noninteractive
-$(bash cyberpanel.sh -v ols -a -p ${ADMINPASSWORD} >/var/www/cyberp.log 2>&1)
+$(bash cyberpanel.sh -v ols -a -p ${ADMINPASSWORD} >/dev/null 2>&1)
 waitOrStop 0 "Failed to install CyberPanel"
-set +x
+
+olspass=$(cat /etc/cyberpanel/webadmin_passwd)
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8090"
-descriptionAppend "OpenLiteSpeed UI: https://${CWM_DOMAIN}:7080"
 descriptionAppend "CyberPanel User: admin"
 descriptionAppend "CyberPanel Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "OpenLiteSpeed UI: https://${CWM_DOMAIN}:7080"
+descriptionAppend "OpenLiteSpeed User: admin"
+descriptionAppend "OpenLiteSpeed Password: ${olspass}"
 
 tagScript success
 
