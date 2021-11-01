@@ -24,8 +24,9 @@ mv passbolt_docker-3.0.1/ passbolt/
 mv passbolt/ /var/www/
 cd /var/www/passbolt/
 sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /var/www/passbolt/env/passbolt.env
-sed -i "s/\/etc\/ssl\/certs\/certificate.crt/\/etc\/letsencrypt\/live\/${CWM_DOMAIN}\/fullchain.pem/g" /var/www/passbolt/conf/passbolt.conf
-sed -i "s/\/etc\/ssl\/certs\/certificate.key/\/etc\/letsencrypt\/live\/${CWM_DOMAIN}\/privkey.pem/g" /var/www/passbolt/conf/passbolt.conf
+rm -rf /var/www/passbolt/conf/passbolt.conf
+cp $rootDir/tweaks/extras/passbolt/passbolt.conf /var/www/passbolt/conf/
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/passbolt/conf/passbolt.conf
 docker-compose up -d
 waitOrStop 0 "Failed docker-compose"
 
@@ -55,10 +56,10 @@ touch /var/www/passbolt/loginurl.txt
 docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /var/www/passbolt/loginurl.txt
 sleep 5
 
-dockerurl=$(cat /var/www/passbolt/loginurl.txt | grep https)
+initialurl=cat /var/www/passbolt/loginurl.txt | grep https
 
 echo "adding descriptions" | log
-descriptionAppend "PassBolt Initial configuration: ${dockerurl}"
+descriptionAppend "PassBolt initial configuration link: ${initialurl}"
 descriptionAppend "PassBolt UI: https://${CWM_DOMAIN}"
 descriptionAppend "PassBolt configuration files: /var/www/passbolt/"
 
