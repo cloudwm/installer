@@ -8,23 +8,13 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Downloading and installing ACME" | log
-cd /root/
-curlDownload https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh
-waitOrStop 0 "File not downloaded from official source"
-chmod +x acme.sh
-bash acme.sh
-waitOrStop 0 "Failed to install ACME"
-
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
-curlDownload https://cyberpanel.net/install.sh
+curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&Ubuntu"
 waitOrStop 0 "File not downloaded from official source"
-chmod +x install.sh
-set -x
+chmod +x cyberpanel.sh
 export DEBIAN_FRONTEND=noninteractive
-bash install.sh -v ols -a -p '${ADMINPASSWORD}' >/dev/null 2>&1
+bash cyberpanel.sh -v ols -a -p '${ADMINPASSWORD}' >/dev/null 2>&1
 waitOrStop 0 "Failed to install CyberPanel"
-set +x
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8090"
