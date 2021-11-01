@@ -11,12 +11,13 @@ rootDir=$(rootDir)
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 mkdir -p /var/www/
 cd /var/www/
+touch cyberp.log
 set -x
 curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&Ubuntu"
 waitOrStop 0 "File not downloaded from official source"
 chmod +x cyberpanel.sh
 export DEBIAN_FRONTEND=noninteractive
-$(bash cyberpanel.sh -v ols -a -p '${ADMINPASSWORD}' >/dev/null 2>&1)
+$(bash cyberpanel.sh -v ols -a -p '${ADMINPASSWORD}' >/var/www/cyberp.log 2>&1)
 waitOrStop 0 "Failed to install CyberPanel"
 set +x
 
