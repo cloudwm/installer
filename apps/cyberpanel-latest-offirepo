@@ -20,9 +20,11 @@ echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 curlDownload https://cyberpanel.net/install.sh
 waitOrStop 0 "File not downloaded from official source"
 chmod +x install.sh
+set -x
 export DEBIAN_FRONTEND=noninteractive
-$(bash install.sh -v ols -a -p '${ADMINPASSWORD}' >/dev/null 2>&1)
+bash install.sh -v ols -a -p '${ADMINPASSWORD}' >/dev/null 2>&1
 waitOrStop 0 "Failed to install CyberPanel"
+set +x
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}:8090"
