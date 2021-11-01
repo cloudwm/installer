@@ -25,8 +25,11 @@ mv passbolt/ /var/www/
 cd /var/www/passbolt/
 sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /var/www/passbolt/env/passbolt.env
 mv /var/www/passbolt/conf/passbolt.conf /var/www/passbolt/conf/passbolt.conf.bk
+mv /var/www/passbolt/docker-compose.yml /var/www/passbolt/docker-compose.yml.bk
 cp $rootDir/tweaks/extras/passbolt/passbolt.conf /var/www/passbolt/conf/
+cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /var/www/passbolt/
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/passbolt/conf/passbolt.conf
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/passbolt/docker-compose.yml
 docker-compose up -d
 waitOrStop 0 "Failed docker-compose"
 
