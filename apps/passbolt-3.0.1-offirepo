@@ -24,7 +24,7 @@ mv passbolt_docker-3.0.1/ passbolt/
 mv passbolt/ /var/www/
 cd /var/www/passbolt/
 sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /var/www/passbolt/env/passbolt.env
-rm -rf /var/www/passbolt/conf/passbolt.conf
+mv /var/www/passbolt/conf/passbolt.conf /var/www/passbolt/conf/passbolt.conf.bk
 cp $rootDir/tweaks/extras/passbolt/passbolt.conf /var/www/passbolt/conf/
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/passbolt/conf/passbolt.conf
 docker-compose up -d
@@ -56,7 +56,7 @@ touch /var/www/passbolt/loginurl.txt
 docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /var/www/passbolt/loginurl.txt
 sleep 5
 
-initialurl=cat /var/www/passbolt/loginurl.txt | grep https
+initialurl=$(cat /var/www/passbolt/loginurl.txt | grep https)
 
 echo "adding descriptions" | log
 descriptionAppend "PassBolt initial configuration link: ${initialurl}"
