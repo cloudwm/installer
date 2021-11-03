@@ -15,6 +15,10 @@ curlDownload https://raw.githubusercontent.com/acmesh-official/acme.sh/master/ac
 waitOrStop 0 "File not downloaded from official source"
 chmod +x acme.sh
 
+echo "Adding firewall fules" | log
+ufw allow 8090
+ufw allow 7090
+
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 mkdir -p /var/www/
 cd /var/www/
