@@ -176,7 +176,7 @@ arr=($tmplt)
 
 WORKER_JSON_STRING='{
 "engineInsecureRegistry":[],
-"engineInstallURL":"${engineInstallUrl}",
+"engineInstallURL":"'"${engineInstallUrl}"'",
 "engineRegistryMirror":[],
 "engineStorageDriver":"overlay2",
 "kamateraConfig":{
