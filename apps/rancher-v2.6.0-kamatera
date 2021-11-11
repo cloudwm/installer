@@ -184,20 +184,20 @@ WORKER_JSON_STRING='{
 "apiSecret":"'"${CWM_APISECRET}"'",
 "billing":"hourly",
 "cpu":"'"${arr[0]}"'",
-"createServerCommandId":0,
+"createServerCommandId":"0",
 "datacenter":"'"${CWM_ZONE}"'",
 "diskSize":"'"${arr[2]}"'",
 "image":"ubuntu_server_18.04_64-bit_optimized",
 "privateNetworkIp":"auto",
 "privateNetworkName":"'"${vlan}"'",
 "ram":"'"${arr[1]}"'",
-"type":"kamateraConfig"},
+"type":"kamateraConfig"
+},
 "name":"'"${arr[3]}"'",
-"useInternalIpAddress":true}'
-
+"useInternalIpAddress":true
+}'
 curl --url "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 done
-
 
 echo "Tweaking NetFilter conntrack_max" | log
 sysctl net/netfilter/nf_conntrack_max=131072

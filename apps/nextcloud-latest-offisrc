@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist ssl-ready.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
-appVersion=latest
+appVersion=nextcloud-22.2.0
 appPath=/var/www/html
 rootDir=$(rootDir)
 
