@@ -11,7 +11,7 @@ echo "Updating Ubuntu mirrors for Kamatera install" | log
 officialDomain="archive.ubuntu.com"
 mirrorDomain="mirror.${CWM_ZONE,,}.kamatera.com"
 officialFullDomain="http:\/\/archive.ubuntu.com\/ubuntu"
-officialMirrors="mirror:\/\/mirrors.ubuntu.com\/mirrors.txt"
+officialDomainZone="http:\/\/${CWM_ZONE,,}.archive.ubuntu.com\/ubuntu"
 
 backupFile /etc/apt/sources.list
 kamateraMirrors=$(sed -n 's/'"${officialDomain}"'/'"${mirrorDomain}"'/gp' /etc/apt/sources.list)
