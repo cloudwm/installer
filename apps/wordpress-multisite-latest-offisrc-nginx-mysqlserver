@@ -40,6 +40,7 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Downloading wordpress and installing" | log
+installPackage libpcre2-8-0 | log
 wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 waitOrStop 0 "Application failed to download"
 wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
