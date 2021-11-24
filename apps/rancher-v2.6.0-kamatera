@@ -27,6 +27,7 @@ tmpltarr=("${cpuarr[0]} ${memarr[0]} ${dskarr[0]} Kamatera_Worker_${cpuarr[0]}/$
           "${cpuarr[3]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[3]}/${memarr[3]}/${dskarr[1]}"
           "${cpuarr[4]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[3]}/${dskarr[1]}"
           "${cpuarr[4]} ${memarr[4]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[4]}/${dskarr[1]}")
+driverarr=("baiducloudcontainerengine" "tencentkubernetesengine" "oraclecontainerengine" "opentelekomcloudcontainerengine" "linodekubernetesengine" "huaweicontainercloudengine")
 
 echo "Installing Jq" | log
 installPackage jq
@@ -141,6 +142,13 @@ echo "Deactivating foreign drivers" | log
 for url in ${KONTAINERDRIVERS}; do
 
     curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" 
+
+done
+
+echo "Removing foreign drivers" | log
+for driver in "${driverarr[@]}"; do
+
+    curl --url "https://${CWM_DOMAIN}/v3/kontainerDrivers/$driver" -XDELETE -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | log
 
 done
 
