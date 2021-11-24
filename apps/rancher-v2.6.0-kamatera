@@ -132,7 +132,7 @@ for url in ${NODEDRIVERS}; do
     curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
 done
-
+set -x
 echo "Removing foreign cluster drivers" | log
 DELKONTAINERDRIVERS=`curl --url "https://${CWM_DOMAIN}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.delete`
 for url in ${DELKONTAINERDRIVERS}; do
@@ -148,7 +148,7 @@ for url in ${DELNODEDRIVERS}; do
     curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
 done
-
+set +x
 echo "Adding Kamatera Docker Machine Driver" | log
 curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
