@@ -146,7 +146,7 @@ for url in ${KONTAINERDRIVERS}; do
 
 done
 
-set +x
+set -x
 echo "Removing foreign cluster drivers" | log
 for clusterdriver in "${clusterdriverarr[@]}"; do
 
@@ -160,7 +160,9 @@ for nodedriver in "${nodedriverarr[@]}"; do
     curl --url "https:///${CWM_DOMAIN}/v3/nodedrivers/$nodedriver" -XDELETE -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
 done
-set -x
+
+set +x
+
 echo "Creating Kamatera templates on Rancher" | log
 sleep 10
 # Kamatera Control Panel
