@@ -19,17 +19,20 @@ waitOrStop 0 "Failed to download PassBolt"
 
 echo "Extracting PassBolt" | log
 tar -xzvf v3.0.1.tar.gz
-mkdir -p /var/www/
 mv passbolt_docker-3.0.1/ passbolt/
-mv passbolt/ /var/www/
-cd /var/www/passbolt/
-sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /var/www/passbolt/env/passbolt.env
-mv /var/www/passbolt/conf/passbolt.conf /var/www/passbolt/conf/passbolt.conf.bk
-mv /var/www/passbolt/docker-compose.yml /var/www/passbolt/docker-compose.yml.bk
-cp $rootDir/tweaks/extras/passbolt/passbolt.conf /var/www/passbolt/conf/
-cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /var/www/passbolt/
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/passbolt/conf/passbolt.conf
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/passbolt/docker-compose.yml
+mv passbolt/ /opt/
+rm -rf v3.0.1.tar.gz
+cd /opt/passbolt/
+sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /opt/passbolt/env/passbolt.env
+sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/passbolt.env
+sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
+sed -i "s/test/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
+mv /opt/passbolt/conf/passbolt.conf /opt/passbolt/conf/passbolt.conf.bk
+mv /opt/passbolt/docker-compose.yml /opt/passbolt/docker-compose.yml.bk
+cp $rootDir/tweaks/extras/passbolt/passbolt.conf /opt/passbolt/conf/
+cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /opt/passbolt/
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
 docker-compose up -d
 waitOrStop 0 "Failed docker-compose"
 
@@ -41,7 +44,7 @@ After=network-online.target nss-lookup.target
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=passbolt
-ExecStart=/usr/bin/docker-compose -f /var/www/passbolt/docker-compose.yml up -d
+ExecStart=/usr/bin/docker-compose -f /opt/passbolt/docker-compose.yml up -d
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -55,11 +58,11 @@ systemctl enable docker
 sleep 30
 
 echo "Creating PassBolt login UI" | log
-touch /var/www/passbolt/loginurl.txt
-docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /var/www/passbolt/loginurl.txt
+touch /opt/passbolt/loginurl.txt
+docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /opt/passbolt/loginurl.txt
 sleep 5
 
-initialurl=$(cat /var/www/passbolt/loginurl.txt | grep https)
+initialurl=$(cat /opt/passbolt/loginurl.txt | grep https)
 
 echo "adding descriptions" | log
 descriptionAppend "PassBolt initial configuration link: ${initialurl}"
