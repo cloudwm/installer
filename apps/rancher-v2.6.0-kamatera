@@ -27,8 +27,6 @@ tmpltarr=("${cpuarr[0]} ${memarr[0]} ${dskarr[0]} Kamatera_Worker_${cpuarr[0]}/$
           "${cpuarr[3]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[3]}/${memarr[3]}/${dskarr[1]}"
           "${cpuarr[4]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[3]}/${dskarr[1]}"
           "${cpuarr[4]} ${memarr[4]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[4]}/${dskarr[1]}")
-#clusterdriverarr=("baiducloudcontainerengine" "tencentkubernetesengine" "oraclecontainerengine" "opentelekomcloudcontainerengine" "linodekubernetesengine" "huaweicontainercloudengine")
-#nodedriverarr=("aliyunecs" "cloudca" "cloudscale" "azure" "exoscale" "harvester" "linode" "oci" "packet" "openstack" "otc" "pinganyunecs" "pnap" "softlayer" "rackspace" "digitalocean")
 
 echo "Installing Jq" | log
 installPackage jq
@@ -132,23 +130,7 @@ for url in ${NODEDRIVERS}; do
     curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
 done
-set -x
-echo "Removing foreign cluster drivers" | log
-DELKONTAINERDRIVERS=`curl --url "https://${CWM_DOMAIN}/v3/kontainerdrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.delete`
-for url in ${DELKONTAINERDRIVERS}; do
 
-    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
-
-done
-
-echo "Removing foreign node drivers" | log
-DELNODEDRIVERS=`curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}" | jq -r .data[].actions.delete`
-for url in ${DELNODEDRIVERS}; do
-
-    curl --url "$url" -d '{}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
-
-done
-set +x
 echo "Adding Kamatera Docker Machine Driver" | log
 curl --url "https://${CWM_DOMAIN}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST -H "Authorization: Bearer $APITOKEN" "${curlBaseParams[@]}"
 
