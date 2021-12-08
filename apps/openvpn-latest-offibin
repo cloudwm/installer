@@ -32,8 +32,7 @@ rm -f $appPackage
 apt -y --fix-broken install
 
 echo "Configuring first user" | log
-usermod -l openvpn -d /home/openvpn_as -m openvpn_as
-echo "openvpn:$ADMINPASSWORD" | chpasswd
+echo "openvpn_as:$ADMINPASSWORD" | chpasswd
 
 echo "Configuring certifications" | log
 service openvpnas stop
@@ -43,7 +42,7 @@ service openvpnas start
 
 echo "Adding descriptions" | log
 descriptionAppend "OpenVPN Management Web UI:  https://${CWM_DISPLAYED_ADDRESS}:943/admin"
-descriptionAppend "OpenVPN Username: openvpn"
+descriptionAppend "OpenVPN Username: openvpn_as"
 descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
 descriptionAppend "OpenVPN Client Web UI: https://${CWM_DISPLAYED_ADDRESS}:943/"
