@@ -32,6 +32,7 @@ rm -f $appPackage
 apt -y --fix-broken install
 
 echo "Configuring first user" | log
+usermod -l openvpn -d /home/openvpn_as -m openvpn_as
 echo "openvpn:$ADMINPASSWORD" | chpasswd
 
 echo "Configuring certifications" | log
