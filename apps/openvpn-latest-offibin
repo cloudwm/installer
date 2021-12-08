@@ -32,7 +32,10 @@ rm -f $appPackage
 apt -y --fix-broken install
 
 echo "Configuring first user" | log
-echo "openvpn_as:$ADMINPASSWORD" | chpasswd
+#echo "openvpn_as:$ADMINPASSWORD" | chpasswd
+cd /usr/local/openvpn_as/scripts/
+bash sacli --user openvpn  --key local --value "user_connect" UserPropPut
+bash sacli --user openvpn --new_pass ${ADMINPASSWORD} SetLocalPassword
 
 echo "Configuring certifications" | log
 service openvpnas stop
