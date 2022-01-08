@@ -5,7 +5,7 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
+exit 0
 runOnceCheck
 checkTagExist nginx.success
 
