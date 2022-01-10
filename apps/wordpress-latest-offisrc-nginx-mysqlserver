@@ -45,7 +45,7 @@ wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 waitOrStop 0 "Application failed to download"
 wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
 waitOrStop 0 "Failed to create database"
-wp core install --url=http://${CWM_SERVERIP} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
+wp core install --url=http://${CWM_DOMAIN} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
 waitOrStop 0 "Failed to install application"
 
 echo "Fixing app permissions" | log
@@ -59,7 +59,7 @@ echo "Misc. cleanups" | log
 rm $WP_PATH/index.nginx-debian.html
 
 echo "Adding descriptions" | log
-descriptionAppend "Wordpress Admin Web UI: http://${CWM_SERVERIP}/wp-login.php"
+descriptionAppend "Wordpress Admin Web UI: https://${CWM_DOMAIN}/wp-login.php"
 descriptionAppend "Wordpress Username: admin"
 descriptionAppend "Wordpress Password: ${ADMINPASSWORD}"
 descriptionAppend " "
