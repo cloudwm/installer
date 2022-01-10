@@ -9,7 +9,7 @@ fi
 checkTagExist php.success
 checkTagExist nginx.success
 checkTagExist mysqld.success
-#checkTagExist ssl-ready.success
+checkTagExist ssl-ready.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 appVersion=latest

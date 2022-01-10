@@ -6,8 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-exit 0
-
 checkTagExist nginx.success
 checkTagExist certbot-nginx.success
 

@@ -6,7 +6,7 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-exit 0
+
 execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
 waitOrStop 0 "Failed certbot certificate generation"
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
