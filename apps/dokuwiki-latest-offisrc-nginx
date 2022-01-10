@@ -8,7 +8,7 @@ fi
 
 checkTagExist nginx.success
 checkTagExist php.success
-checkTagExist nginx-enable-php-ssl.success
+#checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
 rootDir=$(rootDir)

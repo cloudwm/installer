@@ -6,7 +6,7 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
+exit 0
 checkTagExist apache2.success
 
 certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
