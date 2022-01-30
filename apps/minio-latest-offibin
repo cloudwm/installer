@@ -36,9 +36,12 @@ chown minio-user:minio-user /etc/minio
 echo "MINIO_VOLUMES=\"/minio/\"" >> /etc/default/minio
 ips=$(getServerIPAll)
 echo "MINIO_PUBLIC_IPS=${ips// /,}" >> /etc/default/minio
-echo "MINIO_OPTS=\"-C /etc/minio --certs-dir $certsMinio --address :443\"" >> /etc/default/minio
+echo "MINIO_OPTS=\"-C /etc/minio --certs-dir $certsMinio --address :443 --console-address :6725\"" >> /etc/default/minio
 # echo "MINIO_DOMAIN=${CWM_DISPLAYED_ADDRESS}" >> /etc/default/minio 
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
+
+echo "Adding console port to UFW" | log
+ufw allow 6725
 
 echo "Adding Systemd Service" | log
 curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
