@@ -95,7 +95,6 @@ docker run -d --name rancher --restart unless-stopped \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/rancher/ssl/cert.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem \
-	-e SSL_CERT_DIR="/etc/rancher/ssl" \
 	--privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:{RANCHER_VERSION}"
 
 curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
