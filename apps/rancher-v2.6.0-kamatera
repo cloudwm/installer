@@ -13,7 +13,7 @@ rootDir=$(rootDir)
 engineInstallUrl=https://releases.rancher.com/install-docker/20.10.sh
 kamateraDriverUrl=https://github.com/Kamatera/docker-machine-driver-kamatera/releases/download/v1.1.4/docker-machine-driver-kamatera_v1.1.4_linux_amd64.tar.gz
 
-RANCHER_VERSION=v2.6.0
+RANCHER_VERSION=v2.6.3
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 
 cpuarr=("1B" "2B" "4B" "8B" "16B")
