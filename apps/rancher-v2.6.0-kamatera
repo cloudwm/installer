@@ -13,7 +13,7 @@ rootDir=$(rootDir)
 engineInstallUrl=https://releases.rancher.com/install-docker/20.10.sh
 kamateraDriverUrl=https://github.com/Kamatera/docker-machine-driver-kamatera/releases/download/v1.1.4/docker-machine-driver-kamatera_v1.1.4_linux_amd64.tar.gz
 
-#RANCHER_VERSION=latest
+RANCHER_VERSION=v2.6.2
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 
 cpuarr=("1B" "2B" "4B" "8B" "16B")
@@ -96,7 +96,7 @@ docker run -d --name rancher --restart unless-stopped \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem \
 	-e SSL_CERT_DIR="/etc/rancher/ssl" \
-	--privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:latest" --no-cacerts
+	--privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:{RANCHER_VERSION}"
 
 curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
