@@ -11,7 +11,6 @@
 variable "password" {
   type        = string
   description = "Service default password"
-  default = "Omci1234!1234@"
 }
 
 variable "image_id" {
