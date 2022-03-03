@@ -11,6 +11,7 @@
 variable "password" {
   type        = string
   description = "Service default password"
+  default = "C!T3%tN0tS3curPa$$w0rd"
 }
 
 variable "image_id" {
