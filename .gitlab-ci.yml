@@ -6,6 +6,8 @@
 
 image:
   name: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+services:
+    - name: docker
 
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/infra_ci_test  # The relative path to the root directory of the Terraform project
