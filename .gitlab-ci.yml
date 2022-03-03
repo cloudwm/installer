@@ -18,9 +18,6 @@ variables:
 
 before_script:
   - cd ${TF_ROOT}
-  - export KAMATERA_API_CLIENT_ID=${CWM_CLIENTID}
-  - export KAMATERA_API_SECRET=${CWM_SECRET}
-
 stages:
   - prepare
   - validate
@@ -64,17 +61,17 @@ build:
 deploy:
   stage: deploy
   script:
-    - gitlab-terraform apply -parallelism=50 -var='password=${CWM_TEST_PASSWORD}'
+    - gitlab-terraform apply -parallelism=50 -var="password=${CWM_TEST_PASSWORD}" -var="api_client_id=${CWM_CLIENTID}" -var="api_secret=${CWM_SECRET}"
   resource_group: ${TF_STATE_NAME}
   dependencies:
     - build
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      # when: manual
+      when: manual
 
 destroy:
   stage: cleanup
   script:
     - gitlab-terraform destroy -var='password=${CWM_TEST_PASSWORD}'
   resource_group: ${TF_STATE_NAME}
-  # when: manual
+  when: manual
