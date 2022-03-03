@@ -1,16 +1,17 @@
-variable "api_client_id" {
-  type        = string
-  description = "kamatera client id"
-}
+# variable "api_client_id" {
+#   type        = string
+#   description = "kamatera client id"
+# }
 
-variable "api_secret" {
-  type        = string
-  description = "kamatera client secret"
-}
+# variable "api_secret" {
+#   type        = string
+#   description = "kamatera client secret"
+# }
 
 variable "password" {
   type        = string
   description = "Service default password"
+  default = "Omci1234!1234@"
 }
 
 variable "image_id" {

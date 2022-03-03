@@ -12,12 +12,14 @@ services:
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/infra_ci_test  # The relative path to the root directory of the Terraform project
   TF_STATE_NAME: ${TF_STATE_NAME:-default}  # The name of the state file used by the GitLab Managed Terraform state backend
-  CWM_CLIENTID: $CWM_CLIENTID
-  CWM_SECRET: $CWM_SECRET
+  # CWM_CLIENTID: $CWM_CLIENTID
+  # CWM_SECRET: $CWM_SECRET
   CWM_TEST_PASSWORD: $CWM_TEST_PASSWORD
 
 before_script:
   - cd ${TF_ROOT}
+  - export KAMATERA_API_CLIENT_ID=${CWM_CLIENTID}
+  - export KAMATERA_API_SECRET=${CWM_TEST_PASSWORD}
 stages:
   - prepare
   - validate
@@ -61,7 +63,7 @@ build:
 deploy:
   stage: deploy
   script:
-    - gitlab-terraform apply -parallelism=50 -var="password=${CWM_TEST_PASSWORD}" -var="api_client_id=${CWM_CLIENTID}" -var="api_secret=${CWM_SECRET}"
+    - gitlab-terraform apply -parallelism=50 -var="password=${CWM_TEST_PASSWORD}"
   resource_group: ${TF_STATE_NAME}
   dependencies:
     - build
