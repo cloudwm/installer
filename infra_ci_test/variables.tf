@@ -8,18 +8,6 @@ variable "api_secret" {
     description = "kamatera client secret"
 }
 
-variable "os_image" {
-  type= string
-  description="OS family"
-  default = "Ubuntu"
-}
-
-variable "os_image_code" {
-  type=string
-  description="Image flavore"
-  default="20.04 64bit_optimized"
-}
-
 variable "password" {
   type= string
   description="Service default password"

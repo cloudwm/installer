@@ -10,14 +10,13 @@ resource "kamatera_server" "my_server" {
   datacenter_id = data.kamatera_datacenter.rosh_haayin.id
   cpu_type = "B"
   cpu_cores = 2
-  ram_mb = tonumber(var.image_id[count.index].ram)
-  # ram_mb = 2048
+  ram_mb = var.image_id[count.index].ram
   disk_sizes_gb = [10]
   image_id = var.image_id[count.index].id
   network {
     name = "wan"
   }
   network {
-    name = "ci-test-lan"
+    name = "lan-1-ci-test"
   }
 }
