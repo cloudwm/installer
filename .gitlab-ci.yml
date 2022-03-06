@@ -19,7 +19,7 @@ variables:
 before_script:
   - cd ${TF_ROOT}
   - export KAMATERA_API_CLIENT_ID=${CWM_CLIENTID}
-  - export KAMATERA_API_SECRET=${CWM_TEST_PASSWORD}
+  - export KAMATERA_API_SECRET=${CWM_SECRET}
 stages:
   - prepare
   - validate
@@ -51,8 +51,9 @@ validate:
 build:
   stage: build
   script:
-    - KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_TEST_PASSWORD} gitlab-terraform plan -var="'"password=${CWM_TEST_PASSWORD}"'"
-    - KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_TEST_PASSWORD} gitlab-terraform plan-json -var="'"password=${CWM_TEST_PASSWORD}"'"
+    - |
+      KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_SECRET} gitlab-terraform plan -var="'"password=${CWM_TEST_PASSWORD}"'"
+      KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_SECRET} gitlab-terraform plan-json -var="'"password=${CWM_TEST_PASSWORD}"'"
   resource_group: ${TF_STATE_NAME}
   artifacts:
     paths:
