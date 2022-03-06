@@ -21,8 +21,8 @@ variable "datacenter" {
 
 variable "networks" {
   description = "Network names"
-  type = list(string)
-  default = ["wan", "lan-1-ci-test"]
+  type        = list(string)
+  default     = ["wan", "lan-1-ci-test"]
 }
 
 variable "image_id" {
