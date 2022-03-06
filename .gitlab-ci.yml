@@ -1,0 +1,79 @@
+# This file is a template, and might need editing before it works on your project.
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Terraform.gitlab-ci.yml
+
+image:
+  name: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+services:
+    - name: docker
+
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}/infra_ci_test  # The relative path to the root directory of the Terraform project
+  TF_STATE_NAME: ${TF_STATE_NAME:-default}  # The name of the state file used by the GitLab Managed Terraform state backend
+  # CWM_CLIENTID: $CWM_CLIENTID
+  # CWM_SECRET: $CWM_SECRET
+  CWM_TEST_PASSWORD: $CWM_TEST_PASSWORD
+
+before_script:
+  - cd ${TF_ROOT}
+  - export KAMATERA_API_CLIENT_ID=${CWM_CLIENTID}
+  - export KAMATERA_API_SECRET=${CWM_TEST_PASSWORD}
+stages:
+  - prepare
+  - validate
+  - build
+  - deploy
+  - cleanup
+
+cache:
+  key: "${TF_ROOT}"
+  paths:
+    - ${TF_ROOT}/.terraform/
+
+init:
+  stage: prepare
+  script:
+    - gitlab-terraform init
+
+fmt:
+  stage: validate
+  script:
+    - gitlab-terraform fmt
+  allow_failure: true
+
+validate:
+  stage: validate
+  script:
+    - gitlab-terraform validate
+
+build:
+  stage: build
+  script:
+    - gitlab-terraform plan
+    - gitlab-terraform plan-json
+  resource_group: ${TF_STATE_NAME}
+  artifacts:
+    paths:
+      - ${TF_ROOT}/plan.cache
+    reports:
+      terraform: ${TF_ROOT}/plan.json
+
+deploy:
+  stage: deploy
+  script:
+    - gitlab-terraform apply -parallelism=50 -var="'"password=${CWM_TEST_PASSWORD}"'"
+  resource_group: ${TF_STATE_NAME}
+  dependencies:
+    - build
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+
+destroy:
+  stage: cleanup
+  script:
+    - gitlab-terraform destroy -var='password=${CWM_TEST_PASSWORD}'
+  resource_group: ${TF_STATE_NAME}
+  when: manual
