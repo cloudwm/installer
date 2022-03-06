@@ -68,6 +68,7 @@ build:
   artifacts:
     paths:
       - ${TF_ROOT}/plan
+      - ${TF_ROOT}/terraform.tfstate
       # - ${TF_ROOT}/plan.cache
     reports:
       terraform: ${TF_ROOT}/plan
@@ -89,9 +90,9 @@ deploy:
 destroy:
   stage: cleanup
   script:
-    - terraform apply --auto-approve plan
+    - terraform destroy --auto-approve
     # - gitlab-terraform destroy
   resource_group: ${TF_STATE_NAME}
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
+      # when: manual
