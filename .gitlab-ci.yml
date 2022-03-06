@@ -12,14 +12,14 @@ services:
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/infra_ci_test  # The relative path to the root directory of the Terraform project
   TF_STATE_NAME: ${TF_STATE_NAME:-default}  # The name of the state file used by the GitLab Managed Terraform state backend
-  CWM_CLIENTID: $CWM_CLIENTID
-  CWM_SECRET: $CWM_SECRET
-  CWM_TEST_PASSWORD: $CWM_TEST_PASSWORD
+  CI_CWM_CLIENTID: $CI_CWM_CLIENTID
+  CI_CWM_SECRET: $CI_CWM_SECRET
+  CI_CWM_TEST_PASSWORD: $CI_CWM_TEST_PASSWORD
 
 before_script:
   - cd ${TF_ROOT}
-  - export KAMATERA_API_CLIENT_ID=${CWM_CLIENTID}
-  - export KAMATERA_API_SECRET=${CWM_SECRET}
+  - apk add gettext
+  - envsubst < vars.tmpl > vars
 stages:
   - prepare
   - validate
@@ -51,8 +51,6 @@ validate:
 build:
   stage: build
   script:
-    - apk add gettext
-    - envsubst < vars.tmpl > vars
     - gitlab-terraform plan -var-file=vars
     - gitlab-terraform plan-json -var-file=vars
   resource_group: ${TF_STATE_NAME}
@@ -65,7 +63,7 @@ build:
 deploy:
   stage: deploy
   script:
-    - KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_TEST_PASSWORD} gitlab-terraform apply -parallelism=50 -var="'"password=${CWM_TEST_PASSWORD}"'"
+    - gitlab-terraform apply -parallelism=50 -var-file=vars
   resource_group: ${TF_STATE_NAME}
   dependencies:
     - build
@@ -76,6 +74,6 @@ deploy:
 destroy:
   stage: cleanup
   script:
-    - KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_TEST_PASSWORD} gitlab-terraform destroy -var="'"password=${CWM_TEST_PASSWORD}"'"
+    - gitlab-terraform destroy -var-file=vars
   resource_group: ${TF_STATE_NAME}
   when: manual
