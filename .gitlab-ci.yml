@@ -51,6 +51,7 @@ validate:
 build:
   stage: build
   script:
+    - cat vars
     - gitlab-terraform plan -var-file=vars
     - gitlab-terraform plan-json -var-file=vars
   resource_group: ${TF_STATE_NAME}
