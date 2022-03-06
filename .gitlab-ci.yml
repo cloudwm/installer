@@ -51,7 +51,6 @@ validate:
 build:
   stage: build
   script:
-    - cat terraform.tfvars
     - gitlab-terraform plan
     - gitlab-terraform plan-json
   resource_group: ${TF_STATE_NAME}
@@ -68,9 +67,10 @@ deploy:
   resource_group: ${TF_STATE_NAME}
   dependencies:
     - build
+  allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
+      # when: manual
 
 destroy:
   stage: cleanup

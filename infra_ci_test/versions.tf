@@ -3,5 +3,8 @@ terraform {
     kamatera = {
       source = "Kamatera/kamatera"
     }
+    random = {
+      source = "hashicorp/random"
+    }
   }
 }
