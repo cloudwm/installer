@@ -51,9 +51,10 @@ validate:
 build:
   stage: build
   script:
-    - |
-      KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_SECRET} gitlab-terraform plan -var="'"password=${CWM_TEST_PASSWORD}"'"
-      KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_SECRET} gitlab-terraform plan-json -var="'"password=${CWM_TEST_PASSWORD}"'"
+    - apk add gettext
+    - envsubst < vars.tmpl > vars
+    - gitlab-terraform plan -var-file=vars
+    - gitlab-terraform plan-json -var-file=vars
   resource_group: ${TF_STATE_NAME}
   artifacts:
     paths:
