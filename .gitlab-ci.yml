@@ -51,8 +51,8 @@ validate:
 build:
   stage: build
   script:
-    - gitlab-terraform plan
-    - gitlab-terraform plan-json
+    - KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_TEST_PASSWORD} gitlab-terraform plan
+    - KAMATERA_API_CLIENT_ID=${CWM_CLIENTID} KAMATERA_API_SECRET=${CWM_TEST_PASSWORD} gitlab-terraform plan-json
   resource_group: ${TF_STATE_NAME}
   artifacts:
     paths:
