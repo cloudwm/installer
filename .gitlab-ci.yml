@@ -5,7 +5,11 @@
 # https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Terraform.gitlab-ci.yml
 
 image:
-  name: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+  # name: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+  name: hashicorp/terraform:light
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 services:
     - name: docker
 
@@ -18,6 +22,7 @@ variables:
 
 before_script:
   - cd ${TF_ROOT}
+  - terraform init
   - apk add gettext
   - envsubst < terraform.tfvars.tmpl > terraform.tfvars
 stages:
@@ -35,38 +40,47 @@ cache:
 init:
   stage: prepare
   script:
-    - gitlab-terraform init
+    - terraform init
+    # - gitlab-terraform init
 
 fmt:
   stage: validate
   script:
-    - gitlab-terraform fmt
+    - terraform fmt -check -recursive
+    # - gitlab-terraform fmt -check -recursive
   allow_failure: true
 
 validate:
   stage: validate
   script:
-    - gitlab-terraform validate
+    - terraform validate
+    # - gitlab-terraform validate
 
 build:
   stage: build
   script:
-    - gitlab-terraform plan
-    - gitlab-terraform plan-json
+    - terraform plan --out plan
+    # - gitlab-terraform plan
+    # - gitlab-terraform plan-json
   resource_group: ${TF_STATE_NAME}
+  dependencies:
+    - validate
   artifacts:
     paths:
-      - ${TF_ROOT}/plan.cache
+      - ${TF_ROOT}/plan
+      # - ${TF_ROOT}/plan.cache
     reports:
-      terraform: ${TF_ROOT}/plan.json
+      terraform: ${TF_ROOT}/plan
+      # terraform: ${TF_ROOT}/plan.json
 
 deploy:
   stage: deploy
   script:
-    - gitlab-terraform apply -parallelism=50
+    - terraform apply --auto-approve plan
+    # - gitlab-terraform apply -parallelism=50
   resource_group: ${TF_STATE_NAME}
-  dependencies:
-    - build
+  # dependencies:
+  #   - build
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -75,6 +89,9 @@ deploy:
 destroy:
   stage: cleanup
   script:
+    - terraform apply --auto-approve plan
     - gitlab-terraform destroy
   resource_group: ${TF_STATE_NAME}
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   when: manual
