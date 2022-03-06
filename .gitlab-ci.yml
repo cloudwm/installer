@@ -12,8 +12,8 @@ services:
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/infra_ci_test  # The relative path to the root directory of the Terraform project
   TF_STATE_NAME: ${TF_STATE_NAME:-default}  # The name of the state file used by the GitLab Managed Terraform state backend
-  # CWM_CLIENTID: $CWM_CLIENTID
-  # CWM_SECRET: $CWM_SECRET
+  CWM_CLIENTID: $CWM_CLIENTID
+  CWM_SECRET: $CWM_SECRET
   CWM_TEST_PASSWORD: $CWM_TEST_PASSWORD
 
 before_script:
