@@ -90,8 +90,8 @@ destroy:
   stage: cleanup
   script:
     - terraform apply --auto-approve plan
-    - gitlab-terraform destroy
+    # - gitlab-terraform destroy
   resource_group: ${TF_STATE_NAME}
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  when: manual
+      when: manual
