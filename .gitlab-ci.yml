@@ -10,7 +10,7 @@ image:
     - '/usr/bin/env'
     - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 services:
-    - name: docker
+    - name: docker:dind
 
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/infra_ci_test  # The relative path to the root directory of the Terraform project
@@ -18,6 +18,7 @@ variables:
   CI_CWM_CLIENTID: $CI_CWM_CLIENTID
   CI_CWM_SECRET: $CI_CWM_SECRET
   CI_CWM_TEST_PASSWORD: $CI_CWM_TEST_PASSWORD
+  DOCKER_DRIVER: overlay2
 
 before_script:
   - cd ${TF_ROOT}
