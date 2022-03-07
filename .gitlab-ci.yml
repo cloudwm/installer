@@ -5,7 +5,6 @@
 # https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Terraform.gitlab-ci.yml
 
 image:
-  # name: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
   name: hashicorp/terraform:light
   entrypoint:
     - '/usr/bin/env'
@@ -26,7 +25,6 @@ before_script:
   - apk add gettext
   - envsubst < terraform.tfvars.tmpl > terraform.tfvars
 stages:
-  - prepare
   - validate
   - build
   - deploy
@@ -37,54 +35,42 @@ cache:
   paths:
     - ${TF_ROOT}/.terraform/
 
-init:
-  stage: prepare
-  script:
-    - terraform init
-    # - gitlab-terraform init
-
 fmt:
   stage: validate
   script:
     - terraform fmt -check -recursive
-    # - gitlab-terraform fmt -check -recursive
   allow_failure: true
 
 validate:
   stage: validate
   script:
     - terraform validate
-    # - gitlab-terraform validate
 
 build:
   stage: build
   script:
     - terraform plan --out plan
-    # - gitlab-terraform plan
-    # - gitlab-terraform plan-json
   resource_group: ${TF_STATE_NAME}
   dependencies:
     - validate
   artifacts:
     paths:
       - ${TF_ROOT}/plan
-      - ${TF_ROOT}/terraform.tfstate
-      # - ${TF_ROOT}/plan.cache
     reports:
       terraform: ${TF_ROOT}/plan
-      # terraform: ${TF_ROOT}/plan.json
 
 deploy:
   stage: deploy
   script:
     - terraform apply --auto-approve -parallelism=50 plan 
-    # - gitlab-terraform apply -parallelism=50
   resource_group: ${TF_STATE_NAME}
-  # dependencies:
-  #   - build
+  dependencies:
+    - build
   artifacts:
     paths:
       - ${TF_ROOT}/terraform.tfstate
+  reports:
+      terraform: ${TF_ROOT}/terraform.tfstate
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -94,7 +80,6 @@ destroy:
   stage: cleanup
   script:
     - terraform destroy --auto-approve
-    # - gitlab-terraform destroy
   resource_group: ${TF_STATE_NAME}
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
