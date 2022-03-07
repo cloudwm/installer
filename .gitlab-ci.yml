@@ -69,8 +69,8 @@ deploy:
   artifacts:
     paths:
       - ${TF_ROOT}/terraform.tfstate
-  reports:
-      terraform: ${TF_ROOT}/terraform.tfstate
+    reports:
+        terraform: ${TF_ROOT}/terraform.tfstate
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
