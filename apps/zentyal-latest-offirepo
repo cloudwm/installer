@@ -40,6 +40,10 @@ sed '/gateway/a dns-nameservers 8.8.8.8 8.8.4.4' -i /etc/network/interfaces
 echo "Ensuring conntrack modules are enabled" | log 
 echo ip_conntrack | sudo tee -a /etc/modules
 
+echo "Starting resolve daemon " | log
+systemctl enable systemd-resolved.service
+waitOrStop 0 "Failed to enable resolved service"
+
 echo "Adding descriptions" | log
 descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
 descriptionAppend "Zentyal Admin User: admin"
