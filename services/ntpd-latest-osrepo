@@ -7,17 +7,14 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "install NTP from apt" | log
-
 installPackage ntp ntpdate
 waitOrStop 0 "Failed apt install: ntp ntpdate"
 
 echo "Enable NTP Service" | log
-
 systemctl enable ntp
 systemctl start ntp
 
 echo "Update the time via local daemon" | log
-
 timedatectl set-ntp off
 echo "server localhost iburst prefer" >> /etc/ntp.conf
 systemctl restart ntp

@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Updating OS" | log
+apt update
+
+echo "Removing old Python versions" | log
+apt purge python* -y
+
+echo "Installing Python3.6" | log
+installPackage python3.6
+waitOrStop 0 "Failed apt install: Python3.6"
+
+echo "Adding descriptions" | log
+descriptionAppend "To test basic functionality, run 'python3.6 --flag'"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

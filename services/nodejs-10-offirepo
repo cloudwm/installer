@@ -9,24 +9,20 @@ fi
 rootDir=$(rootDir)
 
 echo "Downloading Node.js repository" | log
-
 curlDownload https://deb.nodesource.com/setup_10.x
 waitOrStop 0 "Setup script not downloaded from official source"
 bash setup_10.x | log
 waitOrStop 0 "Failed to install application"
 
 echo "Install Node.js" | log
-
 apt-get install -y nodejs build-essential | log
 checkPackageInstalled nodejs build-essential
 
 echo "Copying files for testing" | log
-
 cp $rootDir/tweaks/extras/nodejs/hello-world.js ~/
 chmod 775 ~/hello-world.js
 
 echo "Adding descriptions" | log
-
 descriptionAppend "To test basic functionality, go to home folder"
 descriptionAppend "# cd ~"
 descriptionAppend " "
