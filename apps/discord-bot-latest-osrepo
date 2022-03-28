@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Installing Python3-pip" | log
+installPackage python3-pip | log
+waitOrStop 0 "Failed to install python3-pip"
+
+echo "Installing discord.py" | log
+pip install discord.py
+waitOrStop 0 "Failed to install discord.py"
+mkdir ~/opt/discord/
+pip freeze > ~/opt/discord/requirements.txt
+
+echo "Copying default bot template" | log
+cp $rootDir/tweaks/extras/discord/bot.py ~/opt/discord/
+
+echo "Adding descriptions" | log
+descriptionAppend "Discord-bot default folder: ~/opt/discord"
+descriptionAppend "Default bot.py lcoation: ~/opt/discord/bot.py"
+descriptionAppend "Make sure to set your Token and Guild variables in bot.py"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
