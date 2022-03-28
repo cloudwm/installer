@@ -15,15 +15,15 @@ waitOrStop 0 "Failed to install python3-pip"
 echo "Installing discord.py" | log
 pip install discord.py
 waitOrStop 0 "Failed to install discord.py"
-mkdir ~/opt/discord/
-pip freeze > ~/opt/discord/requirements.txt
+mkdir -p /opt/discord/
+pip freeze > /opt/discord/requirements.txt
 
 echo "Copying default bot template" | log
-cp $rootDir/tweaks/extras/discord/bot.py ~/opt/discord/
+cp $rootDir/tweaks/extras/discord/bot.py /opt/discord/
 
 echo "Adding descriptions" | log
-descriptionAppend "Discord-bot default folder: ~/opt/discord"
-descriptionAppend "Default bot.py lcoation: ~/opt/discord/bot.py"
+descriptionAppend "Discord-bot default folder: /opt/discord"
+descriptionAppend "Default bot.py lcoation: /opt/discord/bot.py"
 descriptionAppend "Make sure to set your Token and Guild variables in bot.py"
 descriptionAppend " "
 
