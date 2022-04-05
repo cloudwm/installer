@@ -14,7 +14,7 @@ services:
 
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/infra_ci_test  # The relative path to the root directory of the Terraform project
-  TF_STATE_NAME: ${TF_STATE_NAME:-default}  # The name of the state file used by the GitLab Managed Terraform state backend
+  # TF_STATE_NAME: ${TF_STATE_NAME:-default}  # The name of the state file used by the GitLab Managed Terraform state backend
   CI_CWM_CLIENTID: $CI_CWM_CLIENTID
   CI_CWM_SECRET: $CI_CWM_SECRET
   CI_CWM_TEST_PASSWORD: $CI_CWM_TEST_PASSWORD
@@ -51,7 +51,7 @@ build:
   stage: build
   script:
     - terraform plan --out plan
-  resource_group: ${TF_STATE_NAME}
+  # resource_group: ${TF_STATE_NAME}
   dependencies:
     - validate
   artifacts:
@@ -64,7 +64,7 @@ deploy:
   stage: deploy
   script:
     - terraform apply --auto-approve -parallelism=50 plan 
-  resource_group: ${TF_STATE_NAME}
+  # resource_group: ${TF_STATE_NAME}
   dependencies:
     - build
   artifacts:
@@ -75,13 +75,15 @@ deploy:
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      # when: manual
+      when: manual
 
 destroy:
   stage: cleanup
   script:
     - terraform destroy --auto-approve
-  resource_group: ${TF_STATE_NAME}
+  # resource_group: ${TF_STATE_NAME}
+  dependencies:
+    - deploy
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      # when: manual
+      when: manual
