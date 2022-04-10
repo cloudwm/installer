@@ -11,9 +11,6 @@ rootDir=$(rootDir)
 echo "Updating OS" | log
 apt update
 
-echo "Removing old Python versions" | log
-apt purge python* -y
-
 echo "Installing Python3.9" | log
 installPackage python3.9
 waitOrStop 0 "Failed apt install: Python3.9"
