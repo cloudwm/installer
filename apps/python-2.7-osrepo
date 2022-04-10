@@ -11,9 +11,6 @@ rootDir=$(rootDir)
 echo "Updating OS" | log
 apt update
 
-echo "Removing old Python versions" | log
-apt purge python* -y
-
 echo "Installing Python2.7" | log
 installPackage python2.7
 waitOrStop 0 "Failed apt install: Python2.7"
