@@ -22,7 +22,7 @@ installPackage postgresql postgresql-contrib
 waitOrStop 0 "Failed apt install: postgresql"
 
 echo "Changing PostgreSQL listening address" | log
-sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" /etc/postgresql/12/main/postgresql.conf
+sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" /etc/postgresql/14/main/postgresql.conf
 
 echo "Starting and Enabling PostGreSQL service" | log
 systemctl restart postgresql
