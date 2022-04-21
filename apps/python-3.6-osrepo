@@ -9,6 +9,7 @@ fi
 rootDir=$(rootDir)
 
 echo "Updating OS" | log
+add-apt-repository ppa:deadsnakes/ppa
 apt update
 
 echo "Installing Python3.6" | log
