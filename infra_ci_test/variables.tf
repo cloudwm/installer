@@ -17,7 +17,7 @@ variable "datacenter" {
   description = "Datcenter ID's"
   type        = list(string)
   # default     = ["IL-PT", "IL-TA"]
-  default     = ["IL", "IL-PT", "IL-RH", "IL-TA", "IL-HA"]
+  default = ["IL", "IL-PT", "IL-RH", "IL-TA", "IL-HA"]
 }
 
 variable "networks" {
