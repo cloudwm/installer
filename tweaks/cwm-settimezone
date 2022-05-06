@@ -30,6 +30,7 @@ timezones[US-TX]="America/Chicago"
 timezones[US-SC]="America/Los_Angeles"
 timezones[CA-TR]="America/Toronto"
 timezones[AS]="Asia/Hong_Kong"
+timezones[US-MI]="America/New_York"
 
 if [ ! ${timezones[$CWM_ZONE]} ]; then
 
