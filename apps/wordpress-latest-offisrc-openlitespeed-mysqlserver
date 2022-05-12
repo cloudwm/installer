@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkOs
+checkRootUser
+runOnceCheck
+
+#checkTagExist nginx.success
+checkTagExist litespeed-latest-offirepo.success
+checkTagExist mysqld.success
+checkTagExist php.success
+checkTagExist maild.success
+checkTagExist wp-cli.success
+
+
+#install relevant php extantions for wordpress litespeed
+echo "Installing php7.4 modules for wordpress on litespeed" | log
+packages=(lsphp74-common lsphp74-curl lsphp74-imap lsphp74-json lsphp74-mysql lsphp74-opcache lsphp74-imagick lsphp74-memcached lsphp74-redis)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+
+rootDir=$(rootDir)
+
+if [[ ! -d "/usr/local/lsws/Example/html/wordpress" ]];then
+    mkdir /usr/local/lsws/Example/html/wordpress
+else
+    echo "wordpress directory already exists" | log 1
+fi
+
+WP_PATH="/usr/local/lsws/Example/html/wordpress"
+WPID=`shuf -i 100000-999999 -n 1`
+
+
+#test, configuring litespeed for wordpress:
+if [[ -f $rootDir/tweaks/extras/wordpress-litespeed/httpd_config.conf ]];then
+    cp $rootDir/tweaks/extras/wordpress-litespeed/httpd_config.conf /usr/local/lsws/conf/httpd_config.conf
+    sed -i "s/domain_here/${CWM_DOMAIN}/g" /usr/local/lsws/conf/httpd_config.conf
+else
+    echo "${rootDir}/tweaks/extras/wordpress-litespeed/httpd_config.conf does not exist" | log 1
+fi
+
+if [[ -f $rootDir/tweaks/extras/wordpress-litespeed/vhosts/vhconf.conf ]];then
+    cp $rootDir/tweaks/extras/wordpress-litespeed/vhosts/vhconf.conf /usr/local/lsws/conf/vhosts/Example/
+    sed -i "s/domain_here/${CWM_DOMAIN}/g" /usr/local/lsws/conf/vhosts/Example/vhconf.conf
+else
+    echo "${rootDir}/tweaks/extras/wordpress-litespeed/vhosts/vhconf.conf does not exist" | log 1
+fi
+/usr/local/lsws/bin/lswsctrl restart
+
+echo "Creating mysql user and permissions" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE wordpress_${WPID};
+CREATE USER 'wp_${WPID}'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on wordpress_${WPID}.* to 'wp_${WPID}'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+echo "Downloading wordpress and installing" | log
+installPackage libpcre2-8-0 | log
+wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
+waitOrStop 0 "Application failed to download"
+wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
+waitOrStop 0 "Failed to create database"
+wp core install --url=http://${CWM_DOMAIN} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
+waitOrStop 0 "Failed to install application"
+
+#Provide Permissions for litespeed on wordpress
+chown -R nobody:nogroup /usr/local/lsws/Example/html/wordpress
+sudo find /usr/local/lsws/Example/html/wordpress/ -type d -exec chmod 750 {} \;
+sudo find /usr/local/lsws/Example/html/wordpress/ -type f -exec chmod 640 {} \;
+
+echo "Misc tweaks" | log
+ini=$(find /etc -type f -name "php.ini" | grep fpm)
+sed -i '/display_errors = /s/On/Off/g' $ini
+
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Wordpress Admin Web UI: https://${CWM_DOMAIN}/wp-login.php"
+descriptionAppend "Wordpress Username: admin"
+descriptionAppend "Wordpress Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
