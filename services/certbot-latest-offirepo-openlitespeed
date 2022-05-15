@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+checkTagExist litespeed-latest-offirepo.success
+
+echo "Installing certbot for openlitespeed" | log
+#Certbot installation
+sudo apt-get install certbot -y
+waitOrStop 0 "Failed apt install: certbot"
+
+#Certificate request
+certbot certonly --non-interactive --agree-tos -m ${ADMINEMAIL} --webroot -w /usr/local/lsws/Example/html/wordpress -d ${CWM_DOMAIN}
+
+
+#restarting litespeed:
+/usr/local/lsws/bin/lswsctrl restart
+
+
+tag certbot-litespeed.success
+tagScript success
+
+exit 0
