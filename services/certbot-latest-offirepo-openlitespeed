@@ -16,7 +16,7 @@ waitOrStop 0 "Failed apt install: certbot"
 
 #Certificate request
 certbot certonly --non-interactive --agree-tos -m ${ADMINEMAIL} --webroot -w /usr/local/lsws/Example/html/wordpress -d ${CWM_DOMAIN}
-
+waitOrStop 0 "Failed certbot certonly: creating certificate"
 
 #restarting litespeed:
 /usr/local/lsws/bin/lswsctrl restart
