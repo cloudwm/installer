@@ -7,6 +7,15 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+#No Ubuntu mirrors(Clones of the Officail repoes) in Miami\Chicago:
+if [[ ${CWM_ZONE} == "US-CH" ]] || [[ ${CWM_ZONE} == "US-MI" ]]
+then
+    echo "Using default mirrors" | log
+    apt update
+    tagScript success
+    exit 0
+fi
+
 echo "Updating Ubuntu mirrors for Kamatera install" | log
 officialDomain="archive.ubuntu.com"
 mirrorDomain="mirror.${CWM_ZONE,,}.kamatera.com"
