@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "adding ppa:ansible/ansible repository" | log
+add-apt-repository --yes --update ppa:ansible/ansible
+
+echo "Installing Ansible from ppa:ansible/ansible" | log
+installPackage ansible | log
+waitOrStop 0 "Failed apt install: Ansible"
+
+echo "Adding descriptions" | log
+descriptionAppend "Default Inventory File: /etc/ansible/hosts"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
