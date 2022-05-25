@@ -9,8 +9,10 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing dependenices" | log
-installPackage zip unzip php7.4 php7.4-zip
-waitOrStop 0 "Failed apt install: zip unzip php7.4 php7.4-zip"
+#installPackage zip unzip php7.4 php7.4-zip
+installPackage zip unzip php8.0 php8.0-zip
+#waitOrStop 0 "Failed apt install: zip unzip php7.4 php7.4-zip"
+waitOrStop 0 "Failed apt install: zip unzip php8.0 php8.0-zip"
 
 echo "Installing composer" | log
 cd /var/www/
