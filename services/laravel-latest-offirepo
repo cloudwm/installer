@@ -8,12 +8,10 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Installing dependenices" | log
-#installPackage zip unzip php7.4 php7.4-zip
-#installPackage zip unzip php8.0 php8.0-zip
-installPackage zip unzip php8.0 php8.0-zip php-pear php8.0-curl php8.0-dev php8.0-gd php8.0-mbstring  php8.0-mysql php8.0-xml php8.0-fpm libapache2-mod-php8.0 php8.0-imagick php8.0-tidy php8.0-xmlrpc php8.0-intl openssl php-common php-curl php-json php-mbstring php-mysql php-xml php-zip
-#waitOrStop 0 "Failed apt install: zip unzip php7.4 php7.4-zip"
-waitOrStop 0 "Failed Installing php dependenices for Larvel"
+echo "Installing php8.0 modules for laravel" | log
+packages=(zip unzip php8.0 php-pear php8.0-dev libapache2-mod-php8.0 php8.0-imagick php8.0-tidy php8.0-xmlrpc openssl php-common php-curl php-json php-mbstring php-mysql php-xml php-zip)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Installing composer" | log
 cd /var/www/
