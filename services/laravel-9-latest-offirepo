@@ -8,8 +8,8 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Installing php8.0 modules for laravel" | log
-packages=(zip unzip php8.0 php-pear php8.0-dev libapache2-mod-php8.0 php8.0-imagick php8.0-tidy php8.0-xmlrpc openssl php-common php-curl php-json php-mbstring php-mysql php-xml php-zip)
+echo "Installing php8.1 modules for laravel" | log
+packages=(zip unzip php8.1 php-pear php8.1-dev libapache2-mod-php8.1 php8.1-imagick php8.1-tidy php8.1-xmlrpc openssl php-common php-curl php-json php-mbstring php-mysql php-xml php-zip)
 installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
