@@ -23,7 +23,7 @@ mv composer.phar /usr/local/bin/composer
 chmod +x /usr/local/bin/composer
 
 echo "Downloading and Installing Laravel" | log
-cd /var/wwwa
+cd /var/www
 git clone https://github.com/laravel/laravel.git
 cd /var/www/laravel
 export DEBIAN_FRONTEND=noninteractive
