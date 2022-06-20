@@ -109,6 +109,8 @@ echo "Add files relevant to VDI" | log
 cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/ipchecker.lua /etc/haproxy/
 cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/http.lua /etc/haproxy/
 cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/http.lua /usr/share/lua/5.3/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /usr/share/lua/5.3/
 
 echo "Download vdi-brocker" | log
 cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation
