@@ -15,11 +15,6 @@ certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
 certsUpdateService=/opt/update-certs.sh
 certGeneratedName="haproxy-fullcert.pem"
 
-
-echo "Allow 3389 through the UFW" | log
-ufw allow 3389
-waitOrStop 0 "Failed: Allow 3389"
-
 echo "Installing dependencies" | log
 installPackage software-properties-common
 waitOrStop 0 "Failed apt install: software-properties-common"
@@ -32,28 +27,16 @@ echo "Installing main application" | log
 installPackage haproxy=2.4.\* | log
 waitOrStop 0 "Failed apt install: haproxy 2.4.*"
 
-
-echo "Installing lua-rocks" | log
-installPackage luarocks | log
-waitOrStop 0 "Failed apt install: luarocks"
-
 echo "Open port for stats web ui" | log
 ufw allow 8404
 
 echo "Placing annotated config file" | log
 backupFile /etc/haproxy/haproxy.cfg
-cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/haproxy.cfg /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-api.cfg /etc/haproxy/haproxy.cfg
 pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
 sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
 sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
 sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
-sed -i 's/_domain_here_/'"${CWM_DOMAIN}"'/g' /etc/haproxy/haproxy.cfg
-
-
-echo "Add files relevant to VDI" | log
-cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/ipchecker.lua /etc/haproxy/
-cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/http.lua /etc/haproxy/
-cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /etc/haproxy/
 
 
 echo "Generating proper haproxy certificate" | log
@@ -101,6 +84,31 @@ cp -f $rootDir/tweaks/extras/haproxy/dataplaneapi.hcl /etc/haproxy/
 cat /root/guest.conf | grep api >> /etc/default/haproxy
 sed -i "s/apiClientId/clientID/g" /etc/default/haproxy
 sed -i "s/apiSecret/secret/g" /etc/default/haproxy
+
+
+#VDI BROKER:
+
+echo "Allow 3389 through the UFW" | log
+ufw allow 3389
+waitOrStop 0 "Failed: Allow 3389"
+
+echo "Installing lua-rocks" | log
+installPackage luarocks | log
+waitOrStop 0 "Failed apt install: luarocks"
+
+echo "Placing annotated config file" | log
+rm -rf /etc/haproxy/haproxy.cfg
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/haproxy.cfg /etc/haproxy/
+pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
+sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
+sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
+sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
+sed -i 's/_domain_here_/'"${CWM_DOMAIN}"'/g' /etc/haproxy/haproxy.cfg
+
+echo "Add files relevant to VDI" | log
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/ipchecker.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/http.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /etc/haproxy/
 
 echo "Download vdi-brocker" | log
 cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation
