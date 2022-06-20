@@ -126,7 +126,7 @@ sed -i 's/apiKey        =/apiKey        = '"$CWM_APICLIENTID"'/g' /opt/servicele
 sed -i 's/apiSecret     =/apiSecret       = '"$CWM_APISECRET"'/g' /opt/servicelet/servicelet.ini
 
 echo "Create rdp.map file" | log
-cd /etc/haproxy/maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map
+cd /etc/haproxy/ && mkdir maps && cd maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map
 waitOrStop 0 'failed:cd /etc/haproxy/maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map'
 
 echo "Permissions for rdp.map" | log
