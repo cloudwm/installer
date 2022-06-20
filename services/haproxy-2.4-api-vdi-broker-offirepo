@@ -16,7 +16,7 @@ certsUpdateService=/opt/update-certs.sh
 certGeneratedName="haproxy-fullcert.pem"
 
 
-# Allow 3389 through the UFW:
+echo "Allow 3389 through the UFW" | log
 ufw allow 3389
 waitOrStop 0 "Failed: Allow 3389"
 
@@ -32,6 +32,11 @@ echo "Installing main application" | log
 installPackage haproxy=2.4.\* | log
 waitOrStop 0 "Failed apt install: haproxy 2.4.*"
 
+
+echo "Installing lua-rocks" | log
+installPackage luarocks | log
+waitOrStop 0 "Failed apt install: luarocks"
+
 echo "Open port for stats web ui" | log
 ufw allow 8404
 
@@ -43,6 +48,13 @@ sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/hapro
 sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
 sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
 sed -i 's/_domain_here_/'"${CWM_DOMAIN}"'/g' /etc/haproxy/haproxy.cfg
+
+
+echo "Add files relevant to VDI" | log
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/ipchecker.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/http.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /etc/haproxy/
+
 
 echo "Generating proper haproxy certificate" | log
 cd ${certsArchivePath}
@@ -90,43 +102,43 @@ cat /root/guest.conf | grep api >> /etc/default/haproxy
 sed -i "s/apiClientId/clientID/g" /etc/default/haproxy
 sed -i "s/apiSecret/secret/g" /etc/default/haproxy
 
-# Download vdi-brocker:
+echo "Download vdi-brocker" | log
 cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation
 waitOrStop 0 "failed: cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation"
 wget https://github.com/pincher95/vdi-broker/releases/download/v1.0.7/vdi-broker_1.0.7_linux-amd64.deb
 waitOrStop 0 "File not downloaded from source"
 
-# Installing vdi broker:
+echo "Installing vdi broker" | log
 dpkg -i vdi-broker_1.0.7_linux-amd64.deb
 waitOrStop 0 "Failed to extract application archive: vdi-broker_1.0.7_linux-amd64.deb"
 
-# Edit servicelet.ini:
+echo "Edit servicelet.ini" | log
 sed -i 's/id            =/id        = '"$CWM_UUID"'/g' /opt/servicelet/servicelet.ini
 sed -i 's/apiKey        =/apiKey        = '"$CWM_APICLIENTID"'/g' /opt/servicelet/servicelet.ini
 sed -i 's/apiSecret     =/apiSecret       = '"$CWM_APISECRET"'/g' /opt/servicelet/servicelet.ini
 
-# Create rdp.map file:
+echo "Create rdp.map file" | log
 cd /etc/haproxy/maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map
 waitOrStop 0 'failed:cd /etc/haproxy/maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map'
 
-# Permissions for rdp.map:
+echo "Permissions for rdp.map" | log
 chown haproxy.haproxy /etc/haproxy/maps/rdp.map && chmod +x /etc/haproxy/maps/rdp.map
 waitOrStop 0 'failed: Permissions for rdp.map'
 
-# Edit previousState.json:
+echo "Edit previousState.json" | log
 cd /opt/servicelet/ && echo '{"info":{}}' > previousState.json
 waitOrStop 0 'failed: Edit previousState.json'
 
-# Change owner of servicelet and sessionlet
+echo "Change owner of servicelet and sessionlet" | log
 chown -R slet.slet /opt/servicelet && chown -R slet.slet /opt/sessionlet
 waitOrStop 0 'failed: Change owner of servicelet and sessionlet'
 
-# Edit /etc/default/haproxy:
+echo "Edit /etc/default/haproxy" | log
 cd /etc/default/ && echo "clientID=$CWM_APICLIENTID" >> haproxy && echo "secret=$CWM_APISECRET" >> haproxy
 waitOrStop 0 'failed: Edit /etc/default/haproxy'
 
 
-# Restart sessionlet:
+echo "Restart sessionlet" | log
 systemctl restart sessionletd.service
 waitOrStop 0 'failed: Restart sessionlet'
 
