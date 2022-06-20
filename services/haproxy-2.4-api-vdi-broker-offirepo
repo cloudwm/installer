@@ -104,6 +104,7 @@ sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/hapro
 sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
 sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
 sed -i 's/_domain_here_/'"${CWM_DOMAIN}"'/g' /etc/haproxy/haproxy.cfg
+echo "" >> /etc/haproxy/haproxy.cfg
 
 echo "Add files relevant to VDI" | log
 cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/ipchecker.lua /etc/haproxy/
