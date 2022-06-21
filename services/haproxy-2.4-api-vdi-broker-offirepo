@@ -124,9 +124,9 @@ dpkg -i vdi-broker_1.0.7_linux-amd64.deb
 waitOrStop 0 "Failed to extract application archive: vdi-broker_1.0.7_linux-amd64.deb"
 
 echo "Edit servicelet.ini" | log
-sed -i 's/id            =/id        = '"$CWM_UUID"'/g' /opt/servicelet/servicelet.ini
+sed -i 's/id            =/id            = '"$CWM_UUID"'/g' /opt/servicelet/servicelet.ini
 sed -i 's/apiKey        =/apiKey        = '"$CWM_APICLIENTID"'/g' /opt/servicelet/servicelet.ini
-sed -i 's/apiSecret     =/apiSecret       = '"$CWM_APISECRET"'/g' /opt/servicelet/servicelet.ini
+sed -i 's/apiSecret     =/apiSecret     = '"$CWM_APISECRET"'/g' /opt/servicelet/servicelet.ini
 
 echo "Create rdp.map file" | log
 cd /etc/haproxy/ && mkdir maps && cd maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map
@@ -144,9 +144,9 @@ echo "Change owner of servicelet and sessionlet" | log
 chown -R slet.slet /opt/servicelet && chown -R slet.slet /opt/sessionlet
 waitOrStop 0 'failed: Change owner of servicelet and sessionlet'
 
-echo "Edit /etc/default/haproxy" | log
-cd /etc/default/ && echo "clientID=$CWM_APICLIENTID" >> haproxy && echo "secret=$CWM_APISECRET" >> haproxy
-waitOrStop 0 'failed: Edit /etc/default/haproxy'
+# echo "Edit /etc/default/haproxy" | log
+# cd /etc/default/ && echo "clientID=$CWM_APICLIENTID" >> haproxy && echo "secret=$CWM_APISECRET" >> haproxy
+# waitOrStop 0 'failed: Edit /etc/default/haproxy'
 
 
 echo "Restart sessionlet" | log
