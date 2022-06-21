@@ -126,7 +126,7 @@ waitOrStop 0 "Failed to extract application archive: vdi-broker_1.0.7_linux-amd6
 echo "Edit servicelet.ini" | log
 sed -i 's/id            =/id            = '"$CWM_UUID"'/g' /opt/servicelet/servicelet.ini
 sed -i 's/apiKey        =/apiKey        = '"$CWM_APICLIENTID"'/g' /opt/servicelet/servicelet.ini
-sed -i 's/apiSecret     =/apiSecret     = '"$CWM_APISECRET"'/g' /opt/servicelet/servicelet.ini
+sed -i 's|apiSecret     =|apiSecret     = '"$CWM_APISECRET"'|g' /opt/servicelet/servicelet.ini
 
 echo "Create rdp.map file" | log
 cd /etc/haproxy/ && mkdir maps && cd maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map
