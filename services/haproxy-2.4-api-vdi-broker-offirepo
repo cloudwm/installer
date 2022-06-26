@@ -1,0 +1,175 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ssl-ready.success
+
+rootDir=$(rootDir)
+certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
+certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
+certsUpdateService=/opt/update-certs.sh
+certGeneratedName="haproxy-fullcert.pem"
+
+echo "Installing dependencies" | log
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
+
+echo "Adding repository to OS package manager" | log
+add-apt-repository ppa:vbernat/haproxy-2.4 -y
+apt update
+
+echo "Installing main application" | log
+installPackage haproxy=2.4.\* | log
+waitOrStop 0 "Failed apt install: haproxy 2.4.*"
+
+echo "Open port for stats web ui" | log
+ufw allow 8404
+
+echo "Placing annotated config file" | log
+backupFile /etc/haproxy/haproxy.cfg
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-api.cfg /etc/haproxy/haproxy.cfg
+pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
+sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
+sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
+sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
+
+
+echo "Generating proper haproxy certificate" | log
+cd ${certsArchivePath}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
+
+cat << EOF > ${certsUpdateService}
+
+certbot -q renew
+cd ${certsArchivePath}
+rm ${certGeneratedName}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+service haproxy reload
+
+EOF
+chmod +x ${certsUpdateService}
+
+backupFile /lib/systemd/system/certbot.service
+# sed -i '\|ExecStart|s|=.*|=/bin/bash '"${certsUpdateService}"'|' /lib/systemd/system/certbot.service
+sed -i '\|ExecStart|s|-q renew|-q renew --post-hook "/bin/bash '${certsUpdateService}'"|' /lib/systemd/system/certbot.service
+systemctl daemon-reload
+service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
+
+echo "Downloading DataPlane API from Git" | log
+cd $rootDir/temp
+curlDownload https://github.com/haproxytech/dataplaneapi/releases/download/v2.3.3/dataplaneapi_2.3.3_Linux_x86_64.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Extracting DataPlane & Setting Permissions" | log
+cd $rootDir/temp
+tar -xzvf dataplaneapi_2.3.3_Linux_x86_64.tar.gz
+chmod +x build/dataplaneapi
+cp build/dataplaneapi /usr/local/bin/
+
+echo "Creating DataPlane Config File" | log
+cp -f $rootDir/tweaks/extras/haproxy/dataplaneapi.hcl /etc/haproxy/
+
+cat /root/guest.conf | grep api >> /etc/default/haproxy
+sed -i "s/apiClientId/clientID/g" /etc/default/haproxy
+sed -i "s/apiSecret/secret/g" /etc/default/haproxy
+
+
+#VDI BROKER:
+
+echo "Allow 3389 through the UFW" | log
+ufw allow 3389
+waitOrStop 0 "Failed: Allow 3389"
+
+echo "Installing lua-rocks" | log
+installPackage luarocks | log
+waitOrStop 0 "Failed apt install: luarocks"
+
+echo "Placing annotated config file" | log
+rm -rf /etc/haproxy/haproxy.cfg
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/haproxy.cfg /etc/haproxy/
+pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
+sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
+sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
+sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
+sed -i 's/_domain_here_/'"${CWM_DOMAIN}"'/g' /etc/haproxy/haproxy.cfg
+echo "" >> /etc/haproxy/haproxy.cfg
+
+echo "Add files relevant to VDI" | log
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/ipchecker.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/http.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /etc/haproxy/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/http.lua /usr/share/lua/5.3/
+cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /usr/share/lua/5.3/
+
+echo "Download vdi-brocker" | log
+cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation
+waitOrStop 0 "failed: cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation"
+wget https://github.com/pincher95/vdi-broker/releases/download/v1.0.7/vdi-broker_1.0.7_linux-amd64.deb
+waitOrStop 0 "File not downloaded from source"
+
+echo "Installing vdi broker" | log
+dpkg -i vdi-broker_1.0.7_linux-amd64.deb
+waitOrStop 0 "Failed to extract application archive: vdi-broker_1.0.7_linux-amd64.deb"
+
+echo "Edit servicelet.ini" | log
+sed -i 's/id            =/id            = '"$CWM_UUID"'/g' /opt/servicelet/servicelet.ini
+sed -i 's/apiKey        =/apiKey        = '"$CWM_APICLIENTID"'/g' /opt/servicelet/servicelet.ini
+sed -i 's|apiSecret     =|apiSecret     = '"$CWM_APISECRET"'|g' /opt/servicelet/servicelet.ini
+
+echo "Create rdp.map file" | log
+cd /etc/haproxy/ && mkdir maps && cd maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map
+waitOrStop 0 'failed:cd /etc/haproxy/maps && touch rdp.map && echo "null_cloudwm null.cloudwm.com" > rdp.map'
+
+echo "Permissions for rdp.map" | log
+chown haproxy.haproxy /etc/haproxy/maps/rdp.map && chmod +x /etc/haproxy/maps/rdp.map
+waitOrStop 0 'failed: Permissions for rdp.map'
+
+echo "Edit previousState.json" | log
+cd /opt/servicelet/ && echo '{"info":{}}' > previousState.json
+waitOrStop 0 'failed: Edit previousState.json'
+
+echo "Change owner of servicelet and sessionlet" | log
+chown -R slet.slet /opt/servicelet && chown -R slet.slet /opt/sessionlet
+waitOrStop 0 'failed: Change owner of servicelet and sessionlet'
+
+# echo "Edit /etc/default/haproxy" | log
+# cd /etc/default/ && echo "clientID=$CWM_APICLIENTID" >> haproxy && echo "secret=$CWM_APISECRET" >> haproxy
+# waitOrStop 0 'failed: Edit /etc/default/haproxy'
+
+
+echo "Restart sessionlet" | log
+systemctl restart sessionletd.service
+waitOrStop 0 'failed: Restart sessionlet'
+
+systemctl reload haproxy
+waitOrStop 0 "Failed to reload HAProxy" | log
+
+echo "Adding descriptions" | log
+descriptionAppend "HAProxy Address: ${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend " "
+descriptionAppend "HAProxy Stats Web UI: https://${CWM_DISPLAYED_ADDRESS}:8404/stats"
+descriptionAppend "HAProxy Stats Web UI Username: admin"
+descriptionAppend "HAProxy Stats Web UI Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "HAProxy config file: /etc/haproxy/haproxy.cfg"
+descriptionAppend " "
+descriptionAppend "HAProxy examples: /usr/share/doc/haproxy/examples"
+descriptionAppend "HAProxy documentation (on-server): /usr/share/doc/haproxy/"
+descriptionAppend "HAProxy documentation (online): http://cbonte.github.io/haproxy-dconv/2.4/intro.html"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
