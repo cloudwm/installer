@@ -12,7 +12,7 @@
     <link type="text/css" rel="stylesheet" href="/theme.css">
 
     <!-- Fontawesome -->
-    <link type="text/css" rel="stylesheet" href="/3rdparty/fontawesome/css/all.css?32d97f9ffba9ba7a989d8ef52be913efb0d20946"/>
+    <link type="text/css" rel="stylesheet" href="/3rdparty/fontawesome/css/all.css?366949753194ccb941d2cd07130d5d24c17ac365"/>
 
     <!-- jQuery-->
     <script type="text/javascript" src="/3rdparty/js/jquery.min.js"></script>
@@ -39,13 +39,13 @@
     <script type="text/javascript" src="/3rdparty/js/ui-bootstrap-tpls-1.3.3.min.js"></script>
 
     <!-- Angular translate https://angular-translate.github.io/ -->
-    <script type="text/javascript" src="/3rdparty/js/angular-translate.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
-    <script type="text/javascript" src="/3rdparty/js/angular-translate-loader-static-files.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
-    <script type="text/javascript" src="/3rdparty/js/angular-translate-storage-cookie.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
-    <script type="text/javascript" src="/3rdparty/js/angular-translate-storage-local.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-translate.min.js?366949753194ccb941d2cd07130d5d24c17ac365"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-translate-loader-static-files.min.js?366949753194ccb941d2cd07130d5d24c17ac365"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-translate-storage-cookie.min.js?366949753194ccb941d2cd07130d5d24c17ac365"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-translate-storage-local.min.js?366949753194ccb941d2cd07130d5d24c17ac365"></script>
 
     <!-- Showdown (markdown converter) -->
-    <script type="text/javascript" src="/3rdparty/js/showdown-1.9.1.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
+    <script type="text/javascript" src="/3rdparty/js/showdown-1.9.1.min.js?366949753194ccb941d2cd07130d5d24c17ac365"></script>
 
     <!-- Setup Application -->
     <script type="text/javascript" src="/js/setupdns.js"></script>
@@ -68,7 +68,7 @@
         <br/>
         <br/>
         <p>
-          Please wait while Cloudron is setting up the dashboard at my.{{dnsCredentials.domain}}.<br/>
+          Please wait while Cloudron is setting up the dashboard at my.{{dnsCredentials.domain}}.
           You can follow the logs on the server at <code class="clipboard hand" data-clipboard-text="/home/yellowtent/platformdata/logs/box.log" uib-tooltip="{{ clipboardDone ? 'Copied' : 'Click to copy' }}" tooltip-placement="right">/home/yellowtent/platformdata/logs/box.log</code>
         </p>
       </div>
@@ -91,7 +91,6 @@
                             <div class="form-group" style="margin-bottom: 0;" ng-class="{ 'has-error': dnsCredentialsForm.domain.$dirty && dnsCredentialsForm.domain.$invalid }">
                               <label class="control-label">Domain  <sup><a ng-href="https://docs.cloudron.io/installation/#domain-setup" class="help" target="_blank"><i class="fa fa-question-circle"></i></a></sup></label>
                               <input type="text" class="form-control" ng-model="dnsCredentials.domain" name="domain" placeholder="CWMDOMAIN" required autofocus ng-disabled="dnsCredentials.busy">
-                              <div class="text-danger" ng-show="dnsCredentials.domain.indexOf('my.') === 0 && dnsCredentials.domain.length > 3">Are you sure about this domain? The dashboard will be at <b>my.{{ dnsCredentials.domain }}</b></div>
                               <p style="margin-top: 5px; font-size: 13px;">
                                 Apps will be installed on subdomains of this domain. The dashboard will be available on the <b>my</b> subdomain. You can add more domains later.
                               </p>
@@ -100,12 +99,12 @@
                         </div>
                         <div class="row">
                             <div class="col-md-10 col-md-offset-1">
-                                <h3 class="text-center">Domain Configuration <sup><a ng-href="https://docs.cloudron.io/domains/#dns-providers" class="help" target="_blank" tabindex="-1"><i class="fa fa-question-circle"></i></a></sup> </h3>
-                                <p class="has-error text-center" ng-show="error.dnsCredentials">{{ error.dnsCredentials }}</p>
+                                <h3  style="display:none" class="text-center">Domain Configuration <sup><a ng-href="https://docs.cloudron.io/domains/#dns-providers" class="help" target="_blank" tabindex="-1"><i class="fa fa-question-circle"></i></a></sup> </h3>
+                                <p  style="display:none" class="has-error text-center" ng-show="error.dnsCredentials">{{ error.dnsCredentials }}</p>
 
                                 <div class="form-group">
-                                    <label class="control-label">DNS Provider</label>
-                                    <select class="form-control" ng-model="dnsCredentials.provider" ng-options="a.value as a.name for a in dnsProvider" ng-disabled="dnsCredentials.busy" ng-change="setDefaultTlsProvider()"></select>
+                                    <label class="control-label" style="display:none">DNS Provider</label>
+                                    <select  style="display:none" class="form-control" ng-model="dnsCredentials.provider" ng-options="a.value as a.name for a in dnsProvider" ng-disabled="dnsCredentials.busy" ng-change="setDefaultTlsProvider()"></select>
                                 </div>
 
                                 <!-- Route53 -->
@@ -212,12 +211,6 @@
                                     <input type="text" class="form-control" ng-model="dnsCredentials.linodeToken" name="linodeToken" ng-required="dnsCredentials.provider === 'linode'" ng-disabled="dnsCredentials.busy">
                                 </p>
 
-                                <!-- Hetzner -->
-                                <p class="form-group" ng-show="dnsCredentials.provider === 'hetzner'">
-                                  <label class="control-label">API Token</label>
-                                  <input type="text" class="form-control" ng-model="dnsCredentials.hetznerToken" name="hetznerToken" ng-required="dnsCredentials.provider === 'hetzner'" ng-disabled="dnsCredentials.busy">
-                                </p>
-
                                 <!-- Vultr -->
                                 <p class="form-group" ng-show="dnsCredentials.provider === 'vultr'">
                                   <label class="control-label">API Token</label>
@@ -279,8 +272,8 @@
                                       </div>
                                 </div>
                                 <div class="text-center">
-                                    <a href="" ng-click="advancedVisible = true" ng-hide="advancedVisible">Advanced settings...</a>
-                                    <a href="" ng-click="advancedVisible = false" ng-show="advancedVisible">Hide Advanced settings</a>
+                                    <a href="" ng-click="advancedVisible = true" ng-hide="advancedVisible" style="display: none">Advanced settings...</a>
+                                    <a href="" ng-click="advancedVisible = true" ng-show="advancedVisible" style="display: none">Hide Advanced settings</a>
                                 </div>
                             </div>
                         </div>
@@ -303,7 +296,7 @@
     </div>
 
     <footer class="text-center">
-        <span class="text-muted">&copy;2022 <a href="https://cloudron.io" target="_blank">Cloudron</a></span>
+        <span class="text-muted">&copy;2021 <a href="https://cloudron.io" target="_blank">Cloudron</a></span>
         <span class="text-muted"><a href="https://forum.cloudron.io" target="_blank">Forum <i class="fa fa-comments"></i></a></span>
     </footer>
 
