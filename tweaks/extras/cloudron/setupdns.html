@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
+
+    <title> Cloudron Domain Setup </title>
+
+    <link id="favicon" href="/api/v1/cloudron/avatar" rel="icon" type="image/png">
+
+    <!-- Theme CSS -->
+    <link type="text/css" rel="stylesheet" href="/theme.css">
+
+    <!-- Fontawesome -->
+    <link type="text/css" rel="stylesheet" href="/3rdparty/fontawesome/css/all.css?32d97f9ffba9ba7a989d8ef52be913efb0d20946"/>
+
+    <!-- jQuery-->
+    <script type="text/javascript" src="/3rdparty/js/jquery.min.js"></script>
+
+    <!-- async -->
+    <script type="text/javascript" src="/3rdparty/js/async-3.2.0.min.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script type="text/javascript" src="/3rdparty/js/bootstrap.min.js"></script>
+
+    <!-- Angularjs scripts -->
+    <script type="text/javascript" src="/3rdparty/js/angular.min.js"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-loader.min.js"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-cookies.min.js"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-md5.min.js"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-ui-notification.js"></script>
+    <script type="text/javascript" src="/3rdparty/js/autofill-event.js"></script>
+
+    <!-- Angular directives for tldjs -->
+    <script type="text/javascript" src="/3rdparty/js/tld.js"></script>
+    <script type="text/javascript" src="/3rdparty/js/clipboard.min.js"></script>
+
+    <!-- Angular directives for bootstrap https://angular-ui.github.io/bootstrap/ -->
+    <script type="text/javascript" src="/3rdparty/js/ui-bootstrap-tpls-1.3.3.min.js"></script>
+
+    <!-- Angular translate https://angular-translate.github.io/ -->
+    <script type="text/javascript" src="/3rdparty/js/angular-translate.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-translate-loader-static-files.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-translate-storage-cookie.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
+    <script type="text/javascript" src="/3rdparty/js/angular-translate-storage-local.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
+
+    <!-- Showdown (markdown converter) -->
+    <script type="text/javascript" src="/3rdparty/js/showdown-1.9.1.min.js?32d97f9ffba9ba7a989d8ef52be913efb0d20946"></script>
+
+    <!-- Setup Application -->
+    <script type="text/javascript" src="/js/setupdns.js"></script>
+
+</head>
+
+<body class="setup" ng-app="Application" ng-controller="SetupDNSController">
+
+  <div class="main-container ng-cloak text-center" ng-show="state === 'waitingForDnsSetup' || state === 'waitingForBox'">
+    <div class="row">
+      <div class="col-md-6 col-md-offset-3 text-center">
+        <i class="fa fa-circle-notch fa-spin fa-5x"></i><br/>
+        <h3>{{ message }} ...</h3>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <p>
+          Please wait while Cloudron is setting up the dashboard at my.{{dnsCredentials.domain}}.<br/>
+          You can follow the logs on the server at <code class="clipboard hand" data-clipboard-text="/home/yellowtent/platformdata/logs/box.log" uib-tooltip="{{ clipboardDone ? 'Copied' : 'Click to copy' }}" tooltip-placement="right">/home/yellowtent/platformdata/logs/box.log</code>
+        </p>
+      </div>
+    </div>
+  </div>
+
+    <div class="main-container ng-cloak" ng-show="state === 'initialized'">
+        <div class="row">
+            <div class="col-md-6 col-md-offset-3">
+                <div class="card" style="max-width: none; padding: 20px;">
+                    <form name="dnsCredentialsForm" role="form" novalidate ng-submit="setDnsCredentials()" autocomplete="off">
+                        <div class="row">
+                          <div class="col-md-10 col-md-offset-1 text-center">
+                            <h1>Domain Setup</h1>
+                            <p class="has-error text-center" ng-show="error.setup">{{ error.setup }}</p>
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="col-md-10 col-md-offset-1">
+                            <div class="form-group" style="margin-bottom: 0;" ng-class="{ 'has-error': dnsCredentialsForm.domain.$dirty && dnsCredentialsForm.domain.$invalid }">
+                              <label class="control-label">Domain  <sup><a ng-href="https://docs.cloudron.io/installation/#domain-setup" class="help" target="_blank"><i class="fa fa-question-circle"></i></a></sup></label>
+                              <input type="text" class="form-control" ng-model="dnsCredentials.domain" name="domain" placeholder="CWMDOMAIN" required autofocus ng-disabled="dnsCredentials.busy">
+                              <div class="text-danger" ng-show="dnsCredentials.domain.indexOf('my.') === 0 && dnsCredentials.domain.length > 3">Are you sure about this domain? The dashboard will be at <b>my.{{ dnsCredentials.domain }}</b></div>
+                              <p style="margin-top: 5px; font-size: 13px;">
+                                Apps will be installed on subdomains of this domain. The dashboard will be available on the <b>my</b> subdomain. You can add more domains later.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-10 col-md-offset-1">
+                                <h3 class="text-center">Domain Configuration <sup><a ng-href="https://docs.cloudron.io/domains/#dns-providers" class="help" target="_blank" tabindex="-1"><i class="fa fa-question-circle"></i></a></sup> </h3>
+                                <p class="has-error text-center" ng-show="error.dnsCredentials">{{ error.dnsCredentials }}</p>
+
+                                <div class="form-group">
+                                    <label class="control-label">DNS Provider</label>
+                                    <select class="form-control" ng-model="dnsCredentials.provider" ng-options="a.value as a.name for a in dnsProvider" ng-disabled="dnsCredentials.busy" ng-change="setDefaultTlsProvider()"></select>
+                                </div>
+
+                                <!-- Route53 -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.accessKeyId.$dirty && dnsCredentialsForm.accessKeyId.$invalid }" ng-show="dnsCredentials.provider === 'route53'">
+                                    <label class="control-label">Access Key Id</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.accessKeyId" name="accessKeyId" placeholder="Access Key Id" ng-minlength="16" ng-maxlength="32" ng-required="dnsCredentials.provider === 'route53'" ng-disabled="dnsCredentials.busy">
+                                </div>
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.secretAccessKey.$dirty && dnsCredentialsForm.secretAccessKey.$invalid }" ng-show="dnsCredentials.provider === 'route53'">
+                                    <label class="control-label">Secret Access Key</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.secretAccessKey" name="secretAccessKey" placeholder="Secret Access Key" ng-required="dnsCredentials.provider === 'route53'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- Google Cloud DNS -->
+                                <div class="form-group" ng-class="{ 'has-error': false }" ng-show="dnsCredentials.provider === 'gcdns'">
+                                    <label class="control-label">Service Account Key</label>
+                                    <div class="input-group">
+                                        <input type="file" id="gcdnsKeyFileInput" style="display:none"/>
+                                        <input type="text" class="form-control" placeholder="Service Account Key" ng-model="dnsCredentials.gcdnsKey.keyFileName" id="gcdnsKeyInput" name="cert" onclick="getElementById('gcdnsKeyFileInput').click();" style="cursor: pointer;" ng-required="dnsCredentials.provider === 'gcdns'" ng-disabled="dnsCredentials.busy">
+                                        <span class="input-group-addon">
+                                          <i class="fa fa-upload" onclick="getElementById('gcdnsKeyFileInput').click();"></i>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- DigitalOcean -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.digitalOceanToken.$dirty && dnsCredentialsForm.digitalOceanToken.$invalid }" ng-show="dnsCredentials.provider === 'digitalocean'">
+                                    <label class="control-label">DigitalOcean Token</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.digitalOceanToken" name="digitalOceanToken" placeholder="API Token" ng-required="dnsCredentials.provider === 'digitalocean'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- Gandi -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.gandiApiKey.$dirty && dnsCredentialsForm.gandiApiKey.$invalid }" ng-show="dnsCredentials.provider === 'gandi'">
+                                    <label class="control-label">Gandi API Key</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.gandiApiKey" name="gandiApiKey" placeholder="API Key" ng-required="dnsCredentials.provider === 'gandi'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- GoDaddy -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.godaddyApiKey.$dirty && dnsCredentialsForm.godaddyApiKey.$invalid }" ng-show="dnsCredentials.provider === 'godaddy'">
+                                    <label class="control-label">API Key</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.godaddyApiKey" name="godaddyApiKey" placeholder="API Key" ng-minlength="1" ng-required="dnsCredentials.provider === 'godaddy'" ng-disabled="dnsCredentials.busy">
+                                </div>
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.godaddyApiSecret.$dirty && dnsCredentialsForm.godaddyApiSecret.$invalid }" ng-show="dnsCredentials.provider === 'godaddy'">
+                                    <label class="control-label">API Secret</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.godaddyApiSecret" name="godaddyApiSecret" placeholder="API Secret" ng-required="dnsCredentials.provider === 'godaddy'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- Netcup -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.netcupCustomerNumber.$dirty && dnsCredentialsForm.netcupCustomerNumber.$invalid }" ng-show="dnsCredentials.provider === 'netcup'">
+                                  <label class="control-label">Customer Number</label>
+                                  <input type="text" class="form-control" ng-model="dnsCredentials.netcupCustomerNumber" name="netcupCustomerNumber" ng-disabled="dnsCredentials.busy" ng-required="dnsCredentials.provider === 'netcup'" ng-disabled="dnsCredentials.busy">
+                                </div>
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.netcupApiKey.$dirty && dnsCredentialsForm.netcupApiKey.$invalid }" ng-show="dnsCredentials.provider === 'netcup'">
+                                  <label class="control-label">API Key</label>
+                                  <input type="text" class="form-control" ng-model="dnsCredentials.netcupApiKey" name="netcupApiKey" ng-disabled="dnsCredentials.busy" ng-minlength="1" ng-required="dnsCredentials.provider === 'netcup'" ng-disabled="dnsCredentials.busy">
+                                </div>
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.netcupApiPassword.$dirty && dnsCredentialsForm.netcupApiPassword.$invalid }" ng-show="dnsCredentials.provider === 'netcup'">
+                                  <label class="control-label">API Password</label>
+                                  <input type="text" class="form-control" ng-model="dnsCredentials.netcupApiPassword" name="netcupApiPassword" ng-disabled="dnsCredentials.busy" ng-required="dnsCredentials.provider === 'netcup'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- Cloudflare -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.cloudflareToken.$dirty && dnsCredentialsForm.cloudflareToken.$invalid }" ng-show="dnsCredentials.provider === 'cloudflare'">
+                                    <label class="control-label">Token Type</label>
+                                    <select class="form-control" ng-model="dnsCredentials.cloudflareTokenType">
+                                      <option value="GlobalApiKey">Global API Key</option>
+                                      <option value="ApiToken">API Token</option>
+                                    </select>
+                                  </div>
+
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.cloudflareToken.$dirty && dnsCredentialsForm.cloudflareToken.$invalid }" ng-show="dnsCredentials.provider === 'cloudflare'">
+                                    <label class="control-label" ng-show="dnsCredentials.cloudflareTokenType === 'GlobalApiKey'">Global API Key</label>
+                                    <label class="control-label" ng-show="dnsCredentials.cloudflareTokenType === 'ApiToken'">Api Token</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.cloudflareToken" name="cloudflareToken" placeholder="API Key/Token" ng-required="dnsCredentials.provider === 'cloudflare'" ng-disabled="dnsCredentials.busy">
+                                </div>
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.cloudflareEmail.$dirty && dnsCredentialsForm.cloudflareEmail.$invalid }" ng-show="dnsCredentials.provider === 'cloudflare' && dnsCredentials.cloudflareTokenType === 'GlobalApiKey'">
+                                    <label class="control-label">Cloudflare Email</label>
+                                    <input type="email" class="form-control" ng-model="dnsCredentials.cloudflareEmail" name="cloudflareEmail" placeholder="Cloudflare Account Email" ng-required="dnsCredentials.provider === 'cloudflare' && dnsCredentials.cloudflareTokenType === 'GlobalApiKey'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- Name.com -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.nameComUsername.$dirty && dnsCredentialsForm.nameComUsername.$invalid }" ng-show="dnsCredentials.provider === 'namecom'">
+                                    <label class="control-label">Name.com Username</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.nameComUsername" name="nameComUsername" placeholder="Name.com Username" ng-required="dnsCredentials.provider === 'namecom'" ng-disabled="dnsCredentials.busy">
+                                </div>
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.nameComToken.$dirty && dnsCredentialsForm.nameComToken.$invalid }" ng-show="dnsCredentials.provider === 'namecom'">
+                                    <label class="control-label">API Token</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.nameComToken" name="nameComToken" placeholder="Name.com API Token" ng-required="dnsCredentials.provider === 'namecom'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- Namecheap -->
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.namecheapUsername.$dirty && dnsCredentialsForm.namecheapUsername.$invalid }" ng-show="dnsCredentials.provider === 'namecheap'">
+                                    <label class="control-label">Namecheap Username</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.namecheapUsername" name="namecheapUsername" placeholder="Namecheap Username" ng-required="dnsCredentials.provider === 'namecheap'" ng-disabled="dnsCredentials.busy">
+                                </div>
+                                <div class="form-group" ng-class="{ 'has-error': dnsCredentialsForm.namecheapApiKey.$dirty && dnsCredentialsForm.namecheapApiKey.$invalid }" ng-show="dnsCredentials.provider === 'namecheap'">
+                                    <label class="control-label">API Key</label>
+                                    <p class="small text-info" ng-show="dnsCredentials.provider === 'namecheap'"><b>The server IP needs to be whitelisted for this API Key.</b></p>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.namecheapApiKey" name="namecheapApiKey" placeholder="Namecheap API Key" ng-required="dnsCredentials.provider === 'namecheap'" ng-disabled="dnsCredentials.busy">
+                                </div>
+
+                                <!-- Linode -->
+                                <p class="form-group" ng-show="dnsCredentials.provider === 'linode'">
+                                    <label class="control-label">API Token</label>
+                                    <input type="text" class="form-control" ng-model="dnsCredentials.linodeToken" name="linodeToken" ng-required="dnsCredentials.provider === 'linode'" ng-disabled="dnsCredentials.busy">
+                                </p>
+
+                                <!-- Hetzner -->
+                                <p class="form-group" ng-show="dnsCredentials.provider === 'hetzner'">
+                                  <label class="control-label">API Token</label>
+                                  <input type="text" class="form-control" ng-model="dnsCredentials.hetznerToken" name="hetznerToken" ng-required="dnsCredentials.provider === 'hetzner'" ng-disabled="dnsCredentials.busy">
+                                </p>
+
+                                <!-- Vultr -->
+                                <p class="form-group" ng-show="dnsCredentials.provider === 'vultr'">
+                                  <label class="control-label">API Token</label>
+                                  <input type="text" class="form-control" ng-model="dnsCredentials.vultrToken" name="vultrToken" ng-required="dnsCredentials.provider === 'vultr'" ng-disabled="dnsCredentials.busy">
+                                </p>
+
+                                <!-- Wildcard -->
+                                <p class="small text-info" ng-show="dnsCredentials.provider === 'wildcard'">
+                                    <span>Set up A records for <b>*.{{ dnsCredentials.domain || 'example.com' }}.</b> and <b>{{ dnsCredentials.domain || 'example.com' }}.</b> to this server's IP.</span>
+                                </p>
+
+                                <!-- Manual -->
+                                <p class="small text-info" ng-show="dnsCredentials.provider === 'manual'">
+                                    <span>Set up an A record for <b>my.{{ dnsCredentials.domain || 'example.com' }}.</b> to this server's IP.<br/></span>
+                                </p>
+
+                                <p class="small text-info" ng-show="needsPort80(dnsCredentials.provider, dnsCredentials.tlsConfig.provider)">Let's Encrypt requires your server to be reachable on port 80</p>
+
+                                <div ng-show="provider === 'ami'">
+                                    <h3 class="text-center">Owner verification</h3>
+                                    <p class="has-error text-center" ng-show="error.ami">{{ error.ami }}</p>
+
+                                    <div class="form-group" style="margin-bottom: 0;" ng-class="{ 'has-error': dnsCredentialsForm.instanceId.$dirty && (dnsCredentialsForm.instanceId.$invalid || error.ami) }">
+                                        <label class="control-label">EC2 Instance Id</label>
+                                        <input type="text" class="form-control" ng-model="instanceId" id="inputInstanceId" name="instanceId" placeholder="i-0123456789abcdefg" ng-minlength="1" ng-required="provider === 'ami'" autocomplete="off">
+                                    </div>
+                                    <p style="margin-top: 5px; font-size: 13px;">Provide the EC2 instance id to verify you have access to this server.</p>
+                                </div>
+
+                                <br/>
+                                <div uib-collapse="!advancedVisible">
+                                    <div class="form-group">
+                                        <label class="control-label">Zone Name (Optional) <sup><a ng-href="https://docs.cloudron.io/domains/#zone-name" class="help" target="_blank"><i class="fa fa-question-circle"></i></a></sup></label>
+                                        <input type="text" class="form-control" ng-model="dnsCredentials.zoneName" name="zoneName" placeholder="{{dnsCredentials.domain | zoneName}}" ng-disabled="dnsCredentials.busy">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="control-label">Certificate Provider <sup><a ng-href="https://docs.cloudron.io/certificates/#certificate-providers" class="help" target="_blank"><i class="fa fa-question-circle"></i></a></sup></label>
+                                        <select class="form-control" ng-model="dnsCredentials.tlsConfig.provider" ng-options="a.value as a.name for a in tlsProvider" ng-disabled="dnsCredentials.busy"></select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="control-label">IP Configuration  <sup><a ng-href="https://docs.cloudron.io/networking/#ip-configuration" class="help" target="_blank"><i class="fa fa-question-circle"></i></a></sup></label>
+                                        <select class="form-control" ng-model="sysinfo.provider" ng-options="a.value as a.name for a in sysinfoProvider"></select>
+                                      </div>
+
+                                      <!-- Fixed -->
+                                      <div class="form-group" ng-show="sysinfo.provider === 'fixed'" ng-class="{ 'has-error': error.ip }">
+                                        <label class="control-label">IP Address</label>
+                                        <input type="text" class="form-control" ng-model="sysinfo.ip" name="ip" ng-disabled="sysinfo.busy" ng-required="sysinfo.provider === 'fixed'">
+                                        <p class="has-error" ng-show="error.ip">{{ error.ip }}</p>
+                                      </div>
+
+                                      <!-- Network Interface -->
+                                      <div class="form-group" ng-show="sysinfo.provider === 'network-interface'" ng-class="{ 'has-error': error.ifname }">
+                                        <label class="control-label">Interface Name</label>
+                                        <input type="text" class="form-control" ng-model="sysinfo.ifname" name="ifname" ng-disabled="sysinfo.busy" ng-required="sysinfo.provider === 'network-interface'">
+                                        <p class="has-error" ng-show="error.ifname">{{ error.ifname }}</p>
+                                      </div>
+                                </div>
+                                <div class="text-center">
+                                    <a href="" ng-click="advancedVisible = true" ng-hide="advancedVisible">Advanced settings...</a>
+                                    <a href="" ng-click="advancedVisible = false" ng-show="advancedVisible">Hide Advanced settings</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <br/>
+
+                        <div class="row">
+                            <div class="col-md-12 text-center">
+                                <button type="submit" class="btn btn-primary" ng-disabled="dnsCredentialsForm.$invalid"><i class="fa fa-circle-notch fa-spin" ng-show="dnsCredentials.busy"></i> Next</button>
+                            </div>
+                        </div>
+                        <br/>
+                        <div class="row">
+                            <div class="col-md-12 text-center"><small>Looking to <a ng-href="/restore.html{{ search }}">restore?</a></small></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center">
+        <span class="text-muted">&copy;2022 <a href="https://cloudron.io" target="_blank">Cloudron</a></span>
+        <span class="text-muted"><a href="https://forum.cloudron.io" target="_blank">Forum <i class="fa fa-comments"></i></a></span>
+    </footer>
+
+</body>
+</html>
