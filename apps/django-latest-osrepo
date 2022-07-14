@@ -22,9 +22,18 @@ GRANT all privileges on djangodb.* to djangouser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
+
+# Fix for Ubuntu22.04:
+if [[ $(lsb_release -rs) == "22.04" ]]; then
+echo "Installing Django and dependencies from apt" | log
+installPackage python3-pip python3.10-venv python3-django
+waitOrStop 0 "Failed to install python3 dependencies (ubuntu22)"
+else
 echo "Installing Django and dependencies from apt" | log
 installPackage python3-pip python3.8-venv python3-django
 waitOrStop 0 "Failed to install python3 dependencies"
+fi
+
 
 echo "Creating Django directory" | log
 mkdir -p $appPath
