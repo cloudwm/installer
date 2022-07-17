@@ -15,13 +15,8 @@ sudo swapon /swapfile
 sleep 5
 
 echo "Adding ClickHouse Repository" | log
-#if [[ $(lsb_release -rs) == "22.04" ]]; then
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 8919F6BD2B48D754
 echo "deb https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-#else
-#apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4
-#echo "deb http://repo.yandex.ru/clickhouse/deb/stable/ main/" | tee /etc/apt/sources.list.d/clickhouse.list
-#fi
 apt update
 
 
