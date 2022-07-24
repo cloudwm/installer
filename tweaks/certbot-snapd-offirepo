@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+# Instal snapd
+echo "Installing snapd" | log
+apt update
+installPackage snapd
+waitOrStop 0 "Failed apt install: snapd"
+
+# Ensure that your version of snapd is up to date
+echo "test snap core" | log
+snap install core
+waitOrStop 0 "Failed snap install core"
+echo "test snap refresh core" | log
+snap refresh core
+waitOrStop 0 "Failed snap refresh core"
+
+# Remove certbot-auto and any Certbot OS packages
+echo "remove old certbot" | log
+apt-get remove certbot
+waitOrStop 0 "Failed remove old certbot"
+
+# Install new certbot
+echo "Installing certbot via snapd" | log
+snap install --classic certbot
+waitOrStop 0 "Failed snap install --classic certbot"
+
+# Prepare the Certbot command
+echo "Insuring certbot command will work" | log
+ln -s /snap/bin/certbot /usr/bin/certbot
+waitOrStop 0 "Failed ln -s /snap/bin/certbot /usr/bin/certbot"
+
+tagScript success
+
+exit 0
