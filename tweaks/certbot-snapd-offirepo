@@ -7,15 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Installing certbot" | log
-# installPackage software-properties-common
-# waitOrStop 0 "Failed apt install: software-properties-common"
-# add-apt-repository universe
-# add-apt-repository -r ppa:certbot/certbot
-# apt update
-# installPackage certbot
-# waitOrStop 0 "Failed apt install: certbot"
-# tag ssl-ready.success
 
 # Instal snapd
 echo "Installing snapd" | log
