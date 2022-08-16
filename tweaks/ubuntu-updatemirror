@@ -7,8 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-#No Ubuntu mirrors(Clones of the Officail repoes) in Miami\Chicago:
-if [[ ${CWM_ZONE} == "US-CH" ]] || [[ ${CWM_ZONE} == "US-MI" ]]
+#No Ubuntu mirrors(Clones of the Officail repoes) in Miami\Chicago\Milan:
+if [[ ${CWM_ZONE} == "US-CH" ]] || [[ ${CWM_ZONE} == "US-MI" ]] || [[ ${CWM_ZONE} == "EU-ML" ]]
 then
     echo "Using default mirrors" | log
     apt update
