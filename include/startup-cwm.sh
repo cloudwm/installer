@@ -180,8 +180,9 @@ function execSpecial() {
     local ok=1
     local n=0
     until [ $n -ge $times ]; do
-
-        if eval $action | grep -q -E $filter; then
+        #Oren: edited script for testing problems with cert bot
+        #if eval $action | grep -q -E $filter; then
+        if eval $action 2>&1 | grep -q -E $filter; then
 
             n=$(($n + 1))
             sleep 10
