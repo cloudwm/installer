@@ -1,0 +1,211 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist docker-5.20.10-offirepo.success
+
+rootDir=$(rootDir)
+engineInstallUrl=https://releases.rancher.com/install-docker/20.10.sh
+kamateraDriverUrl=https://github.com/Kamatera/docker-machine-driver-kamatera/releases/download/v1.1.4/docker-machine-driver-kamatera_v1.1.4_linux_amd64.tar.gz
+
+RANCHER_VERSION=v2.6.7
+vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
+
+cpuarr=("1B" "2B" "4B" "8B" "16B")
+memarr=(2048 4096 8192 16384 32768)
+dskarr=(30 50)
+tmpltarr=("${cpuarr[0]} ${memarr[0]} ${dskarr[0]} Kamatera_Worker_${cpuarr[0]}/${memarr[0]}/${dskarr[0]}"
+          "${cpuarr[1]} ${memarr[1]} ${dskarr[0]} Kamatera_Worker_${cpuarr[1]}/${memarr[1]}/${dskarr[0]}"
+          "${cpuarr[2]} ${memarr[1]} ${dskarr[0]} Kamatera_Worker_${cpuarr[2]}/${memarr[1]}/${dskarr[0]}"
+          "${cpuarr[2]} ${memarr[2]} ${dskarr[1]} Kamatera_Worker_${cpuarr[2]}/${memarr[2]}/${dskarr[1]}"
+          "${cpuarr[3]} ${memarr[2]} ${dskarr[1]} Kamatera_Worker_${cpuarr[3]}/${memarr[2]}/${dskarr[1]}"
+          "${cpuarr[3]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[3]}/${memarr[3]}/${dskarr[1]}"
+          "${cpuarr[4]} ${memarr[3]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[3]}/${dskarr[1]}"
+          "${cpuarr[4]} ${memarr[4]} ${dskarr[1]} Kamatera_Worker_${cpuarr[4]}/${memarr[4]}/${dskarr[1]}")
+
+echo "Installing Jq" | log
+installPackage jq
+waitOrStop 0 "Failed apt install: jq"
+
+echo "Creating Rancher admin" | log
+mkdir -p /var/lib/rancher
+systemctl start docker.service
+waitOrStop 0 "Start docker service failed"
+
+echo "Creating rancher_start script" | log
+mkdir -p /etc/rancher
+echo "rancher/rancher:${RANCHER_VERSION}" > /etc/rancher/image
+echo "${CWM_DOMAIN}" > /etc/rancher/domain
+echo '#!/bin/bash
+if ! docker pull "$(cat /etc/rancher/image)"; then exit 1; fi
+docker rm -f rancher
+docker run -d --name rancher --restart unless-stopped \
+	-p 80:80 -p 443:443 \
+	-e CATTLE_BOOTSTRAP_PASSWORD=admin \
+	-v /etc/letsencrypt/live/$(cat /etc/rancher/domain)/fullchain.pem:/etc/rancher/ssl/cert.pem \
+	-v /etc/letsencrypt/live/$(cat /etc/rancher/domain)/privkey.pem:/etc/rancher/ssl/key.pem \
+	-v /etc/letsencrypt/live/$(cat /etc/rancher/domain)/chain.pem:/etc/rancher/ssl/cacerts.pem \
+	--privileged -v "/var/lib/rancher:/var/lib/rancher" "$(cat /etc/rancher/image)"
+' > /usr/local/bin/rancher
+chmod +x /usr/local/bin/rancher_start
+rancher_start
+
+curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
+
+echo "Waiting for Rancher to intialize" | log
+HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_DOMAIN}:443 --insecure`
+until [ "$HTTPD" == "200" ]; do
+    sleep 3
+    HTTPD=`curl -s -o /dev/null -w ''%{http_code}'' https://${CWM_DOMAIN}:443 --insecure`
+done
+sleep 15
+
+echo "Getting Rancher Login Token" | log
+LOGINRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3-public/localProviders/local?action=login" --data-binary '{"username":"admin","password":"admin"}' "${curlBaseParams[@]}"`
+LOGINTOKEN=`echo $LOGINRESPONSE | jq -r .token`
+
+function rancherApiCurl() {
+  local token="${1}"
+  local url="${2}"
+  local res
+  if ! res="$(curl -w ''%{http_code}'' --url "${url}" "${@:3}" -H "Authorization: Bearer $token" "${curlBaseParams[@]}" 2>&1)"; then
+    echo "${res}" | log
+    return 1
+  fi
+  local code="$(echo "${res}" | tail -n1)"
+  if [ "${code::1}" != "2" ]; then
+    echo "${res}" | log
+    return 1
+  fi
+  echo "${res}" | head -n-1
+  return 0
+}
+
+echo "Changing Web Interface Password" | log
+if ! rancherApiCurl "${LOGINTOKEN}" "https://${CWM_DOMAIN}/v3/users?action=changepassword" '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}'; then
+  exit 1
+fi
+
+echo "Creating API key" | log
+APIRESPONSE=`curl --url "https://${CWM_DOMAIN}/v3/token" --data-binary '{"type":"token","description":"automation"}' -H "Authorization: Bearer $LOGINTOKEN" "${curlBaseParams[@]}"`
+echo "Getting API Token" | log
+APITOKEN=`echo $APIRESPONSE | jq -r .token`
+
+echo "Listing available Node drivers" | log
+if ! NODEDRIVERS_RES="$(rancherApiCurl "${APITOKEN}" "https://${CWM_DOMAIN}/v3/nodedrivers")"; then
+  exit 1
+fi
+NODEDRIVERS="$(echo "${NODEDRIVERS_RES}" | jq -r .data[].actions.deactivate)"
+
+echo "Deactivating foreign drivers" | log
+for url in ${NODEDRIVERS}; do
+    if [ "${url::1,4}" == "http" ]; then
+      if ! rancherApiCurl "${APITOKEN}" "${url}" -d '{}' -X POST; then
+        echo WARNING: failed to deactivate foreign driver url "${url}" | log
+      fi
+    else
+      echo WARNING: invalid foreign driver deactivate url "${url}" | log
+    fi
+done
+
+echo "Adding Kamatera Docker Machine Driver" | log
+if ! rancherApiCurl "${APITOKEN}" "https://${CWM_DOMAIN}/v3/nodedrivers" -d '{"active":true, "builtin":false, "url":"'${kamateraDriverUrl}'", "whitelistDomains":[]}' -X POST; then
+  exit 1
+fi
+
+echo "Listing available Kubernetes drivers" | log
+if ! KONTAINERDRIVERS_RES="$(rancherApiCurl "${APITOKEN}" "https://${CWM_DOMAIN}/v3/kontainerdrivers")"; then
+  exit 1
+fi
+KONTAINERDRIVERS="$(echo "${KONTAINERDRIVERS_RES}" | jq -r .data[].actions.deactivate)"
+
+echo "Deactivating foreign drivers" | log
+for url in ${KONTAINERDRIVERS}; do
+  if [ "${url::1,4}" == "http" ]; then
+    if ! rancherApiCurl "${APITOKEN}" "${url}" -d '{}' -X POST; then
+      echo WARNING: failed to deactivate foreign driver url "${url}"
+    fi
+  else
+    echo WARNING: invalid kontainer driver deactivate url "${url}" | log
+  fi
+done
+
+echo "Creating Kamatera templates on Rancher" | log
+sleep 10
+# Kamatera Control Panel
+PANEL_JSON_STRING='{
+"engineInsecureRegistry":[],
+"engineInstallURL":"'"${engineInstallUrl}"'",
+"engineRegistryMirror":[],
+"engineStorageDriver":"overlay2",
+"kamateraConfig":{
+"apiClientId":"'"${CWM_APICLIENTID}"'",
+"apiSecret":"'"${CWM_APISECRET}"'",
+"billing":"hourly",
+"cpu":"2B",
+"createServerCommandId":"0",
+"datacenter":"'"${CWM_ZONE}"'",
+"diskSize":"30",
+"image":"ubuntu_server_20.04_64-bit_optimized",
+"privateNetworkIp":"auto",
+"privateNetworkName":"'"${vlan}"'",
+"ram":"2048",
+"type":"kamateraConfig"
+},
+"name":"Kamatera Control Panel",
+"useInternalIpAddress":true
+}'
+if ! rancherApiCurl "${APITOKEN}" "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$PANEL_JSON_STRING")" -X POST; then
+  echo WARNING: failed to add Kamatera Control Panel node template | log
+fi
+
+#Kamatera Worker
+for tmplt in "${tmpltarr[@]}"; do
+arr=($tmplt)
+
+WORKER_JSON_STRING='{
+"engineInsecureRegistry":[],
+"engineInstallURL":"'"${engineInstallUrl}"'",
+"engineRegistryMirror":[],
+"engineStorageDriver":"overlay2",
+"kamateraConfig":{
+"apiClientId":"'"${CWM_APICLIENTID}"'",
+"apiSecret":"'"${CWM_APISECRET}"'",
+"billing":"hourly",
+"cpu":"'"${arr[0]}"'",
+"createServerCommandId":"0",
+"datacenter":"'"${CWM_ZONE}"'",
+"diskSize":"'"${arr[2]}"'",
+"image":"ubuntu_server_18.04_64-bit_optimized",
+"privateNetworkIp":"auto",
+"privateNetworkName":"'"${vlan}"'",
+"ram":"'"${arr[1]}"'",
+"type":"kamateraConfig"
+},
+"name":"'"${arr[3]}"'",
+"useInternalIpAddress":true
+}'
+if ! rancherApiCurl "${APITOKEN}" "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST; then
+  echo WARNING: failed to add Kamatera Worker Node template
+fi
+done
+
+echo "Tweaking NetFilter conntrack_max" | log
+sysctl net/netfilter/nf_conntrack_max=131072
+service docker restart
+waitOrStop 0 "Restart docker failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Rancher Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Rancher Username: admin"
+descriptionAppend "Rancher Password: ${ADMINPASSWORD}"
+descriptionAppend "See https://github.com/Kamatera/rancher-kubernetes/blob/main/README.md for additional guides and documentation"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
