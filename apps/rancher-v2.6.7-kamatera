@@ -50,7 +50,7 @@ docker run -d --name rancher --restart unless-stopped \
 	-v /etc/letsencrypt/live/$(cat /etc/rancher/domain)/privkey.pem:/etc/rancher/ssl/key.pem \
 	-v /etc/letsencrypt/live/$(cat /etc/rancher/domain)/chain.pem:/etc/rancher/ssl/cacerts.pem \
 	--privileged -v "/var/lib/rancher:/var/lib/rancher" "$(cat /etc/rancher/image)"
-' > /usr/local/bin/rancher
+' > /usr/local/bin/rancher_start
 chmod +x /usr/local/bin/rancher_start
 rancher_start
 
