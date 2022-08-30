@@ -91,6 +91,8 @@ sed -i 's/minioadmin/'"${secret_key}"'/' $minioConfigFile
 sed -i 's/ACCESS_KEY_HERE/'"${access_key}"'/' /etc/systemd/system/minio.service
 sed -i 's/PASSWORD_HERE/'"${secret_key}"'/' /etc/systemd/system/minio.service
 sed -i 's/CWM_DOMAIN_HER/'"${CWM_DISPLAYED_ADDRESS}"'/' /etc/systemd/system/minio.service
+sed -i 's/CWM_DOMAIN_HER/'"${CWM_DISPLAYED_ADDRESS}"'/' /etc/systemd/system/minio.service
+systemctl daemon-reload
 systemctl restart minio.service
 waitOrStop 0 "Minio service did not restart"
 
