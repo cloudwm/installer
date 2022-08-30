@@ -93,7 +93,7 @@ function rancherApiCurl() {
 }
 
 echo "Changing Web Interface Password" | log
-if ! rancherApiCurl "${LOGINTOKEN}" "https://${CWM_DOMAIN}/v3/users?action=changepassword" '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}'; then
+if ! rancherApiCurl "${LOGINTOKEN}" "https://${CWM_DOMAIN}/v3/users?action=changepassword" --data-binary '{"currentPassword":"admin","newPassword":"'${ADMINPASSWORD}'"}'; then
   exit 1
 fi
 
