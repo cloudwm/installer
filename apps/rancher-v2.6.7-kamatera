@@ -15,6 +15,15 @@ kamateraDriverUrl=https://github.com/Kamatera/docker-machine-driver-kamatera/rel
 RANCHER_VERSION=v2.6.7
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 
+if [ -z "${vlan}" ]; then
+  echo ERROR: missing private lan
+  exit 1
+fi
+if [ -z "${ADMINPASSWORD}" ]; then
+  echo ERROR: missing server assword, this is required as it is used for the Rancher admin password
+  exit 1
+fi
+
 cpuarr=("1B" "2B" "4B" "8B" "16B")
 memarr=(2048 4096 8192 16384 32768)
 dskarr=(30 50)
