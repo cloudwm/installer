@@ -96,7 +96,7 @@ systemctl daemon-reload
 systemctl restart minio.service
 waitOrStop 0 "Minio service did not restart"
 
-descriptionAppend "Minio Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Minio Web UI: https://${CWM_DISPLAYED_ADDRESS}:9000"
 descriptionAppend "Minio Access key: $access_key"
 descriptionAppend "Minio Secret key: $secret_key"
 descriptionAppend " "
