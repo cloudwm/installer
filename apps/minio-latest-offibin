@@ -41,7 +41,8 @@ echo "MINIO_OPTS=\"-C /etc/minio --certs-dir $certsMinio --address :443 --consol
 setcap 'cap_net_bind_service=+ep' /usr/local/bin/minio
 
 echo "Adding console port to UFW" | log
-ufw allow 6725
+ufw allow 9001
+ufw allow 9000
 
 
 ############### Oren Test #####################
@@ -49,7 +50,8 @@ echo "Adding Systemd Service" | log
 # curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
 # waitOrStop 0 "File not downloaded from github"
 # mv minio.service /etc/systemd/system
-cp $rootDir/apps/minio/minio.service /etc/systemd/system
+cp $rootDir/tweaks/extras/minio/minio.service /etc/systemd/system
+waitOrStop 0 "copy minio.service failed"
 
 echo "Generating certificates" | log
 mkdir -p $certsMinio/
