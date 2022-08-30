@@ -15,12 +15,8 @@ kamateraDriverUrl=https://github.com/Kamatera/docker-machine-driver-kamatera/rel
 RANCHER_VERSION=v2.6.7
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 
-if [ -z "${vlan}" ]; then
-  echo ERROR: missing private lan
-  exit 1
-fi
 if [ -z "${ADMINPASSWORD}" ]; then
-  echo ERROR: missing server assword, this is required as it is used for the Rancher admin password
+  echo ERROR: missing server assword, this is required as it is used for the Rancher admin password | log 1
   exit 1
 fi
 
@@ -61,7 +57,9 @@ docker run -d --name rancher --restart unless-stopped \
 	--privileged -v "/var/lib/rancher:/var/lib/rancher" "$(cat /etc/rancher/image)"
 ' > /usr/local/bin/rancher_start
 chmod +x /usr/local/bin/rancher_start
-rancher_start
+
+echo "Starting rancher container" | log
+rancher_start | log
 
 curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
@@ -82,12 +80,12 @@ function rancherApiCurl() {
   local url="${2}"
   local res
   if ! res="$(curl -w ''%{http_code}'' --url "${url}" "${@:3}" -H "Authorization: Bearer $token" "${curlBaseParams[@]}" 2>&1)"; then
-    echo "${res}" | log
+    echo "${res}" | log 1
     return 1
   fi
   local code="$(echo "${res}" | tail -n1)"
   if [ "${code::1}" != "2" ]; then
-    echo "${res}" | log
+    echo "${res}" | log 1
     return 1
   fi
   echo "${res}" | head -n-1
@@ -136,7 +134,7 @@ echo "Deactivating foreign drivers" | log
 for url in ${KONTAINERDRIVERS}; do
   if [ "${url::1,4}" == "http" ]; then
     if ! rancherApiCurl "${APITOKEN}" "${url}" -d '{}' -X POST; then
-      echo WARNING: failed to deactivate foreign driver url "${url}"
+      echo WARNING: failed to deactivate foreign driver url "${url}" | log
     fi
   else
     echo WARNING: invalid kontainer driver deactivate url "${url}" | log
@@ -199,7 +197,7 @@ WORKER_JSON_STRING='{
 "useInternalIpAddress":true
 }'
 if ! rancherApiCurl "${APITOKEN}" "https://${CWM_DOMAIN}/v3/nodetemplates" -d "$(jsonize "$WORKER_JSON_STRING")" -X POST; then
-  echo WARNING: failed to add Kamatera Worker Node template
+  echo WARNING: failed to add Kamatera Worker Node template | log
 fi
 done
 
