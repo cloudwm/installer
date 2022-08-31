@@ -45,7 +45,7 @@ ufw allow 9001
 ufw allow 9000
 
 
-############### Oren Test #####################
+
 echo "Adding Systemd Service" | log
 # curlDownload https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
 # waitOrStop 0 "File not downloaded from github"
