@@ -25,8 +25,8 @@ installPackage mysql-server
 waitOrStop 0 "Failed apt install: mysql-server"
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
-if [ ! -f ~/.my.cnf ]; then
-
+# if [ ! -f ~/.my.cnf ]; then
+echo "~/.my.cnf not found, creating" | log
 # Oren MySQL pass test:
 if [ -z "$ADMINPASSWORD" ]; then
 # Generate random passowrd for mysql
@@ -49,7 +49,7 @@ password='${ADMINPASSWORD}'
 EOF
 
 fi
-
+# fi
 echo "Running first setup process" | log
 
 mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
@@ -99,6 +99,7 @@ then
 descriptionAppend "mySQL Server Password: ${password_mysql}"
 else
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+fi
 
 descriptionAppend " "
 descriptionAppend "mySQL Server config global files location: /etc/mysql/"
