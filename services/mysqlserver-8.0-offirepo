@@ -39,7 +39,7 @@ password=${random_pass}${random_pass}
 cat << EOF > ~/.my.cnf
 [client]
 user=root
-password=$password
+password='${password}'
 EOF
 
 else
