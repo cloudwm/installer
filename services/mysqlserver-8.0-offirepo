@@ -28,12 +28,11 @@ echo "Set ~/.my.cnf root password for quick cli work" | log
 if [ ! -f ~/.my.cnf ]; then
 
 # Oren MySQL pass test:
-if [ -z "$ADMINPASSWORD" ]
-then
+if [ -z "$ADMINPASSWORD" ]; then
 # Generate random passowrd for mysql
+echo "ADMINPASSWORD is empty, generating password" | log
 random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
 random_num = $(shuf -i 0-50 -n1)
-
 password_mysql=${random_pass}${random_num}
 
 cat << EOF > ~/.my.cnf
