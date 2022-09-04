@@ -31,13 +31,15 @@ if [ ! -f ~/.my.cnf ]; then
 sql_pass=""
 if [ -z "$ADMINPASSWORD" ]
 then
-cat << EOF > ~/.my.cnf
-[client]
-user=root
+# Generate random passowrd for mysql
 random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
 random_num = $(shuf -i 0-50 -n1)
 password=${random_pass}${random_pass}
-sql_pass=password
+
+cat << EOF > ~/.my.cnf
+[client]
+user=root
+password=$password
 EOF
 
 else
@@ -95,7 +97,7 @@ descriptionAppend "mySQL Server Username: root"
 # Orens Test
 if [ -z "$ADMINPASSWORD" ]
 then
-descriptionAppend "mySQL Server Password: ${sql_pass}"
+descriptionAppend "mySQL Server Password: ${password}"
 else
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 
