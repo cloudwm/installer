@@ -27,6 +27,18 @@ waitOrStop 0 "Failed apt install: mysql-server"
 echo "Set ~/.my.cnf root password for quick cli work" | log
 if [ ! -f ~/.my.cnf ]; then
 
+# Oren MySQL pass test:
+sql_pass=""
+if [ -z "$ADMINPASSWORD" ]
+then
+cat << EOF > ~/.my.cnf
+[client]
+user=root
+password=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')
+sql_pass=password
+EOF
+
+else
 cat << EOF > ~/.my.cnf
 [client]
 user=root
@@ -77,7 +89,14 @@ waitOrStop 0 "Restart mysql service failed"
 echo "adding descriptions" | log
 descriptionAppend "mySQL Server Hostname: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
+
+# Orens Test
+if [ -z "$ADMINPASSWORD" ]
+then
+descriptionAppend "mySQL Server Password: $sql_pass"
+else
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+
 descriptionAppend " "
 descriptionAppend "mySQL Server config global files location: /etc/mysql/"
 descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
