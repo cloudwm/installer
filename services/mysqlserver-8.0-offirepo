@@ -93,7 +93,7 @@ descriptionAppend "mySQL Server Username: root"
 # Orens Test
 if [ -z "$ADMINPASSWORD" ]
 then
-descriptionAppend "mySQL Server Password: $sql_pass"
+descriptionAppend "mySQL Server Password: ${sql_pass}"
 else
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 
