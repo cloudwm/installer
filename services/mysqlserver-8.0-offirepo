@@ -34,7 +34,8 @@ echo "ADMINPASSWORD is empty, generating password" | log
 random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
 random_num = $(shuf -i 0-50 -n1)
 password_mysql=${random_pass}${random_num}
-
+debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${password_mysql}"
+debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${password_mysql}"
 cat << EOF > ~/.my.cnf
 [client]
 user=root
