@@ -23,7 +23,9 @@ WPID=`shuf -i 100000-999999 -n 1`
 
 if [ -z "${ADMINPASSWORD}" ]; then
 ADMINPASSWORD=$(awk -F "'" 'FNR == 3 {print $2}' /root/.my.cnf)
-echo "ADMINPASSWORD is: ${ADMINPASSWORD}" | log
+echo "ADMINPASSWORD was empty, generated: ${ADMINPASSWORD}" | log
+else
+echo "ADMINPASSWORD is not empty: ${ADMINPASSWORD}" | log
 fi
 
 echo "Setting nginx config" | log
