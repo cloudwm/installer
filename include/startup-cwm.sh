@@ -222,9 +222,10 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     random_num = $(shuf -i 0-50 -n1)
     export ADMINPASSWORD=${random_pass}${random_num}
     echo "Orens Password is ${ADMINPASSWORD}"
+    else
+    export ADMINPASSWORD="$CWM_PASSWORD"
     fi
 
-    export ADMINPASSWORD="$CWM_PASSWORD"
     mapfile -t wan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
     export CWM_WANNICIDS="$(printf '%q ' "${wan_nicids[@]}")"
     mapfile -t lan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=lan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
