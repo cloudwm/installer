@@ -217,6 +217,13 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
 
     # additional cwm global params
     export ADMINEMAIL=$CWM_EMAIL
+    if [ -z "${CWM_PASSWORD}" ]; then
+    random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
+    random_num = $(shuf -i 0-50 -n1)
+    export ADMINPASSWORD=${random_pass}${random_num}
+    echo "Orens Password is ${ADMINPASSWORD}"
+    fi
+
     export ADMINPASSWORD="$CWM_PASSWORD"
     mapfile -t wan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
     export CWM_WANNICIDS="$(printf '%q ' "${wan_nicids[@]}")"
