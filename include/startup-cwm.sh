@@ -222,7 +222,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     random_num = $(shuf -i 0-50 -n1)
     export ADMINPASSWORD=${random_pass}${random_num}
     echo "Orens Password is ${ADMINPASSWORD}" | log
-    else
+    echo "rootDir is ${rootDir}" | log
     export ADMINPASSWORD="$CWM_PASSWORD"
     fi
 
