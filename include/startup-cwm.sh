@@ -221,7 +221,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     # In case user wanted sshd keys with no password
     if [ -z "${CWM_PASSWORD}"]; then
         if [ -f "${rootDir}/include/sshd_allow_keys_only" ]; then
-            . ${rootDir}/include/sshd_allow_keys_only
+            bash ${rootDir}/include/sshd_allow_keys_only
             echo "sshd_config was configured via 'sshd_allow_keys_only' script" | log
         else
             echo "File not found: ${rootDir}/include/sshd_allow_keys_only" | log 1
