@@ -217,14 +217,24 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
 
     # additional cwm global params
     export ADMINEMAIL=$CWM_EMAIL
-    if [ -z "${CWM_PASSWORD}" ]; then
-    random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
-    random_num=$(shuf -i 0-50 -n1)
-    export ADMINPASSWORD=${random_pass}${random_num}
-    echo "Orens Password is ${ADMINPASSWORD}" | log
-    echo "rootDir is ${rootDir}" | log
-    export ADMINPASSWORD="$CWM_PASSWORD"
-    fi
+
+    # In case user wanted sshd keys with no password
+    if [ -z "${CWM_PASSWORD}"]; then
+        if [ -f "./sshd_allow_keys_only" ]; then
+            . sshd_allow_keys_only
+            echo "sshd_config was configured via 'sshd_allow_keys_only' script" | log
+        elif [ -f "../sshd_allow_keys_only" ]; then
+            . ../sshd_allow_keys_only
+        else
+            echo "File not found: sshd_allow_keys_only" | log 1
+        fi
+        # Generating random password to support following contrib scripts that depends on password:
+        random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
+        random_num=$(shuf -i 0-50 -n1)
+        export ADMINPASSWORD=${random_pass}${random_num}
+    else
+        export ADMINPASSWORD="$CWM_PASSWORD"
+    fi 
 
     mapfile -t wan_nicids < <(cat $CWM_CONFIGFILE | grep ^vlan.*=wan-.* | cut -f 1 -d"=" | cut -f 2 -d"n")
     export CWM_WANNICIDS="$(printf '%q ' "${wan_nicids[@]}")"
