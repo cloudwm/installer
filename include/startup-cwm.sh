@@ -237,6 +237,9 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
     # prevent running over static conguration globals
+    if [ ! -d "$rootDir/temp" ]; then
+        mkdir $rootDir/temp
+    fi    
     tag globals-set.success
 
 fi
