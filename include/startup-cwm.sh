@@ -220,13 +220,11 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
 
     # In case user wanted sshd keys with no password
     if [ -z "${CWM_PASSWORD}"]; then
-        if [ -f "./sshd_allow_keys_only" ]; then
-            . sshd_allow_keys_only
+        if [ -f "${rootDir}/include/sshd_allow_keys_only" ]; then
+            . ${rootDir}/include/sshd_allow_keys_only
             echo "sshd_config was configured via 'sshd_allow_keys_only' script" | log
-        elif [ -f "../sshd_allow_keys_only" ]; then
-            . ../sshd_allow_keys_only
         else
-            echo "File not found: sshd_allow_keys_only" | log 1
+            echo "File not found: ${rootDir}/include/sshd_allow_keys_only" | log 1
         fi
         # Generating random password to support following contrib scripts that depends on password:
         random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
