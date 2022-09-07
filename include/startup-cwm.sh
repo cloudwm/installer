@@ -219,7 +219,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export ADMINEMAIL=$CWM_EMAIL
 
     # In case user wanted sshd keys with no password
-    if [ -z "${CWM_PASSWORD}"]; then
+    if [ -z "${CWM_PASSWORD}" ]; then
         if [ -f "${rootDir}/include/sshd_allow_keys_only" ]; then
             bash ${rootDir}/include/sshd_allow_keys_only
             echo "sshd_config was configured via 'sshd_allow_keys_only' script" | log
