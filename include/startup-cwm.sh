@@ -219,7 +219,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export ADMINEMAIL=$CWM_EMAIL
     if [ -z "${CWM_PASSWORD}" ]; then
     random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
-    random_num = $(shuf -i 0-50 -n1)
+    random_num=$(shuf -i 0-50 -n1)
     export ADMINPASSWORD=${random_pass}${random_num}
     echo "Orens Password is ${ADMINPASSWORD}" | log
     echo "rootDir is ${rootDir}" | log
