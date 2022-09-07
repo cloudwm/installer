@@ -86,6 +86,7 @@ then
 
 file="/etc/ssh/sshd_config"
 fi
+dpkg-reconfigure openssh-server
 backup_sshd_config
 edit_sshd_config
 reload_sshd
