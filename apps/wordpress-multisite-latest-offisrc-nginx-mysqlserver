@@ -21,12 +21,12 @@ rootDir=$(rootDir)
 WP_PATH="/var/www/html"
 WPID=`shuf -i 100000-999999 -n 1`
 
-if [ -z "${ADMINPASSWORD}" ]; then
-ADMINPASSWORD=$(awk -F "'" 'FNR == 3 {print $2}' /root/.my.cnf)
-echo "ADMINPASSWORD was empty, generated: ${ADMINPASSWORD}" | log
-else
-echo "ADMINPASSWORD is not empty: ${ADMINPASSWORD}" | log
-fi
+# if [ -z "${ADMINPASSWORD}" ]; then
+# ADMINPASSWORD=$(awk -F "'" 'FNR == 3 {print $2}' /root/.my.cnf)
+# echo "ADMINPASSWORD was empty, generated: ${ADMINPASSWORD}" | log
+# else
+# echo "ADMINPASSWORD is not empty: ${ADMINPASSWORD}" | log
+# fi
 
 echo "Setting nginx config" | log
 cp $rootDir/tweaks/extras/wordpress-nginx/wordpress.conf /etc/nginx/sites-available/
