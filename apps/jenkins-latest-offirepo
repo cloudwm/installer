@@ -21,7 +21,7 @@ waitOrStop 0 "Failed apt install: openjdk-8-jre-headless"
 
 echo "Installing jenkins" | log
 apt update
-installPackage jenkins | log
+installPackage jenkins=2.346.3 | log
 waitOrStop 0 "Failed apt install: jenkins"
 
 echo "Tweaking server settings" | log
