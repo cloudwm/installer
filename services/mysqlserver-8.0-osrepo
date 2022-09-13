@@ -25,23 +25,7 @@ waitOrStop 0 "Failed apt install: mysql-server-8.0"
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 if [ ! -f ~/.my.cnf ]; then
-# Oren testing:
-echo "~/.my.cnf not found, creating" | log
-if [ -z "$ADMINPASSWORD" ]; then
-# Generate random passowrd for mysql
-echo "ADMINPASSWORD is empty, generating password" | log
-random_pass=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 14 ; echo '')
-random_num = $(shuf -i 0-50 -n1)
-password_mysql=${random_pass}${random_num}
-debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${password_mysql}"
-debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${password_mysql}"
-cat << EOF > ~/.my.cnf
-[client]
-user=root
-password='${password_mysql}'
-EOF
 
-else
 cat << EOF > ~/.my.cnf
 [client]
 user=root
@@ -49,8 +33,6 @@ password='${ADMINPASSWORD}'
 EOF
 
 fi
-fi
-
 
 echo "Running first setup process" | log
 mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
@@ -92,12 +74,7 @@ waitOrStop 0 "Restart mysql service failed"
 echo "Adding descriptions" | log
 descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
-if [ -z "$ADMINPASSWORD" ]; then
-descriptionAppend "mySQL Server Password: ${password_mysql}"
-else
 descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
-fi
-
 descriptionAppend " "
 descriptionAppend "mySQL Server config global files location: /etc/mysql/"
 descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
