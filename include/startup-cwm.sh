@@ -34,6 +34,8 @@ function getServerDescription() {
     if [ $exitCode -ne 0 ]; then
 
         echo "Error retrieving server overview" | log 1
+        # Oren Test:
+        echo "description is: ${description}"
         return 1
 
     fi
