@@ -13,6 +13,12 @@ fi
 function updateServerDescription() {
 
     curl --location -f -X PUT --retry-connrefused --retry 3 --retry-delay 2 -H "AuthClientId: ${CWM_APICLIENTID}" -H "AuthSecret: ${CWM_APISECRET}" "https://$CWM_URL/svc/server/$CWM_UUID/description" --data-urlencode $'description='"$1"
+    
+    ######### Oren testing:
+    echo "CWM_APICLIENTID: ${CWM_APICLIENTID}, CWM_APISECRET: ${CWM_APISECRET}" | log
+    echo "CWM_URL: ${CWM_URL}, CWM_UUID: ${CWM_UUID} and dollar-1 is ${1}" | log
+    ######### Oren testing ^^^^^
+
 
     local exitCode=$?
     if [ $exitCode -ne 0 ]; then
@@ -34,8 +40,6 @@ function getServerDescription() {
     if [ $exitCode -ne 0 ]; then
 
         echo "Error retrieving server overview" | log 1
-        # Oren Test:
-        echo "description is: ${description}"
         return 1
 
     fi
