@@ -116,7 +116,8 @@ cp -f $rootDir/tweaks/extras/haproxy/haproxy-vdi-broker/json.lua /usr/share/lua/
 echo "Download vdi-brocker" | log
 cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation
 waitOrStop 0 "failed: cd /opt && mkdir vdi_broker_installation && cd vdi_broker_installation"
-wget https://github.com/pincher95/vdi-broker/releases/download/v1.0.7/vdi-broker_1.0.7_linux-amd64.deb
+# wget https://github.com/pincher95/vdi-broker/releases/download/v1.0.7/vdi-broker_1.0.7_linux-amd64.deb
+wget https://github.com/cloudwm/vdi-broker/vdi-broker_1.0.7_linux-amd64.deb
 waitOrStop 0 "File not downloaded from source"
 
 echo "Installing vdi broker" | log
