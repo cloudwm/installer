@@ -15,7 +15,10 @@ kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/rele
 
 RANCHER_VERSION=v2.3.3
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
-rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+
+#Oren test
+#rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Installing Jq" | log
 installPackage jq
