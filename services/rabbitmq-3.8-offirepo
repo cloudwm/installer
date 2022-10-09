@@ -12,7 +12,7 @@ rootDir=$(rootDir)
 erlangVersion=23.x
 rabbitmqVersion=3.8.\*
 
-# Oren test
+
 #rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
 rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
 
