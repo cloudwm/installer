@@ -7,7 +7,18 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
+## Oren Testing ##
+#vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+host {CWM_SERVERIP//./-}.cloud-xip.io | grep "has address"
+if [[ $?==1  ]]
+then
+echo "Warning: There is an issue cloud-xip.io using cloud-xip.com instead"
 vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+else
+echo "Using cloud-xip.com for the domain"
+vestaDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+fi
+## Oren Testing ##
 
 echo "Running VestaCP Official Installer" | log
 curlDownload http://vestacp.com/pub/vst-install.sh
