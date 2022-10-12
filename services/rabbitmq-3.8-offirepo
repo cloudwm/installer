@@ -12,9 +12,21 @@ rootDir=$(rootDir)
 erlangVersion=23.x
 rabbitmqVersion=3.8.\*
 
-
+## Oren Test ##
 #rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+#rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+
+host {CWM_SERVERIP//./-}.cloud-xip.io | grep "has address"
+if [[ $?==1  ]]
+then
+echo "Warning: There is an issue cloud-xip.io using cloud-xip.com instead"
 rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+else
+echo "Using cloud-xip.com for the domain"
+rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.io
+fi
+## Oren Test ##
+
 
 echo "Adding RabbitMQ repository" | log
 apt-key adv --keyserver "hkps://keys.openpgp.org" --recv-keys "0x0A9AF2115F4687BD29803A206B73A36E6026DFCA"
