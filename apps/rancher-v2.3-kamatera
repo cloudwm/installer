@@ -16,9 +16,20 @@ kamateraDriverUrl=https://github.com/OriHoch/docker-machine-driver-kamatera/rele
 RANCHER_VERSION=v2.3.3
 vlan=`cat ${CWM_CONFIGFILE}  | grep ^vlan.*=lan-.* | cut -d'=' -f 2`
 
-
+# Oren Test #
 #rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+#rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+
+host {CWM_SERVERIP//./-}.cloud-xip.io | grep "has address"
+if [[ $?==1  ]]
+then
+echo "Warning: There is an issue cloud-xip.io using cloud-xip.com instead"
 rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+else
+echo "Using cloud-xip.com for the domain"
+rancherDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
+fi
+# Oren Test #
 
 echo "Installing Jq" | log
 installPackage jq
