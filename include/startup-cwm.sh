@@ -246,8 +246,21 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     # export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     export CWM_SERVERIP="$(getServerIP)"
+    
+    # Oren Test #
     #export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
+    #export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
+    host 195-28-180-95.cloud-xip.io | grep "has address"
+    if [[ $?==1  ]]
+    then
+    echo "Warning: There is an issue cloud-xip.io using cloud-xip.com instead"
     export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
+    else
+    echo "Using cloud-xip.com for the domain"
+    export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
+    fi
+    # Oren Test #
+
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
     # prevent running over static conguration globals
