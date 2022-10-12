@@ -250,7 +250,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     # Oren Test #
     #export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
     #export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
-    host 195-28-180-95.cloud-xip.io | grep "has address"
+    host {CWM_SERVERIP//./-}.cloud-xip.io | grep "has address"
     if [[ $?==1  ]]
     then
     echo "Warning: There is an issue cloud-xip.io using cloud-xip.com instead"
