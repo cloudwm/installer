@@ -34,7 +34,24 @@ waitOrStop 0 "Failed restart nginx after certification"
 
 echo "Generating letsencrypt certificates with certbot" | log
 execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-waitOrStop 0 "Failed letsencrypt certificate generation"
+
+###OREN CHANGES###
+if [[ $? == 1 ]]
+then
+certbot_failed=1
+echo "Generating self-signed certificate" | log
+# openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/ssl/private/server.key -out /etc/ssl/certs/server.crt -days 1024 -nodes -subj '/CN=localhost'
+mkdir /etc/letsencrypt/live
+mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout $certsPath/privkey.pem -out $certsPath/cert.pem -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
+else
+certbot_failed=0
+fi
+#waitOrStop 0 "Failed letsencrypt certificate generation"
+
+###OREN CHANGES###
+
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 tag global-domain-set.success
 unlink /etc/nginx/sites-enabled/letsencrypt-nginx-register.conf
@@ -42,18 +59,32 @@ unlink /etc/nginx/sites-enabled/letsencrypt-nginx-register.conf
 echo "Configuring certbot renewal service" | log
 mv $certsPath/privkey.pem $modPrivKey
 mv $certsPath/cert.pem $modCert
+
+##OREN TEST##
+if [[ $certbot_failed==0 ]]
+then
 mv $certsPath/chain.pem $modChain
 mv $certsPath/fullchain.pem $modFullChain
 sed -i "s|$certsPath/privkey.pem|$modPrivKey|" $renewConf
 sed -i "s|$certsPath/cert.pem|$modCert|" $renewConf
 sed -i "s|$certsPath/fullchain.pem|$modFullChain|" $renewConf
 sed -i "s|$certsPath/chain.pem|$modChain|" $renewConf
+fi
+###OREN CHANGES###
 
 echo "Attaching certificates to nginx configuration" | log
 cp $rootDir/tweaks/letsencrypt-nginx-certs.conf $certsRoute
 sed -i "s|/path/to/your.key|$modPrivKey|" $certsRoute
 sed -i "s|/path/to/your.crt|$modCert|" $certsRoute
+
+###OREN CHANGES###
+if [[ $certbot_failed==0 ]]
+then
 sed -i "s|/path/to/your.chain|$modChain|" $certsRoute
+else
+sed -i "s|ssl_trusted_certificate /path/to/your.chain;||" $certsRoute
+fi
+###OREN CHANGES###
 
 echo "Creating an SSL vhost" | log
 cat << EOF >> /etc/nginx/sites-available/default-ssl
@@ -78,6 +109,11 @@ EOF
 
 echo "Symlink to sites-enabled" | log 
 ln -s /etc/nginx/sites-available/default-ssl /etc/nginx/sites-enabled/
+
+
+###OREN TEST###
+sed -i "s|ssl_trusted_certificate|#ssl_trusted_certificate|" /etc/nginx/snippets/letsencrypt-nginx-certs.conf
+###OREN TEST###
 
 echo "Restart NGINX service" | log
 sleep 10
