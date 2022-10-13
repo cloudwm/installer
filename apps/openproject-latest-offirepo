@@ -9,6 +9,13 @@ fi
 
 rootDir=$(rootDir)
 
+##Oren Test##
+if [[certbot_failed==1]]
+then
+mv /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem
+fi
+##Oren Test##
+
 echo "Downloading OpenProject key and adding to source list" | log
 curlDownload https://dl.packager.io/srv/opf/openproject/key
 waitOrStop "Failed to download PGP key"
