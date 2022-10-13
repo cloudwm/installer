@@ -38,6 +38,14 @@ bash sacli --user openvpn --new_pass ${ADMINPASSWORD} SetLocalPassword
 
 echo "Configuring certifications" | log
 service openvpnas stop
+
+##OREN CHANGE##
+if [[ $certbot_failed==1 ]]
+then
+mv /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem
+fi
+##OREN CHANGE##
+
 ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem /usr/local/openvpn_as/etc/web-ssl/server.crt
 ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem /usr/local/openvpn_as/etc/web-ssl/server.key
 service openvpnas start
