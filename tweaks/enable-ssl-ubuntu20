@@ -9,7 +9,21 @@ fi
 
 systemctl stop apache2.service
 execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-waitOrStop 0 "Failed certbot certificate generation"
+###OREN CHANGES###
+if [[ $? == 1 ]]
+then
+export certbot_failed=1
+echo "Generating self-signed certificate" | log
+#waitOrStop 0 "Failed certbot certificate generation"
+mkdir /etc/letsencrypt/live
+mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
+else
+export certbot_failed=0
+fi
+###OREN CHANGES###
+
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 systemctl start apache2.service
 waitOrStop 0 "Failed to start Apache service"
