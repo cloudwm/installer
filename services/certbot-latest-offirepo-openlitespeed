@@ -27,6 +27,10 @@ mkdir /etc/letsencrypt/live
 mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem -days 1024 -nodes -subj '/CN=localhost'
 waitOrStop 0 "Certificate creation failed"
+
+# changing configuration - no chain in self signed cert
+sed -i "s/CACertPath/#CACertPath/g" /usr/local/lsws/conf/httpd_config.conf
+sed -i "s/CACertFile/#CACertFile/g" /usr/local/lsws/conf/httpd_config.conf
 else
 export certbot_failed=0
 fi
