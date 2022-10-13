@@ -13,6 +13,7 @@ rootDir=$(rootDir)
 if [[certbot_failed==1]]
 then
 mv /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem
+sed -i "s|SSLCACertificateFile|#SSLCACertificateFile|" /etc/openproject/addons/apache2/includes/vhost/ssl_ca.conf
 fi
 ##Oren Test##
 
