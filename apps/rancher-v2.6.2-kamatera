@@ -89,13 +89,25 @@ mkdir -p /var/lib/rancher
 systemctl start docker.service
 waitOrStop 0 "Start docker service failed"
 
+
+## OREN TEST ##
+
+#docker run -d --name rancher --restart unless-stopped \
+#	-p 80:80 -p 443:443 \
+#	-e CATTLE_BOOTSTRAP_PASSWORD=admin \
+#	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/rancher/ssl/cert.pem \
+#	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem \
+#	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem \
+#	--privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
+
 docker run -d --name rancher --restart unless-stopped \
 	-p 80:80 -p 443:443 \
 	-e CATTLE_BOOTSTRAP_PASSWORD=admin \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/rancher/ssl/cert.pem \
 	-v /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem \
-	-v /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem \
 	--privileged -v "/var/lib/rancher:/var/lib/rancher" "rancher/rancher:${RANCHER_VERSION}"
+
+## OREN TEST END ##
 
 curlBaseParams=(--insecure --silent -S --retry-connrefused --retry 3 --retry-delay 2 -H 'content-type: application/json')
 
