@@ -16,8 +16,13 @@ echo "deb https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.
 
 echo "Installing openjdk" | log
 apt update
-installPackage openjdk-8-jre-headless | log
+
+##OREN TEST##
+#installPackage openjdk-8-jre-headless | log
+installPackage openjdk-11-jre-headless | log
+##OREN TEST END##
 waitOrStop 0 "Failed apt install: openjdk-8-jre-headless"
+
 
 echo "Installing jenkins" | log
 apt update
