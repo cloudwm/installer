@@ -19,7 +19,7 @@ apt update
 
 ##OREN TEST##
 #installPackage openjdk-8-jre-headless | log
-installPackage openjdk-8-jre-headless | log
+installPackage openjdk-11-jre-headless | log
 ##OREN TEST END##
 waitOrStop 0 "Failed apt install: openjdk-8-jre-headless"
 
