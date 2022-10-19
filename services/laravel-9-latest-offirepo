@@ -60,6 +60,13 @@ cp $rootDir/tweaks/extras/laravel/laravel.conf /etc/apache2/sites-available/lara
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/laravel.conf
 ln -s /etc/apache2/sites-available/laravel.conf /etc/apache2/sites-enabled/
 
+## Testing Oren ##
+if [[certbot_failed==1]]
+then
+sed -i "s/cert.pem/fullchain.pem/g" /etc/apache2/sites-available/laravel.conf
+fi
+## Testing Oren END##
+
 echo "Enabling Laravel VirtualHost & Restarting Apache" | log
 a2ensite laravel.conf
 a2enmod ssl
