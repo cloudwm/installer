@@ -17,6 +17,10 @@ mkdir /etc/letsencrypt/live
 mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
 waitOrStop 0 "Certificate creation failed"
+
+# Sending log to log server - 45-93-93-142.cloud-xip.com
+curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
+
 else
 export certbot_failed=0
 #waitOrStop 0 "Failed certbot certificate generation"
