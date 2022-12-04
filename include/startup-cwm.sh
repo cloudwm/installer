@@ -247,7 +247,6 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     export CWM_SERVERIP="$(getServerIP)"
 
-    # Testing Oren
     host -t a 8-8-8-8.cloud-xip.com
     if [ $? -eq 0 ]
     then
@@ -265,7 +264,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
         export CWM_ROOT_DOMAIN="com"
         fi
     fi   
-    # END Testing Oren
+
 
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
