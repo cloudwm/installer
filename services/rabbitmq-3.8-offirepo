@@ -18,9 +18,10 @@ rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Adding RabbitMQ repository" | log
 apt-key adv --keyserver "hkps://keys.openpgp.org" --recv-keys "0x0A9AF2115F4687BD29803A206B73A36E6026DFCA"
-echo "deb https://dl.bintray.com/rabbitmq-erlang/debian bionic erlang-${erlangVersion}" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list
-echo "deb https://dl.bintray.com/rabbitmq/debian bionic main" >> /etc/apt/sources.list.d/bintray.rabbitmq.list
+echo "deb http://ppa.launchpad.net/rabbitmq/rabbitmq-erlang/ubuntu bionic erlang-${erlangVersion}" | tee /etc/apt/sources.list.d/rabbitmq_rabbitmq-server.list
+echo "deb-src http://ppa.launchpad.net/rabbitmq/rabbitmq-erlang/ubuntu bionic main" >> /etc/apt/sources.list.d/rabbitmq_rabbitmq-server.list
 apt update
+
 
 echo "Installing Erlang & Rabbitmq" | log
 packages=(erlang-base erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key erlang-runtime-tools erlang-snmp erlang-ssl erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl)
