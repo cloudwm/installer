@@ -18,6 +18,7 @@ rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Adding RabbitMQ repository" | log
 apt-key adv --keyserver "hkps://keys.openpgp.org" --recv-keys "0x0A9AF2115F4687BD29803A206B73A36E6026DFCA"
+curl -1sLf 'https://packagecloud.io/rabbitmq/rabbitmq-server/gpgkey' | sudo apt-key add -
 echo "deb http://ppa.launchpad.net/rabbitmq/rabbitmq-erlang/ubuntu bionic erlang-${erlangVersion}" | tee /etc/apt/sources.list.d/rabbitmq_rabbitmq-server.list
 echo "deb-src http://ppa.launchpad.net/rabbitmq/rabbitmq-erlang/ubuntu bionic main" >> /etc/apt/sources.list.d/rabbitmq_rabbitmq-server.list
 apt update
