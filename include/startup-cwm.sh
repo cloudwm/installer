@@ -247,24 +247,26 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     export CWM_SERVERIP="$(getServerIP)"
 
-    host -t a 8-8-8-8.cloud-xip.com
-    if [ $? -eq 0 ]
-    then
-    export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
-    export CWM_ROOT_DOMAIN="com"
-    else
-    host -t a 8-8-8-8.cloud-xip.io
-        if [ $? -eq 0 ]
-        then
-        export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
-        export CWM_ROOT_DOMAIN="io"
-        else
-        # both test failed - define the domain anyway
-        export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
-        export CWM_ROOT_DOMAIN="com"
-        fi
-    fi   
-
+### TEST ALEXEY
+export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
+#    host -t a 8-8-8-8.cloud-xip.com
+#    if [ $? -eq 0 ]
+#    then
+#    export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
+#    export CWM_ROOT_DOMAIN="com"
+#    else
+#    host -t a 8-8-8-8.cloud-xip.io
+#        if [ $? -eq 0 ]
+#        then
+#        export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
+#        export CWM_ROOT_DOMAIN="io"
+#        else
+#        # both test failed - define the domain anyway
+#        export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
+#        export CWM_ROOT_DOMAIN="com"
+#        fi
+#    fi   
+### TEST ALEXEY
 
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
