@@ -246,9 +246,16 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     # export CWM_DISKS=`cat $CWM_CONFIGFILE | grep ^disk.*size=.* | wc -l`
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     export CWM_SERVERIP="$(getServerIP)"
-    #export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
-    export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
+    
+    # TEST START ALEXEYM #################################################
+    
+    export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
+    #export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"  THIS ONE WAS B4
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
+
+    # TEST END ALEXEYM #################################################
+
+
 
     # prevent running over static conguration globals
     if [ ! -d "$rootDir/temp" ]; then
