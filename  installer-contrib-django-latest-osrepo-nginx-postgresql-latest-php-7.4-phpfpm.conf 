@@ -1,0 +1,93 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist nginx.success
+checkTagExist postgresql-latest-osrepo.success
+checkTagExist nginx-enable-php-ssl.success
+
+appPath=/var/www/html/django
+rootDir=$(rootDir)
+
+echo "Creating Django Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE djangodb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'djangouser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on djangodb.* to djangouser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+
+# Fix for Ubuntu22.04:
+if [[ $(lsb_release -rs) == "22.04" ]]; then
+echo "Installing Django and dependencies from apt" | log
+installPackage python3-pip python3.10-venv python3-django
+waitOrStop 0 "Failed to install python3 dependencies (ubuntu22)"
+else
+echo "Installing Django and dependencies from apt" | log
+installPackage python3-pip python3.8-venv python3-django
+waitOrStop 0 "Failed to install python3 dependencies"
+fi
+
+
+echo "Creating Django directory" | log
+mkdir -p $appPath
+cd $appPath
+
+echo "Creating Python3 enviroment and installing Django from pip" | log
+python3 -m venv django_env
+source django_env/bin/activate
+pip install django
+waitOrStop 0 "Failed to install django from pip"
+
+echo "Creating Django project" | log
+cd $appPath
+django-admin startproject djangoproject .
+python3 manage.py migrate
+./manage.py shell -c "from django.contrib.auth.models import User; User.objects.create_superuser('root', '${ADMINEMAIL}', '${ADMINPASSWORD}')"
+
+sed -i "s/ALLOWED_HOSTS \= \[]/ALLOWED_HOSTS \= \['${CWM_DOMAIN}']/g" $appPath/djangoproject/settings.py
+
+echo "Adding WebUI port to ufw" | log
+ufw allow 8000
+
+echo "Creating Django service" | log
+cat << EOF > /etc/systemd/system/django.service
+[Unit]
+Description=Django Web Framework
+After=network.target
+[Service]
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=django
+User=root
+ExecStart=python3 $appPath/manage.py runserver ${CWM_DOMAIN}:8000
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Enabling and starting Django service" | log
+systemctl daemon-reload
+systemctl enable django.service
+systemctl start django.service
+waitOrStop 0 "Failed to start Django service"
+
+echo "Adding descriptions" | log
+descriptionAppend "Django Debug mode is on."
+descriptionAppend "Make sure to add your website CSS and index files"
+descriptionAppend "Django root directory: $appPath"
+descriptionAppend "Django settings file: $appPath/djangoproject/settings.py"
+descriptionAppend "Django WebUI: http://${CWM_DOMAIN}:8000"
+descriptionAppend "Django Admin UI: http://${CWM_DOMAIN}:8000/admin"
+descriptionAppend "Django user:root"
+descriptionAppend "Django password:${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
