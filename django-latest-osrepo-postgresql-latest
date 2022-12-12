@@ -14,13 +14,13 @@ checkTagExist nginx-enable-php-ssl.success
 appPath=/var/www/html/django
 rootDir=$(rootDir)
 
-echo "Creating Django Database" | log
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-CREATE DATABASE djangodb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-CREATE USER 'djangouser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
-GRANT all privileges on djangodb.* to djangouser@localhost;
-FLUSH PRIVILEGES;
-EOF
+#echo "Creating Django Database" | log
+#mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+#CREATE DATABASE djangodb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+#CREATE USER 'djangouser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+#GRANT all privileges on djangodb.* to djangouser@localhost;
+#FLUSH PRIVILEGES;
+#EOF
 
 
 # Fix for Ubuntu22.04:
