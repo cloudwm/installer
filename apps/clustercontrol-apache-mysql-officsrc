@@ -24,3 +24,5 @@ tag mysqld.success
 tag php.success
 tag cmon.success
 tagScript success
+
+exit 0
