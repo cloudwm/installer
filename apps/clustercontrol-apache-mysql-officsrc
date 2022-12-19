@@ -15,7 +15,7 @@ echo "Adding execute permissions for install-cc script" | log
 chmod +x install-cc
 
 echo "running non-interactive installation provided by severalnines" | log
-SEND_DIAGNOSTICS=0 S9S_CMON_PASSWORD=${ADMINPASSWORD} S9S_ROOT_PASSWORD=${ADMINPASSWORD} S9S_DB_PORT=3306 HOST=${CWM_SERVERIP} ./install-cc
+(SEND_DIAGNOSTICS=0 S9S_CMON_PASSWORD=${ADMINPASSWORD} S9S_ROOT_PASSWORD=${ADMINPASSWORD} S9S_DB_PORT=3306 HOST=${CWM_SERVERIP} ./install-cc)
 waitOrStop 0 "Failed to install ClusterControl from install-cc script"
 
 tag httpd.success
