@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-// downloading installation from severalnines
+#downloading installation from severalnines
 echo "Downloading ClusterControl installing script" | log
 wget http://www.severalnines.com/downloads/cmon/install-cc
 waitOrStop 0 "Failed download CC installation script"
@@ -15,7 +15,7 @@ echo "Adding execute permissions for install-cc script" | log
 chmod +x install-cc
 
 echo "running non-interactive installation provided by severalnines" | log
-(SEND_DIAGNOSTICS=0 S9S_CMON_PASSWORD=${ADMINPASSWORD} S9S_ROOT_PASSWORD=${ADMINPASSWORD} S9S_DB_PORT=3306 HOST=${CWM_SERVERIP} ./install-cc)
+bash SEND_DIAGNOSTICS=0 S9S_CMON_PASSWORD=${ADMINPASSWORD} S9S_ROOT_PASSWORD=${ADMINPASSWORD} S9S_DB_PORT=3306 HOST=${CWM_SERVERIP} ./install-cc
 waitOrStop 0 "Failed to install ClusterControl from install-cc script"
 
 tag httpd.success
