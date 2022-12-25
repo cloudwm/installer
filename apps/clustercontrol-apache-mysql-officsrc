@@ -18,7 +18,7 @@ wget http://www.severalnines.com/downloads/cmon/s9s-repo.list -P /etc/apt/source
 wget -qO - http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/Release.key | sudo apt-key add -
 echo "deb http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/ ./" | sudo tee /etc/apt/sources.list.d/s9s-tools.list
 apt-get update
-apt-get install s9s-tools -y
+installPackage  install s9s-tools -y | log
 
 # disable apparmor and iptables for installation
 /etc/init.d/apparmor stop
@@ -28,7 +28,7 @@ ufw disable
 
 # Installing CC dependencies
 apt-get update
-apt-get install -y libapache2-mod-php mailutils dnsutils php-common php-mysql php-gd php-ldap php-curl php-json
+installPackage libapache2-mod-php mailutils dnsutils php-common php-mysql php-gd php-ldap php-curl php-json | log
 
 # Install Cluster Control
 apt-get install -y clustercontrol-controller \
