@@ -16,6 +16,9 @@ then
     exit 0
 fi
 
+# TEST ALEXEY
+echo "$(hostname -I) $(hostname)" | sudo tee -a /etc/hosts
+# TEST ALEXEY
 echo "Updating Ubuntu mirrors for Kamatera install" | log
 officialDomain="archive.ubuntu.com"
 mirrorDomain="mirror.${CWM_ZONE,,}.kamatera.com"
