@@ -6,37 +6,45 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# get key for updating mysql
+echo "get key for updating mysql" | log
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
+#waitOrStop 0 "Failed get key for updating mysql"
 
-# add severalnines repo
+echo "add severalnines repo" | log
 apt-get -y install gnupg2
 wget http://repo.severalnines.com/severalnines-repos.asc -O- | sudo apt-key add -
 wget http://www.severalnines.com/downloads/cmon/s9s-repo.list -P /etc/apt/sources.list.d/
+#waitOrStop 0 "Failed add severalnines repo"
 
-# add cli-tool repo and install it
+echo "add cli-tool repo and install it" | log
 wget -qO - http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/Release.key | sudo apt-key add -
 echo "deb http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/ ./" | sudo tee /etc/apt/sources.list.d/s9s-tools.list
+
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install s9s-tools -y
+#waitOrStop 0 "Failed add cli-tool repo and install it"
 
-# disable apparmor and iptables for installation
+echo "disable apparmor and iptables for installation" | log
 /etc/init.d/apparmor stop
 /etc/init.d/apparmor teardown
 update-rc.d -f apparmor remove
 ufw disable
+#waitOrStop 0 "failed disable apparmor and iptables for installation"
 
-# Installing CC dependencies
+echo "Installing CC dependencies" | log
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get -y install libapache2-mod-php mailutils dnsutils php-common php-mysql php-gd php-ldap php-curl php-json
+#waitOrStop 0 "failed Installing CC dependencies"
 
-# Install Cluster Control
+echo "Install Cluster Control" | log
 apt-get install -y clustercontrol-controller \
   clustercontrol \
   clustercontrol-ssh \
   clustercontrol-notifications \
   clustercontrol-cloud \
   clustercontrol-clud
+#waitOrStop 0 "failed Install Cluster Control"
+
 
 # OLD mysql versions:
 #mysql -uroot -e 'DROP SCHEMA IF EXISTS cmon; CREATE SCHEMA cmon'
@@ -46,8 +54,7 @@ apt-get install -y clustercontrol-controller \
 #mysql -uroot -e 'FLUSH PRIVILEGES'
 
 # MySQL 8:
-
-
+echo "create cmon mysql objects" | log
 mysql -u root <<EOF
 DROP SCHEMA IF EXISTS cmon;
 CREATE SCHEMA cmon;
@@ -59,21 +66,25 @@ GRANT ALL PRIVILEGES ON *.* TO "cmon"@"localhost";
 GRANT ALL PRIVILEGES ON *.* TO "cmon"@"127.0.0.1";
 FLUSH PRIVILEGES;
 EOF
+#waitOrStop 0 "failed create cmon mysql objects"
 
 
-# link site documents for apache default websites location
+echo "link site documents for apache default websites location" | log
 ln -sfn /var/www/clustercontrol /var/www/html/clustercontrol
 ln -sfn /var/www/cmon /var/www/html/cmon
+#waitOrStop 0 "failed link site documents for apache default websites location"
 
-# Import cmon db shcema:
+echo "Import cmon db shcema" | log
 mysql -uroot cmon < /usr/share/cmon/cmon_db.sql
 mysql -uroot cmon < /usr/share/cmon/cmon_data.sql
 mysql -uroot dcps < /var/www/clustercontrol/sql/dc-schema.sql
 
-# Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key
+echo "Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key" | log
 rpc_key=$(uuidgen | tr -d '-')
+#waitOrStop 0 "failed Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key"
 
-# And create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf with the following configuration options:
+echo "create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf" | log
+#with the following configuration options:
 cat <<EOF > /etc/cmon.cnf
 mysql_port=3306
 mysql_hostname=127.0.0.1
@@ -81,14 +92,17 @@ mysql_password='${ADMINPASSWORD}'
 hostname=${CWM_SERVERIP}
 rpc_key=${rpc_key}
 EOF
+#waitOrStop 0 "failed create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf"
 
-# create conf for cmon
+echo "create conf for cmon" | log
 cat <<EOF > /etc/default/cmon
 EVENTS_CLIENT="http://127.0.0.1:9510"
 CLOUD_SERVICE="http://127.0.0.1:9518"
 EOF
+#waitOrStop 0 "failed create conf for cmon"
 
-# copy apache configuration
+
+echo "copy apache configuration" | log
 cp -f /var/www/clustercontrol/ssl/server.crt /etc/ssl/certs/s9server.crt
 cp -f /var/www/clustercontrol/ssl/server.key /etc/ssl/certs/s9server.key
 rm -rf /var/www/clustercontrol/ssl
@@ -100,33 +114,35 @@ rm -f /etc/apache2/sites-enabled/001-default-ssl.conf
 ln -sfn /etc/apache2/sites-available/s9s.conf /etc/apache2/sites-enabled/001-s9s.conf
 ln -sfn /etc/apache2/sites-available/s9s-ssl.conf /etc/apache2/sites-enabled/001-s9s-ssl.conf
 
+
 # No need for selfsigned cert
 #sed -i 's|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/ssl/certs/s9server.crt|g' /etc/apache2/sites-available/s9s-ssl.conf
 #sed -i 's|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/ssl/certs/s9server.key|g' /etc/apache2/sites-available/s9s-ssl.conf
 
 sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
-# unofficial change:
+#waitOrStop 0 "failed copy apache configuration"
 
 
-
-# enable apache site
+echo "enable apache site" | log
 a2enmod ssl rewrite proxy proxy_http proxy_wstunnel
 a2dissite default-ssl
 unlink /etc/apache2/sites-enabled/001-s9s.conf
 sed -i 's|Header always set Strict-Transport|#Header always set Strict-Transport|g' /etc/apache2/sites-enabled/001-s9s-ssl.conf
-
 a2enmod s9s-ssl.conf
-# Rename the ClusterControl UI default file and assign correct permission
+#waitOrStop 0 "failed enable apache site"
+
+echo "Rename the ClusterControl UI default file and assign correct permission" | log
 mv /var/www/clustercontrol/bootstrap.php.default /var/www/clustercontrol/bootstrap.php
 chmod 644 /var/www/clustercontrol/bootstrap.php
-
 # Assign correct permissions
 chmod -R 777 /var/www/html/clustercontrol/app/tmp
 chmod -R 777 /var/www/html/clustercontrol/app/upload
 chown -Rf www-data.www-data /var/www/html/clustercontrol/
+#waitOrStop 0 "failed Rename the ClusterControl UI default file and assign correct permission"
 
-# define bootstrap.php
+
+echo "define bootstrap.php" | log
 cat <<EOF > /var/www/clustercontrol/bootstrap.php
 
 <?php
@@ -199,16 +215,21 @@ define('DB_PASS', '${ADMINPASSWORD}');
 define('DB_PORT', '3306');
 define('RPC_TOKEN', '${rpc_key}');
 EOF
+#waitOrStop 0 "failed define bootstrap"
 
-#insert relevant data to cc db:
+echo "insert relevant data to cc db" | log
 mysql -uroot -e "INSERT IGNORE INTO dcps.apis (id, company_id, user_id, url, token, created) values (1,1,1,'http://127.0.0.1','${rpc_key}', UNIX_TIMESTAMP())"
+#waitOrStop 0 "failed insert relevant data to cc db"
 
-# Apply changes and restart apache
+
+echo "Apply changes and restart apache" | log
 service apache2 restart
+#waitOrStop 0 "failed Apply changes and restart apache"
 
-# Enable cluster control
+echo "Enable cluster control" | log
 systemctl enable cmon cmon-ssh cmon-events cmon-cloud
 systemctl restart cmon cmon-ssh cmon-events cmon-cloud
+#waitOrStop 0 "failed Enable cluster control"
 
 # Create cc user:
 #cd /root
@@ -229,9 +250,11 @@ descriptionAppend "clustercontrol web page: $CWM_DOMAIN"
 descriptionAppend "clustercontrol webpage config files location: /var/www/clustercontrol/bootstrap.php"
 descriptionAppend " "
 
-
+echo "tagging success" | log
 tag cmon.success
 tag cc.success
 
-tagScript success
+echo "exiting cc-script" | log
+
+
 exit 0
