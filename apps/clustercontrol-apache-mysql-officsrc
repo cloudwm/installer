@@ -232,4 +232,6 @@ descriptionAppend " "
 
 tag cmon.success
 tag cc.success
+
+tagScript success
 exit 0
