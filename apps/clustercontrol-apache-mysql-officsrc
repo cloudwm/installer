@@ -37,12 +37,7 @@ DEBIAN_FRONTEND=noninteractive apt-get -y install libapache2-mod-php mailutils d
 #waitOrStop 0 "failed Installing CC dependencies"
 
 echo "Install Cluster Control" | log
-apt-get install -y clustercontrol-controller \
-  clustercontrol \
-  clustercontrol-ssh \
-  clustercontrol-notifications \
-  clustercontrol-cloud \
-  clustercontrol-clud
+installPackage clustercontrol-controller clustercontrol clustercontrol-ssh clustercontrol-notifications clustercontrol-cloud clustercontrol-clud | log
 #waitOrStop 0 "failed Install Cluster Control"
 
 
@@ -255,6 +250,4 @@ tag cmon.success
 tag cc.success
 
 echo "exiting cc-script" | log
-
-
 exit 0
