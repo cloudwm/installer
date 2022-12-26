@@ -9,12 +9,7 @@ fi
 checkTagExist nginx.success
 
 echo "Installing certbot for nginx" | log
-
-###### Oren Testing
-#installPackage python3-certbot-nginx
-installPackage python3-certbot-apache
-###### Oren Testing END
-
+installPackage python3-certbot-nginx
 waitOrStop 0 "Failed apt install: python-certbot-nginx"
 
 
