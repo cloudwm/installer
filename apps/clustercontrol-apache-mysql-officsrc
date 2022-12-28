@@ -42,7 +42,7 @@ installPackage clustercontrol-controller clustercontrol-ssh clustercontrol-cloud
 # Problem with notifications
 #apt install clustercontrol clustercontrol-notifications
 apt download clustercontrol
-dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
+sudo dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
 
 # OLD mysql versions:
 #mysql -uroot -e 'DROP SCHEMA IF EXISTS cmon; CREATE SCHEMA cmon'
@@ -53,7 +53,7 @@ dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
 
 # MySQL 8:
 echo "create cmon mysql objects" | log
-mysql -u root <<EOF
+mysql -uroot <<EOF
 DROP SCHEMA IF EXISTS cmon;
 CREATE SCHEMA cmon;
 DROP SCHEMA IF EXISTS dcps;
@@ -82,7 +82,6 @@ rpc_key=$(uuidgen | tr -d '-')
 #waitOrStop 0 "failed Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key"
 
 echo "create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf" | log
-#with the following configuration options:
 cat <<EOF > /etc/cmon.cnf
 mysql_port=3306
 mysql_hostname=127.0.0.1
@@ -125,7 +124,7 @@ sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/
 echo "enable apache site" | log
 a2enmod ssl rewrite proxy proxy_http proxy_wstunnel
 a2dissite default-ssl
-sed -i 's|Header always set Strict-Transport|#Header always set Strict-Transport|g' /etc/apache2/sites-enabled/001-s9s-ssl.conf
+sed -i 's|Header always set Strict-Transport|#Header always set Strict-Transport|g' /etc/apache2/sites-available/s9s-ssl.conf
 a2enmod s9s-ssl.conf
 #waitOrStop 0 "failed enable apache site"
 
@@ -243,13 +242,13 @@ echo "Adding descriptions" | log
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
 descriptionAppend "cmon rpc-key: ${rpc_key}"
 descriptionAppend "cmon mysql user password: ${ADMINPASSWORD}"
-descriptionAppend "clustercontrol web page: $CWM_DOMAIN"
+descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
 descriptionAppend "clustercontrol webpage config files location: /var/www/clustercontrol/bootstrap.php"
 descriptionAppend " "
 
-echo "tagging success" | log
+
 tag cmon.success
 tag cc.success
 
-echo "exiting cc-script" | log
+
 exit 0
