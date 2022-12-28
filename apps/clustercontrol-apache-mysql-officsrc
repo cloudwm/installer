@@ -39,6 +39,7 @@ DEBIAN_FRONTEND=noninteractive apt-get -y install libapache2-mod-php mailutils d
 echo "Install Cluster Control" | log
 installPackage clustercontrol-controller clustercontrol-ssh clustercontrol-cloud clustercontrol-clud | log
 #waitOrStop 0 "failed Install Cluster Control"
+# Problem with notifications
 #apt install clustercontrol clustercontrol-notifications
 apt download clustercontrol
 dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
@@ -124,7 +125,6 @@ sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/
 echo "enable apache site" | log
 a2enmod ssl rewrite proxy proxy_http proxy_wstunnel
 a2dissite default-ssl
-unlink /etc/apache2/sites-enabled/001-s9s.conf
 sed -i 's|Header always set Strict-Transport|#Header always set Strict-Transport|g' /etc/apache2/sites-enabled/001-s9s-ssl.conf
 a2enmod s9s-ssl.conf
 #waitOrStop 0 "failed enable apache site"
