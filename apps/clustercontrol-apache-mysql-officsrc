@@ -125,7 +125,7 @@ echo "enable apache site" | log
 a2enmod ssl rewrite proxy proxy_http proxy_wstunnel
 a2dissite default-ssl
 sed -i 's|Header always set Strict-Transport|#Header always set Strict-Transport|g' /etc/apache2/sites-available/s9s-ssl.conf
-a2enmod s9s-ssl.conf
+#a2enmod s9s-ssl.conf
 #waitOrStop 0 "failed enable apache site"
 
 echo "Rename the ClusterControl UI default file and assign correct permission" | log
@@ -222,9 +222,9 @@ echo "Apply changes and restart apache" | log
 service apache2 restart
 #waitOrStop 0 "failed Apply changes and restart apache"
 
-echo "Enable cluster control" | log
-systemctl enable cmon cmon-ssh cmon-events cmon-cloud
-systemctl restart cmon cmon-ssh cmon-events cmon-cloud
+#echo "Enable cluster control" | log
+#systemctl enable cmon cmon-ssh cmon-events cmon-cloud
+#systemctl restart cmon cmon-ssh cmon-events cmon-cloud
 #waitOrStop 0 "failed Enable cluster control"
 
 # Create cc user:
@@ -232,19 +232,19 @@ systemctl restart cmon cmon-ssh cmon-events cmon-cloud
 #mkdir .s9s
 #touch root/.s9s/ccrpc.conf
 #export S9S_USER_CONFIG=$HOME/.s9s/ccrpc.conf
-#s9s user --create --new-password=${ADMINPASSWORD} --generate-key --private-key-file==$HOME/.s9s/ccrpc.key --group=admins --controller=https://localhost:9501 ccrpc
+#s9s user --create --new-password=${ADMINPASSWORD} --generate-key --private-key-file==$HOME/.s9s/ccrpc.key --group=admins #--controller=https://localhost:9501 ccrpc
 #s9s user --set --first-name=RPC --last-name=API --cmon-user=ccrpc &>/dev/null
 
 # enable ufw
 #ufw enable
 
-echo "Adding descriptions" | log
-descriptionAppend "cmon config files location: /etc/cmon.cnf"
-descriptionAppend "cmon rpc-key: ${rpc_key}"
-descriptionAppend "cmon mysql user password: ${ADMINPASSWORD}"
-descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
-descriptionAppend "clustercontrol webpage config files location: /var/www/clustercontrol/bootstrap.php"
-descriptionAppend " "
+#echo "Adding descriptions" | log
+#descriptionAppend "cmon config files location: /etc/cmon.cnf"
+#descriptionAppend "cmon rpc-key: ${rpc_key}"
+#descriptionAppend "cmon mysql user password: ${ADMINPASSWORD}"
+#descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
+#descriptionAppend "clustercontrol webpage config files location: /var/www/clustercontrol/bootstrap.php"
+#descriptionAppend " "
 
 
 tag cmon.success
