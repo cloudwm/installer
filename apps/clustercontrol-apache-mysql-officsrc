@@ -40,6 +40,8 @@ echo "Install Cluster Control" | log
 installPackage clustercontrol-controller clustercontrol-ssh clustercontrol-cloud clustercontrol-clud | log
 #waitOrStop 0 "failed Install Cluster Control"
 #apt install clustercontrol clustercontrol-notifications
+apt download clustercontrol
+dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
 
 # OLD mysql versions:
 #mysql -uroot -e 'DROP SCHEMA IF EXISTS cmon; CREATE SCHEMA cmon'
