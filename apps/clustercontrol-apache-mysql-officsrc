@@ -37,10 +37,10 @@ DEBIAN_FRONTEND=noninteractive apt-get -y install libapache2-mod-php mailutils d
 #waitOrStop 0 "failed Installing CC dependencies"
 
 echo "Install Cluster Control" | log
-installPackage clustercontrol-controller | log
-#clustercontrol clustercontrol-ssh clustercontrol-notifications clustercontrol-cloud clustercontrol-clud
+installPackage clustercontrol-controller clustercontrol-ssh clustercontrol-notifications clustercontrol-cloud clustercontrol-clud | log
 #waitOrStop 0 "failed Install Cluster Control"
 
+apt install clustercontrol
 
 # OLD mysql versions:
 #mysql -uroot -e 'DROP SCHEMA IF EXISTS cmon; CREATE SCHEMA cmon'
