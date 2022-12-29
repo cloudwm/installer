@@ -6,25 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "get key for updating mysql" | log
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
+#echo "get key for updating mysql" | log
+#apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
 #waitOrStop 0 "Failed get key for updating mysql"
 
-
-# MySQL 8:
-echo "create cmon mysql objects" | log
-mysql -uroot <<EOF
-DROP SCHEMA IF EXISTS cmon;
-CREATE SCHEMA cmon;
-DROP SCHEMA IF EXISTS dcps;
-CREATE SCHEMA dcps;
-CREATE USER "cmon"@"localhost" IDENTIFIED BY "${ADMINPASSWORD}";
-CREATE USER "cmon"@"127.0.0.1" IDENTIFIED BY "${ADMINPASSWORD}";
-GRANT ALL PRIVILEGES ON *.* TO "cmon"@"localhost";
-GRANT ALL PRIVILEGES ON *.* TO "cmon"@"127.0.0.1";
-FLUSH PRIVILEGES;
-EOF
-#waitOrStop 0 "failed create cmon mysql objects"
 
 
 
@@ -59,8 +44,24 @@ installPackage clustercontrol-controller clustercontrol-ssh clustercontrol-cloud
 #waitOrStop 0 "failed Install Cluster Control"
 # Problem with notifications
 #apt install clustercontrol clustercontrol-notifications
-apt download clustercontrol
-sudo dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
+sudo apt download clustercontrol
+dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
+
+# MySQL 8:
+echo "create cmon mysql objects" | log
+mysql -uroot <<EOF
+DROP SCHEMA IF EXISTS cmon;
+CREATE SCHEMA cmon;
+DROP SCHEMA IF EXISTS dcps;
+CREATE SCHEMA dcps;
+CREATE USER "cmon"@"localhost" IDENTIFIED BY "${ADMINPASSWORD}";
+CREATE USER "cmon"@"127.0.0.1" IDENTIFIED BY "${ADMINPASSWORD}";
+GRANT ALL PRIVILEGES ON *.* TO "cmon"@"localhost";
+GRANT ALL PRIVILEGES ON *.* TO "cmon"@"127.0.0.1";
+FLUSH PRIVILEGES;
+EOF
+#waitOrStop 0 "failed create cmon mysql objects"
+
 
 
 echo "link site documents for apache default websites location" | log
