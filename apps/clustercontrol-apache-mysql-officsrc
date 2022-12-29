@@ -49,7 +49,7 @@ dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
 
 # MySQL 8:
 echo "create cmon mysql objects" | log
-mysql -uroot <<EOF
+mysql -uroot --defaults-file=/root/.my.cnf -h localhost <<EOF
 DROP SCHEMA IF EXISTS cmon;
 CREATE SCHEMA cmon;
 DROP SCHEMA IF EXISTS dcps;
@@ -70,9 +70,9 @@ ln -sfn /var/www/cmon /var/www/html/cmon
 #waitOrStop 0 "failed link site documents for apache default websites location"
 
 echo "Import cmon db shcema" | log
-mysql -uroot cmon < /usr/share/cmon/cmon_db.sql
-mysql -uroot cmon < /usr/share/cmon/cmon_data.sql
-mysql -uroot dcps < /var/www/clustercontrol/sql/dc-schema.sql
+mysql -uroot --defaults-file=/root/.my.cnf -h localhost cmon < /usr/share/cmon/cmon_db.sql
+mysql -uroot --defaults-file=/root/.my.cnf -h localhost cmon < /usr/share/cmon/cmon_data.sql
+mysql -uroot --defaults-file=/root/.my.cnf -h localhost dcps < /var/www/clustercontrol/sql/dc-schema.sql
 
 echo "Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key" | log
 rpc_key=$(uuidgen | tr -d '-')
@@ -211,7 +211,7 @@ EOF
 #waitOrStop 0 "failed define bootstrap"
 
 echo "insert relevant data to cc db" | log
-mysql -uroot -e "INSERT IGNORE INTO dcps.apis (id, company_id, user_id, url, token, created) values (1,1,1,'http://127.0.0.1','${rpc_key}', UNIX_TIMESTAMP())"
+mysql -uroot --defaults-file=/root/.my.cnf -h localhost -e "INSERT IGNORE INTO dcps.apis (id, company_id, user_id, url, token, created) values (1,1,1,'http://127.0.0.1','${rpc_key}', UNIX_TIMESTAMP())"
 #waitOrStop 0 "failed insert relevant data to cc db"
 
 
