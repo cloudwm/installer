@@ -215,7 +215,7 @@ mysql --defaults-file=/root/.my.cnf -h localhost -e "INSERT IGNORE INTO dcps.api
 #waitOrStop 0 "failed insert relevant data to cc db"
 
 #### Try to fix broken apt:
-apt --fix-broken install -y
+#apt --fix-broken install -y
 
 echo "Apply changes and restart apache" | log
 service apache2 restart
