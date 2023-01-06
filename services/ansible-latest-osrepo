@@ -12,6 +12,26 @@ echo "Installing Ansible from APT" | log
 installPackage ansible | log
 waitOrStop 0 "Failed apt install: Ansible"
 
+# Get ansible Role
+ansible-galaxy install severalnines.clustercontrol | log
+
+# install MariaDB:
+installPackage install -y mariadb-server | log
+installPackage install -y mariadb-client | log
+
+# Create ansible playbook:
+cd /root
+touch cc.playbook
+cat <<EOF > cc.playbook
+- hosts: localhost
+  roles:
+    - { role: severalnines.clustercontrol }
+EOF
+
+# Run playbook
+ansible-playbook cc.playbook | log
+
+
 echo "Adding descriptions" | log
 descriptionAppend "Default Inventory File: /etc/ansible/hosts"
 descriptionAppend " "
