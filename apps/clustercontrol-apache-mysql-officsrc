@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+: <<COMMENT
+
 #echo "get key for updating mysql" | log
 #apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
 #waitOrStop 0 "Failed get key for updating mysql"
@@ -34,6 +36,7 @@ update-rc.d -f apparmor remove
 ufw disable
 #waitOrStop 0 "failed disable apparmor and iptables for installation"
 
+
 echo "Installing CC dependencies" | log
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get -y install libapache2-mod-php mailutils dnsutils php-common php-mysql php-gd php-ldap php-curl php-json
@@ -43,9 +46,14 @@ echo "Install Cluster Control" | log
 installPackage clustercontrol-controller clustercontrol-ssh clustercontrol-cloud clustercontrol-clud | log
 #waitOrStop 0 "failed Install Cluster Control"
 # Problem with notifications
-#apt install clustercontrol clustercontrol-notifications
+
+#Trying exec in same shell
+exec apt install clustercontrol clustercontrol-notifications
 sudo apt download clustercontrol
-dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
+#dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
+
+
+
 
 # MySQL 8:
 echo "create cmon mysql objects" | log
@@ -249,5 +257,26 @@ service apache2 restart
 tag cmon.success
 tag cc.success
 
+COMMENT
+
+#################################TEST 2 - ANSIBLE
+# Get ansible Role
+ansible-galaxy install severalnines.clustercontrol
+
+# install MariaDB:
+apt install -y mariadb-server
+apt install -y mariadb-client
+
+# Create ansible playbook:
+cd /root
+touch cc.playbook
+cat <<EOF > cc.playbook
+- hosts: localhost
+  roles:
+    - { role: severalnines.clustercontrol }
+EOF
+
+# Run playbook
+ansible-playbook cc.playbook
 
 exit 0
