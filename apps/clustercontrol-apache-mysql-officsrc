@@ -10,9 +10,9 @@ rootDir=$(rootDir)
 
 ## Ansible Installation ##
 
-echo "Installing Ansible from APT" | log
-installPackage ansible | log
-waitOrStop 0 "Failed apt install: Ansible"
+#echo "Installing Ansible from APT" | log
+#installPackage ansible | log
+#waitOrStop 0 "Failed apt install: Ansible"
 
 ## Get ansible Role ##
 ansible-galaxy install severalnines.clustercontrol | log
