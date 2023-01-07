@@ -6,260 +6,51 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-: <<COMMENT
+rootDir=$(rootDir)
 
-#echo "get key for updating mysql" | log
-#apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
-#waitOrStop 0 "Failed get key for updating mysql"
+## Ansible Installation ##
 
+echo "Installing Ansible from APT" | log
+installPackage ansible | log
+waitOrStop 0 "Failed apt install: Ansible"
 
+## Get ansible Role ##
+ansible-galaxy install severalnines.clustercontrol | log
 
+## install MariaDB ##
+installPackage install -y mariadb-server | log
+installPackage install -y mariadb-client | log
 
-echo "add severalnines repo" | log
-apt-get -y install gnupg2
-wget http://repo.severalnines.com/severalnines-repos.asc -O- | sudo apt-key add -
-wget http://www.severalnines.com/downloads/cmon/s9s-repo.list -P /etc/apt/sources.list.d/
-#waitOrStop 0 "Failed add severalnines repo"
-
-echo "add cli-tool repo and install it" | log
-wget -qO - http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/Release.key | sudo apt-key add -
-echo "deb http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/ ./" | sudo tee /etc/apt/sources.list.d/s9s-tools.list
-
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install s9s-tools -y
-#waitOrStop 0 "Failed add cli-tool repo and install it"
-
-echo "disable apparmor and iptables for installation" | log
-/etc/init.d/apparmor stop
-/etc/init.d/apparmor teardown
-update-rc.d -f apparmor remove
-ufw disable
-#waitOrStop 0 "failed disable apparmor and iptables for installation"
-
-
-echo "Installing CC dependencies" | log
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get -y install libapache2-mod-php mailutils dnsutils php-common php-mysql php-gd php-ldap php-curl php-json
-#waitOrStop 0 "failed Installing CC dependencies"
-
-echo "Install Cluster Control" | log
-installPackage clustercontrol-controller clustercontrol-ssh clustercontrol-cloud clustercontrol-clud | log
-#waitOrStop 0 "failed Install Cluster Control"
-# Problem with notifications
-
-#Trying exec in same shell
-exec apt install clustercontrol clustercontrol-notifications
-sudo apt download clustercontrol
-#dpkg --force-all -i clustercontrol_1.9.5-8494_amd64.deb
-
-
-
-
-# MySQL 8:
-echo "create cmon mysql objects" | log
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-DROP SCHEMA IF EXISTS cmon;
-CREATE SCHEMA cmon;
-DROP SCHEMA IF EXISTS dcps;
-CREATE SCHEMA dcps;
-CREATE USER "cmon"@"localhost" IDENTIFIED BY "${ADMINPASSWORD}";
-CREATE USER "cmon"@"127.0.0.1" IDENTIFIED BY "${ADMINPASSWORD}";
-GRANT ALL PRIVILEGES ON *.* TO "cmon"@"localhost";
-GRANT ALL PRIVILEGES ON *.* TO "cmon"@"127.0.0.1";
-FLUSH PRIVILEGES;
+## Create ansible playbook ##
+cd /root
+touch cc.playbook
+cat <<EOF > cc.playbook
+- hosts: localhost
+  roles:
+    - { role: severalnines.clustercontrol }
 EOF
-#waitOrStop 0 "failed create cmon mysql objects"
+
+## Run playbook ##
+ansible-playbook cc.playbook | log
 
 
-
-echo "link site documents for apache default websites location" | log
-ln -sfn /var/www/clustercontrol /var/www/html/clustercontrol
-ln -sfn /var/www/cmon /var/www/html/cmon
-#waitOrStop 0 "failed link site documents for apache default websites location"
-
-echo "Import cmon db shcema" | log
-mysql --defaults-file=/root/.my.cnf -h localhost cmon < /usr/share/cmon/cmon_db.sql
-mysql --defaults-file=/root/.my.cnf -h localhost cmon < /usr/share/cmon/cmon_data.sql
-mysql --defaults-file=/root/.my.cnf -h localhost dcps < /var/www/clustercontrol/sql/dc-schema.sql
-
-echo "Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key" | log
-rpc_key=$(uuidgen | tr -d '-')
-#waitOrStop 0 "failed Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key"
-
-echo "create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf" | log
-cat <<EOF > /etc/cmon.cnf
-mysql_port=3306
-mysql_hostname=127.0.0.1
-mysql_password='${ADMINPASSWORD}'
-hostname=${CWM_SERVERIP}
-rpc_key=${rpc_key}
-EOF
-#waitOrStop 0 "failed create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf"
-
-echo "create conf for cmon" | log
-cat <<EOF > /etc/default/cmon
-EVENTS_CLIENT="http://127.0.0.1:9510"
-CLOUD_SERVICE="http://127.0.0.1:9518"
-EOF
-#waitOrStop 0 "failed create conf for cmon"
+echo "Adding descriptions" | log
+descriptionAppend "Default Inventory File: /etc/ansible/hosts"
+descriptionAppend " "
 
 
-echo "copy apache configuration" | log
-cp -f /var/www/clustercontrol/ssl/server.crt /etc/ssl/certs/s9server.crt
-cp -f /var/www/clustercontrol/ssl/server.key /etc/ssl/certs/s9server.key
-rm -rf /var/www/clustercontrol/ssl
-cp -f /var/www/clustercontrol/app/tools/apache2/s9s.conf /etc/apache2/sites-available/
-cp -f /var/www/clustercontrol/app/tools/apache2/s9s-ssl.conf /etc/apache2/sites-available/
-rm -f /etc/apache2/sites-enabled/000-default.conf
-rm -f /etc/apache2/sites-enabled/default-ssl.conf
-rm -f /etc/apache2/sites-enabled/001-default-ssl.conf
-ln -sfn /etc/apache2/sites-available/s9s.conf /etc/apache2/sites-enabled/001-s9s.conf
-ln -sfn /etc/apache2/sites-available/s9s-ssl.conf /etc/apache2/sites-enabled/001-s9s-ssl.conf
+## Install certbot ##
+echo "Installing certbot for apache" | log
+installPackage python3-certbot-apache
+waitOrStop 0 "Failed apt install: python-certbot-apache"
 
 
-# No need for selfsigned cert
-#sed -i 's|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/ssl/certs/s9server.crt|g' /etc/apache2/sites-available/s9s-ssl.conf
-#sed -i 's|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/ssl/certs/s9server.key|g' /etc/apache2/sites-available/s9s-ssl.conf
-
+## Reconfigure SSL in Vhost ##
 sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
-#waitOrStop 0 "failed copy apache configuration"
+systemctl restart apache2.service
 
-
-echo "enable apache site" | log
-a2enmod ssl rewrite proxy proxy_http proxy_wstunnel
-a2dissite default-ssl
-sed -i 's|Header always set Strict-Transport|#Header always set Strict-Transport|g' /etc/apache2/sites-available/s9s-ssl.conf
-#a2enmod s9s-ssl.conf
-#waitOrStop 0 "failed enable apache site"
-
-echo "Rename the ClusterControl UI default file and assign correct permission" | log
-mv /var/www/clustercontrol/bootstrap.php.default /var/www/clustercontrol/bootstrap.php
-chmod 644 /var/www/clustercontrol/bootstrap.php
-# Assign correct permissions
-chmod -R 777 /var/www/html/clustercontrol/app/tmp
-chmod -R 777 /var/www/html/clustercontrol/app/upload
-chown -Rf www-data.www-data /var/www/html/clustercontrol/
-#waitOrStop 0 "failed Rename the ClusterControl UI default file and assign correct permission"
-
-
-echo "define bootstrap.php" | log
-cat <<EOF > /var/www/clustercontrol/bootstrap.php
-
-<?php
-define('DB_HOST', '127.0.0.1');
-
-define('DB_LOGIN', 'cmon');
-//define('DB_PASS', 'DBPASS');
-define('DB_NAME', 'dcps');
-//define('DB_PORT', 'DBPORT');
-
-define('APP_PROTOCOL', 'http');
-define('APP_HOST', '127.0.0.1');
-define('APP_URL', APP_PROTOCOL.'://'.APP_HOST);
-
-define('CC_UI_VERSION', '1.9.5.8494-#822572');
-
-define('SMTP_HOST', '');
-define('SMTP_USER', '');
-define('SMTP_PASS', '');
-define('SMTP_PORT', '');
-
-define('STATUS_REFRESH_RATE', 10000);
-
-define('RPC_PORT','9500');
-define('RPC_HOST','127.0.0.1');
-
-// RPC v2
-define('RPC_V2_PORT','9501');
-define('RPC_V2_HOST','127.0.0.1');
-
-define('RPC_TOKEN','RPCTOKEN');
-
-//define('WEBSOCKET_HOST', 'ws://127.0.0.1:1337');
-
-define('VENDOR', 'Severalnines');
-
-// Disable Google Analytics
-//define('DISABLE_GA', 'true');
-define('DEBUG_LOGGING', false);
-
-// Disable Ping Home and Google Analytics
-//define('ENABLE_PRIVACY', true);
-
-// Enable Web SSH
-define('SSH_ENABLED', true);
-
-// cmon-events configuration
-define('CMON_EVENTS_ENABLED', true);
-define('CMON_EVENTS_HOST', '127.0.0.1');
-define('CMON_EVENTS_PORT', 9510);
-define('CMON_EVENTS_SSE_ENABLED', true);
-
-// Cloud services
-define('CLOUDS_ENABLED', true);
-
-// Enable new user journey
-//define('ENABLE_ONBOARDING_V1', 'true');
-
-define('SESSIONS_FALLBACK', false);
-define('ENABLE_AUTH_AUDIT_LOG', true);
-define('DISABLE_PHPCAKE_DEBUG_LOG', false);
-
-// Enable readonly demo mode
-// define('DEMO_MODE', true);
-
-// Sort cluster list by name, cluster_id, status, or type. Default is cluster_id.
-define('CLUSTER_LIST_SORT_BY', 'cluster_id');
-//define('AUDIT_DEFAULT_TIMEZONE', 'Europe/Berlin');
-define('DB_PASS', '${ADMINPASSWORD}');
-define('DB_PORT', '3306');
-define('RPC_TOKEN', '${rpc_key}');
-EOF
-#waitOrStop 0 "failed define bootstrap"
-
-echo "insert relevant data to cc db" | log
-mysql --defaults-file=/root/.my.cnf -h localhost -e "INSERT IGNORE INTO dcps.apis (id, company_id, user_id, url, token, created) values (1,1,1,'http://127.0.0.1','${rpc_key}', UNIX_TIMESTAMP())"
-#waitOrStop 0 "failed insert relevant data to cc db"
-
-#### Try to fix broken apt:
-#apt --fix-broken install -y
-
-echo "Apply changes and restart apache" | log
-service apache2 restart
-#waitOrStop 0 "failed Apply changes and restart apache"
-
-#echo "Enable cluster control" | log
-#systemctl enable cmon cmon-ssh cmon-events cmon-cloud
-#systemctl restart cmon cmon-ssh cmon-events cmon-cloud
-#waitOrStop 0 "failed Enable cluster control"
-
-# Create cc user:
-#cd /root
-#mkdir .s9s
-#touch root/.s9s/ccrpc.conf
-#export S9S_USER_CONFIG=$HOME/.s9s/ccrpc.conf
-#s9s user --create --new-password=${ADMINPASSWORD} --generate-key --private-key-file==$HOME/.s9s/ccrpc.key --group=admins #--controller=https://localhost:9501 ccrpc
-#s9s user --set --first-name=RPC --last-name=API --cmon-user=ccrpc &>/dev/null
-
-# enable ufw
-#ufw enable
-
-#echo "Adding descriptions" | log
-#descriptionAppend "cmon config files location: /etc/cmon.cnf"
-#descriptionAppend "cmon rpc-key: ${rpc_key}"
-#descriptionAppend "cmon mysql user password: ${ADMINPASSWORD}"
-#descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
-#descriptionAppend "clustercontrol webpage config files location: /var/www/clustercontrol/bootstrap.php"
-#descriptionAppend " "
-
-
-tag cmon.success
-tag cc.success
-
-COMMENT
-
-sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
-sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
-
+tag apache2.success
+tag certbot-apache2.success
+tagScript success
 exit 0
