@@ -12,11 +12,15 @@ rootDir=$(rootDir)
 
 echo "Downloading Zulip from original repo" | log
 cd $(mktemp -d)
-#curlDownload https://www.zulip.org/dist/releases/zulip-server-latest.tar.gz
-curl https://www.zulip.org/dist/releases/zulip-server-latest.tar.gz -L --output zulip-serv-latest.tar.gz
+curlDownload https://www.zulip.org/dist/releases/zulip-server-latest.tar.gz
 waitOrStop 0 "File not downloaded from official sources"
 tar -xzvf zulip-server-latest.tar.gz
 waitOrStop 0 "Failed to extract archive"
+######## ALEX TEST
+
+chown root:root /tmp/*/zulip-server-* -R
+
+######## END TEST
 
 echo "Installing Zulip Application" | log
 ./zulip-server-*/scripts/setup/install --self-signed-cert --email=${ADMINEMAIL} --hostname=${CWM_DOMAIN}
