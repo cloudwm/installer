@@ -16,11 +16,6 @@ curlDownload https://www.zulip.org/dist/releases/zulip-server-latest.tar.gz
 waitOrStop 0 "File not downloaded from official sources"
 tar -xzvf zulip-server-latest.tar.gz
 waitOrStop 0 "Failed to extract archive"
-######## ALEX TEST
-
-chown root:root /tmp/*/zulip-server-* -R
-
-######## END TEST
 
 echo "Installing Zulip Application" | log
 ./zulip-server-*/scripts/setup/install --self-signed-cert --email=${ADMINEMAIL} --hostname=${CWM_DOMAIN}
@@ -30,7 +25,8 @@ waitOrStop 0 "Failed to install Zulip"
 webui=$(su -c "/home/zulip/deployments/next/manage.py generate_realm_creation_link" -s /bin/sh zulip | grep https)
 
 echo "Configuring Nginx VirtualHost" | log
-cp $rootDir/tweaks/extras/zulip/zulip.conf /etc/nginx/sites-enabled/
+cp /etc/zulip/zulip.conf /etc/nginx/sites-enabled/
+#cp $rootDir/tweaks/extras/zulip/zulip.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/zulip-enterprise
 sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/nginx/sites-enabled/zulip.conf
 service nginx restart
