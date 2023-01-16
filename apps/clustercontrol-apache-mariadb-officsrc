@@ -70,8 +70,8 @@ tag global-domain-set.success
 
 
 echo "Reconfigure SSL in Vhost" | log
-sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
-sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
+sed -i "s|^[ \t]SSLCertificateFile.|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
+sed -i "s|^[ \t]SSLCertificateKeyFile.|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 waitOrStop 0 "Failed Reconfigure SSL in Vhost"
 systemctl restart apache2.service
 waitOrStop 0 "Failed restart apache2.service"
@@ -96,5 +96,5 @@ tag ssl-ready.success
 tagScript success
 tag apache2.success
 tag certbot-apache2.success
-tagScript success
-exit 0
+tagScript success
+exit 0
