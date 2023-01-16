@@ -11,7 +11,7 @@ descriptionMotd=/etc/update-motd.d/98-description
 if [ -f "$CWM_DESCFILE" ]; then
 
     echo "Adding $CWM_DESCFILE to $descriptionMotd file" | log
-
+    installPackage libu2f-udev
     installPackage update-motd
     waitOrStop 0 "Failed apt install: update-motd"
 
