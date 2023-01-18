@@ -1,0 +1,77 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ruby.success
+checkTagExist mysqld.success
+checkTagExist httpd.success
+checkTagExist passenger.success
+
+rootDir=$(rootDir)
+appPath=/var/www/redmine
+
+echo "Installing Dependencies" | log
+packages=(build-essential libmysqlclient-dev imagemagick libmagickwand-dev)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Cloning stable version from repository" | log
+mkdir -p /var/www
+cd /var/www/
+git clone https://github.com/redmine/redmine.git -b 5.0-stable | log
+waitOrStop 0 "File not downloaded from Github"
+
+echo "Creating Database and user" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE redmine CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'redmine'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on redmine.* to redmine@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Pushing database config" | log
+cat << EOF > ${appPath}/config/database.yml
+production:
+  adapter: mysql2
+  database: redmine
+  host: localhost
+  username: redmine
+  password: "${ADMINPASSWORD}"
+  encoding: utf8
+EOF
+
+echo "Installing Bundle" | log
+cd $appPath
+gem install bundler --no-document
+bundle install --without development test postgresql sqlite
+bundle exec rake generate_secret_token
+RAILS_ENV=production bundle exec rake db:migrate
+waitOrStop 0 "Application bundle not installed"
+# echo "en" | RAILS_ENV=production bundle exec rake redmine:load_default_data
+chown -R www-data: $appPath/
+
+echo "Connecting app to nginx" | log
+cp -f $rootDir/tweaks/extras/redmine-nginx/redmine.conf /etc/nginx/sites-available/
+sed -i "s|_appPath_|${appPath}|g" /etc/nginx/sites-available/redmine.conf
+ln -s /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Redmine Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Redmine Initial username: admin"
+descriptionAppend "Redmine Initial password: admin"
+descriptionAppend " "
+descriptionAppend "Redmine application directory: ${appPath}"
+descriptionAppend "Redmine config files location: ${appPath}/config/"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
