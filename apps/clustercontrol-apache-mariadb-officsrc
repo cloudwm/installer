@@ -18,6 +18,7 @@ waitOrStop 0 "Failed install MariaDB - server"
 installPackage install -y mariadb-client | log
 waitOrStop 0 "Failed install MariaDB - client"
 
+apt update -y
 
 echo "Create ansible playbook" | log
 cd /root
