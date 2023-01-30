@@ -13,9 +13,9 @@ ansible-galaxy install severalnines.clustercontrol | log
 waitOrStop 0 "Failed Get ansible Role"
 
 echo "install MariaDB" | log
-installPackage install -y mariadb-server | log
+installPackage -y mariadb-server | log
 waitOrStop 0 "Failed install MariaDB - server"
-installPackage install -y mariadb-client | log
+installPackage -y mariadb-client | log
 waitOrStop 0 "Failed install MariaDB - client"
 
 apt update -y
