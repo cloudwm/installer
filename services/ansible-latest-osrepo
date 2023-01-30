@@ -12,6 +12,9 @@ echo "Installing Ansible from APT" | log
 installPackage ansible | log
 waitOrStop 0 "Failed apt install: Ansible"
 
+# Coment zone
+: '
+
 # Get ansible Role
 ansible-galaxy install severalnines.clustercontrol | log
 
@@ -31,6 +34,8 @@ EOF
 # Run playbook
 ansible-playbook cc.playbook | log
 
+'
+#end comment zone
 
 echo "Adding descriptions" | log
 descriptionAppend "Default Inventory File: /etc/ansible/hosts"
