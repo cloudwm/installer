@@ -14,7 +14,8 @@ myadminPath=/var/www/html/phpmyadmin
 
 echo "Installing phpMyAdmin" | log
 mkdir -p $myadminPath
-tar -xzvf $rootDir/src/phpMyAdmin-all-languages.tar.gz -C $myadminPath/ --strip-components=1
+wget https://files.phpmyadmin.net/phpMyAdmin/5.2.0/phpMyAdmin-5.2.0-all-languages.tar.gz
+tar -xzvf $rootDir/src/phpMyAdmin-5.2.0-all-languages.tar.gz -C $myadminPath/ --strip-components=1
 waitOrStop 0 "Failed to extract application archive"
 
 echo "Setting default config file" | log
