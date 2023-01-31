@@ -1,0 +1,41 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+. include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+. ../include/startup.sh
+fi
+
+echo "Adding php8.1 repo" | log
+installPackage software-properties-common | log
+waitOrStop 0 "Failed apt install: software-properties-common"
+add-apt-repository -y ppa:ondrej/php | log
+apt update
+
+echo "Installing php8.1-fpm" | log
+installPackage php8.1-fpm
+waitOrStop 0 "Failed apt install: php8.1-fpm"
+
+echo "Installing php8.1 modules" | log
+packages=(php8.1-cli php8.1-bz2 php8.1-common php8.1-curl php8.1-gd php8.1-json php8.1-mbstring php8.1-mysql php8.1-readline php8.1-xml php8.1-zip php8.1-bcmath php8.1-intl php8.1-soap)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Configuring php-fpm to listen on correct socket" | log
+sed -i 's/listen = /run/php/php8.1-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/8.1/fpm/pool.d/www.conf
+
+echo "Restarting service to implement changes" | log
+service php8.1-fpm restart
+waitOrStop 0 "Restarting fpm service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "PHP config files location: /etc/php/"
+descriptionAppend "PHP-FPM config files location: /etc/php/8.1/fpm/"
+descriptionAppend " "
+
+tag php.success
+tag php-fpm.success
+
+tagScript success
+
+exit 0
