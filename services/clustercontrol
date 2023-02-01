@@ -6,96 +6,230 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
+echo "get key for updating mysql" | log
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
+waitOrStop 0 "Failed get key for updating mysql"
 
-echo "Get ansible Role" | log
-ansible-galaxy install severalnines.clustercontrol | log
-waitOrStop 0 "Failed Get ansible Role"
+echo "add severalnines repo" | log
+apt-get -y install gnupg2
+wget http://repo.severalnines.com/severalnines-repos.asc -O- | sudo apt-key add -
+wget http://www.severalnines.com/downloads/cmon/s9s-repo.list -P /etc/apt/sources.list.d/
+waitOrStop 0 "Failed add severalnines repo"
 
-echo "install MariaDB" | log
-installPackage mariadb-server | log
-waitOrStop 0 "Failed install MariaDB - server"
-installPackage mariadb-client | log
-waitOrStop 0 "Failed install MariaDB - client"
+echo "add cli-tool repo and install it" | log
+wget -qO - http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/Release.key | sudo apt-key add -
+echo "deb http://repo.severalnines.com/s9s-tools/$(lsb_release -sc)/ ./" | sudo tee /etc/apt/sources.list.d/s9s-tools.list
 
-apt update
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install s9s-tools -y
+waitOrStop 0 "Failed add cli-tool repo and install it"
 
-echo "Create ansible playbook" | log
-cd /root
-touch cc.playbook
-cat <<EOF > cc.playbook
-- hosts: localhost
-  roles:
-    - { role: severalnines.clustercontrol }
+echo "disable apparmor and ufw for installation" | log
+/etc/init.d/apparmor stop
+/etc/init.d/apparmor teardown
+update-rc.d -f apparmor remove
+ufw disable
+waitOrStop 0 "failed disable apparmor and iptables for installation"
+
+echo "Installing CC dependencies" | log
+sudo apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y curl apache2 libapache2-mod-php mailutils dnsutils mysql-client mysql-server php-common php-mysql php-gd php-ldap php-curl php-json
+waitOrStop 0 "failed Installing CC dependencies"
+
+apt-get install -y clustercontrol-controller clustercontrol clustercontrol-ssh clustercontrol-notifications clustercontrol-cloud clustercontrol-clud s9s-tools | log
+
+
+echo "create cmon mysql objects" | log
+mysql -u root <<EOF
+DROP SCHEMA IF EXISTS cmon;
+CREATE SCHEMA cmon;
+DROP SCHEMA IF EXISTS dcps;
+CREATE SCHEMA dcps;
+CREATE USER "cmon"@"localhost" IDENTIFIED BY "${ADMINPASSWORD}";
+CREATE USER "cmon"@"127.0.0.1" IDENTIFIED BY "${ADMINPASSWORD}";
+GRANT ALL PRIVILEGES ON *.* TO "cmon"@"localhost";
+GRANT ALL PRIVILEGES ON *.* TO "cmon"@"127.0.0.1";
+FLUSH PRIVILEGES;
 EOF
-
-echo "runing playbook" | log
-ansible-playbook cc.playbook | log
+waitOrStop 0 "failed create cmon mysql objects"
 
 
+echo "link site documents for apache default websites location" | log
+ln -sfn /var/www/clustercontrol /var/www/html/clustercontrol
+ln -sfn /var/www/cmon /var/www/html/cmon
+waitOrStop 0 "failed link site documents for apache default websites location"
+
+echo "Import cmon db shcema" | log
+mysql -uroot cmon < /usr/share/cmon/cmon_db.sql
+mysql -uroot cmon < /usr/share/cmon/cmon_data.sql
+mysql -uroot dcps < /var/www/clustercontrol/sql/dc-schema.sql
+
+echo "Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key" | log
+rpc_key=$(uuidgen | tr -d '-')
+waitOrStop 0 "failed Generate a ClusterControl key to be used by RPC_TOKEN and rpc_key"
+
+echo "create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf" | log
+#with the following configuration options:
+cat <<EOF > /etc/cmon.cnf
+mysql_port=3306
+mysql_hostname=127.0.0.1
+mysql_password='${ADMINPASSWORD}'
+hostname=${CWM_SERVERIP}
+rpc_key=${rpc_key}
+EOF
+waitOrStop 0 "failed create the ClusterControl Controller (cmon) configuration file at /etc/cmon.cnf"
+
+echo "create conf for cmon" | log
+cat <<EOF > /etc/default/cmon
+EVENTS_CLIENT="http://127.0.0.1:9510"
+CLOUD_SERVICE="http://127.0.0.1:9518"
+EOF
+waitOrStop 0 "failed create conf for cmon"
+
+
+echo "copy apache configuration" | log
+cp -f /var/www/clustercontrol/ssl/server.crt /etc/ssl/certs/s9server.crt
+cp -f /var/www/clustercontrol/ssl/server.key /etc/ssl/certs/s9server.key
+rm -rf /var/www/clustercontrol/ssl
+cp -f /var/www/clustercontrol/app/tools/apache2/s9s.conf /etc/apache2/sites-available/
+cp -f /var/www/clustercontrol/app/tools/apache2/s9s-ssl.conf /etc/apache2/sites-available/
+rm -f /etc/apache2/sites-enabled/000-default.conf
+rm -f /etc/apache2/sites-enabled/default-ssl.conf
+rm -f /etc/apache2/sites-enabled/001-default-ssl.conf
+ln -sfn /etc/apache2/sites-available/s9s.conf /etc/apache2/sites-enabled/001-s9s.conf
+ln -sfn /etc/apache2/sites-available/s9s-ssl.conf /etc/apache2/sites-enabled/001-s9s-ssl.conf
 
 
 
-#### SSL ####
-echo "Installing certbot for apache" | log
-installPackage python3-certbot-apache
-waitOrStop 0 "Failed apt install: python-certbot-apache"
 
-
-## applying ssl for cc web app ##
-systemctl stop apache2.service
-execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-
-if [[ $? == 1 ]]
-then
-export certbot_failed=1
-echo "Generating self-signed certificate" | log
-#waitOrStop 0 "Failed certbot certificate generation"
-mkdir /etc/letsencrypt/live
-mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
-
-# Sending log to log server - 45-93-93-142.cloud-xip.com
-curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
-
-
-else
-export certbot_failed=0
-fi
-
-export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
-systemctl start apache2.service
-waitOrStop 0 "Failed to start Apache service"
-tag global-domain-set.success
-
-
-echo "Reconfigure SSL in Vhost" | log
 sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
-waitOrStop 0 "Failed Reconfigure SSL in Vhost"
-systemctl restart apache2.service
-waitOrStop 0 "Failed restart apache2.service"
+waitOrStop 0 "failed copy apache configuration"
 
-#### SSL END ####
 
-## Remove Ansible ##
-apt-get remove -y ansible
+echo "enable apache site" | log
+a2enmod ssl rewrite proxy proxy_http proxy_wstunnel
+a2dissite default-ssl
+unlink /etc/apache2/sites-enabled/001-s9s.conf
+sed -i 's|Header always set Strict-Transport|#Header always set Strict-Transport|g' /etc/apache2/sites-enabled/001-s9s-ssl.conf
+a2enmod s9s-ssl.conf
+waitOrStop 0 "failed enable apache site"
 
+echo "Rename the ClusterControl UI default file and assign correct permission" | log
+mv /var/www/clustercontrol/bootstrap.php.default /var/www/clustercontrol/bootstrap.php
+chmod 644 /var/www/clustercontrol/bootstrap.php
+# Assign correct permissions
+chmod -R 777 /var/www/html/clustercontrol/app/tmp
+chmod -R 777 /var/www/html/clustercontrol/app/upload
+chown -Rf www-data.www-data /var/www/html/clustercontrol/
+waitOrStop 0 "failed Rename the ClusterControl UI default file and assign correct permission"
+
+
+echo "define bootstrap.php" | log
+cat <<EOF > /var/www/clustercontrol/bootstrap.php
+
+<?php
+define('DB_HOST', '127.0.0.1');
+
+define('DB_LOGIN', 'cmon');
+//define('DB_PASS', 'DBPASS');
+define('DB_NAME', 'dcps');
+//define('DB_PORT', 'DBPORT');
+
+define('APP_PROTOCOL', 'http');
+define('APP_HOST', '127.0.0.1');
+define('APP_URL', APP_PROTOCOL.'://'.APP_HOST);
+
+define('CC_UI_VERSION', '1.9.5.8494-#822572');
+
+define('SMTP_HOST', '');
+define('SMTP_USER', '');
+define('SMTP_PASS', '');
+define('SMTP_PORT', '');
+
+define('STATUS_REFRESH_RATE', 10000);
+
+define('RPC_PORT','9500');
+define('RPC_HOST','127.0.0.1');
+
+// RPC v2
+define('RPC_V2_PORT','9501');
+define('RPC_V2_HOST','127.0.0.1');
+
+define('RPC_TOKEN','RPCTOKEN');
+
+//define('WEBSOCKET_HOST', 'ws://127.0.0.1:1337');
+
+define('VENDOR', 'Severalnines');
+
+// Disable Google Analytics
+//define('DISABLE_GA', 'true');
+define('DEBUG_LOGGING', false);
+
+// Disable Ping Home and Google Analytics
+//define('ENABLE_PRIVACY', true);
+
+// Enable Web SSH
+define('SSH_ENABLED', true);
+
+// cmon-events configuration
+define('CMON_EVENTS_ENABLED', true);
+define('CMON_EVENTS_HOST', '127.0.0.1');
+define('CMON_EVENTS_PORT', 9510);
+define('CMON_EVENTS_SSE_ENABLED', true);
+
+// Cloud services
+define('CLOUDS_ENABLED', true);
+
+// Enable new user journey
+//define('ENABLE_ONBOARDING_V1', 'true');
+
+define('SESSIONS_FALLBACK', false);
+define('ENABLE_AUTH_AUDIT_LOG', true);
+define('DISABLE_PHPCAKE_DEBUG_LOG', false);
+
+// Enable readonly demo mode
+// define('DEMO_MODE', true);
+
+// Sort cluster list by name, cluster_id, status, or type. Default is cluster_id.
+define('CLUSTER_LIST_SORT_BY', 'cluster_id');
+//define('AUDIT_DEFAULT_TIMEZONE', 'Europe/Berlin');
+define('DB_PASS', '${ADMINPASSWORD}');
+define('DB_PORT', '3306');
+define('RPC_TOKEN', '${rpc_key}');
+EOF
+waitOrStop 0 "failed define bootstrap"
+
+echo "insert relevant data to cc db" | log
+mysql -uroot -e "INSERT IGNORE INTO dcps.apis (id, company_id, user_id, url, token, created) values (1,1,1,'http://127.0.0.1','${rpc_key}', UNIX_TIMESTAMP())"
+waitOrStop 0 "failed insert relevant data to cc db"
+
+
+echo "Apply changes and restart apache" | log
+service apache2 restart
+waitOrStop 0 "failed Apply changes and restart apache"
+
+echo "Enable cluster control" | log
+systemctl enable cmon cmon-ssh cmon-events cmon-cloud
+systemctl restart cmon cmon-ssh cmon-events cmon-cloud
+#waitOrStop 0 "failed Enable cluster control"
+
+# enable ufw
+ufw enable
 
 echo "Adding descriptions" | log
-descriptionAppend "!!!! Before first registration, please run: /var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
-descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
-descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
+descriptionAppend "cmon rpc-key: ${rpc_key}"
+descriptionAppend "cmon mysql user password: ${ADMINPASSWORD}"
+descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}"
 descriptionAppend "clustercontrol webpage config files location: /var/www/clustercontrol/bootstrap.php"
 descriptionAppend " "
 
+echo "tagging success" | log
+tag cmon.success
+tag cc.success
 
-
-tag ssl-ready.success
-tagScript success
-tag apache2.success
-tag certbot-apache2.success
-tagScript success
+echo "exiting cc-script" | log
 exit 0
+
+
