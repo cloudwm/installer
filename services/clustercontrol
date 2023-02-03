@@ -1,0 +1,110 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Get ansible Role" | log
+ansible-galaxy install severalnines.clustercontrol | log
+waitOrStop 0 "Failed Get ansible Role"
+
+echo "install MariaDB" | log
+installPackage mariadb-server | log
+waitOrStop 0 "Failed install MariaDB - server"
+installPackage mariadb-client | log
+waitOrStop 0 "Failed install MariaDB - client"
+
+apt update
+
+echo "Create ansible playbook" | log
+cd /root
+touch cc.playbook
+cat <<EOF > cc.playbook
+- hosts: localhost
+  roles:
+    - { role: severalnines.clustercontrol }
+EOF
+
+echo "runing playbook" | log
+ansible-playbook cc.playbook | log
+
+
+
+
+
+#### SSL ####
+echo "Installing certbot for apache" | log
+installPackage python3-certbot-apache
+waitOrStop 0 "Failed apt install: python-certbot-apache"
+
+
+## applying ssl for cc web app ##
+systemctl stop apache2.service
+execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
+
+if [[ $? == 1 ]]
+then
+export certbot_failed=1
+echo "Generating self-signed certificate" | log
+#waitOrStop 0 "Failed certbot certificate generation"
+mkdir /etc/letsencrypt/live
+mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
+openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
+waitOrStop 0 "Certificate creation failed"
+
+# Sending log to log server - 45-93-93-142.cloud-xip.com
+curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
+
+
+else
+export certbot_failed=0
+fi
+
+export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+systemctl start apache2.service
+waitOrStop 0 "Failed to start Apache service"
+tag global-domain-set.success
+
+
+
+echo "Reconfigure SSL in Vhost" | log
+sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
+sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
+
+waitOrStop 0 "Failed Reconfigure SSL in Vhost"
+systemctl restart apache2.service
+waitOrStop 0 "Failed restart apache2.service"
+
+#### SSL END ####
+
+## Remove Ansible ##
+apt-get remove -y ansible
+
+
+## Create new rpc-key and modify relevant files ##
+random_rpc=$(date +%s | sha256sum | base64 | head -c 32 ; echo)
+echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
+sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
+echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
+
+echo "Adding descriptions" | log
+descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
+descriptionAppend "cmon config files location: /etc/cmon.cnf"
+descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
+descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
+descriptionAppend "clustercontrol webpage config: /var/www/clustercontrol/bootstrap.php"
+descriptionAppend "rpc-key: ${random_rpc}"
+descriptionAppend " "
+
+
+
+tag ssl-ready.success
+tagScript success
+tag apache2.success
+tag certbot-apache2.success
+tagScript success
+exit 0
