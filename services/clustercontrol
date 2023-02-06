@@ -94,6 +94,8 @@ echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/boo
 ## Deploy Galera Clustyer ##
 
 ips=(192.168.0.1 192.168.0.2 192.168.0.3)
+echo "generate ssh keys" | log
+ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -q -N ""
 
 # wait until cmon is up
 echo "waiting for cmon" | log
@@ -103,13 +105,16 @@ done
 
 echo "Fix issues with admin user:" | log
 echo "backing up s9s.conf to backup" | log
-mv /root/.s9s/s9s.conf /root/.s9s/s9s.conf.bak
-mv /etc/s9s.conf /etc/s9s.conf.b
+#mv /root/.s9s/s9s.conf /root/.s9s/s9s.conf.bak
+#mv /etc/s9s.conf /etc/s9s.conf.b
 echo "Creating dba user to enable admin" | log
 s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
+sleep 30
 s9s user --cmon-user=dba --enable admin
+sleep 30
 echo "using reset ccrpc script" | log
 echo "yes" | /var/www/clustercontrol/app/tools/reset-ccrpc.sh
+sleep 30
 
 echo "adding public key to nodes" | log
 apt-get install sshpass
@@ -119,6 +124,7 @@ echo "Coping ssh-keys nodes" | log
 for ip in "${ips[@]}"; do
   echo "Copying SSH key to $ip"
   echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa.pub root@$ip
+  sleep 10
 done
 
 
