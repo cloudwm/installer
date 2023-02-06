@@ -91,6 +91,41 @@ echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
 sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
 echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
 
+## Deploy Galera Clustyer ##
+
+ips=(192.168.0.1 192.168.0.2 192.168.0.3)
+
+
+# Fix issues with admin user
+mv ~/.s9s/s9s.conf ~/.s9s/s9s.conf.bak
+mv /etc/s9s.conf /etc/s9s.conf.b
+s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
+s9s user --cmon-user=dba --enable admin
+echo "yes" | /var/www/clustercontrol/app/tools/reset-ccrpc.sh
+
+# add public key to nodes:
+apt-get install sshpass
+ips=(192.168.0.1 192.168.0.2 192.168.0.3)
+
+
+for ip in "${ips[@]}"; do
+  echo "Copying SSH key to $ip"
+  echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub root@$ip
+done
+
+
+# Run Galera (percona) with 3 servers.
+s9s cluster --create \
+        --cluster-type=galera \
+        --nodes="192.168.0.1;192.168.0.2;192.168.0.3" \
+        --vendor=percona \
+        --provider-version=5.7 \
+        --db-admin-passwd='${ADMINPASSWORD}' \
+        --os-user=root \
+        --os-key-file=/root/.ssh/id_rsa \
+        --cluster-name='Percona XtraDB Cluster 5.7'
+
+
 echo "Adding descriptions" | log
 descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
