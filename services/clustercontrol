@@ -95,26 +95,34 @@ echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/boo
 
 ips=(192.168.0.1 192.168.0.2 192.168.0.3)
 
+# wait until cmon is up
+echo "waiting for cmon" | log
+while ! nc -z localhost 9501; do
+  sleep 1
+done
 
-# Fix issues with admin user
+echo "Fix issues with admin user:" | log
+echo "backing up s9s.conf to backup" | log
 mv ~/.s9s/s9s.conf ~/.s9s/s9s.conf.bak
 mv /etc/s9s.conf /etc/s9s.conf.b
+echo "Creating dba user to enable admin" | log
 s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
 s9s user --cmon-user=dba --enable admin
+echo "using reset ccrpc script" | log
 echo "yes" | /var/www/clustercontrol/app/tools/reset-ccrpc.sh
 
-# add public key to nodes:
+echo "adding public key to nodes" | log
 apt-get install sshpass
 ips=(192.168.0.1 192.168.0.2 192.168.0.3)
 
-
+echo "Coping ssh-keys nodes" | log
 for ip in "${ips[@]}"; do
   echo "Copying SSH key to $ip"
   echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub root@$ip
 done
 
 
-# Run Galera (percona) with 3 servers.
+echo "Deploying: Run Galera (percona) with 3 servers" | log
 s9s cluster --create \
         --cluster-type=galera \
         --nodes="192.168.0.1;192.168.0.2;192.168.0.3" \
