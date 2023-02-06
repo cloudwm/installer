@@ -103,7 +103,7 @@ done
 
 echo "Fix issues with admin user:" | log
 echo "backing up s9s.conf to backup" | log
-mv ~/.s9s/s9s.conf ~/.s9s/s9s.conf.bak
+mv /root/.s9s/s9s.conf /root/.s9s/s9s.conf.bak
 mv /etc/s9s.conf /etc/s9s.conf.b
 echo "Creating dba user to enable admin" | log
 s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
@@ -118,7 +118,7 @@ ips=(192.168.0.1 192.168.0.2 192.168.0.3)
 echo "Coping ssh-keys nodes" | log
 for ip in "${ips[@]}"; do
   echo "Copying SSH key to $ip"
-  echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub root@$ip
+  echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa.pub root@$ip
 done
 
 
@@ -133,6 +133,9 @@ s9s cluster --create \
         --os-key-file=/root/.ssh/id_rsa \
         --cluster-name='Percona XtraDB Cluster 5.7'
 
+echo "waiting to ClusterControl to finnish deployment" | log
+job_id=$(s9s job --list | grep "Creating a Cluster" | awk '{print $1}')
+s9s job --wait $job_id
 
 echo "Adding descriptions" | log
 descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
