@@ -123,7 +123,7 @@ ips=(192.168.0.1 192.168.0.2 192.168.0.3)
 echo "Coping ssh-keys nodes" | log
 for ip in "${ips[@]}"; do
   echo "Copying SSH key to $ip"
-  echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa.pub root@$ip
+  echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -i /root/.ssh/id_rsa.pub root@$ip
   sleep 10
 done
 
