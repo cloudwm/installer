@@ -105,8 +105,8 @@ done
 
 echo "Fix issues with admin user:" | log
 echo "backing up s9s.conf to backup" | log
-#mv /root/.s9s/s9s.conf /root/.s9s/s9s.conf.bak
-#mv /etc/s9s.conf /etc/s9s.conf.b
+mv /root/.s9s/s9s.conf /root/.s9s/s9s.conf.bak
+mv /etc/s9s.conf /etc/s9s.conf.b
 echo "Creating dba user to enable admin" | log
 s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
 sleep 30
