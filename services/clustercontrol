@@ -117,7 +117,7 @@ done
 echo "Fix issues with admin user:" | log
 echo "backing up s9s.conf to backup" | log
 #mv /root/.s9s/s9s.conf /root/.s9s/s9s.conf.bak | log
-mv /etc/s9s.conf /etc/s9s.conf.b
+mv /etc/s9s.conf /etc/s9s.conf.bak
 echo "Creating dba user to enable admin" | log
 s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
 s9s user --cmon-user=dba --enable admin
@@ -138,8 +138,8 @@ s9s cluster --create \
         --cluster-name='Percona XtraDB Cluster 5.7'
 
 echo "waiting to ClusterControl to finnish deployment" | log
-job_id=$(s9s job --list | grep "Creating a Cluster" | awk '{print $1}')
-s9s job --wait $job_id
+#job_id=$(s9s job --list | grep "Creating a Cluster" | awk '{print $1}')
+s9s job --wait --job-id=1
 
 echo "Adding descriptions" | log
 descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
