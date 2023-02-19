@@ -121,12 +121,26 @@ apt-get install sshpass
 ips=(192.168.1.1 192.168.1.2 192.168.1.3)
 
 echo "Coping ssh-keys nodes" | log
-for ip in "${ips[@]}"; do
-  echo "Copying SSH key to $ip"
-  #echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -i /root/.ssh/id_rsa.pub root@$ip # To remove
-  sshpass -p '${ADMINPASSWORD}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@$ip 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
-  sleep 10
-done
+sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.1 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+
+sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.2 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+
+sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.3 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+
+
+echo "Coping ssh-keys nodes again" | log
+sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.1 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+
+sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.2 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+
+sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.3 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+
+#for ip in "${ips[@]}"; do
+#  echo "Copying SSH key to $ip"
+#  #echo "${ADMINPASSWORD}" | sshpass ssh-copy-id -i /root/.ssh/id_rsa.pub root@$ip # To remove
+#  sshpass -p '${ADMINPASSWORD}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@$ip 'cat >> /root/.ssh/#authorized_keys' < /root/.ssh/id_rsa.pub
+#  sleep 10
+#done
 
 
 echo "Deploying: Run Galera (percona) with 3 servers" | log
