@@ -121,19 +121,13 @@ apt-get install sshpass
 ips=(192.168.1.1 192.168.1.2 192.168.1.3)
 
 echo "Coping ssh-keys nodes" | log
-sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.1 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+sshpass -p ${ADMINPASSWORD} ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.1 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub | log
 
-sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.2 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+sshpass -p ${ADMINPASSWORD} ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.2 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub | log
 
-sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.3 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
+sshpass -p ${ADMINPASSWORD} ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.3 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub | log
 
 
-echo "Coping ssh-keys nodes again" | log
-sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.1 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
-
-sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.2 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
-
-sshpass -p '${ADMINPASSWORD}' ssh -o -v StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@192.168.1.3 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
 
 #for ip in "${ips[@]}"; do
 #  echo "Copying SSH key to $ip"
