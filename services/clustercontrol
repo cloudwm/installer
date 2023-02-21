@@ -57,8 +57,7 @@ params+="&network_name_0=${network_name_0}"
 params+="&network_name_1=${network_name_1}"
 params+="&network_ip_1=${network_ip_1}"
 
-curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}"
-"https://null.cloudwm.com/service/server"
+curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server"
 
 
 ##NODE 2
@@ -91,8 +90,7 @@ params+="&network_name_0=${network_name_0}"
 params+="&network_name_1=${network_name_1}"
 params+="&network_ip_1=${network_ip_1}"
 
-curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}"
-"https://null.cloudwm.com/service/server"
+curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server"
 
 
 ##NODE 3
@@ -125,9 +123,7 @@ params+="&network_name_0=${network_name_0}"
 params+="&network_name_1=${network_name_1}"
 params+="&network_ip_1=${network_ip_1}"
 
-curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}"
-"https://null.cloudwm.com/service/server"
-
+curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server"
 ####################################
 
 
