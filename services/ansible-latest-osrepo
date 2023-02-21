@@ -8,13 +8,126 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Installing Ansible from APT" | log
-installPackage ansible | log
-waitOrStop 0 "Failed apt install: Ansible"
+####### Deploying CWM Nodes #######
+## NODE 1
+clientId=${CWM_APICLIENTID}
+secret=${CWM_APISECRET}
+datacenter=${CWM_ZONE}
 
-echo "Adding descriptions" | log
-descriptionAppend "Default Inventory File: /etc/ansible/hosts"
-descriptionAppend " "
+# temporal hardcode
+node_num=1
+name="${CWM_NAME}_NODE_${node_num}"
+password=${ADMINPASSWORD}
+cpu="2B"
+ram="2048"
+billing="monthly"
+managed="0"
+backup="0"
+power="1"
+traffic="3"
+disk_size_0="10"
+# note: parameters requires url encoding - ubuntu 20
+disk_src_0="${CWM_ZONE}:6000C29f313b496da71f669782d04b75"
+network_name_0="wan"
+network_name_1=$CWM_VLAN1
+# Extract the first three octets of the IP address
+FIRST_THREE_OCTETS="${CWM_IP1%.*}"
+# Set the last octet to a new value
+NEW_LAST_OCTET="201"
+# Combine the first three octets and the new last octet to form the new IP address
+NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
+# Print the new IP address
+echo $NEW_IP_ADDRESS
+network_ip_1=$NEW_IP_ADDRESS
+node_1_ip=$network_ip_1
+
+params="datacenter=${datacenter}"
+params+="&name=${name}"
+params+="&password=${password}"
+params+="&cpu=${cpu}"
+params+="&ram=${ram}"
+params+="&billing=${billing}"
+params+="&managed=${managed}"
+params+="&backup=${backup}"
+params+="&power=${power}"
+params+="&traffic=${traffic}"
+params+="&disk_size_0=${disk_size_0}"
+params+="&disk_src_0=${disk_src_0}"
+params+="&network_name_0=${network_name_0}"
+params+="&network_name_1=${network_name_1}"
+params+="&network_ip_1=${network_ip_1}"
+
+curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server" | log
+
+
+##NODE 2
+# temporal hardcode
+node_num=2
+name="${CWM_NAME}_NODE_${node_num}"
+FIRST_THREE_OCTETS="${CWM_IP1%.*}"
+# Set the last octet to a new value
+NEW_LAST_OCTET="202"
+# Combine the first three octets and the new last octet to form the new IP address
+NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
+# Print the new IP address
+echo $NEW_IP_ADDRESS
+network_ip_1=$NEW_IP_ADDRESS
+node_2_ip=$network_ip_1
+
+params="datacenter=${datacenter}"
+params+="&name=${name}"
+params+="&password=${password}"
+params+="&cpu=${cpu}"
+params+="&ram=${ram}"
+params+="&billing=${billing}"
+params+="&managed=${managed}"
+params+="&backup=${backup}"
+params+="&power=${power}"
+params+="&traffic=${traffic}"
+params+="&disk_size_0=${disk_size_0}"
+params+="&disk_src_0=${disk_src_0}"
+params+="&network_name_0=${network_name_0}"
+params+="&network_name_1=${network_name_1}"
+params+="&network_ip_1=${network_ip_1}"
+
+curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server" | log
+
+
+##NODE 3
+# temporal hardcode
+node_num=3
+name="${CWM_NAME}_NODE_${node_num}"
+FIRST_THREE_OCTETS="${CWM_IP1%.*}"
+# Set the last octet to a new value
+NEW_LAST_OCTET="203"
+# Combine the first three octets and the new last octet to form the new IP address
+NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
+# Print the new IP address
+echo $NEW_IP_ADDRESS
+network_ip_1=$NEW_IP_ADDRESS
+node_3_ip=$network_ip_1
+
+params="datacenter=${datacenter}"
+params+="&name=${name}"
+params+="&password=${password}"
+params+="&cpu=${cpu}"
+params+="&ram=${ram}"
+params+="&billing=${billing}"
+params+="&managed=${managed}"
+params+="&backup=${backup}"
+params+="&power=${power}"
+params+="&traffic=${traffic}"
+params+="&disk_size_0=${disk_size_0}"
+params+="&disk_src_0=${disk_src_0}"
+params+="&network_name_0=${network_name_0}"
+params+="&network_name_1=${network_name_1}"
+params+="&network_ip_1=${network_ip_1}"
+
+curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server" | log
+
+####################################
+
+
 
 tagScript success
 
