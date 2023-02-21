@@ -91,14 +91,16 @@ echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
 sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
 echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
 
-## Deploy Galera Clustyer ##
+
+
+###################################################
+## Deploy Galera Cluster ##
 
 # wait until cmon is up
 echo "waiting for cmon" | log
 while ! nc -z localhost 9501; do
   sleep 1
 done
-
 
 echo "adding public key to nodes" | log
 apt-get install sshpass
@@ -110,17 +112,23 @@ for ip in "${ips[@]}"; do
   sshpass -p ${ADMINPASSWORD} ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa root@$ip 'cat >> /root/.ssh/authorized_keys' < /root/.ssh/id_rsa.pub
 done
 
-echo "Fix issues with admin user:" | log
-echo "backing up s9s.conf to backup" | log
-mv /etc/s9s.conf /etc/s9s.conf.bak
-echo "Creating dba user to enable admin" | log
-s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
-sleep 1
-s9s user --cmon-user=dba --enable admin
-sleep 1
-echo "using reset ccrpc script" | log
-echo "yes" | /var/www/clustercontrol/app/tools/reset-ccrpc.sh
-sleep 10
+#echo "Fix issues with admin user:" | log
+#echo "backing up s9s.conf to backup" | log
+#mv /etc/s9s.conf /etc/s9s.conf.bak
+#echo "Creating dba user to enable admin" | log
+#s9s user --create --generate-key --controller="https://localhost:9501" --group=admins dba
+#sleep 1
+#s9s user --cmon-user=dba --enable admin
+#sleep 1
+#echo "using reset ccrpc script" | log
+#echo "yes" | /var/www/clustercontrol/app/tools/reset-ccrpc.sh
+#sleep 10
+
+## Create cmon user named dba
+s9s user --create \
+  --generate-key \
+  --controller="https://localhost:9501" \
+  --group=admins dba
 
 
 echo "Deploying: Run Galera (percona) with 3 servers" | log
@@ -132,19 +140,24 @@ s9s cluster --create \
         --db-admin-passwd='${ADMINPASSWORD}' \
         --os-user=root \
         --os-key-file=/root/.ssh/id_rsa \
-        --cluster-name='Percona XtraDB Cluster 5.7'
+        --cluster-name='Percona XtraDB Cluster 5.7' \
+        --wait
 
-echo "waiting to ClusterControl to finnish deployment" | log
-#job_id=$(s9s job --list | grep "Creating a Cluster" | awk '{print $1}')
-s9s job --wait --job-id=1
+s9s cluster --add-node \
+        --cluster-id=1 \
+        --nodes="haproxy://${CWM_SERVERIP}" \
+        --wait
+
 
 echo "Adding descriptions" | log
 descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
 descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
+descriptionAppend "Galera user password: ${ADMINPASSWORD}"
 descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
 descriptionAppend "clustercontrol webpage config: /var/www/clustercontrol/bootstrap.php"
 descriptionAppend "rpc-key: ${random_rpc}"
+descriptionAppend "cmon user(dba) auth: /root/.s9s"
 descriptionAppend " "
 
 
