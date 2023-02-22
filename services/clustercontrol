@@ -226,19 +226,18 @@ done
 ip1=$node_1_ip
 ip2=$node_2_ip
 ip3=$node_3_ip
-
-# Loop until all IPs are pingable
+# Loop until all IPs have SSH service
+echo "testing ssh for ${ip1}, ${ip2}, ${ip3}"
 while true; do
-    if ping -c1 "$ip1" >/dev/null && ping -c1 "$ip2" >/dev/null && ping -c1 "$ip3" >/dev/null; then
-        echo "all nodes responded to ping" | log
+    if nc -zv "$ip1" 22 >/dev/null && nc -zv "$ip2" 22 >/dev/null && nc -zv "$ip3" 22 >/dev/null; then
         break
     else
-        echo "No response from all Nodes yet" | log
+        echo "not all servers are listening on 22 yet" | log
         sleep 1
     fi
 done
+echo "All IPs have SSH service." | log
 
-echo "All IPs are pingable."
 
 
 echo "adding public key to nodes" | log
