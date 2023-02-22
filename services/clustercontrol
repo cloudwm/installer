@@ -242,7 +242,7 @@ echo "All IPs have SSH service." | log
 
 echo "adding public key to nodes" | log
 apt-get install sshpass
-ips=($node_1_ip $node_2_ip $node_3_ip3)
+ips=($node_1_ip $node_2_ip $node_3_ip)
 
 echo "Coping ssh-keys nodes" | log
 for ip in "${ips[@]}"; do
