@@ -221,6 +221,25 @@ while ! nc -z localhost 9501; do
   sleep 1
 done
 
+## Check that Nodes are responding ##
+# IP addresses to ping
+ip1=$node_1_ip
+ip2=$node_2_ip
+ip3=$node_3_ip
+
+# Loop until all IPs are pingable
+while true; do
+    if ping -c1 "$ip1" >/dev/null && ping -c1 "$ip2" >/dev/null && ping -c1 "$ip3" >/dev/null; then
+        break
+    else
+        echo "No response from all Nodes yet"
+        sleep 1
+    fi
+done
+
+echo "All IPs are pingable."
+
+
 echo "adding public key to nodes" | log
 apt-get install sshpass
 ips=($node_1_ip $node_2_ip $node_3_ip3)
