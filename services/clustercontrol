@@ -13,9 +13,11 @@ rootDir=$(rootDir)
 clientId=${CWM_APICLIENTID}
 secret=${CWM_APISECRET}
 datacenter=${CWM_ZONE}
+last_oct=200   #this is the last octat base for calculation
 
-# temporal hardcode
-node_num=1
+for i in {1..3}
+do
+node_num=${i}
 name="${CWM_NAME}_NODE_${node_num}"
 password=${ADMINPASSWORD}
 cpu="2B"
@@ -33,13 +35,12 @@ network_name_1=$CWM_VLAN1
 # Extract the first three octets of the IP address
 FIRST_THREE_OCTETS="${CWM_IP1%.*}"
 # Set the last octet to a new value
-NEW_LAST_OCTET="201"
+NEW_LAST_OCTET=$((last_oct+i))
 # Combine the first three octets and the new last octet to form the new IP address
 NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
 # Print the new IP address
-echo $NEW_IP_ADDRESS
-network_ip_1=$NEW_IP_ADDRESS
-node_1_ip=$network_ip_1
+echo "New IP address for node: ${NEW_IP_ADDRESS}" | log
+eval node_${i}_ip=$NEW_IP_ADDRESS
 
 params="datacenter=${datacenter}"
 params+="&name=${name}"
@@ -55,76 +56,12 @@ params+="&disk_size_0=${disk_size_0}"
 params+="&disk_src_0=${disk_src_0}"
 params+="&network_name_0=${network_name_0}"
 params+="&network_name_1=${network_name_1}"
-params+="&network_ip_1=${network_ip_1}"
+params+="&network_ip_1=${NEW_IP_ADDRESS}"
 
 curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server"
-
-
-##NODE 2
-# temporal hardcode
-node_num=2
-name="${CWM_NAME}_NODE_${node_num}"
-FIRST_THREE_OCTETS="${CWM_IP1%.*}"
-# Set the last octet to a new value
-NEW_LAST_OCTET="202"
-# Combine the first three octets and the new last octet to form the new IP address
-NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
-# Print the new IP address
-echo $NEW_IP_ADDRESS
-network_ip_1=$NEW_IP_ADDRESS
-node_2_ip=$network_ip_1
-
-params="datacenter=${datacenter}"
-params+="&name=${name}"
-params+="&password=${password}"
-params+="&cpu=${cpu}"
-params+="&ram=${ram}"
-params+="&billing=${billing}"
-params+="&managed=${managed}"
-params+="&backup=${backup}"
-params+="&power=${power}"
-params+="&traffic=${traffic}"
-params+="&disk_size_0=${disk_size_0}"
-params+="&disk_src_0=${disk_src_0}"
-params+="&network_name_0=${network_name_0}"
-params+="&network_name_1=${network_name_1}"
-params+="&network_ip_1=${network_ip_1}"
-
-curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server"
-
-
-##NODE 3
-# temporal hardcode
-node_num=3
-name="${CWM_NAME}_NODE_${node_num}"
-FIRST_THREE_OCTETS="${CWM_IP1%.*}"
-# Set the last octet to a new value
-NEW_LAST_OCTET="203"
-# Combine the first three octets and the new last octet to form the new IP address
-NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
-# Print the new IP address
-echo $NEW_IP_ADDRESS
-network_ip_1=$NEW_IP_ADDRESS
-node_3_ip=$network_ip_1
-
-params="datacenter=${datacenter}"
-params+="&name=${name}"
-params+="&password=${password}"
-params+="&cpu=${cpu}"
-params+="&ram=${ram}"
-params+="&billing=${billing}"
-params+="&managed=${managed}"
-params+="&backup=${backup}"
-params+="&power=${power}"
-params+="&traffic=${traffic}"
-params+="&disk_size_0=${disk_size_0}"
-params+="&disk_src_0=${disk_src_0}"
-params+="&network_name_0=${network_name_0}"
-params+="&network_name_1=${network_name_1}"
-params+="&network_ip_1=${network_ip_1}"
-
-curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server"
-####################################
+#echo "I want to send API request network_ip_1 is ${NEW_IP_ADDRESS}"
+done
+#########################################################
 
 
 echo "Get ansible Role" | log
