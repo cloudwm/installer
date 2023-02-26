@@ -13,7 +13,7 @@ rootDir=$(rootDir)
 clientId=${CWM_APICLIENTID}
 secret=${CWM_APISECRET}
 datacenter=${CWM_ZONE}
-last_oct=200   #this is the last octat base for calculation
+last_oct=$((RANDOM % 231 + 10))  # Random number between 10 - 240 to define as last octat for nodes
 
 for i in {1..3}
 do
