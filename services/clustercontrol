@@ -58,7 +58,8 @@ params+="&network_name_0=${network_name_0}"
 params+="&network_name_1=${network_name_1}"
 params+="&network_ip_1=${NEW_IP_ADDRESS}"
 
-curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server"
+echo "requesting node with IP: ${NEW_IP_ADDRESS} from CWM" | log
+curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server" | log
 #echo "I want to send API request network_ip_1 is ${NEW_IP_ADDRESS}"
 done
 #########################################################
