@@ -32,16 +32,25 @@ disk_size_0="10"
 disk_src_0="${CWM_ZONE}:6000C29f313b496da71f669782d04b75"
 network_name_0="wan"
 network_name_1=$CWM_VLAN1
+
 # Extract the first three octets of the IP address
-FIRST_THREE_OCTETS="${CWM_IP1%.*}"
+echo "CWM_IP1: ${CWM_IP1} to base deployment upon" | log
+FIRST_THREE_OCTETS=$(echo $CWM_IP1 | cut -d '.' -f 1-3)
+echo "first free octats: ${FIRST_THREE_OCTETS}" | log
+
 # Set the last octet to a new value
 NEW_LAST_OCTET=$((last_oct+i))
+
 # Combine the first three octets and the new last octet to form the new IP address
 NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
-# Print the new IP address
-echo "New IP address for node: ${NEW_IP_ADDRESS}" | log
-eval node_${i}_ip=$NEW_IP_ADDRESS
+echo "New ip address: ${NEW_IP_ADDRESS}" | log
 
+# Print the new IP address
+echo "New IP address for node ${i} is: ${NEW_IP_ADDRESS}" | log
+#eval node_${i}_ip=$NEW_IP_ADDRESS
+#eval "echo \"node ${i} new ip address \${node_${i}_ip}\"" | log
+
+# Define the cwm api request
 params="datacenter=${datacenter}"
 params+="&name=${name}"
 params+="&password=${password}"
@@ -57,10 +66,24 @@ params+="&disk_src_0=${disk_src_0}"
 params+="&network_name_0=${network_name_0}"
 params+="&network_name_1=${network_name_1}"
 params+="&network_ip_1=${NEW_IP_ADDRESS}"
-
 echo "requesting node with IP: ${NEW_IP_ADDRESS} from CWM" | log
-curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server" | log
-#echo "I want to send API request network_ip_1 is ${NEW_IP_ADDRESS}"
+response=$(curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server")
+echo "response:${response}" | log
+# Remove spaces
+error_code=$(echo "$response" | grep -oP '(?<="code":)\d+')
+echo "error code: $error_code" | log
+if [[ ${error_code} -eq 102 ]]
+then
+# false - returns non-zero status
+false
+waitOrStop 0 "Failed Node ${i} deploy: generated name already taken"
+fi
+if [[ ${error_code} -eq 117 ]]
+then
+# false - returns non-zero status
+false
+waitOrStop 0 "Failed Node ${i} deploy: choosen vlan doesnt exist"
+fi
 done
 #########################################################
 
@@ -165,17 +188,26 @@ ip1=$node_1_ip
 ip2=$node_2_ip
 ip3=$node_3_ip
 # Loop until all IPs have SSH service
-echo "testing ssh for ${ip1}, ${ip2}, ${ip3}"
-while true; do
+echo "testing ssh for ${ip1}, ${ip2}, ${ip3}, timeout is set for 20*5 seconds" | log
+ip_while_counter=0
+while true && ((ip_while_counter<20)); do
     if nc -zv "$ip1" 22 >/dev/null && nc -zv "$ip2" 22 >/dev/null && nc -zv "$ip3" 22 >/dev/null; then
         break
     else
         echo "not all servers are listening on 22 yet" | log
-        sleep 1
+        sleep 5
+        ip_while_counter=$((ip_while_counter+1))
+        echo "counter is ${ip_while_counter}"
     fi
 done
 echo "All IPs have SSH service." | log
 
+echo "Testing for time out of node deployment" | log
+if [[ ip_while_counter -eq 20 ]]
+then
+false
+waitOrStop 0 "Failed: time out while waiting node deployment"
+fi
 
 
 echo "adding public key to nodes" | log
