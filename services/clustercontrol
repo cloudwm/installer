@@ -47,7 +47,7 @@ echo "New ip address: ${NEW_IP_ADDRESS}" | log
 
 # Print the new IP address
 echo "New IP address for node ${i} is: ${NEW_IP_ADDRESS}" | log
-#eval node_${i}_ip=$NEW_IP_ADDRESS
+eval node_${i}_ip=$NEW_IP_ADDRESS
 #eval "echo \"node ${i} new ip address \${node_${i}_ip}\"" | log
 
 # Define the cwm api request
