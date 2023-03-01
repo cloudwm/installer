@@ -30,7 +30,8 @@ origin_last_oct=$(echo "$CWM_IP1" | awk -F '.' '{print $4}')
 if ((origin_last_oct < 10)); then
   last_oct=$((RANDOM % 230 + 11))
 else
-  last_oct=$((RANDOM % (origin_last_oct - 3) + 1))
+  #last_oct=$((RANDOM % (origin_last_oct - 3) + 1))
+  last_oct=3
 fi
 
 
@@ -368,9 +369,11 @@ if [ "$termination_flag" -eq 1 ]; then
   # Terminate created nodes:
   for i in {1..3}
   do
-      # j is used for the nodes_name_indexing
+      # j is used for the nodes_names array access
       j=$((i-1))
+      echo "j is: ${j}" | log
       eval "node_name=\${${nodes_names[$j]}}"
+      
       echo "currently trying to terminate node: ${node_name}" | log
       echo "Fetching server create options"
 
