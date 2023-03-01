@@ -131,7 +131,7 @@ eval "echo \"node ${i} new name \${node_${i}_name}\"" | log
 nodes_names+=( "$temp_node_name" )
 done
 #########################################################
-
+if [ "$termination_flag" -eq 0 ]; then
 
 echo "Get ansible Role" | log
 ansible-galaxy install severalnines.clustercontrol | log
@@ -359,6 +359,8 @@ descriptionAppend "clustercontrol webpage config: /var/www/clustercontrol/bootst
 descriptionAppend "rpc-key: ${random_rpc}"
 descriptionAppend "cmon user(dba) auth: /root/.s9s"
 descriptionAppend " "
+
+fi
 
 if [ "$termination_flag" -eq 1 ]; then
   # Terminate created nodes:
