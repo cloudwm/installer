@@ -365,11 +365,11 @@ descriptionAppend " "
 fi
 
 if [ "$termination_flag" -eq 1 ]; then
-  apt install jq
+  installPackage jq
   
   for i in "${my_array[@]}"
   do
-    echo "element in array is: $i"
+    echo "element in array is: $i" | log
   done
 
   # Terminate created nodes:
