@@ -91,7 +91,7 @@ echo "response:${response}" | log
 # Remove spaces
 error_code=$(echo "$response" | grep -oP '(?<="code":)\d+')
 echo "error code: $error_code" | log
-if [ -z "$error_code" ]; then
+if [ ! -z "$error_code" ]; then
   echo "terminatin_flag switched to 1: error_code of node exists" | log
   termination_flag=1
 else
