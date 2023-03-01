@@ -94,9 +94,8 @@ error_code=$(echo "$response" | grep -oP '(?<="code":)\d+')
 echo "error code: $error_code" | log
 if [ ! -z "$error_code" ]; then
   echo "terminatin_flag switched to 1: error_code of node exists" | log
-  termination_flag=1
-else
   echo "error_code for node ${i} creation was ${error_code}" | log
+  termination_flag=1
 fi
 
 #if [[ ${error_code} -eq 102 ]]
