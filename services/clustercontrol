@@ -366,7 +366,7 @@ fi
 if [ "$termination_flag" -eq 1 ]; then
   installPackage jq
   
-  for i in "${my_array[@]}"
+  for i in "${nodes_names[@]}"
   do
     echo "element in array is: $i" | log
   done
