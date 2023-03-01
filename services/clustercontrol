@@ -1,5 +1,12 @@
 #!/bin/bash
 
+: '
+NOTE:
+This image is special since it creates multiple nodes using CWM api.
+In case of an error, these nodes must be terminated, thus using waitOrStop function is problematic.
+Instead a flag will be used, termination will be desided upon the flag.
+'
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -7,13 +14,25 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
+termination_flag=0
+nodes_names=()
 
 ####### Deploying CWM Nodes #######
 ## NODE 1
 clientId=${CWM_APICLIENTID}
 secret=${CWM_APISECRET}
 datacenter=${CWM_ZONE}
-last_oct=$((RANDOM % 231 + 10))  # Random number between 10 - 240 to define as last octat for nodes
+#last_oct=$((RANDOM % 231 + 10))  # Random number between 10 - 240 to define as last octat for nodes
+# Define last octet for first new Node (the rest will be calculated by additional 1 each)
+# Extract the last octet from the input variable
+origin_last_oct=$(echo "$CWM_IP1" | awk -F '.' '{print $4}')
+# Calculate the new value for the last octet
+if ((origin_last_oct < 10)); then
+  last_oct=$((RANDOM % 230 + 11))
+else
+  last_oct=$((RANDOM % (origin_last_oct - 3) + 1))
+fi
+
 
 for i in {1..3}
 do
@@ -72,31 +91,69 @@ echo "response:${response}" | log
 # Remove spaces
 error_code=$(echo "$response" | grep -oP '(?<="code":)\d+')
 echo "error code: $error_code" | log
-if [[ ${error_code} -eq 102 ]]
-then
-# false - returns non-zero status
-false
-waitOrStop 0 "Failed Node ${i} deploy: generated name already taken"
+if [ -z "$error_code" ]; then
+  termination_flag=1
+else
+  echo "error_code for node ${i} creation was ${error_code}" | log
 fi
-if [[ ${error_code} -eq 117 ]]
-then
+
+#if [[ ${error_code} -eq 102 ]]
+#then
 # false - returns non-zero status
-false
-waitOrStop 0 "Failed Node ${i} deploy: choosen vlan doesnt exist"
-fi
+#false
+#waitOrStop 0 "Failed Node ${i} deploy: generated name already taken"
+#fi
+#if [[ ${error_code} -eq 117 ]]
+#then
+# false - returns non-zero status
+#false
+#waitOrStop 0 "Failed Node ${i} deploy: choosen vlan doesnt exist"
+#fi
+
+# If api request was successful grab the command ID:
+# Sleep to wait for command appear in CWM
+sleep 10
+command_id="${response//[!0-9]/}"
+response_command=$(curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" "https://null.cloudwm.com/service/queue/${command_id}")
+echo ${response_command} | log
+# Extract name of Node that was created in case termination will be required duting the script
+# Extract the value of the "description" field using grep and cut
+response_description=$(echo "$response_command" | grep -oP '(?<="description": ")[^"]*')
+echo "Description from api respond to command info: ${response_description}" | log
+
+# Extract the substring before " - Create Server" using bash string manipulation
+eval node_${i}_name=${response_description%% - Create Server}
+temp_node_name=${response_description%% - Create Server}
+echo "Node ${i} name: ${temp_node_name}" | log
+echo "Test node_i_name var" | log
+eval "echo \"node ${i} new name \${node_${i}_name}\"" | log
+
+nodes_names+=( "$temp_node_name" )
 done
 #########################################################
 
 
 echo "Get ansible Role" | log
 ansible-galaxy install severalnines.clustercontrol | log
-waitOrStop 0 "Failed Get ansible Role"
+#waitOrStop 0 "Failed Get ansible Role"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed: Get ansible Role" | log
+fi
 
 echo "install MariaDB" | log
 installPackage mariadb-server | log
-waitOrStop 0 "Failed install MariaDB - server"
+#waitOrStop 0 "Failed install MariaDB - server"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed install MariaDB - server" | log
+fi
 installPackage mariadb-client | log
-waitOrStop 0 "Failed install MariaDB - client"
+#waitOrStop 0 "Failed install MariaDB - client"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed install MariaDB - client" | log
+fi
 
 apt update
 
@@ -119,7 +176,11 @@ ansible-playbook cc.playbook | log
 #### SSL ####
 echo "Installing certbot for apache" | log
 installPackage python3-certbot-apache
-waitOrStop 0 "Failed apt install: python-certbot-apache"
+#waitOrStop 0 "Failed apt install: python-certbot-apache"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed apt install: python-certbot-apache" | log
+fi
 
 
 ## applying ssl for cc web app ##
@@ -134,7 +195,12 @@ echo "Generating self-signed certificate" | log
 mkdir /etc/letsencrypt/live
 mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
+#waitOrStop 0 "Certificate creation failed"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Certificate creation failed" | log
+fi
+
 
 # Sending log to log server - 45-93-93-142.cloud-xip.com
 curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
@@ -146,7 +212,11 @@ fi
 
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 systemctl start apache2.service
-waitOrStop 0 "Failed to start Apache service"
+#waitOrStop 0 "Failed to start Apache service"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed to start Apache service" | log
+fi
 tag global-domain-set.success
 
 
@@ -155,9 +225,17 @@ echo "Reconfigure SSL in Vhost" | log
 sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 
-waitOrStop 0 "Failed Reconfigure SSL in Vhost"
+#waitOrStop 0 "Failed Reconfigure SSL in Vhost"
+if [ $? -ne 0 ]; then
+  termination_flag=1  
+  echo "Failed Reconfigure SSL in Vhost" | log
+fi
 systemctl restart apache2.service
-waitOrStop 0 "Failed restart apache2.service"
+#waitOrStop 0 "Failed restart apache2.service"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed restart apache2.service" | log
+fi
 
 #### SSL END ####
 
@@ -206,7 +284,11 @@ echo "Testing for time out of node deployment" | log
 if [[ ip_while_counter -eq 100 ]]
 then
 false
-waitOrStop 0 "Failed: time out while waiting node deployment"
+#waitOrStop 0 "Failed: time out while waiting node deployment"
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed: time out while waiting node deployment" | log
+fi
 fi
 
 
@@ -237,7 +319,10 @@ s9s user --create \
   --generate-key \
   --controller="https://localhost:9501" \
   --group=admins dba
-
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed: s9s user create" | log
+fi
 
 echo "Deploying: Run Galera (percona) with 3 servers" | log
 s9s cluster --create \
@@ -250,12 +335,19 @@ s9s cluster --create \
         --os-key-file=/root/.ssh/id_rsa \
         --cluster-name='Percona XtraDB Cluster 5.7' \
         --wait
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed: s9s deploy galera" | log
+fi
 
 s9s cluster --add-node \
         --cluster-id=1 \
         --nodes="haproxy://${CWM_SERVERIP}" \
         --wait
-
+if [ $? -ne 0 ]; then
+  termination_flag=1
+  echo "Failed: s9s deploy haproxy" | log
+fi
 
 echo "Adding descriptions" | log
 descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
@@ -268,6 +360,51 @@ descriptionAppend "rpc-key: ${random_rpc}"
 descriptionAppend "cmon user(dba) auth: /root/.s9s"
 descriptionAppend " "
 
+if [ "$termination_flag" -eq 1 ]; then
+  # Terminate created nodes:
+  for i in {1..3}
+  do
+      # j is used for the nodes_name_indexing
+      j=$((i-1))
+      eval "node_name=\${${nodes_names[$j]}}"
+      echo "currently trying to terminate node: ${node_name}" | log
+      echo "Fetching server create options"
+
+    curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" "https://null.cloudwm.com/service/servers" > listServers.json
+
+    #LIST=`cat listServers.json | jq -r '.[] | select(.name|test("$node_name")) | .id'`
+    LIST=$(cat listServers.json | jq -r ".[] | select(.name|test(\"$node_name\")) | .id")
+
+    #echo $LIST
+
+    echo "Found these images:"
+    imageArray=()
+    for imageId in $LIST; do
+        imageDescription=`cat listServers.json | jq -r '.[] | select(.id|test("'$imageId'")) | .name'`
+    #    echo "Image ID: $imageId: $imageDescription"
+        imageArray+=("Image ID: $imageId : $imageDescription")
+    done
+
+    #printf "%s\n" "${imageArray[@]}" | sort -t : -k 3
+
+    #read -p "Click to continue terminating images ..."
+    #read -p "Are you sure? Click again ..."
+
+    for serverId in $LIST; do
+    echo "Terminating server $serverId" | log
+
+    confirm="1"
+    force="1"
+
+    echo "simulating terminatin node: ${node_name}" | log
+    #curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X DELETE -d "confirm=${confirm}" -d "force=${force}" "https://console.kamatera.com/service/server/${serverId}/terminate"
+    done
+  done
+
+  # exiting
+  false
+  waitOrStop 0 "Somthing went wrong in Cluster Deploy Script, check the logs"
+fi
 
 
 tag ssl-ready.success
