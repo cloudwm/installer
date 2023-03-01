@@ -92,6 +92,7 @@ echo "response:${response}" | log
 error_code=$(echo "$response" | grep -oP '(?<="code":)\d+')
 echo "error code: $error_code" | log
 if [ -z "$error_code" ]; then
+  echo "terminatin_flag switched to 1: error_code of node exists" | log
   termination_flag=1
 else
   echo "error_code for node ${i} creation was ${error_code}" | log
@@ -138,7 +139,7 @@ ansible-galaxy install severalnines.clustercontrol | log
 #waitOrStop 0 "Failed Get ansible Role"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed: Get ansible Role" | log
+  echo "Failed: termination_flag=1 Get ansible Role" | log
 fi
 
 echo "install MariaDB" | log
@@ -146,13 +147,13 @@ installPackage mariadb-server | log
 #waitOrStop 0 "Failed install MariaDB - server"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed install MariaDB - server" | log
+  echo "Failed install MariaDB - server termination_flag=1" | log
 fi
 installPackage mariadb-client | log
 #waitOrStop 0 "Failed install MariaDB - client"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed install MariaDB - client" | log
+  echo "Failed install MariaDB - client termination_flag=1" | log
 fi
 
 apt update
@@ -179,7 +180,7 @@ installPackage python3-certbot-apache
 #waitOrStop 0 "Failed apt install: python-certbot-apache"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed apt install: python-certbot-apache" | log
+  echo "Failed apt install: python-certbot-apache termination_flag=1" | log
 fi
 
 
@@ -198,7 +199,7 @@ openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_D
 #waitOrStop 0 "Certificate creation failed"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Certificate creation failed" | log
+  echo "Certificate creation failed termination_flag=1" | log
 fi
 
 
@@ -215,7 +216,7 @@ systemctl start apache2.service
 #waitOrStop 0 "Failed to start Apache service"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed to start Apache service" | log
+  echo "Failed to start Apache service termination_flag=1" | log
 fi
 tag global-domain-set.success
 
@@ -228,13 +229,13 @@ sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/
 #waitOrStop 0 "Failed Reconfigure SSL in Vhost"
 if [ $? -ne 0 ]; then
   termination_flag=1  
-  echo "Failed Reconfigure SSL in Vhost" | log
+  echo "Failed Reconfigure SSL in Vhost termination_flag=1" | log
 fi
 systemctl restart apache2.service
 #waitOrStop 0 "Failed restart apache2.service"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed restart apache2.service" | log
+  echo "Failed restart apache2.service termination_flag=1" | log
 fi
 
 #### SSL END ####
@@ -287,7 +288,7 @@ false
 #waitOrStop 0 "Failed: time out while waiting node deployment"
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed: time out while waiting node deployment" | log
+  echo "Failed: time out while waiting node deployment termination_flag=1" | log
 fi
 fi
 
@@ -337,7 +338,7 @@ s9s cluster --create \
         --wait
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed: s9s deploy galera" | log
+  echo "Failed: s9s deploy galera termination_flag=1" | log
 fi
 
 s9s cluster --add-node \
@@ -346,7 +347,7 @@ s9s cluster --add-node \
         --wait
 if [ $? -ne 0 ]; then
   termination_flag=1
-  echo "Failed: s9s deploy haproxy" | log
+  echo "Failed: s9s deploy haproxy termination_flag=1" | log
 fi
 
 echo "Adding descriptions" | log
@@ -363,6 +364,7 @@ descriptionAppend " "
 fi
 
 if [ "$termination_flag" -eq 1 ]; then
+  apt install jq
   # Terminate created nodes:
   for i in {1..3}
   do
