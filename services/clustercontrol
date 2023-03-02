@@ -379,7 +379,25 @@ if [ "$termination_flag" -eq 1 ]; then
     #eval "node_name=\${${nodes_names[$j]}}"
     node_name="${nodes_names[j]}"
     echo "By j indexing, node name now is: ${node_name}" | log 
+
     if [ ! -z "$node_name" ]; then
+      # SLEEP UNTIL ALL NODES ARE CREATED (TO BE TERMINATED)
+      echo "Termination: Sleeping until node ${i} responding" | log
+      current_ip_var="node_${i}_ip"
+      current_ip="${!current_ip_var}"
+      ip_while_counter=0
+      while true && ((ip_while_counter<100)); do
+          if nc -zv "$current_ip" 22 >/dev/null; then
+              break
+          else
+              echo "Termination sleep: ${current_ip} is not listening on 22 yet" | log
+              sleep 5
+              ip_while_counter=$((ip_while_counter+1))
+              echo "counter is ${ip_while_counter}"
+          fi
+      done
+      echo "Termination: All IPs have SSH service." | log
+
       echo "currently trying to terminate node: ${node_name}" | log
       echo "Fetching server create options with api call to CWM" | log
       curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" "https://null.cloudwm.com/service/servers" > listServers.json
