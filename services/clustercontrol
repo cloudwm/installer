@@ -376,7 +376,8 @@ if [ "$termination_flag" -eq 1 ]; then
     # j is used for the nodes_names array access
     j=$((i-1))
     echo "j is: ${j}" | log
-    eval "node_name=\${${nodes_names[$j]}}"
+    #eval "node_name=\${${nodes_names[$j]}}"
+    node_name="${nodes_names[j]}"
     echo "By j indexing, node name now is: ${node_name}" | log 
     if [ ! -z "$node_name" ]; then
       echo "currently trying to terminate node: ${node_name}" | log
