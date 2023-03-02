@@ -384,7 +384,7 @@ if [ "$termination_flag" -eq 1 ]; then
       echo "Fetching server create options with api call to CWM" | log
       curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" "https://null.cloudwm.com/service/servers" > listServers.json
       LIST=$(cat listServers.json | jq -r ".[] | select(.name|test(\"$node_name\")) | .id")
-
+      echo "Before for loog of termination Server IDs: ${LIST[@]}" | log
       ## Building list of termination ##
       #echo "Found these images:" | log
       #imageArray=()
