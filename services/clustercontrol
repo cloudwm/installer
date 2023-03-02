@@ -350,14 +350,17 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Adding descriptions" | log
+descriptionAppend "Three Nodes should have been created, please make sure you see the nodes in your panel "
 descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
+descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
 descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
-descriptionAppend "Galera user password: ${ADMINPASSWORD}"
-descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
+descriptionAppend "Galera Cluster users info can be accessed from CC web page after registration"
 descriptionAppend "clustercontrol webpage config: /var/www/clustercontrol/bootstrap.php"
 descriptionAppend "rpc-key: ${random_rpc}"
 descriptionAppend "cmon user(dba) auth: /root/.s9s"
+descriptionAppend "Connection String: ${CWM_SERVERIP}:3307 - HAproxy will loadbalance 3306 requests through this port"
+descriptionAppend "You should create new mysql user from CC webpage to authenticate at  ${CWM_SERVERIP}:3307"
 descriptionAppend " "
 
 fi
