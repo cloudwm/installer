@@ -399,8 +399,9 @@ if [ "$termination_flag" -eq 1 ]; then
       echo "Terminating server name:${node_name}, id:${serverId}" | log
       confirm="1"
       force="1"
-      echo "simulating terminatin node: ${node_name}" | log
-      #curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X DELETE -d "confirm=${confirm}" -d "force=${force}" "https://console.kamatera.com/service/server/${serverId}/terminate"
+      echo "terminatin node: ${node_name}" | log
+      response_termination=$(curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X DELETE -d "confirm=${confirm}" -d "force=${force}" "https://console.kamatera.com/service/server/${serverId}/terminate")
+      echo "CWM TERMINATION for ${node_name} response is: ${response_termination}" | log
       done
     fi
   done
