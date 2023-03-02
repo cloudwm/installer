@@ -34,7 +34,7 @@ else
   last_oct=3
 fi
 
-
+echo "IP of ClusterControl: ${CWM_IP1}" | log
 for i in {1..3}
 do
 node_num=${i}
@@ -54,16 +54,15 @@ network_name_0="wan"
 network_name_1=$CWM_VLAN1
 
 # Extract the first three octets of the IP address
-echo "CWM_IP1: ${CWM_IP1} to base deployment upon" | log
 FIRST_THREE_OCTETS=$(echo $CWM_IP1 | cut -d '.' -f 1-3)
-echo "first free octats: ${FIRST_THREE_OCTETS}" | log
+#echo "first free octats: ${FIRST_THREE_OCTETS}" | log
 
 # Set the last octet to a new value
 NEW_LAST_OCTET=$((last_oct+i))
 
 # Combine the first three octets and the new last octet to form the new IP address
 NEW_IP_ADDRESS="$FIRST_THREE_OCTETS.$NEW_LAST_OCTET"
-echo "New ip address: ${NEW_IP_ADDRESS}" | log
+#echo "New ip address: ${NEW_IP_ADDRESS}" | log
 
 # Print the new IP address
 echo "New IP address for node ${i} is: ${NEW_IP_ADDRESS}" | log
@@ -86,12 +85,12 @@ params+="&disk_src_0=${disk_src_0}"
 params+="&network_name_0=${network_name_0}"
 params+="&network_name_1=${network_name_1}"
 params+="&network_ip_1=${NEW_IP_ADDRESS}"
-echo "requesting node with IP: ${NEW_IP_ADDRESS} from CWM" | log
+echo "CWM API: Create new node with IP: ${NEW_IP_ADDRESS} from CWM" | log
 response=$(curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" -X POST -d "${params}" "https://null.cloudwm.com/service/server")
-echo "response:${response}" | log
+echo "CWM API RESPONSE:${response}" | log
 # Remove spaces
 error_code=$(echo "$response" | grep -oP '(?<="code":)\d+')
-echo "error code: $error_code" | log
+echo "API CREATE - error code: $error_code" | log
 if [ ! -z "$error_code" ]; then
   echo "terminatin_flag switched to 1: error_code of node exists" | log
   echo "error_code for node ${i} creation was ${error_code}" | log
@@ -114,9 +113,10 @@ fi
 # If api request was successful grab the command ID:
 # Sleep to wait for command appear in CWM
 sleep 10
+echo "Using CWM API to track ID of creation command for node ${i}"
 command_id="${response//[!0-9]/}"
 response_command=$(curl -H "AuthClientId: ${clientId}" -H "AuthSecret: ${secret}" "https://null.cloudwm.com/service/queue/${command_id}")
-echo ${response_command} | log
+echo "CWM API COMMAND INFO RESPONSE:${response_command}" | log
 # Extract name of Node that was created in case termination will be required duting the script
 # Extract the value of the "description" field using grep and cut
 response_description=$(echo "$response_command" | grep -oP '(?<="description": ")[^"]*')
@@ -125,10 +125,9 @@ echo "Description from api respond to command info: ${response_description}" | l
 # Extract the substring before " - Create Server" using bash string manipulation
 eval node_${i}_name=${response_description%% - Create Server}
 temp_node_name=${response_description%% - Create Server}
+echo "Extracting Node ${i} name for termination, if required" | log
 echo "Node ${i} name: ${temp_node_name}" | log
-echo "Test node_i_name var" | log
-eval "echo \"node ${i} new name \${node_${i}_name}\"" | log
-
+#eval "echo \"node ${i} new name \${node_${i}_name}\"" | log
 nodes_names+=( "$temp_node_name" )
 done
 #########################################################
@@ -378,7 +377,7 @@ if [ "$termination_flag" -eq 1 ]; then
     j=$((i-1))
     echo "j is: ${j}" | log
     eval "node_name=\${${nodes_names[$j]}}"
-      
+    echo "By j indexing, node name now is: ${node_name}" | log 
     if [ ! -z "$node_name" ]; then
       echo "currently trying to terminate node: ${node_name}" | log
       echo "Fetching server create options with api call to CWM" | log
