@@ -79,10 +79,6 @@ for run in "${execute[@]}"; do
 		echo "Error. ${run} not found. dying. (127)" | log 1
 		exit 1
 		;;
-	128)
-		echo "Could not resolve host: github.com. This might be due wrong Network Configuration with no internet access or an internal error. Please try again or contact support." | log 1
-		exit 1
-		;;
 	*)
 		echo "Exit Code not configured. Dying. ($scriptExitCode)" | log 1
 		exit 1
