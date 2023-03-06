@@ -2,6 +2,7 @@
 
 : '
 NOTE:
+Do not change script name, there is an issue with dashes.
 This image is special since it creates multiple nodes using CWM api.
 In case of an error, these nodes must be terminated, thus using waitOrStop function is problematic.
 Instead a flag will be used, termination will be desided upon the flag.
@@ -434,6 +435,8 @@ fi
 
 echo "install clustercontrol2 package" | log
 installPackage clustercontrol2 | log
+systemctl restart cmon.service
+systemctl restart apache2.service
 
 tag ssl-ready.success
 tagScript success
