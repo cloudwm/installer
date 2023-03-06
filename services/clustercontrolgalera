@@ -432,6 +432,8 @@ if [ "$termination_flag" -eq 1 ]; then
   waitOrStop 0 "Somthing went wrong in Cluster Deploy Script, check the logs"
 fi
 
+echo "install clustercontrol2 package" | log
+installPackage clustercontrol2 | log
 
 tag ssl-ready.success
 tagScript success
