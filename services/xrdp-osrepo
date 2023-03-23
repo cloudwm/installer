@@ -31,7 +31,7 @@ rm -rf /etc/pam.d/gdm-password
 cp $rootDir/tweaks/extras/xubuntu-desktop/gdm-password /etc/pam.d/
 
 echo "Restart xRDP service" | log
-sudo sed -i 's/Exec=exo-open --launch TerminalEmulator/Exec=\/bin\/xfce4-terminal/g' /root/.config/xfce4/panel/launcher-17/*.desktop
+sudo update-alternatives --set x-terminal-emulator /usr/bin/xfce4-terminal.wrapper
 systemctl restart xrdp
 waitOrStop 0 "Restart xrdp service failed"
 
