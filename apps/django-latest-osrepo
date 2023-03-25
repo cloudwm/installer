@@ -6,9 +6,15 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+
+
 checkTagExist php.success
 checkTagExist nginx.success
-checkTagExist mysqld.success
+
+## Oren Testing ##
+#checkTagExist mysqld.success
+###################
+
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html/django
