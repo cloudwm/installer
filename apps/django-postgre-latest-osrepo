@@ -42,6 +42,7 @@ source django_env/bin/activate
 #pip install django
 #Alex test start
 python3 -m pip install -U Django
+systemctl restart django.service
 #Alex test end
 waitOrStop 0 "Failed to install django from pip"
 
