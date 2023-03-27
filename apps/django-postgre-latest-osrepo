@@ -39,7 +39,10 @@ cd $appPath
 echo "Creating Python3 enviroment and installing Django from pip" | log
 python3 -m venv django_env
 source django_env/bin/activate
-pip install django
+#pip install django
+#Alex test start
+python -m pip install -U Django
+#Alex test end
 waitOrStop 0 "Failed to install django from pip"
 
 echo "Creating Django project" | log
