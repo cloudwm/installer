@@ -39,7 +39,25 @@ cd $appPath
 echo "Creating Python3 enviroment and installing Django from pip" | log
 python3 -m venv django_env
 source django_env/bin/activate
-pip install django
+
+# Check if Django is installed
+if python -c "import django" &> /dev/null; then
+    # Get installed version of Django
+    django_version=$(python -c "import django; print(django.get_version())")
+
+    # Check if version starts with "2"
+    if [[ $django_version == 2.* ]]; then
+        echo "Upgrading Django from version $django_version to the latest version." | log
+        python3 -m pip install --upgrade django
+    else
+        echo "Django version $django_version is already up-to-date." | log
+    fi
+else
+    # Install Django
+    echo "Django is not installed. Installing the latest version." | log
+    python3 -m pip install django
+fi
+
 waitOrStop 0 "Failed to install django from pip"
 
 echo "Creating Django project" | log
