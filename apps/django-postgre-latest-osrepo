@@ -55,7 +55,7 @@ if python -c "import django" &> /dev/null; then
 else
     # Install Django
     echo "Django is not installed. Installing the latest version." | log
-    python3 -m pip install django
+    python3 -m pip install django --upgrade
 fi
 
 waitOrStop 0 "Failed to install django from pip"
