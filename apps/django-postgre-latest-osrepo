@@ -75,10 +75,8 @@ systemctl enable django.service
 systemctl start django.service
 waitOrStop 0 "Failed to start Django service"
 
-#Alex test start
 python3 -m pip install -U Django | log
 systemctl restart django.service | log
-#Alex test end
 
 echo "Adding descriptions" | log
 descriptionAppend "Django Debug mode is on."
