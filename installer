@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+
 installerDir=$(dirname "$(readlink -f $0)")
 
 if [ ! -z "$2" ]; then
