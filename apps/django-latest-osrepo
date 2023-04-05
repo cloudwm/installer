@@ -8,7 +8,6 @@ fi
 
 checkTagExist php.success
 checkTagExist nginx.success
-checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html/django
@@ -43,6 +42,7 @@ echo "Creating Python3 enviroment and installing Django from pip" | log
 python3 -m venv django_env
 source django_env/bin/activate
 pip install django
+deactivate
 waitOrStop 0 "Failed to install django from pip"
 
 echo "Creating Django project" | log
