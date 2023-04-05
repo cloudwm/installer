@@ -8,7 +8,6 @@ fi
 
 checkTagExist php.success
 checkTagExist nginx.success
-checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html/django
