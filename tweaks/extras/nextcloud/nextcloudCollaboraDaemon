@@ -1,0 +1,3 @@
+sudo apt-get install loolwsd | log
+echo 'apt-get install loolwsd error code is + $?'
+sudo systemctl restart loolwsd
