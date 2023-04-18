@@ -29,6 +29,7 @@ mkdir -p $appPath
 cd $rootDir/temp
 curlDownload https://download.nextcloud.com/server/releases/$appVersion.tar.bz2
 waitOrStop 0 "File not downloaded from official source"
+installPackage bzip2
 tar -xjvf $appVersion.tar.bz2 -C $appPath/ --strip 1
 waitOrStop 0 "Failed to extract application archive"
 rm -f $appVersion.tar.bz2 

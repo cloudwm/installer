@@ -1,0 +1,3 @@
+# this snippet changes php memory limit to allow installation of Collabora Online - Built-in CODE Server
+sudo -u www-data php -d memory_limit=512M /var/www/html/occ app:install richdocumentscode
+
