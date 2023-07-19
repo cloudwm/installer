@@ -19,7 +19,7 @@ rootDir=$(rootDir)
 
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
-curlDownload https://download.moodle.org/download.php/$appBranch/moodle-$appVersion.tgz
+curlDownload https://download.moodle.org/download.php/direct/$appBranch/moodle-$appVersion.tgz
 waitOrStop 0 "File not downloaded from official source"
 tar -xzvf moodle-$appVersion.tgz
 waitOrStop 0 "Failed to extract application archive"
