@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist php.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+appPath=/var/www/html
+appVersion=4.2.1
+appBranch=stable402
+rootDir=$(rootDir)
+
+echo "Downloading and extracting application" | log
+cd $rootDir/temp
+curlDownload https://download.moodle.org/download.php/direct/$appBranch/moodle-$appVersion.tgz
+waitOrStop 0 "File not downloaded from official source"
+tar -xzvf moodle-$appVersion.tgz
+waitOrStop 0 "Failed to extract application archive"
+mkdir -p $appPath
+mv moodle $appPath
+rm -f moodle-$appVersion.tgz
+chown -R www-data:www-data $appPath/moodle/
+chmod -R 755 $appPath/moodle/
+
+echo "Setting database and db user " | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE moodle CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'moodleuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on moodle.* to moodleuser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Tweaking PHP settings" | log
+ini=$(find /etc -type f -name "php.ini" | grep fpm)
+sed -i '/file_uploads/s/Off/On/g' $ini
+sed -i '/allow_url_fopen/s/Off/On/g' $ini
+sed -i '/max_execution_time/s/[0-9]\+/360/g' $ini
+sed -i '/cgi.fix_pathinfo/s/^;//g' $ini
+sed -i '/cgi.fix_pathinfo/s/[0-9]\+/0/g' $ini
+# sed -i '/date.timezone/s/^;//g' $ini
+# sed -i '/date.timezone/s/_OLD_/_NEW_/g' $ini
+sed -i 's/;max_input_vars = 1000/max_input_vars = 5000/' /etc/php/8.0/fpm/php.ini
+
+
+echo "Move phpmyadmin into app if available" | log
+if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
+    mv $appPath/phpmyadmin $appPath/moodle
+fi
+
+echo "Creating nginx configurations" | log
+cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
+ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Adding descriptions" | log
+
+descriptionAppend "Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Moodle Username: admin"
+descriptionAppend "Moodle Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Moodle Database Username: moodleuser"
+descriptionAppend "Moodle Database Password: ${ADMINPASSWORD}"
+descriptionAppend "(On initial setup, enter database user and password in the matching fields. Other fields should remain as is.)"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
