@@ -14,7 +14,7 @@ checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
 appVersion=4.2.1
-appBranch=stable401
+appBranch=stable402
 rootDir=$(rootDir)
 
 echo "Downloading and extracting application" | log
