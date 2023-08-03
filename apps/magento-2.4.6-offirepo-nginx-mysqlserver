@@ -1,0 +1,134 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist nginx.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+appPath=/var/www/html
+appVersion=2.4.6
+rootDir=$(rootDir)
+
+echo "Creating Magento Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE magentodb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'magentouser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on magentodb.* to magentouser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Installing Composer for machine" | log
+installPackage composer | log
+waitOrStop 0 "Failed apt install: composer"
+
+echo "Downloading Magento ${appVersion} from github repo" | log
+mkdir -p $appPath
+cd $rootDir/temp
+# curl -o 2.3.0.tar.gz https://codeload.github.com/magento/magento2/tar.gz/2.3.0
+curlDownload https://codeload.github.com/magento/magento2/tar.gz/$appVersion $appVersion.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+mv $appVersion.tar.gz $appPath
+
+echo "Extracting Magento to ${appPath}" | log
+tar -xzvf $appPath/$appVersion.tar.gz -C $appPath/ --strip 1
+waitOrStop 0 "Failed to extract application archive"
+rm -f $appPath/$appVersion.tar.gz
+
+echo "Setting permissions for Magento" | log
+cd $appPath
+find var generated vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
+find var generated vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
+chown -R www-data:www-data .
+chmod u+x bin/magento
+
+echo "Installing Composer dependencies for Magento" | log
+cd $appPath
+export COMPOSER_HOME=/root
+curlDownload https://getcomposer.org/installer composer-setup.php
+waitOrStop 0 "File not downloaded from official source"
+curlDownload https://composer.github.io/installer.sig installer.sig 
+waitOrStop 0 "File not downloaded from official source"
+php -r "if (hash_file('SHA384', 'composer-setup.php') === '$(cat installer.sig)') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+php composer-setup.php --version=1.10.1
+sleep 2
+php composer.phar install -v | log
+waitOrStop 0 "Failed to install composer dependencies"
+
+echo "Installing Java" | log
+installPackage openjdk-11-jdk
+installPackage apt-transport-https
+
+echo "Installing ElasticSearch" | log
+curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch
+waitOrStop 0 "Key not downloaded from official source"
+apt-key add GPG-KEY-elasticsearch
+echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-7.x.list
+apt update | log
+installPackage elasticsearch
+systemctl enable elasticsearch.service
+systemctl stop elasticsearch.service
+
+echo "Installing Magento" | log
+systemctl start elasticsearch.service
+sleep 5
+$appPath/bin/magento setup:install --base-url-secure=https://${CWM_DISPLAYED_ADDRESS}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD}  --language=en_US  --currency=USD --timezone=$(cat /etc/timezone) --use-rewrites=1 --use-secure=1 --use-secure-admin=1 --search-engine=elasticsearch7 --elasticsearch-host=localhost --elasticsearch-port=9200 | log
+
+ADMIN_URI=`grep "Admin URI:" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | head -1`
+# ADMIN_URI=`php /var/www/html/bin/magento info:adminuri | rev | cut -d ' ' -f 1 | rev`
+
+
+echo "Verifying permissions for Magento" | log
+cd $appPath 
+find var generated vendor pub/static pub/media app/etc -type f -exec chmod g+w {} \;
+find var generated vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} \;
+chown -R www-data:www-data .
+chmod u+x bin/magento
+
+echo "Disabling sign static files and forcing cache refresh" | log
+cd $appPath
+php bin/magento cache:disable config | log
+bin/magento config:set dev/static/sign 0
+curl https://${CWM_DISPLAYED_ADDRESS} --insecure -o /dev/null
+waitOrStop 0 "Website failed to respond"
+bin/magento setup:static-content:deploy -f
+sleep 5
+bin/magento cache:clean
+waitOrStop 0 "Cleanup actions failed"
+
+echo "Setting nginx config" | log
+# main magento config
+cp $rootDir/tweaks/extras/magento-nginx/magento.conf /etc/nginx/sites-available/
+# specific configs supplied by magento install, included by main magento config
+mkdir -p /etc/nginx/config
+cp $appPath/nginx.conf.sample /etc/nginx/config/magento.sample.conf
+# tweak locations in magento config to allow for user themes and folders
+tweakFilePath=$rootDir/tweaks/extras/magento-nginx/magento-locations.conf
+perl -i -p0e 's/location \/ .*?args;\n}/`cat $ARGV[0]`/se' -- /etc/nginx/config/magento.sample.conf "$tweakFilePath"
+# Symlink magento vhost
+ln -s /etc/nginx/sites-available/magento.conf /etc/nginx/sites-enabled/
+# Remove default vhosts
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Adding index.php to document root"
+cp $appPath/pub/index.php $appPath/
+cd $appPath && sed -i "s/\/..\/app/\/app/g" index.php
+
+echo "Adding descriptions" | log
+descriptionAppend "Magento Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}${ADMIN_URI}"
+descriptionAppend "Magento Email: ${ADMINEMAIL}"
+descriptionAppend "Magento Username: admin"
+descriptionAppend "Magento Password: ${ADMINPASSWORD}" 
+descriptionAppend " "
+
+tagScript success
+
+exit 0
