@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist firewalld.success
+
+firewall-cmd --add-service=http --permanent | log
+firewall-cmd --add-service=https --permanent | log
+firewall-cmd --reload | log
+firewall-cmd --list-all | log
+
+tagScript success

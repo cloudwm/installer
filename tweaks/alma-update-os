@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Updating and upgrading OS to latest kernel and packages" | log
+dnf update -y | log
+dnf clean all | log
+
+tagScript success
+
+exit 0
