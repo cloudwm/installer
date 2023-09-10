@@ -16,7 +16,7 @@ firewall-cmd --add-service=ssh --permanent | log
 firewall-cmd --reload | log
 firewall-cmd --list-all | log
 
-tag firewalld.success
+#tag firewalld.success
 tagScript success
 
 exit 0
