@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist firewalld.success
+#checkTagExist firewalld.success
 
 firewall-cmd --add-service=http --permanent | log
 firewall-cmd --add-service=https --permanent | log
