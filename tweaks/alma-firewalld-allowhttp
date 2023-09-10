@@ -13,4 +13,4 @@ firewall-cmd --add-service=https --permanent | log
 firewall-cmd --reload | log
 firewall-cmd --list-all | log
 
-tagScript success
+#tagScript success
