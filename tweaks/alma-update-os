@@ -11,6 +11,6 @@ echo "Updating and upgrading OS to latest kernel and packages" | log
 dnf update -y | log
 dnf clean all | log
 
-tagScript success
+#tagScript success
 
 exit 0
