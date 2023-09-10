@@ -17,6 +17,6 @@ firewall-cmd --reload | log
 firewall-cmd --list-all | log
 
 #tag firewalld.success
-tagScript success
+#tagScript success
 
 exit 0
