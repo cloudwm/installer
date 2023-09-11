@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+runOnceCheck
+
+echo "Stopping and disabling lvm2" | log
+
+systemctl stop lvm2-lvmetad.service | log
+systemctl stop lvm2-lvmpolld.socket | log
+
+systemctl disable lvm2-lvmetad | log
+systemctl disable lvm2-metad | log
+systemctl disable lvm2-lvmpolld | log
+
+dnf remove lvm2 -y
+
+tagScript success
