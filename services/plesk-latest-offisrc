@@ -9,7 +9,8 @@ fi
 rootDir=$(rootDir)
 
 echo "Preparing FQDN for installation process" | log
-#sed -i "2i${CWM_SERVERIP} ${CWM_DOMAIN}" /etc/hosts
+nmcli connection modify eth0 ipv4.dns "8.8.8.8 8.8.4.4"
+sed -i "2i${CWM_SERVERIP} ${CWM_DOMAIN}" /etc/hosts
 echo ${CWM_SERVERIP} ${CWM_DOMAIN} >> /etc/hosts
 hostnamectl set-hostname ${CWM_DOMAIN}
 
