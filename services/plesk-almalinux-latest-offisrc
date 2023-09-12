@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "${CWM_SERVERIP} ${CWM_DOMAIN}" | sudo tee -a /etc/hosts
+
+firewall-cmd --add-port=8443/tcp --permanent
+firewall-cmd --add-port=8880/tcp --permanent
+firewall-cmd --reload
+
+echo "Running Plesk Official Installer" | log
+wget http://installer.plesk.com/plesk-installer -O - | sh /dev/stdin --source http://installer.plesk.com/ --target /tmp/plesk-installation --select-product-id plesk --select-release-latest --installation-type "Typical" --notify-email ${ADMINEMAIL}
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Adding descriptions" | log
+descriptionAppend "Enter Plesk UI to finalize installation: ${CWM_DOMAIN}:8443"
+descriptionAppend "Plesk Username: root"
+descriptionAppend "Plesk Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+
+tagScript success
+
+exit 0
