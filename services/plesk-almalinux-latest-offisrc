@@ -8,12 +8,8 @@ fi
 
 rootDir=$(rootDir)
 
-# TESTING ALEXEYM
-echo "Testing append to hosts"
-# END TESTING ALEXEYM
-echo "${CWM_DOMAIN} + ${CWM_SERVERIP}" > /test.alexeym.txt
-#echo "${CWM_SERVERIP} ${CWM_DOMAIN}" | sudo tee -a /etc/hosts
-echo "${CWM_SERVERIP} ${CWM_DOMAIN}" >> /etc/hosts
+sed -i "2i${CWM_SERVERIP} ${CWM_DOMAIN}" /etc/hosts
+hostnamectl set-hostname ${CWM_DOMAIN}
 
 firewall-cmd --add-port=8443/tcp --permanent
 firewall-cmd --add-port=8880/tcp --permanent
