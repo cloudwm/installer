@@ -9,11 +9,10 @@ fi
 rootDir=$(rootDir)
 
 echo "Preparing FQDN for installation process" | log
-nmcli connection modify eth0 ipv4.dns "8.8.8.8 8.8.4.4"
-sudo systemctl restart NetworkManager
 sed -i "2i${CWM_SERVERIP} ${CWM_DOMAIN}" /etc/hosts
 echo ${CWM_SERVERIP} ${CWM_DOMAIN} >> /etc/hosts
 hostnamectl set-hostname ${CWM_DOMAIN}
+echo -e "nameserver 8.8.8.8\nnameserver 8.8.4.4" | sudo tee /etc/resolv.conf
 
 
 ufw allow 8443
