@@ -12,19 +12,10 @@ if [ -f "$CWM_DESCFILE" ]; then
 
     echo "Adding $CWM_DESCFILE to $descriptionMotd file" | log
 
-    echo "#!/bin/sh" >> $descriptionMotd
-    echo "echo \"=== System Description =======================================================\"" >> $descriptionMotd
-    echo "echo \" \""  >> $descriptionMotd
-    echo "cat $CWM_DESCFILE" >> $descriptionMotd
-    echo "echo \" \""  >> $descriptionMotd
-    echo "echo \"==============================================================================\""  >> $descriptionMotd
-    echo "echo \" \""  >> $descriptionMotd
     if [ -f "$CWM_CONFIGFILE" ]; then
         domainname=`cat $CWM_CONFIGFILE | grep url= | awk -F . '{print $2"."$3}'`
-        echo "echo \"If you found any issue with this installation or have an idea how to improve this, please email us to: devteam@$domainname, thanks!\"" >> $descriptionMotd
+   echo "If you found any issue with this installation or have an idea how to improve this, please email us to: devteam@$domainname, thanks!" >> $descriptionMotd
     fi
-    echo "echo \" \""  >> $descriptionMotd
-    echo "echo \"To delete this message of the day: rm $descriptionMotd  \""  >> $descriptionMotd
 
     chmod +x $descriptionMotd
 
