@@ -11,6 +11,20 @@ rootDir=$(rootDir)
 sed -i "2i${CWM_SERVERIP} ${CWM_DOMAIN}" /etc/hosts
 hostnamectl set-hostname ${CWM_DOMAIN}
 
+echo "Checking resolve.conf contents"
+
+FILE="/etc/resolv.conf"
+NAMESERVER1="nameserver 8.8.8.8"
+NAMESERVER2="nameserver 8.8.4.4"
+
+if ! grep -q "$NAMESERVER1" $FILE; then
+  echo "$NAMESERVER1" | sudo tee -a $FILE
+fi
+
+if ! grep -q "$NAMESERVER2" $FILE; then
+  echo "$NAMESERVER2" | sudo tee -a $FILE
+fi
+
 firewall-cmd --add-port=8443/tcp --permanent
 firewall-cmd --add-port=8880/tcp --permanent
 firewall-cmd --reload
