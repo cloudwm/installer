@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing firewalld" | log
+dnf install -y firewalld
+waitOrStop 0 "Failed dnf install: firewalld"
+
+systemctl start firewalld | log
+systemctl enable firewalld | log
+firewall-cmd --add-service=ssh --permanent | log
+firewall-cmd --reload | log
+firewall-cmd --list-all | log
+
+#tag firewalld.success
+#tagScript success
+
+exit 0

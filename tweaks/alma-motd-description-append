@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+descriptionMotd=/etc/motd
+
+if [ -f "$CWM_DESCFILE" ]; then
+
+    echo "Adding $CWM_DESCFILE to $descriptionMotd file" | log
+
+    if [ -f "$CWM_CONFIGFILE" ]; then
+        domainname=`cat $CWM_CONFIGFILE | grep url= | awk -F . '{print $2"."$3}'`
+   echo "If you found any issue with this installation or have an idea how to improve this, please email us to: devteam@$domainname, thanks!" >> $descriptionMotd
+    fi
+
+    chmod +x $descriptionMotd
+
+fi
+
+tagScript success
+
+exit 0
