@@ -1,0 +1,41 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Adding php8.3 repo" | log
+installPackage software-properties-common | log
+waitOrStop 0 "Failed apt install: software-properties-common"
+add-apt-repository -y ppa:ondrej/php | log
+apt update
+
+echo "Installing php8.3-fpm" | log
+installPackage php8.3-fpm
+waitOrStop 0 "Failed apt install: php8.4-fpm"
+
+echo "Installing php8.3 modules" | log
+packages=(php8.3-cli php8.3-bz2 php8.3-common php8.3-curl php8.3-gd php8.3-json php8.3-mbstring php8.3-mysql php8.3-readline php8.3-xml php8.3-zip php8.3-bcmath php8.3-intl php8.3-soap)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Configuring php-fpm to listen on correct socket" | log
+sed -i 's/listen = \/run\/php\/php8.3-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php/8.3/fpm/pool.d/www.conf
+
+echo "Restarting service to implement changes" | log
+service php8.3-fpm restart
+waitOrStop 0 "Restarting fpm service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "PHP config files location: /etc/php/"
+descriptionAppend "PHP-FPM config files location: /etc/php/8.3/fpm/"
+descriptionAppend " "
+
+tag php.success
+tag php-fpm.success
+
+tagScript success
+
+exit 0

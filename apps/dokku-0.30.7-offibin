@@ -1,0 +1,33 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Setting Hostname & adding it to hosts" | log
+hostnamectl set-hostname ${CWM_DOMAIN}
+echo "127.0.0.1 ${CWM_DOMAIN} localhost" >> /etc/hosts
+
+echo "Installing application" | log
+cd $rootDir/temp
+curlDownload https://raw.githubusercontent.com/dokku/dokku/v0.30.7/bootstrap.sh
+waitOrStop 0 "File not downloaded from github"
+DOKKU_TAG=v0.30.7 bash bootstrap.sh
+waitOrStop 0 "Failed to install application"
+
+echo "Setting dokku domain"
+dokku domains:set-global ${CWM_DOMAIN}
+
+echo "Adding descriptions" | log
+descriptionAppend "Please proceed to http://${CWM_DOMAIN}/ to finish the installation"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
+
