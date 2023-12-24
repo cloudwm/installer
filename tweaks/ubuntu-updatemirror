@@ -22,10 +22,18 @@ mirrorDomain="mirror.${CWM_ZONE,,}.kamatera.com"
 officialFullDomain="http:\/\/archive.ubuntu.com\/ubuntu"
 officialDomainZone="http:\/\/${CWM_ZONE,,}.archive.ubuntu.com\/ubuntu"
 
-backupFile /etc/apt/sources.list
-kamateraMirrors=$(sed -n 's/'"${officialDomain}"'/'"${mirrorDomain}"'/gp' /etc/apt/sources.list)
-ubuntuMirrors=$(sed 's/'"${officialFullDomain}"'/'"${officialDomainZone}"'/g' /etc/apt/sources.list)
-echo -e "#Kamatera Mirrors (1st priority)\n$kamateraMirrors\n\n$ubuntuMirrors" > /etc/apt/sources.list
+# Rename the existing sources.list to sources.list.old
+mv /etc/apt/sources.list /etc/apt/sources.list.old
+
+# Backup the original sources.list file
+backupFile /etc/apt/sources.list.old
+
+# Generate new sources.list content
+kamateraMirrors=$(sed -n 's/'"${officialDomain}"'/'"${mirrorDomain}"'/gp' /etc/apt/sources.list.old)
+ubuntuMirrors=$(sed 's/'"${officialFullDomain}"'/'"${officialDomainZone}"'/g' /etc/apt/sources.list.old)
+
+# Write the new mirrors to sources.list
+echo -e "#Kamatera Mirrors (1st priority)\n$kamateraMirrors\n\n#Ubuntu Mirrors\n$ubuntuMirrors" > /etc/apt/sources.list
 
 apt update
 
