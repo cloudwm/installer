@@ -19,7 +19,6 @@ if [ -f "$cronFilename" ]; then
 fi
 
 cat << EOF > ${cronFilename}
-
 #!/bin/bash
 
 availablespace="\$(df / | awk 'NR==2{print \$4}')"
