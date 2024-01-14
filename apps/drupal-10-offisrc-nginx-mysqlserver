@@ -1,0 +1,110 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist nginx.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+appPath=/var/www/html
+versionFilename=10.2.1
+rootDir=$(rootDir)
+drupaluser_password="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')"
+
+
+echo "Creating Drupal Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE drupal CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'drupaluser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on drupal.* to drupaluser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Installing Composer for machine" | log
+installPackage composer | log
+waitOrStop 0 "Failed apt install: composer"
+
+echo "Downloading latest Drupal" | log
+mkdir -p $appPath
+cd $rootDir/temp
+curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Extracting Drupal to $appPath" | log
+tar -xzvf drupal-$versionFilename.tar.gz -C $appPath/ --strip 1
+waitOrStop 0 "Failed to extract application archive"
+rm -f drupal-$versionFilename.tar.gz
+
+echo "Setting misc definitions & permissions for Drupal" | log
+cd $appPath/sites/default
+cp default.settings.php settings.php
+cp default.services.yml services.yml
+mkdir files/
+chmod a+w *
+chown -R www-data:www-data files
+
+echo "Create temp swap for composer processes" | log
+#increase vm swappiness to allow swap to dominate process
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+sleep 5
+
+echo "Installing Drush" | log
+cd $appPath
+export COMPOSER_HOME=/root
+composer require drush/drush:10.4.0 -v | log
+waitOrStop 0 "Failed to install Drush"
+
+echo "Creating Website" | log
+cd $appPath
+# site install
+export HOME=$appPath
+echo "yes" | vendor/bin/drush site-install --db-url=mysql://drupaluser:${ADMINPASSWORD}@localhost/drupal | log
+sleep 5
+# update admin password
+vendor/bin/drush user:password admin "$ADMINPASSWORD" | log
+# permissions and cleanup
+rm index.nginx-debian.html
+chown -R www-data:www-data .
+cat << EOF >> ${appPath}/sites/default/settings.php
+\$settings['trusted_host_patterns'] = ['^${CWM_DISPLAYED_ADDRESS}$'];
+EOF
+
+echo "Setting nginx config" | log
+#main drupal config
+cp $rootDir/tweaks/extras/drupal-nginx/drupal.conf /etc/nginx/sites-available/
+# specific configs supplied by nginx for drupal
+mkdir -p /etc/nginx/config
+cp $rootDir/tweaks/extras/drupal-nginx/drupal-locations.conf /etc/nginx/config/
+# Symlink drupal vhost
+ln -s /etc/nginx/sites-available/drupal.conf /etc/nginx/sites-enabled/
+# Remove default vhosts
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx.service
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Remove temp swap" | log
+# set vm swappiness to recommended optimal case
+sysctl vm.swappiness=10
+# mount off and remove swap file 
+removeSwapFile $swapFilename
+waitOrStop 0 "Failed to remove swap file"
+sleep 5
+
+echo "Adding descriptions" | log
+descriptionAppend "Drupal Web UI: https://${CWM_DISPLAYED_ADDRESS}/user/login"
+descriptionAppend "Drupal Username: admin"
+descriptionAppend "Drupal Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
