@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-packageVersion=2.235.\*
+packageVersion=2.361.\*
 assignedPort="9090"
 
 echo "Setting jenkins repository and key" | log

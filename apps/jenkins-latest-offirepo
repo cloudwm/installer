@@ -27,7 +27,7 @@ waitOrStop 0 "Failed apt install: openjdk-8-jre-headless"
 echo "Installing jenkins" | log
 sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 5BA31D57EF5975CA
 apt update
-installPackage jenkins=2.346.3 | log
+installPackage jenkins=2.426.2 | log
 waitOrStop 0 "Failed apt install: jenkins"
 
 echo "Tweaking server settings" | log
