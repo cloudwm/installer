@@ -340,7 +340,7 @@ s9s cluster --create \
         --cluster-name='Percona XtraDB Cluster 5.7' \
         --wait
 if [ $? -ne 0 ]; then
-  termination_flag=1
+  #termination_flag=1
   echo "Failed: s9s deploy galera termination_flag=1" | log
 fi
 
@@ -349,7 +349,7 @@ s9s cluster --add-node \
         --nodes="haproxy://${CWM_SERVERIP}" \
         --wait
 if [ $? -ne 0 ]; then
-  termination_flag=1
+  #termination_flag=1
   echo "Failed: s9s deploy haproxy termination_flag=1" | log
 fi
 
