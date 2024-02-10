@@ -249,7 +249,11 @@ echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
 sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
 echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
 
-
+## Fix /etc/cmon.cnf missing hostname
+sed -i "s/^hostname=$/hostname=${CWM_DOMAIN}/g" /etc/cmon.cnf
+echo "Used sed to fix hostname at cmon.cnf" | log
+systemctl restart cmon
+echo "restarted cmon after conf change exit code is ${?}" | log
 
 ###################################################
 ## Deploy Galera Cluster ##
