@@ -318,7 +318,7 @@ done
 #echo "yes" | /var/www/clustercontrol/app/tools/reset-ccrpc.sh
 #sleep 10
 
-: '
+
 
 ## Create cmon user named dba
 s9s user --create \
@@ -355,7 +355,7 @@ if [ $? -ne 0 ]; then
   #termination_flag=1
   echo "Failed: s9s deploy haproxy termination_flag=1" | log
 fi
-'
+
 
 echo "Adding descriptions" | log
 descriptionAppend "Three Nodes should have been created, please make sure you see the nodes in your panel "
