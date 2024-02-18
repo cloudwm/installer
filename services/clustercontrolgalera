@@ -49,7 +49,7 @@ power="1"
 traffic="3"
 disk_size_0="10"
 # note: parameters requires url encoding - ubuntu 20
-disk_src_0="${CWM_ZONE}:6000C29f313b496da71f669782d04b75"
+disk_src_0="${CWM_ZONE}:6000C293f92e9a0c758033a11976d225"
 network_name_0="wan"
 network_name_1=$CWM_VLAN1
 
