@@ -336,7 +336,7 @@ s9s cluster --create \
         --cluster-type=galera \
         --nodes="${node_1_ip};${node_2_ip};${node_3_ip}" \
         --vendor=percona \
-        --provider-version=5.7 \
+        --provider-version=8.0 \
         --db-admin-passwd='${ADMINPASSWORD}' \
         --os-user=root \
         --os-key-file=/root/.ssh/id_rsa \
