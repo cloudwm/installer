@@ -455,7 +455,7 @@ if [ "$termination_flag" -eq 1 ]; then
 
   # exiting
   false
-  waitOrStop 0 "Somthing went wrong in Cluster Deploy Script, check the logs"
+  waitOrStop 0 "Termination of node mechanism was trigered by termination_flag - somthing went wrong in Cluster Deploy Script, check the logs"
 fi
 
 
