@@ -16,7 +16,7 @@ installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed to install dependencies"
 
 echo "Create app user" | log
-useradd -m -d /opt/odoo14 -U -r -s /bin/bash odoo14
+useradd -m -d /opt/odoo17 -U -r -s /bin/bash odoo17
 
 echo "Installing postgresql" | log
 installPackage postgresql | log
@@ -26,43 +26,43 @@ echo "Downloading and installing wkhtmltox"
 curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
 waitOrStop 0 "File not downloaded from official source"
 
-su odoo14 << EOF
-git clone https://www.github.com/odoo/odoo --depth 1 --branch 14.0 /opt/odoo14/odoo
-cd /opt/odoo14
+su odoo17 << EOF
+git clone https://www.github.com/odoo/odoo --depth 1 --branch 17.0 /opt/odoo17/odoo
+cd /opt/odoo17
 python3 -m venv odoo-venv
 source odoo-venv/bin/activate
 pip3 install wheel
 pip3 install -r odoo/requirements.txt
 deactivate
-mkdir -p /opt/odoo14/odoo-custom-addons
+mkdir -p /opt/odoo17/odoo-custom-addons
 EOF
 
 echo "Creating Odoo service"
-cat << EOF > /etc/odoo14.conf
+cat << EOF > /etc/odoo17.conf
 [options]
 ; This is the password that allows database operations:
 admin_passwd = $ADMINPASSWORD
 db_host = False
 db_port = False
-db_user = odoo14
+db_user = odoo17
 db_password = False
-addons_path = /opt/odoo14/odoo/addons,/opt/odoo14/odoo-custom-addons
+addons_path = /opt/odoo17/odoo/addons,/opt/odoo17/odoo-custom-addons
 
 EOF
 
-cat << EOF > /etc/systemd/system/odoo14.service
+cat << EOF > /etc/systemd/system/odoo17.service
 [Unit]
-Description=Odoo14
+Description=Odoo17
 Requires=postgresql.service
 After=network.target postgresql.service
 
 [Service]
 Type=simple
-SyslogIdentifier=odoo14
+SyslogIdentifier=odoo17
 PermissionsStartOnly=true
-User=odoo14
-Group=odoo14
-ExecStart=/opt/odoo14/odoo-venv/bin/python3 /opt/odoo14/odoo/odoo-bin -c /etc/odoo14.conf
+User=odoo17
+Group=odoo17
+ExecStart=/opt/odoo17/odoo-venv/bin/python3 /opt/odoo17/odoo/odoo-bin -c /etc/odoo17.conf
 StandardOutput=journal+console
 
 [Install]
@@ -80,21 +80,21 @@ systemctl start postgresql
 sleep 5
 waitOrStop 0 "Failed to start postgresql"
 
-echo "Creating Odoo14 user in postgres" | log
+echo "Creating Odoo17 user in postgres" | log
 su - postgres <<EOF
-createuser -s odoo14
+createuser -s odoo17
 EOF
 
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
-systemctl enable odoo14
+systemctl enable odoo17
 sleep 1
-systemctl start odoo14
+systemctl start odoo17
 sleep 2
-waitOrStop 0 "Start Odoo14 service failed"
+waitOrStop 0 "Start Odoo17 service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Odoo configuration file: /etc/odoo14.conf"
+descriptionAppend "Odoo configuration file: /etc/odoo17.conf"
 descriptionAppend "Odoo web UI: http://${CWM_DISPLAYED_ADDRESS}:8069"
 descriptionAppend " "
 
