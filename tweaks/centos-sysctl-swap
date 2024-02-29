@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Load startup scripts if they exist
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# Check if total swap size is less than 500MB
+current_swap_total=$(free -m | awk '/Swap:/ {print $2}')
+if [[ $current_swap_total -ge 500 ]]; then
+    echo "Sufficient swap space already exists ($current_swap_total MB). No new swap will be created." | log
+    exit 0
+fi
+
+# Function to create swap
+create_swap() {
+    swapsize=$1
+    swapfile="/swapfile"
+
+    # Creating swap file
+    fallocate -l ${swapsize}M ${swapfile} | log
+    chmod 600 ${swapfile} | log
+    mkswap ${swapfile} | log
+    swapon ${swapfile} | log
+
+    # Making the swap file permanent
+    echo "${swapfile} none swap sw 0 0" >> /etc/fstab | log
+
+    # Logging swap details
+    echo "Swap file created of size ${swapsize}MB" | log
+    swapon --show | log
+}
+
+# Determine the distribution name
+distro_name=$(cat /etc/*release | grep ^NAME= | cut -d= -f2)
+
+# Allocate swap based on distribution
+case $distro_name in
+    *Rocky*)
+        create_swap 1024
+        ;;
+    *Alma*)
+        create_swap 1024
+        ;;
+    *CentOS*)
+        create_swap 512
+        ;;
+    *)
+        echo "Unsupported distribution: $distro_name" | log
+        ;;
+esac
+
+#tagScript success
+
+exit 0
