@@ -32,18 +32,25 @@ create_swap() {
     swapon --show | log
 }
 
-# Determine Ubuntu version
-ubuntu_version=$(lsb_release -rs)
+# Determine the distribution name
+distro_name=$(cat /etc/*release | grep ^NAME= | cut -d= -f2)
 
-# Allocate swap based on Ubuntu version
-if [[ "$ubuntu_version" == "18.04" || "$ubuntu_version" == "20.04" ]]; then
-    create_swap 512
-elif [[ "$ubuntu_version" == "22.04" ]]; then
-    create_swap 1024
-else
-    echo "Unsupported Ubuntu version: $ubuntu_version" | log
-fi
+# Allocate swap based on distribution
+case $distro_name in
+    *Rocky*)
+        create_swap 1024
+        ;;
+    *Alma*)
+        create_swap 1024
+        ;;
+    *CentOS*)
+        create_swap 512
+        ;;
+    *)
+        echo "Unsupported distribution: $distro_name" | log
+        ;;
+esac
 
-tagScript success
+#tagScript success
 
 exit 0
