@@ -7,9 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# Check if swap already exists
-if swapon --summary | grep -q "^"; then
-    echo "Swap already exists. No new swap will be created." | log
+# Check if total swap size is less than 500MB
+current_swap_total=$(free -m | awk '/Swap:/ {print $2}')
+if [[ $current_swap_total -ge 500 ]]; then
+    echo "Sufficient swap space already exists ($current_swap_total MB). No new swap will be created." | log
     exit 0
 fi
 
