@@ -13,7 +13,7 @@ installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 561F9B9CAC40B2F7
-add-apt-repository 'deb https://oss-binaries.phusionpassenger.com/apt/passenger bionic main'
+add-apt-repository -y "deb https://oss-binaries.phusionpassenger.com/apt/passenger $(lsb_release -cs) main"
 apt update
 
 installPackage libnginx-mod-http-passenger
