@@ -16,6 +16,10 @@ apt autoclean -qy | log
 apt upgrade -y | log
 apt autoremove -y | log
 
+# Clean up old journalctl logs
+echo "Cleaning up old journalctl logs" | log
+journalctl --flush --rotate --vacuum-time=1s | log
+
 tagScript success
 
 exit 0
