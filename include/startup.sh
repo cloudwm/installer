@@ -64,7 +64,7 @@ function checkRootUser() {
 }
 
 function checkOs() {
-    SupportedOS=(18 20 22)
+    SupportedOS=(18 20 22 24)
 
     echo "Checking if OS is supported ..."
     if [ -n "$(grep 'Ubuntu' /etc/issue)" -o "$(lsb_release -is 2>/dev/null)" == "Ubuntu" -o -n "$(grep 'Linux Mint' /etc/issue)" ]; then
