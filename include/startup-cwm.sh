@@ -285,10 +285,8 @@ if [ -f "$rootDir/temp/global-domain-set.success" ]; then
 fi
 
 # add support for testing system
-if [ ! -f "$rootDir/guest.testing_data" ]; then
-    touch $rootDir/guest.testing_data 
-fi
-echo "CWM_DOMAIN=${CWM_DOMAIN}" > $rootDir/guest.testing_data
+touch $rootDir/guest.testing_data
+echo "cwm_domain=${CWM_DOMAIN}" > $rootDir/guest.testing_data
 
 
 
