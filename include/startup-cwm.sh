@@ -287,6 +287,7 @@ fi
 # add support for testing system
 touch $rootDir/guest.testing_data
 echo "cwm_domain=${CWM_DOMAIN}" > $rootDir/guest.testing_data
+echo "[ORENB!!!!!!!!!!!]:wrote cwm_domain=${CWM_DOMAIN} to ${rootDir}/guest.testing_data" | log
 
 
 
