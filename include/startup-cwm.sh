@@ -268,6 +268,8 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
 
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
+   
+
     # prevent running over static conguration globals
     if [ ! -d "$rootDir/temp" ]; then
         mkdir $rootDir/temp
@@ -281,6 +283,14 @@ if [ -f "$rootDir/temp/global-domain-set.success" ]; then
     export CWM_DISPLAYED_ADDRESS=${CWM_DOMAIN}
 
 fi
+
+# add support for testing system
+if [ ! -f "$rootDir/guest.testing_data" ]; then
+    touch $rootDir/guest.testing_data 
+fi
+echo "CWM_DOMAIN=${CWM_DOMAIN}" > $rootDir/guest.testing_data
+
+
 
 # fail install if cwm api key or secret is missing
 if [ -z "$CWM_NO_API_KEY" ] && [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
