@@ -8,13 +8,16 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Updating and upgrading OS to latest kernel and packages" | log
-export DEBIAN_FRONTEND=noninteractive
-export DEBIAN_PRIORITY=critical
+# NOTE: since the kamatera mirror is faulty the update process is faulty from that stage on.
+# without these changes, certine packages related to nginx runtime will be unavailable.
+
+#export DEBIAN_FRONTEND=noninteractive
+#export DEBIAN_PRIORITY=critical
 apt update -qy | log
-apt upgrade -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" | log
-apt autoclean -qy | log
-apt upgrade -y | log
-apt autoremove -y | log
+#apt upgrade -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" | log
+#apt autoclean -qy | log
+#apt upgrade -y | log
+#apt autoremove -y | log
 
 # Clean up old journalctl logs
 echo "Cleaning up old journalctl logs" | log
