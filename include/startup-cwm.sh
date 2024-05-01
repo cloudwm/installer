@@ -274,6 +274,12 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     if [ ! -d "$rootDir/temp" ]; then
         mkdir $rootDir/temp
     fi    
+
+    # add support for testing system
+    touch $rootDir/guest.testing_data
+    echo "cwm_domain=${CWM_DOMAIN}" > $rootDir/guest.testing_data
+    echo "[ORENB!!!!!!!!!!!]:wrote cwm_domain=${CWM_DOMAIN} to ${rootDir}/guest.testing_data" | log
+
     tag globals-set.success
 
 fi
@@ -284,10 +290,7 @@ if [ -f "$rootDir/temp/global-domain-set.success" ]; then
 
 fi
 
-# add support for testing system
-touch $rootDir/guest.testing_data
-echo "cwm_domain=${CWM_DOMAIN}" > $rootDir/guest.testing_data
-echo "[ORENB!!!!!!!!!!!]:wrote cwm_domain=${CWM_DOMAIN} to ${rootDir}/guest.testing_data" | log
+
 
 
 
