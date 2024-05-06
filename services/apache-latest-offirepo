@@ -23,8 +23,6 @@ echo "Writing apache configuration file..."
 cat <<_EOF_ > /etc/apache2/sites-available/figletIDX.conf
 <VirtualHost *:80>
 	ServerName _
-
-	ServerAdmin webmaster@localhost
 	DocumentRoot /etc/apache2/sites-available/
 
 	ErrorLog ${APACHE_LOG_DIR}/error.log
@@ -48,9 +46,12 @@ cat <<_EOF_ > /etc/apache2/sites-available/figletIDX.conf
 _EOF_
 
 a2enmod ssl
-a2ensite figletIDX
 a2dissite 000-default
+a2dissite 000-default-ssl
+a2ensite figletIDX
+
 systemctl start apache2
+systemctl reload apache2
 
 tag apache.success
 tag httpd.success
