@@ -6,9 +6,13 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+echo "Installing Apache2..."
 installPackage apache2
+
+echo "Installing passenger module for apache2..."
 installPackage libapache2-mod-passenger
 
+echo "Writing apache configuration file..."
 cat <<_EOF_ > /etc/apache2/sites-available/redmine.conf
 <VirtualHost *:80>
     ServerName redmine.omc
