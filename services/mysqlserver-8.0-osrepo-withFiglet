@@ -8,13 +8,18 @@ fi
 
 checkTagExist ubuntu-updateos.success
 
+appPath="/etc/apache2/sites-available"
 figletApp=$(which figlet)
 
 echo "Updating 'Installing MySQL server 8.0...' notice to $appPath/index.html" | log
+echo "" > "$appPath/index.html"
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
 echo "Please Wait. Installing MySQL server 8.0..." >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
+
+echo "Reloading Apache2..."
+systemctl reload apache2
 
 echo "Create temp swap for composer processes" | log
 #increase vm swappiness to allow swap to dominate process

@@ -6,9 +6,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+appPath="/etc/apache2/sites-available"
 figletApp=$(which figlet)
 
 echo "Updating 'Installing Ruby...' notice to $appPath/index.html" | log
+echo "" > "$appPath/index.html"
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
 echo "Please Wait. Installing Ruby..." >> "$appPath/index.html"
