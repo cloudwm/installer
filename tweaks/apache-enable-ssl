@@ -12,11 +12,41 @@ echo "Installing openssl and generating certificate..."
 installPackage openssl
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt -subj "/C=US/ST=YourState/L=YourCity/O=YourOrganization/OU=IT/CN=example.com"
 
+echo "Creating SSL params" | log
+cat << EOF >> /etc/apache2/conf-available/ssl-params.conf
+SSLCipherSuite EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH
+SSLProtocol All -SSLv2 -SSLv3 -TLSv1 -TLSv1.1
+SSLHonorCipherOrder On
+Header always set X-Frame-Options DENY
+Header always set X-Content-Type-Options nosniff
+# Requires Apache >= 2.4
+SSLCompression off
+SSLUseStapling on
+SSLStaplingCache "shmcb:logs/stapling-cache(150000)"
+# Requires Apache >= 2.4.11
+SSLSessionTickets Off
+EOF
+
+echo "Tweaking SSL virtual host" | log
+defaultSSL=/etc/apache2/sites-available/default-ssl.conf
+sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
+sed -i '/SSLCertificateFile/s/ssl-cert-snakeoil.pem/server.crt/g' $defaultSSL
+sed -i '/SSLCertificateKeyFile/s/ssl-cert-snakeoil.key/server.key/g' $defaultSSL
+# add ServerName + fpm install placeholder
+sed -i '/<VirtualHost/{ :a N;/<\/VirtualHost>/!b a; /ServerName/!s!\([[:blank:]]*\)\(</VirtualHost>\)!\1\tServerName localhost\n\t\t#FPM_INSTALL_PLACEHOLDER\n\1\2!}' $defaultSSL
+
+echo "Enabling apache ssl modules" | log
+a2enmod ssl
+a2enmod headers
+a2enconf ssl-params
+a2ensite default-ssl
+
+echo "Restarting apache service" | log
+systemctl restart apache2.service
+waitOrStop 0 "Restart apache service failed"
+
 descriptionAppend "SSL certificates location: /etc/ssl/certs/"
 descriptionAppend " "
-
-echo "Enabling SSL..."
-a2enmod ssl
 
 tag ssl-ready.success
 tagScript success
