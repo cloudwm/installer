@@ -46,9 +46,13 @@ cat <<_EOF_ > /etc/apache2/sites-available/figletIDX.conf
 _EOF_
 
 a2enmod ssl
-a2dissite 000-default
 a2ensite figletIDX
+a2dissite 000-default
 systemctl start apache2
+systemctl enable Apache2
+
+echo "Reloading Apache2..."
+systemctl reload apache2
 
 tag apache.success
 tag httpd.success
