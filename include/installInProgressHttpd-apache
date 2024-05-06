@@ -38,8 +38,8 @@ fi
 echo "Adding 'Install in Progress' notice to $appPath/index.html" | log
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
-echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience. Refresh the page within a couple of minutes for an updated status." >> "$appPath/index.html"
-echo "<script>setTimeout(function() { window.location.reload(1); }, 5000);</script>" >> "$appPath/index.html"
+echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience." >> "$appPath/index.html"
+echo "<script>setTimeout(function() { window.location.reload(1); }, 15000);</script>" >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
 
 echo "Reloading Apache2..."
