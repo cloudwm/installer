@@ -10,11 +10,12 @@ fi
 echo "Installing Figlet..."
 apt update && apt install -y figlet
 
-appPath=/var/www/html
+appPath=/etc/apache2/sites-available
 if [ ! -d "$appPath" ]; then
 	echo "$appPath does not exists. Creating directory..."
 	mkdir -p $appPath
 fi
+touch $appPath/index.html
 
 figletApp=$(which figlet)
 
@@ -34,7 +35,6 @@ if [ -z "$figletApp" ]; then
     exit 1
 fi
 
-touch $appPath/index.html
 echo "Adding 'Install in Progress' notice to $appPath/index.html" | log
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
