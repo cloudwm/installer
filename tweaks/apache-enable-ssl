@@ -15,7 +15,12 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/apa
 descriptionAppend "SSL certificates location: /etc/ssl/certs/"
 descriptionAppend " "
 
+echo "Enabling SSL..."
+a2enmod ssl
+
 tag ssl-ready.success
 tagScript success
+
+systemctl status apache2
 
 exit 0
