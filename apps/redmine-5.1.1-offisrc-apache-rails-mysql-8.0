@@ -15,7 +15,7 @@ echo "Updating 'Installing Redmine...' notice to $appPath/index.html" | log
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
 echo "Install MySQL server 8.0...[DONE]" >> "$appPath/index.html"
-echo "Install Ruby 3.2.3...[DONE]" >> "$appPath/index.html"
+echo "Install Ruby 3.2.3.........[DONE]" >> "$appPath/index.html"
 echo "Please Wait. Installing Redmine 5.1.1..." >> "$appPath/index.html"
 echo "<script>setTimeout(function() { window.location.reload(1); }, 15000);</script>" >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
@@ -116,15 +116,5 @@ echo "Enabling redmine site & disabling defaults..."
 a2ensite redmine
 a2dissite figletIDX
 systemctl reload apache2
-
-# Add firewall rule
-echo "Setting up firewall rules..."
-ufw allow 22
-ufw allow 80
-ufw allow 443
-ufw allow 3306
-echo "y" | sudo ufw enable
-ufw reload
-ufw app list
 
 echo "Redmine installation is complete. Access it via http://your-server-ip or https://your-server-ip."
