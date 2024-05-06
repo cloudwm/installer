@@ -13,7 +13,7 @@ installPackage apache2
 echo "Installing passenger module for apache2..."
 installPackage libapache2-mod-passenger
 
-idxHTMLPath="/var/www/html"
+idxHTMLPath="/etc/apache2/sites-available"
 if [ ! -d "$idxHTMLPath" ]; then
 	mkdir -p $idxHTMLPath
 
@@ -50,6 +50,7 @@ _EOF_
 a2enmod ssl
 a2ensite figletIDX
 a2dissite 000-default
+systemctl start apache2
 
 tag apache.success
 tag httpd.success
