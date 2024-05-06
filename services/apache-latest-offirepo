@@ -20,18 +20,36 @@ if [ ! -d "$idxHTMLPath" ]; then
 fi
 
 echo "Writing apache configuration file..."
-cat <<_EOF_ > /etc/apache2/sites-available/redmine.conf
+cat <<_EOF_ > /etc/apache2/sites-available/figletIDX.conf
 <VirtualHost *:80>
-	#ServerName www.example.com
+	ServerName _
 
 	ServerAdmin webmaster@localhost
-	DocumentRoot /var/www/html
+	DocumentRoot /etc/apache2/sites-available/
 
 	ErrorLog ${APACHE_LOG_DIR}/error.log
 	CustomLog ${APACHE_LOG_DIR}/access.log combined
 
 </VirtualHost>
+<VirtualHost *:443>
+    ServerName _
+    DocumentRoot /etc/apache2/sites-available/
+
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/apache-selfsigned.crt
+    SSLCertificateKeyFile /etc/ssl/private/apache-selfsigned.key
+
+    <Directory /etc/apache2/sites-available/>
+        Allow from all
+        Options -MultiViews
+        Require all granted
+    </Directory>
+</VirtualHost>
 _EOF_
+
+a2enmod ssl
+a2ensite figletIDX
+a2dissite 000-default
 
 tag apache.success
 tag httpd.success
