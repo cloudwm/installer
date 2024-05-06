@@ -1,0 +1,85 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+
+fi
+
+# Variables
+DB_ROOT_PASS="Pass1234!"
+DB_REDMINE_PASS="redmine"
+REPO_URL="https://www.redmine.org/releases/redmine-5.1.1.tar.gz"
+REPO_DIR="/opt/redmine"
+
+# Update system and install required packages
+apt-get update && apt-get upgrade -y
+apt-get install -y libmysqlclient-dev apt-transport-https
+
+# Secure MySQL and set up Redmine database
+mysql --user=root <<_EOF_
+DELETE FROM mysql.user WHERE User='';
+CREATE DATABASE redmine CHARACTER SET utf8mb4;
+CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${DB_REDMINE_PASS}';
+GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';
+FLUSH PRIVILEGES;
+_EOF_
+
+# Install Redmine
+mkdir -p ${REPO_DIR}
+curl -s ${REPO_URL} | sudo tar xz -C ${REPO_DIR} --strip-components=1
+cd ${REPO_DIR}
+
+# Configure database connection
+cat <<_EOF_ > ${REPO_DIR}/config/database.yml
+production:
+  adapter: mysql2
+  database: redmine
+  host: localhost
+  username: redmine
+  password: "${DB_REDMINE_PASS}"
+  encoding: utf8mb4
+_EOF_
+
+# Install gems
+gem install bundler
+cd ${REPO_DIR}
+bundle config set --local without 'development test'
+bundle install
+
+# Prepare the database
+bundle exec rake generate_secret_token
+RAILS_ENV=production bundle exec rake db:migrate
+RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
+
+# Configuring permissions
+echo "Configuring permissions..."
+chown -R www-data:www-data /opt/redmine/
+
+# Install ImageMagic for Redmine
+echo "Installing ImageMagic & ghostscript..."
+apt update
+apt install -y imagemagick libmagickwand-dev
+convert -version
+apt install -y ghostscript
+
+# Enable Redmine site, disable default site
+echo "Enabling redmine site & disabling defaults..."
+a2enmod ssl
+a2ensite redmine
+a2dissite 000-default
+systemctl reload apache2
+
+# Add firewall rule
+echo "Setting up firewall rules..."
+ufw allow 22
+ufw allow 80
+ufw allow 443
+ufw allow 3306
+echo "y" | sudo ufw enable
+ufw reload
+ufw app list
+
+echo "Redmine installation is complete. Access it via http://your-server-ip or https://your-server-ip."
