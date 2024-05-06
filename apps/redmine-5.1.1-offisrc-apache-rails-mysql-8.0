@@ -97,9 +97,9 @@ _EOF_
 
 # Enable Redmine site, disable default site
 echo "Enabling redmine site & disabling defaults..."
-a2enmod ssl
+#a2enmod ssl
 a2ensite redmine
-a2dissite 000-default
+a2dissite figletIDX
 systemctl reload apache2
 
 # Add firewall rule
