@@ -21,6 +21,4 @@ a2enmod ssl
 tag ssl-ready.success
 tagScript success
 
-systemctl status apache2
-
 exit 0
