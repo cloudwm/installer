@@ -18,6 +18,9 @@ descriptionAppend " "
 echo "Enabling SSL..."
 a2enmod ssl
 
+echo "Reloading Apache2..."
+systemctl reload apache2
+
 tag ssl-ready.success
 tagScript success
 
