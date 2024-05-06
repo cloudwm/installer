@@ -49,9 +49,7 @@ a2enmod ssl
 a2dissite 000-default
 a2dissite 000-default-ssl
 a2ensite figletIDX
-
 systemctl start apache2
-systemctl reload apache2
 
 tag apache.success
 tag httpd.success
