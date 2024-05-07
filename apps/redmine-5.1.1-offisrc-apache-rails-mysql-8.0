@@ -95,8 +95,7 @@ if admin_user.nil?
 else
   admin_user.password = ENV['NEW_ADMIN_PASSWORD']
   admin_user.password_confirmation = ENV['NEW_ADMIN_PASSWORD']
-  admin_user.must_change_password = false
-  admin_user.password_changed_at = Time.current
+  admin_user.must_change_passwd = false
 
   if admin_user.save
     puts "Password updated successfully."
