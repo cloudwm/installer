@@ -29,6 +29,7 @@ systemctl reload apache2
 DB_REDMINE_PASS="redmine"
 REPO_URL="https://www.redmine.org/releases/redmine-5.1.1.tar.gz"
 REPO_DIR="/opt/redmine"
+WEB_DIR="/etc/apache2/sites-available"
 
 # Update system and install required packages
 apt-get update && apt-get upgrade -y
@@ -117,9 +118,9 @@ echo "Removing $changePassScript..."
 rm -f $changePassScript
 
 echo "Writing apache configuration file..."
-cat <<_EOF_ > /etc/apache2/sites-available/redmine.conf
+cat <<_EOF_ > $WEB_DIR/redmine.conf
 <VirtualHost *:80>
-    ServerName redmine.omc
+    ServerName _
     DocumentRoot ${REPO_DIR}/public
     <Directory ${REPO_DIR}/public>
         Allow from all
@@ -130,7 +131,7 @@ cat <<_EOF_ > /etc/apache2/sites-available/redmine.conf
 
 <IfModule mod_ssl.c>
 <VirtualHost *:443>
-    ServerName redmine.omc
+    ServerName _
     DocumentRoot ${REPO_DIR}/public
 
     SSLEngine on
