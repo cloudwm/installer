@@ -104,9 +104,9 @@ apt install -y imagemagick libmagickwand-dev
 convert -version
 apt install -y ghostscript
 
-changePassScript="${REPO_DIR}/change_admin_password.sh"
+changePassScript="${REPO_DIR}/change_admin_password.rb"
 touch $changePassScript
-cat <<_EOF_ > $changePassScript
+cat <<'_EOF_' > $changePassScript
 # Find the admin user
 admin_user = User.where(admin: true).first
 
@@ -120,18 +120,18 @@ else
 
   # Save changes and check for success
   if admin_user.save
-	puts "Password updated successfully."
+    puts "Password updated successfully."
   else
-	puts "Failed to update password: #{admin_user.errors.full_messages.join(", ")}"
-	exit 1
+    puts "Failed to update password: #{admin_user.errors.full_messages.join(", ")}"
+    exit 1
   end
 end
 _EOF_
-chmod +x $changePassScript
 
 # Replace default admin password
 echo "Replacing default admin password..."
 RAILS_ENV=production NEW_ADMIN_PASSWORD='12341234' rails runner $changePassScript
+
 
 echo "Writing apache configuration file..."
 cat <<_EOF_ > /etc/apache2/sites-available/redmine.conf
