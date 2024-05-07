@@ -22,7 +22,7 @@ echo "Reloading Apache2..."
 systemctl reload apache2
 
 echo "Create temp swap for composer processes" | log
-#increase vm swappiness to allow swap to dominate process
+# Increase vm swappiness to allow swap to dominate process
 sudo fallocate -l 2G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
@@ -42,7 +42,7 @@ if [ ! -f ~/.my.cnf ]; then
 cat << EOF > ~/.my.cnf
 [client]
 user=root
-password='${ADMINPASSWORD}'
+password="${ADMINPASSWORD}"
 EOF
 
 fi
