@@ -81,6 +81,7 @@ convert -version
 apt install -y ghostscript
 
 changePassScript="$REPO_DIR/change_admin_password.rb"
+echo "Writing password change script to $changePassScript..."
 touch $changePassScript
 cat <<_EOF_ > $changePassScript
 #!/usr/bin/env ruby
@@ -110,6 +111,10 @@ _EOF_
 # Replace default admin password
 echo "Replacing default admin password..."
 RAILS_ENV=production NEW_ADMIN_PASSWORD='12341234' rails runner $changePassScript
+#RAILS_ENV=production NEW_ADMIN_PASSWORD='${ADMINPASSWORD}' rails runner $changePassScript
+
+echo "Removing $changePassScript..."
+rm -f $changePassScript
 
 echo "Writing apache configuration file..."
 cat <<_EOF_ > /etc/apache2/sites-available/redmine.conf
