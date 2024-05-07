@@ -50,8 +50,8 @@ a2ensite figletIDX
 a2dissite 000-default
 systemctl start apache2
 
-tag apache.success
 tag httpd.success
+tag apache.success
 tagScript success
 
 exit 0
