@@ -20,10 +20,10 @@ if [ ! -d "$idxHTMLPath" ]; then
 fi
 
 echo "Writing apache configuration file..."
-cat <<_EOF_ > /etc/apache2/sites-available/figletIDX.conf
+cat <<_EOF_ > $idxHTMLPath/figletIDX.conf
 <VirtualHost *:80>
 	ServerName _
-	DocumentRoot /etc/apache2/sites-available/
+	DocumentRoot $idxHTMLPath
 
 	ErrorLog ${APACHE_LOG_DIR}/error.log
 	CustomLog ${APACHE_LOG_DIR}/access.log combined
@@ -31,13 +31,13 @@ cat <<_EOF_ > /etc/apache2/sites-available/figletIDX.conf
 </VirtualHost>
 <VirtualHost *:443>
     ServerName _
-    DocumentRoot /etc/apache2/sites-available/
+    DocumentRoot $idxHTMLPath
 
     SSLEngine on
     SSLCertificateFile /etc/ssl/certs/apache-selfsigned.crt
     SSLCertificateKeyFile /etc/ssl/private/apache-selfsigned.key
 
-    <Directory /etc/apache2/sites-available/>
+    <Directory $idxHTMLPath/>
         Allow from all
         Options -MultiViews
         Require all granted
