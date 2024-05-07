@@ -43,8 +43,5 @@ echo "Installing dependencies..." >> "$appPath/index.html"
 echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
 
-#echo "Reloading Apache2..."
-#systemctl reload apache2
-
 tagScript success
 exit 0
