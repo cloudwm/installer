@@ -105,6 +105,7 @@ convert -version
 apt install -y ghostscript
 
 changePassScript="${REPO_DIR}/change_admin_password.sh"
+touch $changePassScript
 cat <<_EOF_ > $changePassScript
 # Find the admin user
 admin_user = User.where(admin: true).first
