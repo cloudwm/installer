@@ -17,7 +17,7 @@ $figletApp "Install in Progress" >> "$appPath/index.html"
 echo "Install MySQL server 8.0...[DONE]" >> "$appPath/index.html"
 echo "Install Ruby 3.2.3.........[DONE]" >> "$appPath/index.html"
 echo "Please Wait. Installing Redmine 5.1.1..." >> "$appPath/index.html"
-echo "<script>setTimeout(function() { window.location.reload(1); }, 15000);</script>" >> "$appPath/index.html"
+echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
 
 echo "Reloading Apache2..."
