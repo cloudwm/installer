@@ -15,14 +15,10 @@ echo "Updating 'Installing Redmine...' notice to $appPath/index.html" | log
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
 echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience." >> "$appPath/index.html"
-echo "Installing initial dependencies............[DONE]" >> "$appPath/index.html"
+echo "Installing dependencies....................[DONE]" >> "$appPath/index.html"
 echo "Install MySQL server 8.0...................[DONE]" >> "$appPath/index.html"
 echo "Install Ruby 3.2.3.........................[DONE]" >> "$appPath/index.html"
 echo "Please Wait. Installing Redmine 5.1.1..." >> "$appPath/index.html"
-echo "=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=" >> "$appPath/index.html"
-echo "Username: admin" >> "$appPath/index.html"
-echo "Default password (You will be required to change that on first login): admin" >> "$appPath/index.html"
-echo "=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=" >> "$appPath/index.html"
 echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
 
@@ -30,7 +26,6 @@ echo "Reloading Apache2..."
 systemctl reload apache2
 
 # Variables
-DB_ROOT_PASS="${ADMINPASSWORD}"
 DB_REDMINE_PASS="redmine"
 REPO_URL="https://www.redmine.org/releases/redmine-5.1.1.tar.gz"
 REPO_DIR="/opt/redmine"
@@ -114,6 +109,16 @@ cat <<_EOF_ > /etc/apache2/sites-available/redmine.conf
 </VirtualHost>
 </IfModule>
 _EOF_
+
+
+# Replace default admin password
+echo "Replacing default admin password..."
+cd ${REPO_DIR}
+RAILS_ENV=production bundle exec rails c
+admin_user = User.where(admin: true).first
+admin_user.password = '${ADMINPASSWORD}'
+admin_user.password_confirmation = '${ADMINPASSWORD}'
+admin_user.save!
 
 # Enable Redmine site, disable default site
 echo "Enabling redmine site & disabling defaults..."
