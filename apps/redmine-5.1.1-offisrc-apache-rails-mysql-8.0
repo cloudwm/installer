@@ -24,7 +24,7 @@ echo "Reloading Apache2..."
 systemctl reload apache2
 
 # Variables
-DB_ROOT_PASS="Pass1234!"
+DB_ROOT_PASS="${ADMINPASSWORD}"
 DB_REDMINE_PASS="redmine"
 REPO_URL="https://www.redmine.org/releases/redmine-5.1.1.tar.gz"
 REPO_DIR="/opt/redmine"
@@ -60,7 +60,6 @@ _EOF_
 
 # Install gems
 gem install bundler
-cd ${REPO_DIR}
 bundle config set --local without 'development test'
 bundle install
 
@@ -112,9 +111,8 @@ _EOF_
 
 # Enable Redmine site, disable default site
 echo "Enabling redmine site & disabling defaults..."
-#a2enmod ssl
 a2ensite redmine
 a2dissite figletIDX
 systemctl reload apache2
 
-echo "Redmine installation is complete. Access it via http://your-server-ip or https://your-server-ip."
+echo "Redmine installation is complete."
