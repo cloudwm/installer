@@ -35,6 +35,9 @@ timezones[US-CH]="America/Chicago"
 timezones[EU-ML]="Europe/Rome"
 timezones[EU-MD]="Europe/Madrid"
 timezones[EU-ST]="Europe/Stockholm"
+timezones[US-AT]="America/Atlanta"
+timezones[US-LA]="America/Los_Angeles"
+timezones[US-SE]="America/Seattle"
 
 if [ ! ${timezones[$CWM_ZONE]} ]; then
 
