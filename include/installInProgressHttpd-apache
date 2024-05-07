@@ -39,11 +39,7 @@ echo "Adding 'Install in Progress' notice to $appPath/index.html" | log
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
 echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience." >> "$appPath/index.html"
-echo "Installing initial dependencies..." >> "$appPath/index.html"
-echo "=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=" >> "$appPath/index.html"
-echo "Username: admin" >> "$appPath/index.html"
-echo "Default password (You will be required to change that on first login): admin" >> "$appPath/index.html"
-echo "=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=" >> "$appPath/index.html"
+echo "Installing dependencies..." >> "$appPath/index.html"
 echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
 
