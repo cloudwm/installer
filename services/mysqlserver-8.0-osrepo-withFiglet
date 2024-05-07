@@ -15,7 +15,7 @@ echo "Updating 'Installing MySQL server 8.0...' notice to $appPath/index.html" |
 echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
 $figletApp "Install in Progress" >> "$appPath/index.html"
 echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience." >> "$appPath/index.html"
-echo "Installing dependencies....................[DONE]" >> "$appPath/index.html"
+echo "Install dependencies.......................[DONE]" >> "$appPath/index.html"
 echo "Please Wait. Installing MySQL server 8.0..." >> "$appPath/index.html"
 echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$appPath/index.html"
 echo "</pre></body></html>" >> "$appPath/index.html"
