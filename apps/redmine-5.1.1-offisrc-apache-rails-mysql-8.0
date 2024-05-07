@@ -24,10 +24,7 @@ echo "Reloading Apache2..."
 systemctl reload apache2
 
 # Variables
-DB_ROOT_PASS="${ADMINPASSWORD}"
-echo "${ADMINPASSWORD}"
-exit 0
-
+DB_ROOT_PASS="Pass1234!"
 DB_REDMINE_PASS="redmine"
 REPO_URL="https://www.redmine.org/releases/redmine-5.1.1.tar.gz"
 REPO_DIR="/opt/redmine"
