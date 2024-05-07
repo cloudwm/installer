@@ -95,6 +95,8 @@ if admin_user.nil?
 else
   admin_user.password = ENV['NEW_ADMIN_PASSWORD']
   admin_user.password_confirmation = ENV['NEW_ADMIN_PASSWORD']
+  admin_user.must_change_password = false
+  admin_user.password_changed_at = Time.current
 
   if admin_user.save
     puts "Password updated successfully."
@@ -106,7 +108,6 @@ else
 end
 _EOF_
 
-cat $changePassScript
 # Replace default admin password
 echo "Replacing default admin password..."
 RAILS_ENV=production NEW_ADMIN_PASSWORD='12341234' rails runner $changePassScript
