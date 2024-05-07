@@ -114,11 +114,25 @@ _EOF_
 # Replace default admin password
 echo "Replacing default admin password..."
 cd ${REPO_DIR}
-RAILS_ENV=production bundle exec rails c
+ruby << 'RUBY'
+require_relative 'config/environment'
+
 admin_user = User.where(admin: true).first
-admin_user.password = '${ADMINPASSWORD}'
-admin_user.password_confirmation = '${ADMINPASSWORD}'
-admin_user.save!
+if admin_user.nil?
+  puts "Admin user not found!"
+  exit 1
+end
+
+admin_user.password = 'new_password_here'
+admin_user.password_confirmation = 'new_password_here'
+
+if admin_user.save
+  puts "Password updated successfully."
+else
+  puts "Failed to update password: #{admin_user.errors.full_messages.join(", ")}"
+  exit 1
+end
+RUBY
 
 # Enable Redmine site, disable default site
 echo "Enabling redmine site & disabling defaults..."
