@@ -8,28 +8,64 @@ elif [ -f "../include/startup.sh" ]; then
 
 fi
 
-appPath="/etc/apache2/sites-available"
-figletApp=$(which figlet)
+replaceAdPass() {
+	changePassScript="$REPO_DIR/change_admin_password.rb"
+	echo "Writing password change script to $changePassScript..."
+	touch $changePassScript
+	cat <<_EOF_ > $changePassScript
+#!/usr/bin/env ruby
 
-echo "Updating 'Installing Redmine...' notice to $appPath/index.html" | log
-echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
-$figletApp "Install in Progress" >> "$appPath/index.html"
-echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience." >> "$appPath/index.html"
-echo "Install dependencies.......................[DONE]" >> "$appPath/index.html"
-echo "Install MySQL server 8.0...................[DONE]" >> "$appPath/index.html"
-echo "Install Ruby 3.2.3.........................[DONE]" >> "$appPath/index.html"
-echo "Please Wait. Installing Redmine 5.1.1..." >> "$appPath/index.html"
-echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$appPath/index.html"
-echo "</pre></body></html>" >> "$appPath/index.html"
+require_relative 'config/environment'
+admin_user = User.where(admin: true).first
 
-echo "Reloading Apache2..."
-systemctl reload apache2
+if admin_user.nil?
+  puts "Admin user not found!"
+  exit 1
+
+else
+  admin_user.password = ENV['NEW_ADMIN_PASSWORD']
+  admin_user.password_confirmation = ENV['NEW_ADMIN_PASSWORD']
+  admin_user.must_change_passwd = false
+
+  if admin_user.save
+    puts "Password updated successfully."
+	
+  else
+    puts "Failed to update password: #{admin_user.errors.full_messages.join(", ")}"
+    exit 1
+  end
+end
+_EOF_
+
+	# Replace default admin password
+	echo "Replacing default admin password..."
+	RAILS_ENV=production NEW_ADMIN_PASSWORD='${ADMINPASSWORD}' rails runner $changePassScript
+	
+	echo "Removing $changePassScript..."
+	rm -f $changePassScript
+	
+}
 
 # Variables
 DB_REDMINE_PASS="redmine"
 REPO_URL="https://www.redmine.org/releases/redmine-5.1.1.tar.gz"
 REPO_DIR="/opt/redmine"
 WEB_DIR="/etc/apache2/sites-available"
+figletApp=$(which figlet)
+
+echo "Updating 'Installing Redmine...' notice to $WEB_DIR/index.html" | log
+echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$WEB_DIR/index.html"
+$figletApp "Install in Progress" >> "$WEB_DIR/index.html"
+echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience." >> "$WEB_DIR/index.html"
+echo "Install dependencies.......................[DONE]" >> "$WEB_DIR/index.html"
+echo "Install MySQL server 8.0...................[DONE]" >> "$WEB_DIR/index.html"
+echo "Install Ruby 3.2.3.........................[DONE]" >> "$WEB_DIR/index.html"
+echo "Please Wait. Installing Redmine 5.1.1..." >> "$WEB_DIR/index.html"
+echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$WEB_DIR/index.html"
+echo "</pre></body></html>" >> "$WEB_DIR/index.html"
+
+echo "Reloading Apache2..."
+systemctl reload apache2
 
 # Update system and install required packages
 apt-get update && apt-get upgrade -y
@@ -81,42 +117,7 @@ apt install -y imagemagick libmagickwand-dev
 convert -version
 apt install -y ghostscript
 
-changePassScript="$REPO_DIR/change_admin_password.rb"
-echo "Writing password change script to $changePassScript..."
-touch $changePassScript
-cat <<_EOF_ > $changePassScript
-#!/usr/bin/env ruby
-
-require_relative 'config/environment'
-admin_user = User.where(admin: true).first
-
-if admin_user.nil?
-  puts "Admin user not found!"
-  exit 1
-
-else
-  admin_user.password = ENV['NEW_ADMIN_PASSWORD']
-  admin_user.password_confirmation = ENV['NEW_ADMIN_PASSWORD']
-  admin_user.must_change_passwd = false
-
-  if admin_user.save
-    puts "Password updated successfully."
-	
-  else
-    puts "Failed to update password: #{admin_user.errors.full_messages.join(", ")}"
-    exit 1
-  end
-end
-_EOF_
-
-# Replace default admin password
-echo "Replacing default admin password..."
-RAILS_ENV=production NEW_ADMIN_PASSWORD='12341234' rails runner $changePassScript
-#RAILS_ENV=production NEW_ADMIN_PASSWORD='${ADMINPASSWORD}' rails runner $changePassScript
-
-echo "Removing $changePassScript..."
-rm -f $changePassScript
-
+#replaceAdPass
 echo "Writing apache configuration file..."
 cat <<_EOF_ > $WEB_DIR/redmine.conf
 <VirtualHost *:80>
