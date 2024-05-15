@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="icon" href="" type="image/x-icon">
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #E0E0E0;
+            min-height: 100vh;
+            justify-content: flex-start;
+        }
+        .wrapper {
+            width: 80%; /* Increased the width for better layout */
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .container {
+            background-color: #1E1E1E;
+            padding: 5px;
+            width: 60%; /* Adjusted to use full width of the wrapper */
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .logo-space {
+            height: 100px; /* Space for the logo */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-top: 20px; /* Added margin to lower the logo */
+        }
+        .status-container {
+            max-height: 250px;
+            overflow-y: auto;
+            width: 60%; /* Adjusted to use full width of the container */
+            background-color: #000000; /* Terminal background color */
+            border: 2px solid #169307; /* Darker green border */
+            border-radius: 5px;
+            padding: 20px 10px 10px 10px; /* Added top padding to prevent text cut off */
+            color: #00cc00; /* Darker green text color */
+            font-family: 'Courier New', Courier, monospace; /* Monospace font */
+            text-align: left; /* Align text to the left */
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; /* Align items to the start */
+            line-height: 1.5; /* Adjusted line height */
+        }
+        .status {
+            font-size: 16px;
+            font-weight: normal;
+            color: #878C87; /* Darker green text color */
+            width: 100%;
+            text-align: left; /* Ensure text is aligned to the left */
+            margin: 5px 0; /* Added margin to each status item */
+        }
+        /* Scrollbar styles */
+        .status-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .status-container::-webkit-scrollbar-track {
+            background: #2A2A2A;
+        }
+        .status-container::-webkit-scrollbar-thumb {
+            background-color: #444;
+            border-radius: 10px;
+            border: 2px solid #2A2A2A;
+        }
+        .status-container {
+            scrollbar-width: thin;
+            scrollbar-color: #444 #2A2A2A;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="logo-space">
+            <img src="" alt="Company Logo" style="max-height: 100%;">
+        </div>
+        <div class="container">
+            <h1></h1>
+        </div>
+        <div class="container status-container">
+            <div id="statusList"></div>
+        </div>
+    </div>
+
+    <script>
+        setInterval(function() {
+            window.location.reload(true);
+        }, 10000);
+    </script>
+</body>
+</html>

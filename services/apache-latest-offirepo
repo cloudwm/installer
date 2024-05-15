@@ -8,47 +8,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing Apache2..."
-installPackage apache2
-
-echo "Installing passenger module for apache2..."
-installPackage libapache2-mod-passenger
-
-idxHTMLPath="/etc/apache2/sites-available"
-if [ ! -d "$idxHTMLPath" ]; then
-	mkdir -p $idxHTMLPath
-
-fi
-
-echo "Writing apache configuration file..."
-cat <<_EOF_ > $idxHTMLPath/figletIDX.conf
-<VirtualHost *:80>
-	ServerName _
-	DocumentRoot $idxHTMLPath
-
-	ErrorLog ${APACHE_LOG_DIR}/error.log
-	CustomLog ${APACHE_LOG_DIR}/access.log combined
-
-</VirtualHost>
-<VirtualHost *:443>
-    ServerName _
-    DocumentRoot $idxHTMLPath
-
-    SSLEngine on
-    SSLCertificateFile /etc/ssl/certs/apache-selfsigned.crt
-    SSLCertificateKeyFile /etc/ssl/private/apache-selfsigned.key
-
-    <Directory $idxHTMLPath/>
-        Allow from all
-        Options -MultiViews
-        Require all granted
-    </Directory>
-</VirtualHost>
-_EOF_
-
-a2enmod ssl
-a2ensite figletIDX
-a2dissite 000-default
-systemctl start apache2
+apt update && apt install -y apache2
 
 tag httpd.success
 tag apache.success

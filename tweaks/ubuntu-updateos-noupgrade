@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Updating and upgrading OS to latest kernel and packages" | log
+# NOTE: since the kamatera mirror is faulty the update process is faulty from that stage on.
+# without these changes, certine packages related to nginx runtime will be unavailable.
+
+apt update | log
+
+# Clean up old journalctl logs
+echo "Cleaning up old journalctl logs" | log
+journalctl --flush --rotate --vacuum-time=1s | log
+
+tag ubuntu-updateos.success
+tagScript success
+
+exit 0

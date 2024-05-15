@@ -1,26 +1,11 @@
 #!/bin/bash
 
+# Add this at the begining of all scripts.
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
-appPath="/etc/apache2/sites-available"
-figletApp=$(which figlet)
-
-echo "Updating 'Installing Ruby...' notice to $appPath/index.html" | log
-echo "<html><head><title>Installation Progress</title></head><body><pre align='center'>" > "$appPath/index.html"
-$figletApp "Install in Progress" >> "$appPath/index.html"
-echo "Please Wait. Application and services installation is in progress, the process will take a couple of minutes to complete. Thank you for your patience." >> "$appPath/index.html"
-echo "Install dependencies.......................[DONE]" >> "$appPath/index.html"
-echo "Install MySQL server 8.0...................[DONE]" >> "$appPath/index.html"
-echo "Please Wait. Installing Ruby 3.2.3..." >> "$appPath/index.html"
-echo "<script>setTimeout(function() { window.location.reload(1); }, 10000);</script>" >> "$appPath/index.html"
-echo "</pre></body></html>" >> "$appPath/index.html"
-
-echo "Reloading Apache2..."
-systemctl reload apache2
 
 echo "Installing Ruby from apt" | log
 installPackage ruby | log
