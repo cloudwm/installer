@@ -40,16 +40,15 @@ updateAndFinalize() {
 
     echo "Setup DNS files have been updated." | log
 	
-	. tweaks/cwm-description-autoconfig
+	# Touchups
+	bash tweaks/motd-description-append
+	bash tweaks/cwm-description-autoconfig
 	
 	echo "Adding descriptions" | log
 	descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
 	descriptionAppend "SSL will be configured after the first step."
 	
-	. tweaks/motd-description-append
-	. tweaks/cwm-description-autoconfig
-	. include/installInProgressSSH-remove
-	
+	# Cleanup
 	echo "Cleaning up..." | log
 	sleep 5
 	systemctl stop apache2
