@@ -38,8 +38,9 @@ timezones[EU-ST]="Europe/Stockholm"
 
 if [ ! ${timezones[$CWM_ZONE]} ]; then
 
-    echo "timezone $CWM_ZONE not set. Exiting." | log 1
-    exit 1
+    echo "timezone $CWM_ZONE not set. Using New York as default time." | log 1
+    timedatectl set-timezone America/New_York | log
+    exit 0
 
 fi
 
