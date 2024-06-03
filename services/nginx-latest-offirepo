@@ -7,6 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 appPath=/var/www/html
+# Creates the dir if not exists to prevent nginx install exit 1 with 'dir not exists'
+if [ ! -d $appPath ]; then
+	mkdir -p $appPath
+fi
 
 echo "Adding nginx repo to apt" | log
 add-apt-repository -y ppa:nginx/stable | log
