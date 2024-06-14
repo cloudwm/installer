@@ -26,7 +26,9 @@ timezones[EU]="Europe/Amsterdam"
 timezones[EU-LO]="Europe/London"
 timezones[EU-FR]="Europe/Berlin"
 timezones[US-NY2]="America/New_York"
+timezones[US-MI]="America/New_York"
 timezones[US-TX]="America/Chicago"
+timezones[US-CH]="America/Chicago"
 timezones[US-SC]="America/Los_Angeles"
 timezones[CA-TR]="America/Toronto"
 timezones[AS]="Asia/Hong_Kong"
@@ -38,6 +40,7 @@ timezones[EU-ST]="Europe/Stockholm"
 timezones[US-AT]="America/Atlanta"
 timezones[US-LA]="America/Los_Angeles"
 timezones[US-SE]="America/Seattle"
+
 
 if [ ! ${timezones[$CWM_ZONE]} ]; then
 
