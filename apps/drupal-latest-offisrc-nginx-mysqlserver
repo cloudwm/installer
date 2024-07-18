@@ -12,7 +12,7 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-versionFilename=9.1.4
+versionFilename=10.3.1
 rootDir=$(rootDir)
 drupaluser_password="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')"
 
@@ -32,7 +32,7 @@ waitOrStop 0 "Failed apt install: composer"
 echo "Downloading latest Drupal" | log
 mkdir -p $appPath
 cd $rootDir/temp
-curlDownload https://ftp.drupal.org/files/projects/drupal-$versionFilename.tar.gz
+curlDownload https://ftp.drupal.org/files/projects/drupal-10.3.1.tar.gz
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Drupal to $appPath" | log
