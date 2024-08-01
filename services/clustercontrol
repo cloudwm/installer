@@ -69,6 +69,8 @@ systemctl start apache2.service
 waitOrStop 0 "Failed to start Apache service"
 tag global-domain-set.success
 
+ubuntu_version=$(lsb_release -rs)
+
 if [[ "$ubuntu_version" == "24.04" ]]; then
         sslConf="/etc/apache2/sites-available/default-ssl.conf"
 else
