@@ -29,12 +29,15 @@ cat <<EOF > cc.playbook
     - { role: severalnines.clustercontrol }
 EOF
 
+ubuntu_version=$(lsb_release -rs)
+
+if [[ "$ubuntu_version" == "24.04" ]]; then
+	sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
+	sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
+fi
+
 echo "runing playbook" | log
 ansible-playbook cc.playbook | log
-
-
-
-
 
 #### SSL ####
 echo "Installing certbot for apache" | log
@@ -68,14 +71,6 @@ export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 systemctl start apache2.service
 waitOrStop 0 "Failed to start Apache service"
 tag global-domain-set.success
-
-ubuntu_version=$(lsb_release -rs)
-
-if [[ "$ubuntu_version" == "24.04" ]]; then
-        sslConf="/etc/apache2/sites-available/default-ssl.conf"
-else
-        sslConf="/etc/apache2/sites-available/s9s-ssl.conf"
-fi
 
 echo "Reconfigure SSL in Vhost" | log
 sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" $sslConf
