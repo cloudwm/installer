@@ -34,7 +34,7 @@ ubuntu_version=$(lsb_release -rs)
 
 if [[ "$ubuntu_version" == "24.04" ]]; then
 	sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
-	sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
+	sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/*.yml
 fi
 
 echo "runing playbook" | log
