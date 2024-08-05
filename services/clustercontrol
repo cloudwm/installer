@@ -100,9 +100,9 @@ sed -i '/^rpc_key=/d' /etc/cmon.cnf
 echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
 sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
 echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
+/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh
 
 echo "Adding descriptions" | log
-descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
 descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
 descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
