@@ -6,31 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-function execSpecial() {
-
-    local times=$1
-    local filter=$2
-    local action="${@:3}"
-    local ok=1
-    local n=0
-    until [ $n -ge $times ]; do
-        if eval $action 2>&1 | grep -q -E $filter; then
-
-            n=$(($n + 1))
-            sleep 10
-
-        else
-
-            ok=0
-            break
-
-        fi
-
-    done
-
-    return $ok
-
-}
 
 
 rootDir=$(rootDir)
@@ -62,6 +37,12 @@ ubuntu_version=$(lsb_release -rs)
 if [[ "$ubuntu_version" == "24.04" ]]; then
 	sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
 	sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
+	apt -y install software-properties-common
+	add-apt-repository ppa:ondrej/php
+	apt-get update
+	apt -y install php7.4 php7.4-mysql	
+	a2dismod php8.3
+	a2enmod php7.4
 fi
 
 echo "runing playbook" | log
