@@ -6,6 +6,33 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+function execSpecial() {
+
+    local times=$1
+    local filter=$2
+    local action="${@:3}"
+    local ok=1
+    local n=0
+    until [ $n -ge $times ]; do
+        if eval $action 2>&1 | grep -q -E $filter; then
+
+            n=$(($n + 1))
+            sleep 10
+
+        else
+
+            ok=0
+            break
+
+        fi
+
+    done
+
+    return $ok
+
+}
+
+
 rootDir=$(rootDir)
 sslConf="/etc/apache2/sites-available/s9s-ssl.conf"
 
