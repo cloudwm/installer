@@ -96,6 +96,7 @@ apt-get remove -y ansible
 
 ## Create new rpc-key and modify relevant files ##
 random_rpc=$(date +%s | sha256sum | base64 | head -c 32 ; echo)
+sed -i '/^rpc_key=/d' /etc/cmon.cnf
 echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
 sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
 echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
