@@ -19,6 +19,9 @@ packages=(unzip php7.2 libapache2-mod-php7.2 php7.2-common php7.2-curl \
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed to install dependencies"
 
+a2dismod php8.3
+a2enmod php7.2
+
 echo "Creating Directus Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE directus CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
