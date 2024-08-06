@@ -27,7 +27,7 @@ if [[ $ubuntu_version == 24.04 ]]; then
 	apt update
 else
 	add-apt-repository ppa:vbernat/haproxy-2.4 -y
-        apt update
+	apt update
 fi
 
 echo "Installing main application" | log
