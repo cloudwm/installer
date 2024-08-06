@@ -19,8 +19,11 @@ packages=(unzip php7.2 libapache2-mod-php7.2 php7.2-common php7.2-curl \
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed to install dependencies"
 
-a2dismod php8.3
-a2enmod php7.2
+ubuntu_version=$(lsb_release -rs)
+if [[ "$ubuntu_version" == "24.04" ]]; then
+	a2dismod php8.3
+	a2enmod php7.2
+fi
 
 echo "Creating Directus Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -41,32 +44,8 @@ echo "Setting permissions for Directus" | log
 chown -R www-data:www-data /var/www/html/directus/
 chmod -R 755 /var/www/html/directus/
 
-#### SSL ####
-echo "Installing certbot for apache" | log
-installPackage python3-certbot-apache
-waitOrStop 0 "Failed apt install: python-certbot-apache"
-
-
-## applying ssl for cc web app ##
-systemctl stop apache2.service
-execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-
-if [[ $? == 1 ]]
-then
-export certbot_failed=1
-echo "Generating self-signed certificate" | log
-#waitOrStop 0 "Failed certbot certificate generation"
-mkdir /etc/letsencrypt/live
-mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
-
-# Sending log to log server - 45-93-93-142.cloud-xip.com
-curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
-
-
-else
-export certbot_failed=0
+if [[ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem ]]; then
+	sed -i 's/cert\.pem/fullchain\.pem/g' /etc/apache2/sites-available/directus.conf
 fi
 
 echo "Setting Apache VirtualHost" | log
