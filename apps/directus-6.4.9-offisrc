@@ -44,7 +44,7 @@ echo "Setting permissions for Directus" | log
 chown -R www-data:www-data /var/www/html/directus/
 chmod -R 755 /var/www/html/directus/
 
-if [[ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem ]]; then
+if [[ ! -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
 	sed -i 's/cert\.pem/fullchain\.pem/g' /etc/apache2/sites-available/directus.conf
 fi
 
