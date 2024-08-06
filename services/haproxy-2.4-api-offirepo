@@ -32,8 +32,8 @@ fi
 
 echo "Installing main application" | log
 if [[ $ubuntu_version == 24.04 ]]; then
-	installPackage haproxy=2.9
-	waitOrStop 0 "Failed apt install: haproxy 2.9"
+	installPackage haproxy=2.9.\*
+	waitOrStop 0 "Failed apt install: haproxy 2.9.*"
 else
 	installPackage haproxy=2.4.\* | log
 	waitOrStop 0 "Failed apt install: haproxy 2.4.*"
