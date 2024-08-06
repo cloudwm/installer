@@ -19,13 +19,25 @@ echo "Installing dependencies" | log
 installPackage software-properties-common
 waitOrStop 0 "Failed apt install: software-properties-common"
 
+ubuntu_version=$(lsb_release -rs)
+
 echo "Adding repository to OS package manager" | log
-add-apt-repository ppa:vbernat/haproxy-2.4 -y
-apt update
+if [[ ubuntu_version == 24.04 ]]; then
+	add-apt-repository ppa:vbernat/haproxy-2.9 -y
+	apt update
+else
+	add-apt-repository ppa:vbernat/haproxy-2.4 -y
+        apt update
+fi
 
 echo "Installing main application" | log
-installPackage haproxy=2.4.\* | log
-waitOrStop 0 "Failed apt install: haproxy 2.4.*"
+if [[ ubuntu_version == 24.04 ]]; then
+	apt install haproxy	
+	waitOrStop 0 "Failed apt install: haproxy 2.9"
+else
+	installPackage haproxy=2.4.\* | log
+	waitOrStop 0 "Failed apt install: haproxy 2.4.*"
+fi
 
 echo "Open port for stats web ui" | log
 ufw allow 8404
