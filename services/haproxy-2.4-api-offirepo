@@ -22,7 +22,7 @@ waitOrStop 0 "Failed apt install: software-properties-common"
 ubuntu_version=$(lsb_release -rs)
 
 echo "Adding repository to OS package manager" | log
-if [[ ubuntu_version == 24.04 ]]; then
+if [[ $ubuntu_version == 24.04 ]]; then
 	add-apt-repository ppa:vbernat/haproxy-2.9 -y
 	apt update
 else
@@ -31,7 +31,7 @@ else
 fi
 
 echo "Installing main application" | log
-if [[ ubuntu_version == 24.04 ]]; then
+if [[ $ubuntu_version == 24.04 ]]; then
 	installPackage haproxy=2.9
 	waitOrStop 0 "Failed apt install: haproxy 2.9"
 else
