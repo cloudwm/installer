@@ -51,17 +51,10 @@ sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
 sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
 
 echo "Generating proper haproxy certificate" | log
-
-if [[ ! -d ${certsArchivePath} ]]; then
-	cd ${certsPath} 
-	cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
-else
-	cd ${certsArchivePath}
-	cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
-	cd ${certsPath}
-	ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
-fi
-
+cd ${certsArchivePath}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
 service haproxy reload
 waitOrStop 0 "Reload haproxy service failed"
 
