@@ -17,7 +17,7 @@ ubuntu_version=$(lsb_release -rs)
 
 echo "Downloading passbolt from Git" | log
 if [[ "$ubuntu_version" == "24.04" ]]; then
-	wget https://github.com/passbolt/passbolt_docker/archive/refs/tags/v4.0.0.tar.gz
+	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/4.0.0.tar.gz
 	waitOrStop 0 "Failed to download PassBolt"
 else
 	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/v3.0.1.tar.gz
