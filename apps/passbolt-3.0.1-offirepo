@@ -26,7 +26,7 @@ fi
 
 echo "Extracting PassBolt" | log
 if [[ "$ubuntu_version" == "24.04" ]]; then
-	tar -xzvf v4.0.0.tar.gz
+	tar -xzvf 4.0.0.tar.gz
 	mv passbolt_docker-4.0.0/ passbolt/
 	mv passbolt/ /opt/
 	rm -rf v4.0.0.tar.gz
