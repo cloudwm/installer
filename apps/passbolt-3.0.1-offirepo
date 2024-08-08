@@ -14,6 +14,7 @@ installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 ubuntu_version=$(lsb_release -rs)
+containerName="passbolt_passbolt_1"
 
 echo "Downloading passbolt from Git" | log
 if [[ "$ubuntu_version" == "24.04" ]]; then
@@ -56,6 +57,7 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
 	docker-compose up -d
 	waitOrStop 0 "Failed docker-compose"
+	containerName="passbolt-passbolt-1"
 else	
 	tar -xzvf v3.0.1.tar.gz
 	mv passbolt_docker-3.0.1/ passbolt/
@@ -99,7 +101,7 @@ sleep 30
 
 echo "Creating PassBolt login UI" | log
 touch /opt/passbolt/loginurl.txt
-docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /opt/passbolt/loginurl.txt
+docker exec ${containerName} su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /opt/passbolt/loginurl.txt
 sleep 5
 
 initialurl=$(cat /opt/passbolt/loginurl.txt | grep https)
