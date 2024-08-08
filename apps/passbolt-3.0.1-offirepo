@@ -9,7 +9,7 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing dependencies" | log
-packages=(apt-transport-https ca-certificates gnupg-agent software-properties-common docker-compose)
+packages=(apt-transport-https ca-certificates gnupg-agent software-properties-common docker-compose docker.io)
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
