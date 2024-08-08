@@ -17,6 +17,12 @@ ubuntu_version=$(lsb_release -rs)
 
 echo "Downloading passbolt from Git" | log
 if [[ "$ubuntu_version" == "24.04" ]]; then
+	rm /usr/bin/docker-compose 
+	curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep tag_name | cut -d '"' -f 4)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/bin/docker-compose
+	chmod +x /usr/bin/docker-compose
+	systemctl daemon-reload 
+	systemctl restart docker.service
+	systemctl restart docker.socket
 	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/4.0.0.tar.gz
 	waitOrStop 0 "Failed to download PassBolt"
 else
@@ -39,6 +45,9 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
 	mv /opt/passbolt/docker-compose.yml /opt/passbolt/docker-compose.yml.bk
 	cp $rootDir/tweaks/extras/passbolt/passbolt.conf /opt/passbolt/conf/
 	cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /opt/passbolt/
+	sed -i 's/image: mariadb:10.3/image: mariadb:10.11/' /opt/passbolt/docker-compose.yml
+	sed -i 's/image: passbolt\/passbolt:3.0.1-ce/image: passbolt\/passbolt:latest-ce/' /opt/passbolt/docker-compose.yml
+	sed -i 's/env\/passbolt.env/dev\/env\/passbolt.env/' /opt/passbolt/docker-compose.yml
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
 	docker-compose up -d
