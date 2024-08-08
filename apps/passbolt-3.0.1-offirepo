@@ -29,12 +29,12 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
 	tar -xzvf 4.0.0.tar.gz
 	mv passbolt_docker-4.0.0/ passbolt/
 	mv passbolt/ /opt/
-	rm -rf v4.0.0.tar.gz
+	rm -rf 4.0.0.tar.gz
 	cd /opt/passbolt/
-	sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /opt/passbolt/env/passbolt.env
-	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/passbolt.env
-	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
-	sed -i "s/test/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
+	sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /opt/passbolt/dev/env/passbolt.env
+	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/dev/env/passbolt.env
+	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/dev/env/mysql.env
+	sed -i "s/test/${ADMINPASSWORD}/g" /opt/passbolt/dev/env/mysql.env
 	mv /opt/passbolt/conf/passbolt.conf /opt/passbolt/conf/passbolt.conf.bk
 	mv /opt/passbolt/docker-compose.yml /opt/passbolt/docker-compose.yml.bk
 	cp $rootDir/tweaks/extras/passbolt/passbolt.conf /opt/passbolt/conf/
