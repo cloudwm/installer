@@ -45,10 +45,13 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
 	mv /opt/passbolt/docker-compose.yml /opt/passbolt/docker-compose.yml.bk
 	cp $rootDir/tweaks/extras/passbolt/passbolt.conf /opt/passbolt/conf/
 	cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /opt/passbolt/
-	sed -i 's/image: mariadb:10.3/image: mariadb:10.11/' /opt/passbolt/docker-compose.yml
-	sed -i 's/image: passbolt\/passbolt:3.0.1-ce/image: passbolt\/passbolt:latest-ce/' /opt/passbolt/docker-compose.yml
+	sed -i 's/image: mariadb:10.3/image: mariadb:10.11/' docker-compose.yml
+	sed -i 's/image: passbolt\/passbolt:3.0.1-ce/image: passbolt\/passbolt:latest-ce/' docker-compose.yml
 	sed -i 's/env\/mysql.env/dev\/env\/mysql.env/' docker-compose.yml
 	sed -i 's/env\/passbolt.env/dev\/env\/passbolt.env/' docker-compose.yml
+	if [[ ! -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
+		sed -i 's/cert\.pem/fullchain\.pem/g' /conf/passbolt.conf
+	fi
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
 	docker-compose up -d
