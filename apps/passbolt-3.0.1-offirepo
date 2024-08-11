@@ -50,7 +50,7 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
 	sed -i 's/image: passbolt\/passbolt:3.0.1-ce/image: passbolt\/passbolt:latest-ce/' docker-compose.yml
 	sed -i 's/env\/mysql.env/dev\/env\/mysql.env/' docker-compose.yml
 	sed -i 's/env\/passbolt.env/dev\/env\/passbolt.env/' docker-compose.yml
-	if [[ -d /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
+	if [[ ! -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
 		sed -i 's/cert\.pem/fullchain\.pem/g' conf/passbolt.conf
 		sed -i 's/cert\.pem/fullchain\.pem/g' docker-compose.yml
 	fi
