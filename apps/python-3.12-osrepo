@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Updating OS" | log
+apt update
+
+echo "Installing Python 3.12" | log
+installPackage python3.12-full
+waitOrStop 0 "Failed apt install: Python3.12"
+
+echo "Adding descriptions" | log
+descriptionAppend "To test basic functionality, run 'python3.12 --flag'"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
