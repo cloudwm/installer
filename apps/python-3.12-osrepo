@@ -16,7 +16,7 @@ installPackage python3.12-full
 waitOrStop 0 "Failed apt install: Python3.12-full"
 
 echo "Adding descriptions" | log
-descriptionAppend "To test basic functionality, run 'python3.12 --flag'"
+descriptionAppend "To test basic functionality, run 'python3.12 --help or python3.12 --version'"
 descriptionAppend " "
 
 tagScript success
