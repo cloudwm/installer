@@ -12,7 +12,7 @@ echo "Updating OS" | log
 apt update
 
 echo "Installing Python 3.12" | log
-apt install python3.12-full
+installPackage python3.12-full
 waitOrStop 0 "Failed apt install: Python3.12-full"
 
 echo "Adding descriptions" | log
