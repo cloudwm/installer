@@ -103,6 +103,9 @@ bin/magento config:set dev/static/sign 0
 curl https://${CWM_DISPLAYED_ADDRESS} --insecure -o /dev/null
 waitOrStop 0 "Website failed to respond"
 bin/magento setup:static-content:deploy -f
+sleep 5
+bin/magento cache:clean
+waitOrStop 0 "Cleanup actions failed"
 
 echo "Setting nginx config" | log
 # main magento config
@@ -125,9 +128,6 @@ echo "Adding index.php to document root"
 cp $appPath/pub/index.php $appPath/
 cd $appPath && sed -i "s/\/..\/app/\/app/g" index.php
 
-bin/magento cache:clean
-waitOrStop 0 "Cleanup actions failed"
-sleep 5
 bin/magento indexer:reindex
 waitOrStop 0 "Reindex actions failed"
 
