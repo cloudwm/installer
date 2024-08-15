@@ -15,7 +15,7 @@ appPath=/var/www/html
 rootDir=$(rootDir)
 ubuntu_version=$(lsb_release -rs)
 
-if [[ ubuntu_version == 24 ]]; then
+if [[ $ubuntu_version == 24 ]]; then
 	appVersion=2.4.7
 else
 	appVersion=2.4.6
