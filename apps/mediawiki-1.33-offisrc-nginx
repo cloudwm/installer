@@ -38,7 +38,7 @@ waitOrStop 0 "Failed to extract application archive"
 rm -f $appPath/$appArchive
 
 echo "Setting directory permissions" | log
-chown -R www-data.www-data $appPath/
+chown -R www-data:www-data $appPath/
 find  $appPath/ -type f -exec chmod 644 {} \;
 find  $appPath/ -type d -exec chmod 755 {} \;
 
