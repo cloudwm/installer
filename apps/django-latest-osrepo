@@ -10,6 +10,7 @@ checkTagExist php.success
 checkTagExist nginx.success
 checkTagExist nginx-enable-php-ssl.success
 
+ubuntu_version=$(lsb_release -rs)
 appPath=/var/www/html/django
 rootDir=$(rootDir)
 
@@ -22,8 +23,8 @@ FLUSH PRIVILEGES;
 EOF
 
 
-# Fix for Ubuntu22.04:
-if [[ $(lsb_release -rs) == "22.04" ]]; then
+# Fix for Ubuntu24.04:
+if [[ $ubuntu_version == "22.04" || $ubuntu_version == "24.04" ]]; then
 echo "Installing Django and dependencies from apt" | log
 installPackage python3-pip python3.10-venv python3-django
 waitOrStop 0 "Failed to install python3 dependencies (ubuntu22)"
