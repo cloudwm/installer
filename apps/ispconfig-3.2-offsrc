@@ -32,6 +32,11 @@ sed   -i "s/apache/nginx/" ./autoinstall.ini
 php install.php --autoinstall=autoinstall.ini
 systemctl start mysql.service
 
+sed -i 's/^\(\s*fastcgi_pass\s*\).*/\1127.0.0.1:9000;/' /etc/nginx/sites-available/ispconfig.vhost
+chown -R www-data:www-data /usr/local/ispconfig
+systemctl restart php7.4-fpm.service
+systemctl reload nginx.service
+
 echo "adding descriptions" | log
 descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"
 descriptionAppend "ISPConfig Admin Username: admin"
