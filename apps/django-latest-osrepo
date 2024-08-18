@@ -24,9 +24,9 @@ EOF
 
 
 # Fix for Ubuntu24.04:
-if [[ $ubuntu_version == "22.04" || $ubuntu_version == "24.04" ]]; then
+if [[ $ubuntu_version == "24.04" ]]; then
 echo "Installing Django and dependencies from apt" | log
-installPackage python3-pip python3.10-venv python3-django
+installPackage python3-pip python3.12-venv python3-django
 waitOrStop 0 "Failed to install python3 dependencies (ubuntu22)"
 else
 echo "Installing Django and dependencies from apt" | log
