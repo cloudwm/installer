@@ -12,7 +12,6 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-appArchive=mediawiki-$appVersion.tar.gz
 rootDir=$(rootDir)
 ubuntu_version=$(lsb_release -rs)
 
@@ -21,6 +20,8 @@ if [[ $ubuntu_version == "24.04" ]]; then
 else
 	appVersion=1.35.1
 fi
+
+appArchive=mediawiki-$appVersion.tar.gz
 
 echo "Installing MediaWiki" | log
 
