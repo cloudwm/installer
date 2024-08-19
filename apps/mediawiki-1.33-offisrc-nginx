@@ -17,6 +17,7 @@ ubuntu_version=$(lsb_release -rs)
 
 if [[ $ubuntu_version == "24.04" ]]; then
 	appVersion=1.42.0
+	installPackage php8.3-fpm php8.3-mbstring php8.3-xml php8.3-intl
 else
 	appVersion=1.35.1
 fi
