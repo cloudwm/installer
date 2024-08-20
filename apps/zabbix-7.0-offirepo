@@ -21,13 +21,15 @@ curlDownload https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-releas
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Zabbix" | log
-dpkg -i zabbix-release_latest+ubuntu24.04_all.deb
+dpkg -i zabbix-release_latest%2Bubuntu24.04_all.deb
 waitOrStop 0 "Failed to extract application archive"
 apt update | log
 
 echo "Installing Zabbix" | log
 installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
 waitOrStop 0 "Failed to install Zabbix"
+
+chown zabbix:zabbix /run/zabbix
 
 echo "Creating Zabbix Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
