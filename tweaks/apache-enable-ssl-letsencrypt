@@ -1,3 +1,32 @@
+Logo
+Issues
+Pull Requests
+Milestones
+Explore
+DevOps
+/
+installer
+Code
+Issues
+Pull Requests
+15
+Wiki
+Activity
+You pushed on branch CWMA-328-Zabbix 9 minutes ago
+installer
+/
+tweaks
+/
+apache-enable-ssl-letsencrypt
+cloudwm
+cloudwm
+ccf450e5d1
+Remove SSL from WordPress
+3 years ago
+54 lines
+1.7 KiB
+Bash
+Executable File
 #!/bin/bash
 
 # Add this at the begining of all scripts.
@@ -26,26 +55,6 @@ SSLStaplingCache "shmcb:logs/stapling-cache(150000)"
 SSLSessionTickets Off
 EOF
 
-## applying ssl for cc web app ##
-systemctl stop apache2.service
-execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-
-if [[ $? == 1 ]]; then
-	export certbot_failed=1
-	echo "Generating self-signed certificate" | log
-	#waitOrStop 0 "Failed certbot certificate generation"
-	mkdir /etc/letsencrypt/live
-	mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
-	openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-	waitOrStop 0 "Certificate creation failed"
-
-	# Sending log to log server - 45-93-93-142.cloud-xip.com
-	curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
-
-else	
-	export certbot_failed=0
-fi
-
 echo "Tweaking SSL virtual host" | log
 defaultSSL=/etc/apache2/sites-available/default-ssl.conf
 sed -i '/ServerAdmin/s/webmaster@localhost/'"${ADMINEMAIL}"'/g' $defaultSSL
@@ -71,3 +80,10 @@ descriptionAppend " "
 tagScript success
 
 exit 0
+Powered by Gitea
+Version: 1.22.0 Page:
+54ms
+Template:
+5ms
+Licenses
+API
