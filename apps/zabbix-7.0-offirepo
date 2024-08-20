@@ -92,7 +92,7 @@ sleep 3
 systemctl restart apache2
 waitOrStop 0 "Failed to restart Apache"
 sleep 3
-systemctl restart php7.4-fpm
+systemctl restart php8.3-fpm
 waitOrStop 0 "Failed to restart php7.4-fpm"
 sleep 3
 
