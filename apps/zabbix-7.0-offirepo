@@ -17,11 +17,11 @@ installPackage php7.4-ldap
 waitOrStop 0 "Failed to install ldap"
 
 echo "Downloading Zabbix from official repo" | log
-curlDownload wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu24.04_all.deb 
+curlDownload https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu24.04_all.deb 
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Zabbix" | log
-dpkg -i dpkg -i zabbix-release_7.0-2+ubuntu24.04_all.deb
+dpkg -i zabbix-release_7.0-2+ubuntu24.04_all.deb
 waitOrStop 0 "Failed to extract application archive"
 apt update | log
 
