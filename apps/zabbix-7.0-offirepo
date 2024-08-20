@@ -1,0 +1,107 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist php.success
+checkTagExist httpd.success
+checkTagExist mysqld.success
+
+rootDir=$(rootDir)
+
+echo "Installing php ldap" | log
+installPackage php7.4-ldap
+waitOrStop 0 "Failed to install ldap"
+
+echo "Downloading Zabbix from official repo" | log
+curlDownload https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest%2Bubuntu24.04_all.deb 
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Extracting Zabbix" | log
+dpkg -i zabbix-release_latest+ubuntu24.04_all.deb
+waitOrStop 0 "Failed to extract application archive"
+apt update | log
+
+echo "Installing Zabbix" | log
+installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
+waitOrStop 0 "Failed to install Zabbix"
+
+echo "Creating Zabbix Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE zabbix CHARACTER SET utf8 COLLATE utf8_bin;
+CREATE USER 'zabbixuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+GRANT all privileges on zabbix.* to zabbixuser@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Tweaking Zabbix & PHP configuration" | log
+sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
+sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
+sed -i "s/#\sDBPassword=/DBPassword=${ADMINPASSWORD}/g" /etc/zabbix/zabbix_server.conf
+sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/7.4/fpm/php.ini
+sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/7.4/fpm/php.ini
+sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/php/7.4/fpm/php.ini
+sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/8.0/apache2/php.ini
+sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/8.0/apache2/php.ini
+sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/8.0/apache2/php.ini
+sed -i "s/127.0.0.1/0.0.0.0/g" /etc/mysql/mysql.conf.d/mysqld.cnf
+
+echo "Adding FW rules" | log
+ufw allow 10050
+ufw allow 10051
+ufw allow 3306
+ufw reload
+
+rm -rf /usr/share/zabbix/conf/zabbix.conf.php
+cp $rootDir/tweaks/extras/zabbix/zabbix.conf.php /usr/share/zabbix/conf/
+sed -i "s/PASSWORDVAR/${ADMINPASSWORD}/g" /usr/share/zabbix/conf/zabbix.conf.php
+unlink /etc/apache2/sites-enabled/default-ssl.conf
+cp $rootDir/tweaks/extras/zabbix/zabbix.conf /etc/apache2/sites-available/
+sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/zabbix.conf
+ln -s /etc/apache2/sites-available/zabbix.conf /etc/apache2/sites-enabled/
+
+echo "Extracting database content" | log
+gunzip /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz
+
+echo "Enabling and starting SQL" | log
+systemctl enable mysql.service
+systemctl stop mysql.service
+sleep 2
+systemctl start mysql.service
+sleep 5
+waitOrStop 0 "Failed to start SQL"
+
+echo "Importing Zabbix databse" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+USE zabbix;
+source /usr/share/doc/zabbix-sql-scripts/mysql/create.sql;
+EOF
+
+systemctl enable zabbix-server
+sleep 1
+systemctl stop zabbix-server
+sleep 1
+systemctl start zabbix-server
+waitOrStop 0 "Failed to restart Zabbix"
+sleep 3
+systemctl restart apache2
+waitOrStop 0 "Failed to restart Apache"
+sleep 3
+systemctl restart php7.4-fpm
+waitOrStop 0 "Failed to restart php7.4-fpm"
+sleep 3
+
+echo "Adding descriptions" | log
+descriptionAppend " "
+descriptionAppend "Database = zabbix"
+descriptionAppend "DBUser = zabbixuser"
+descriptionAppend "Zabbix Admin Web UI: https://${CWM_DOMAIN}/zabbix"
+descriptionAppend "Zabbix default credentials: User=Admin | Pass=zabbix"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
