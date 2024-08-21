@@ -36,7 +36,6 @@ create user zabbixuser@localhost identified by '${ADMINPASSWORD}';
 grant all privileges on zabbix.* to zabbixuser@localhost;
 set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
-quit;
 EOF
 
 chmod 600 ~/.my.cnf
