@@ -10,20 +10,9 @@ echo "Installing docker.io package" | log
 installPackage docker.io 
 waitOrStop 0 "Docker didnt installed successfully"
 
-echo "Install docker-ce" | log
-cat > /usr/sbin/policy-rc.d <<EOF
-#!/bin/sh
-exit 101
-EOF
-
-chmod a+x /usr/sbin/policy-rc.d
-apt-get install -y docker-ce
-rm -f /usr/sbin/policy-rc.d
 
 systemctl enable docker
-systemctl enable containerd
 systemctl start docker
-systemctl start containerd
 
 tagScript success
 
