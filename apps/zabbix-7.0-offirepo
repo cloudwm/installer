@@ -30,11 +30,12 @@ installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix
 waitOrStop 0 "Failed to install Zabbix"
 
 echo "Creating Zabbix Database" | log
-mysql --default-file=/root/.my.cnf -h localhost <<EOF
+mysql -uroot -p${ADMINPASSWORD} <<EOF
 create database zabbix character set utf8mb4 collate utf8mb4_bin;
-CREATE USER 'zabbixuser'@'localhost' identified by '${ADMINPASSWORD}';
-GRANT all privileges on zabbix.* to zabbixuser@localhost;
+create user zabbix@localhost identified by '${ADMINPASSWORD}';
+grant all privileges on zabbix.* to zabbixuser@localhost;
 set global log_bin_trust_function_creators = 1;
+FLUSH PRIVILEGES;
 quit;
 EOF
 
@@ -65,12 +66,11 @@ cp $rootDir/tweaks/extras/zabbix/zabbix.conf /etc/apache2/sites-available/
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/zabbix.conf
 ln -s /etc/apache2/sites-available/zabbix.conf /etc/apache2/sites-enabled/
 
-chown -R zabbix:zabbix /run/zabbix
 chown -R zabbixuser:zabbixuser /run/zabbix
 
 echo "Extracting database content" | log
-zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p zabbix
-mysql --default-file=/root/.my.cnf -h localhost <<EOF
+zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uuserzabbix -p ${ADMINPASSWORD}
+mysql -uroot -p${ADMINPASSWORD} <<EOF
 set global log_bin_trust_function_creators = 0;
 quit;
 EOF
@@ -84,7 +84,7 @@ sleep 5
 waitOrStop 0 "Failed to start SQL"
 
 echo "Importing Zabbix databse" | log
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+mysql -uroot -p${ADMINPASSWORD} <<EOF
 USE zabbix;
 source /usr/share/doc/zabbix-sql-scripts/mysql/create.sql;
 EOF
