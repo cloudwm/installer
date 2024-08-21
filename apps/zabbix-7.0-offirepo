@@ -32,8 +32,8 @@ waitOrStop 0 "Failed to install Zabbix"
 echo "Creating Zabbix Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 create database zabbix character set utf8mb4 collate utf8mb4_bin;
-create user zabbixuser@localhost identified by '${ADMINPASSWORD}';
-grant all privileges on zabbix.* to zabbixuser@localhost;
+create user zabbix@localhost identified by '${ADMINPASSWORD}';
+grant all privileges on zabbix.* to zabbix@localhost;
 set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
 EOF
@@ -42,7 +42,7 @@ chmod 600 ~/.my.cnf
 
 echo "Tweaking Zabbix & PHP configuration" | log
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
-sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
+sed -i "s/DBUser=zabbix/DBUser=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/#\sDBPassword=/DBPassword=${ADMINPASSWORD}/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/8.3/fpm/php.ini
 sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/8.3/fpm/php.ini
@@ -97,7 +97,7 @@ sleep 3
 echo "Adding descriptions" | log
 descriptionAppend " "
 descriptionAppend "Database = zabbix"
-descriptionAppend "DBUser = zabbixuser"
+descriptionAppend "DBUser = zabbix"
 descriptionAppend "Zabbix Admin Web UI: https://${CWM_DOMAIN}/zabbix"
 descriptionAppend "Zabbix default credentials: User=Admin | Pass=zabbix"
 descriptionAppend " "
