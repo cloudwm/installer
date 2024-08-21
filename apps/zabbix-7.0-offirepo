@@ -66,10 +66,11 @@ cp $rootDir/tweaks/extras/zabbix/zabbix.conf /etc/apache2/sites-available/
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/zabbix.conf
 ln -s /etc/apache2/sites-available/zabbix.conf /etc/apache2/sites-enabled/
 
-echo "Extracting database content" | log
+echo "Extracting database content and Importing zabbix database" | log
 zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 zabbix
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 set global log_bin_trust_function_creators = 0;
+USE zabbix;
 EOF
 
 echo "Enabling and starting SQL" | log
