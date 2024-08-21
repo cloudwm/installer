@@ -30,11 +30,12 @@ installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix
 waitOrStop 0 "Failed to install Zabbix"
 
 echo "Creating Zabbix Database" | log
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+mysql --default-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE zabbix CHARACTER SET utf8 COLLATE utf8_bin;
 CREATE USER 'zabbixuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
 GRANT all privileges on zabbix.* to zabbixuser@localhost;
-FLUSH PRIVILEGES;
+set global log_bin_trust_function_creators = 1;
+quit;
 EOF
 
 
@@ -68,7 +69,11 @@ chown -R zabbix:zabbix /run/zabbix
 chown -R zabbixuser:zabbixuser /run/zabbix
 
 echo "Extracting database content" | log
-gunzip /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz
+zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p zabbix
+mysql --default-file=/root/.my.cnf -h localhost <<EOF
+set global log_bin_trust_function_creators = 0;
+quit;
+EOF
 
 echo "Enabling and starting SQL" | log
 systemctl enable mysql.service
@@ -95,7 +100,7 @@ systemctl restart apache2
 waitOrStop 0 "Failed to restart Apache"
 sleep 3
 systemctl restart php8.3-fpm
-waitOrStop 0 "Failed to restart php7.4-fpm"
+waitOrStop 0 "Failed to restart php8.3-fpm"
 sleep 3
 
 echo "Adding descriptions" | log
