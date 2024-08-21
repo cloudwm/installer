@@ -80,12 +80,6 @@ systemctl start mysql.service
 sleep 5
 waitOrStop 0 "Failed to start SQL"
 
-echo "Importing Zabbix databse" | log
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-USE zabbix;
-source /usr/share/doc/zabbix-sql-scripts/mysql/create.sql;
-EOF
-
 systemctl enable zabbix-server
 sleep 1
 systemctl stop zabbix-server
