@@ -31,8 +31,8 @@ waitOrStop 0 "Failed to install Zabbix"
 
 echo "Creating Zabbix Database" | log
 mysql --default-file=/root/.my.cnf -h localhost <<EOF
-CREATE DATABASE zabbix CHARACTER SET utf8 COLLATE utf8_bin;
-CREATE USER 'zabbixuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+create database zabbix character set utf8mb4 collate utf8mb4_bin;
+CREATE USER 'zabbixuser'@'localhost' identified by '${ADMINPASSWORD}';
 GRANT all privileges on zabbix.* to zabbixuser@localhost;
 set global log_bin_trust_function_creators = 1;
 quit;
