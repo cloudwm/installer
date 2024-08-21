@@ -69,7 +69,7 @@ ln -s /etc/apache2/sites-available/zabbix.conf /etc/apache2/sites-enabled/
 
 echo "Extracting database content" | log
 zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 zabbix
-mysql -uroot -p${ADMINPASSWORD} <<EOF
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 set global log_bin_trust_function_creators = 0;
 EOF
 
