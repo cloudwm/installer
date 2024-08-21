@@ -29,6 +29,8 @@ echo "Installing Zabbix" | log
 installPackage zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
 waitOrStop 0 "Failed to install Zabbix"
 
+chmod 600 ~/.my.cnf
+
 echo "Creating Zabbix Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 create database zabbix character set utf8mb4 collate utf8mb4_bin;
@@ -37,8 +39,6 @@ grant all privileges on zabbix.* to zabbix@localhost;
 set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
 EOF
-
-chmod 600 ~/.my.cnf
 
 echo "Tweaking Zabbix & PHP configuration" | log
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
