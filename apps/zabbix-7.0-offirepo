@@ -55,6 +55,7 @@ echo "StartIPMIPollers=1" >> /etc/zabbix/zabbix_server.conf
 echo "StartSNMPTrapper=1" >> /etc/zabbix/zabbix_server.conf
 echo "StartVMwareCollectors=1" >> /etc/zabbix/zabbix_server.conf
 echo "StartReportWriters=1" >> /etc/zabbix/zabbix_server.conf
+echo "WebServiceURL=1" >> /etc/zabbix/zabbix_server.conf
 
 echo "Adding FW rules" | log
 ufw allow 10050
