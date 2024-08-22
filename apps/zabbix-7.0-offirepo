@@ -72,7 +72,24 @@ sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/zabbix.conf
 ln -s /etc/apache2/sites-available/zabbix.conf /etc/apache2/sites-enabled/
 
 echo "Extracting database content and Importing zabbix database" | log
+while true; do
+        echo "Testing"
+        status=$(systemctl status mysql.service | grep "Active:" | awk -F' ' '{print $2}')
+        if [ "${status,,}" == "active" ]; then
+                echo "Active"
+                break
+        fi
+        sleep 1
+done
+
+exist=$(mysql -e "show databases;" | grep "zabbix")
+if [ -z $exist ]; then
+        echo "Zabbix not found,script is stopping!" | log
+	exit 1
+fi
+
 zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 zabbix
+
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 set global log_bin_trust_function_creators = 0;
 USE zabbix;
