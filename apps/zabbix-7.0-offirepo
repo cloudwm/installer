@@ -84,10 +84,8 @@ done
 
 echo "Enabling and starting SQL" | log
 systemctl enable mysql.service
-systemctl stop mysql.service
-sleep 2
-systemctl start mysql.service
-sleep 5
+sleep 1
+systemctl restart mysql.service
 waitOrStop 0 "Failed to start SQL"
 
 exist=$(mysql -e "show databases;" | grep "zabbix")
@@ -104,9 +102,7 @@ EOF
 
 systemctl enable zabbix-server
 sleep 1
-systemctl stop zabbix-server
-sleep 1
-systemctl start zabbix-server
+systemctl restart zabbix-server
 waitOrStop 0 "Failed to restart Zabbix"
 sleep 3
 systemctl restart apache2
