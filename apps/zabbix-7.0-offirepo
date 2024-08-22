@@ -82,24 +82,19 @@ while true; do
         sleep 1
 done
 
-echo "Enabling and starting SQL" | log
+gunzip /usr/share/zabbix-sql-scripts/mysql/server.sql.gz 
+
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+set global log_bin_trust_function_creators = 0;
+use zabbix;
+source /usr/share/zabbix-sql-scripts/mysql/server.sql;
+EOF
+
+echo "Enabling and starting SQL and Zabbix" | log
 systemctl enable mysql.service
 sleep 1
 systemctl restart mysql.service
 waitOrStop 0 "Failed to start SQL"
-
-exist=$(mysql -e "show databases;" | grep "zabbix")
-if [ -z $exist ]; then
-        echo "Zabbix not found,script is stopping!" | log
-	exit 1
-fi
-
-zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 zabbix
-
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-set global log_bin_trust_function_creators = 0;
-EOF
-
 systemctl enable zabbix-server
 sleep 1
 systemctl restart zabbix-server
