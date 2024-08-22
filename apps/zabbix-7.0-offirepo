@@ -34,15 +34,15 @@ chmod 600 ~/.my.cnf
 echo "Creating Zabbix Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 create database zabbix character set utf8mb4 collate utf8mb4_bin;
-create user zabbix@localhost identified by '${ADMINPASSWORD}';
-grant all privileges on zabbix.* to zabbix@localhost;
+create user zabbixuser@localhost identified by '${ADMINPASSWORD}';
+grant all privileges on zabbix.* to zabbixuser@localhost;
 set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
 EOF
 
 echo "Tweaking Zabbix & PHP configuration" | log
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
-#sed -i "s/DBUser=zabbix/DBUser=zabbix/g" /etc/zabbix/zabbix_server.conf
+sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/#\sDBPassword=/DBPassword=${ADMINPASSWORD}/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/8.3/fpm/php.ini
 sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/8.3/fpm/php.ini
@@ -51,6 +51,10 @@ sed -i "s/post_max_size = 8M/post_max_size = 32M/g" /etc/php/8.3/apache2/php.ini
 sed -i "s/max_input_time = 60/max_input_time = 360/g" /etc/php/8.3/apache2/php.ini
 sed -i "s/max_execution_time = 30/max_execution_time = 360/g" /etc/php/8.3/apache2/php.ini
 sed -i "s/127.0.0.1/0.0.0.0/g" /etc/mysql/mysql.conf.d/mysqld.cnf
+echo "StartIPMIPollers=1" >> /etc/zabbix/zabbix_server.conf
+echo "StartSNMPTrapper=1" >> /etc/zabbix/zabbix_server.conf
+echo "StartVMwareCollectors=1" >> /etc/zabbix/zabbix_server.conf
+echo "StartReportWriters=1" >> /etc/zabbix/zabbix_server.conf
 
 echo "Adding FW rules" | log
 ufw allow 10050
@@ -98,7 +102,7 @@ sleep 3
 echo "Adding descriptions" | log
 descriptionAppend " "
 descriptionAppend "Database = zabbix"
-descriptionAppend "DBUser = zabbix"
+descriptionAppend "DBUser = zabbixuser"
 descriptionAppend "Zabbix Admin Web UI: https://${CWM_DOMAIN}/zabbix"
 descriptionAppend "Zabbix default credentials: User=Admin | Pass=zabbix"
 descriptionAppend " "
