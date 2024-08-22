@@ -15,7 +15,7 @@ mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
 ubuntu_version=$(lsb_release -rs)
 
-if [[ $ubuntu_version == 24 ]]; then
+if [[ $ubuntu_version == 24.04 ]]; then
 	appVersion=9.10.1
 else
 	appVersion=5.35.3
