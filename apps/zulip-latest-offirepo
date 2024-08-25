@@ -29,6 +29,10 @@ unlink /etc/nginx/sites-enabled/zulip-enterprise
 sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/nginx/sites-enabled/zulip.conf
 sed -i '1i include /etc/zulip/nginx_sharding_map.conf;' /etc/nginx/sites-enabled/zulip.conf
 sed -i '/include \/etc\/zulip\/nginx_sharding.conf;/d' /etc/nginx/sites-enabled/zulip.conf
+if [[ ! -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
+        sed -i 's/cert\.pem/fullchain\.pem/g' /etc/nginx/sites-enabled/zulip.conf
+fi
+
 service nginx restart
 waitOrStop 0 "Failed to restart NGINX"
 
