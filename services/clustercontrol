@@ -6,7 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+
+
 rootDir=$(rootDir)
+sslConf="/etc/apache2/sites-available/s9s-ssl.conf"
 
 echo "Get ansible Role" | log
 ansible-galaxy install severalnines.clustercontrol | log
@@ -29,12 +32,21 @@ cat <<EOF > cc.playbook
     - { role: severalnines.clustercontrol }
 EOF
 
+ubuntu_version=$(lsb_release -rs)
+
+if [[ "$ubuntu_version" == "24.04" ]]; then
+	sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
+	sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
+	apt -y install software-properties-common
+	add-apt-repository ppa:ondrej/php
+	apt-get update
+	apt -y install php7.4 php7.4-mysql php7.4-curl	
+	a2dismod php8.3
+	a2enmod php7.4
+fi
+
 echo "runing playbook" | log
 ansible-playbook cc.playbook | log
-
-
-
-
 
 #### SSL ####
 echo "Installing certbot for apache" | log
@@ -59,7 +71,6 @@ waitOrStop 0 "Certificate creation failed"
 # Sending log to log server - 45-93-93-142.cloud-xip.com
 curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
 
-
 else
 export certbot_failed=0
 fi
@@ -69,11 +80,9 @@ systemctl start apache2.service
 waitOrStop 0 "Failed to start Apache service"
 tag global-domain-set.success
 
-
-
 echo "Reconfigure SSL in Vhost" | log
-sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
-sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
+sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" $sslConf
+sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" $sslConf
 
 waitOrStop 0 "Failed Reconfigure SSL in Vhost"
 systemctl restart apache2.service
@@ -87,12 +96,13 @@ apt-get remove -y ansible
 
 ## Create new rpc-key and modify relevant files ##
 random_rpc=$(date +%s | sha256sum | base64 | head -c 32 ; echo)
+sed -i '/^rpc_key=/d' /etc/cmon.cnf
 echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
 sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
 echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
+/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh
 
 echo "Adding descriptions" | log
-descriptionAppend "Run before registration:/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh "
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
 descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
 descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
