@@ -39,7 +39,7 @@ ubuntu_version=$(lsb_release -rs)
 # Allocate swap based on Ubuntu version
 if [[ "$ubuntu_version" == "18.04" || "$ubuntu_version" == "20.04" ]]; then
     create_swap 512
-elif [[ "$ubuntu_version" == "22.04" ]]; then
+elif [[ "$ubuntu_version" == "22.04" || "$ubuntu_version" == "24.04" ]]; then
     create_swap 1024
 else
     echo "Unsupported Ubuntu version: $ubuntu_version" | log
