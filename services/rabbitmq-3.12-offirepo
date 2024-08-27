@@ -122,15 +122,11 @@ systemctl start rabbitmq-server
 systemctl restart rabbitmq-server
 waitOrStop 0 "Starting rabbitmq service failed"
 
-echo "Adding admin user" | log
-while ! rabbitmqctl status; do
-    echo "Waiting for RabbitMQ to start..."
-    sleep 5
-done
 rabbitmqctl add_user admin ${ADMINPASSWORD}
 rabbitmqctl set_user_tags admin administrator 
 rabbitmqctl set_permissions -p / admin ".*" ".*" ".*" 
 rabbitmqctl delete_user guest 
+rabbitmqctl list_users >> /root/log.txt
 
 echo "Adding descriptions" | log
 descriptionAppend "RabbitMQ Web UI: https://${rabbitmqDomain}"
