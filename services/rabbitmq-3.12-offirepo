@@ -9,7 +9,7 @@ fi
 checkTagExist nginx.success
 
 rootDir=$(rootDir)
-erlangVersion=25.x
+erlangVersion=26.x
 rabbitmqVersion=3.12.\*
 
 
@@ -31,6 +31,12 @@ installPackage rabbitmq-server=$rabbitmqVersion
 waitOrStop 0 "Failed apt install: rabbitmq-server"
 # enable web ui plugin
 rabbitmq-plugins enable rabbitmq_management
+
+echo "Adding admin user" | log
+rabbitmqctl add_user admin ${ADMINPASSWORD}
+rabbitmqctl set_user_tags admin administrator
+rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+rabbitmqctl delete_user guest
 
 echo "Opening web UI to remote access" | log
 # Enabling certbot for rabbitmq
@@ -121,12 +127,6 @@ systemctl enable rabbitmq-server
 systemctl start rabbitmq-server
 systemctl restart rabbitmq-server
 waitOrStop 0 "Starting rabbitmq service failed"
-
-rabbitmqctl add_user admin ${ADMINPASSWORD}
-rabbitmqctl set_user_tags admin administrator 
-rabbitmqctl set_permissions -p / admin ".*" ".*" ".*" 
-rabbitmqctl delete_user guest 
-rabbitmqctl list_users >> /root/log.txt
 
 echo "Adding descriptions" | log
 descriptionAppend "RabbitMQ Web UI: https://${rabbitmqDomain}"
