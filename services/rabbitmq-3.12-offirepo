@@ -32,11 +32,12 @@ waitOrStop 0 "Failed apt install: rabbitmq-server"
 # enable web ui plugin
 rabbitmq-plugins enable rabbitmq_management
 
-echo "Adding admin user" | log
-rabbitmqctl add_user admin ${ADMINPASSWORD}
-rabbitmqctl set_user_tags admin administrator
-rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
-rabbitmqctl delete_user guest
+#echo "Adding admin user" | log
+#rabbitmqctl add_user admin ${ADMINPASSWORD}
+#rabbitmqctl set_user_tags admin administrator
+#rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+#rabbitmqctl delete_user guest
+rabbitmqctl change_password guest ${ADMINPASSWORD}
 
 echo "Opening web UI to remote access" | log
 # Enabling certbot for rabbitmq
