@@ -93,9 +93,10 @@ ssl_options.fail_if_no_peer_cert = true
 management.ssl.cacertfile = /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem
 management.ssl.certfile   = /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem
 management.ssl.keyfile    = /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem
-
 EOF
+
 else
+	sed -i '/ssl_trusted_certificate \/path\/to\/your.chain;/d' /etc/nginx/sites-available/rabbitmq.conf
 	cat << EOF > /etc/rabbitmq/rabbitmq.conf
 
 listeners.ssl.default = 5671
@@ -108,7 +109,6 @@ ssl_options.fail_if_no_peer_cert = true
 
 management.ssl.certfile   = /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem
 management.ssl.keyfile    = /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem
-
 EOF
 
 fi
