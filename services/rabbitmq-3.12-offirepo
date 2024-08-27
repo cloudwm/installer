@@ -123,10 +123,11 @@ systemctl restart rabbitmq-server
 waitOrStop 0 "Starting rabbitmq service failed"
 
 echo "Adding admin user" | log
-rabbitmqctl add_user admin $ADMINPASSWORD
-rabbitmqctl set_user_tags admin administrator
-rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
-rabbitmqctl delete_user guest
+rabbitmqctl add_user admin $ADMINPASSWORD >> log.txt
+rabbitmqctl set_user_tags admin administrator >> log.txt
+rabbitmqctl set_permissions -p / admin ".*" ".*" ".*" >> log.txt
+rabbitmqctl delete_user guest >> log.txt
+systemctl status rabbitmq-server >> log.txt
 
 echo "Adding descriptions" | log
 descriptionAppend "RabbitMQ Web UI: https://${rabbitmqDomain}"
