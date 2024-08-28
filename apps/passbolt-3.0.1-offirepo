@@ -9,32 +9,75 @@ fi
 rootDir=$(rootDir)
 
 echo "Installing dependencies" | log
-packages=(apt-transport-https ca-certificates gnupg-agent software-properties-common docker-compose)
+packages=(apt-transport-https ca-certificates gnupg-agent software-properties-common docker-compose docker.io)
 installPackage "${packages[@]}" | log
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
+ubuntu_version=$(lsb_release -rs)
+containerName="passbolt_passbolt_1"
+
 echo "Downloading passbolt from Git" | log
-curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/v3.0.1.tar.gz
-waitOrStop 0 "Failed to download PassBolt"
+if [[ "$ubuntu_version" == "24.04" ]]; then
+	rm /usr/bin/docker-compose 
+	curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep tag_name | cut -d '"' -f 4)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/bin/docker-compose
+	chmod +x /usr/bin/docker-compose
+	systemctl daemon-reload 
+	systemctl restart docker.service
+	systemctl restart docker.socket
+	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/4.0.0.tar.gz
+	waitOrStop 0 "Failed to download PassBolt"
+else
+	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/v3.0.1.tar.gz
+	waitOrStop 0 "Failed to download PassBolt"
+fi
 
 echo "Extracting PassBolt" | log
-tar -xzvf v3.0.1.tar.gz
-mv passbolt_docker-3.0.1/ passbolt/
-mv passbolt/ /opt/
-rm -rf v3.0.1.tar.gz
-cd /opt/passbolt/
-sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /opt/passbolt/env/passbolt.env
-sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/passbolt.env
-sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
-sed -i "s/test/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
-mv /opt/passbolt/conf/passbolt.conf /opt/passbolt/conf/passbolt.conf.bk
-mv /opt/passbolt/docker-compose.yml /opt/passbolt/docker-compose.yml.bk
-cp $rootDir/tweaks/extras/passbolt/passbolt.conf /opt/passbolt/conf/
-cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /opt/passbolt/
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
-docker-compose up -d
-waitOrStop 0 "Failed docker-compose"
+if [[ "$ubuntu_version" == "24.04" ]]; then
+	tar -xzvf 4.0.0.tar.gz
+	mv passbolt_docker-4.0.0/ passbolt/
+	mv passbolt/ /opt/
+	rm -rf 4.0.0.tar.gz
+	cd /opt/passbolt/
+	sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /opt/passbolt/dev/env/passbolt.env
+	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/dev/env/passbolt.env
+	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/dev/env/mysql.env
+	sed -i "s/test/${ADMINPASSWORD}/g" /opt/passbolt/dev/env/mysql.env
+	mv /opt/passbolt/conf/passbolt.conf /opt/passbolt/conf/passbolt.conf.bk
+	mv /opt/passbolt/docker-compose.yml /opt/passbolt/docker-compose.yml.bk
+	cp $rootDir/tweaks/extras/passbolt/passbolt.conf /opt/passbolt/conf/
+	cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /opt/passbolt/
+	sed -i 's/image: mariadb:10.3/image: mariadb:10.11/' docker-compose.yml
+	sed -i 's/image: passbolt\/passbolt:3.0.1-ce/image: passbolt\/passbolt:latest-ce/' docker-compose.yml
+	sed -i 's/env\/mysql.env/dev\/env\/mysql.env/' docker-compose.yml
+	sed -i 's/env\/passbolt.env/dev\/env\/passbolt.env/' docker-compose.yml
+	if [[ ! -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
+		sed -i 's/cert\.pem/fullchain\.pem/g' conf/passbolt.conf
+		sed -i 's/cert\.pem/fullchain\.pem/g' docker-compose.yml
+	fi
+	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
+	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
+	docker-compose up -d
+	waitOrStop 0 "Failed docker-compose"
+	containerName="passbolt-passbolt-1"
+else	
+	tar -xzvf v3.0.1.tar.gz
+	mv passbolt_docker-3.0.1/ passbolt/
+	mv passbolt/ /opt/
+	rm -rf v3.0.1.tar.gz
+	cd /opt/passbolt/
+	sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /opt/passbolt/env/passbolt.env
+	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/passbolt.env
+	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
+	sed -i "s/test/${ADMINPASSWORD}/g" /opt/passbolt/env/mysql.env
+	mv /opt/passbolt/conf/passbolt.conf /opt/passbolt/conf/passbolt.conf.bk
+	mv /opt/passbolt/docker-compose.yml /opt/passbolt/docker-compose.yml.bk
+	cp $rootDir/tweaks/extras/passbolt/passbolt.conf /opt/passbolt/conf/
+	cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /opt/passbolt/
+	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
+	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
+	docker-compose up -d
+	waitOrStop 0 "Failed docker-compose"
+fi
 
 cat << EOF > /etc/systemd/system/passbolt.service
 [Unit]
@@ -59,7 +102,7 @@ sleep 30
 
 echo "Creating PassBolt login UI" | log
 touch /opt/passbolt/loginurl.txt
-docker exec passbolt_passbolt_1 su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /opt/passbolt/loginurl.txt
+docker exec ${containerName} su -m -c "bin/cake passbolt register_user -u ${ADMINEMAIL} -f admin -l admin -r admin" -s /bin/sh www-data >> /opt/passbolt/loginurl.txt
 sleep 5
 
 initialurl=$(cat /opt/passbolt/loginurl.txt | grep https)
