@@ -1,32 +1,3 @@
-Logo
-Issues
-Pull Requests
-Milestones
-Explore
-DevOps
-/
-installer
-Code
-Issues
-Pull Requests
-15
-Wiki
-Activity
-You pushed on branch CWMA-328-Zabbix 9 minutes ago
-installer
-/
-tweaks
-/
-apache-enable-ssl-letsencrypt
-cloudwm
-cloudwm
-ccf450e5d1
-Remove SSL from WordPress
-3 years ago
-54 lines
-1.7 KiB
-Bash
-Executable File
 #!/bin/bash
 
 # Add this at the begining of all scripts.
@@ -79,11 +50,5 @@ descriptionAppend " "
 
 tagScript success
 
+
 exit 0
-Powered by Gitea
-Version: 1.22.0 Page:
-54ms
-Template:
-5ms
-Licenses
-API
