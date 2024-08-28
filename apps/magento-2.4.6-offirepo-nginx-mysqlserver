@@ -12,8 +12,14 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-appVersion=2.4.6
 rootDir=$(rootDir)
+ubuntu_version=$(lsb_release -rs)
+
+if [[ $ubuntu_version == "24.04" ]]; then
+	appVersion=2.4.7
+else
+	appVersion=2.4.6
+fi
 
 echo "Creating Magento Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -121,6 +127,9 @@ waitOrStop 0 "Restart nginx service failed"
 echo "Adding index.php to document root"
 cp $appPath/pub/index.php $appPath/
 cd $appPath && sed -i "s/\/..\/app/\/app/g" index.php
+
+bin/magento indexer:reindex
+waitOrStop 0 "Reindex actions failed"
 
 echo "Adding descriptions" | log
 descriptionAppend "Magento Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}${ADMIN_URI}"
