@@ -12,9 +12,9 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-rootDir=$(rootDir)
-appVersion=1.35.1
+appVersion=1.42.0
 appArchive=mediawiki-$appVersion.tar.gz
+rootDir=$(rootDir)
 
 echo "Installing MediaWiki" | log
 

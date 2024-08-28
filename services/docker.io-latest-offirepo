@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing docker.io package" | log
+installPackage docker.io 
+waitOrStop 0 "Docker didnt installed successfully"
+
+
+systemctl enable docker
+systemctl start docker
+
+tagScript success
+
+exit 0
