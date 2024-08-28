@@ -32,8 +32,10 @@ waitOrStop 0 "Failed apt install: rabbitmq-server"
 # enable web ui plugin
 rabbitmq-plugins enable rabbitmq_management
 
-sed -i 's|#NODENAME=rabbit|NODENAME=rabbit@$(hostname)|' /etc/rabbitmq/rabbitmq-env.conf
-rm -rf /var/lib/rabbitmq/mnesia/rabbit@localhost
+hostname=$(echo "hostname")
+sed -i 's|#NODENAME=rabbit|NODENAME=rabbit@${hostname})|' /etc/rabbitmq/rabbitmq-env.conf
+rm -rf /var/lib/rabbitmq/mnesia/rabbit@local*
+
 
 echo "Adding admin user" | log
 rabbitmqctl add_user admin ${ADMINPASSWORD}
@@ -67,10 +69,8 @@ mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem -out /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
 waitOrStop 0 "Certificate creation failed"
 
-# Sending log to log server - 45-93-93-142.cloud-xip.com
-curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
-
 else
+
 export certbot_failed=0
 #waitOrStop 0 "Failed certbot certificate generation"
 fi
@@ -80,18 +80,14 @@ cp $rootDir/tweaks/extras/rabbitmq-nginx/rabbitmq.conf /etc/nginx/sites-availabl
 # add keys to ssl configs
 sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem|" /etc/nginx/sites-available/rabbitmq.conf
 sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem|" /etc/nginx/sites-available/rabbitmq.conf
-if [[ -f /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem ]]; then
-	sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${rabbitmqDomain}/chain.pem|" /etc/nginx/sites-available/rabbitmq.conf
-else
-	sed -i '/ssl_trusted_certificate \/path\/to\/your.chain;/d' /etc/nginx/sites-available/rabbitmq.conf
-fi
 
 ln -s /etc/nginx/sites-available/rabbitmq.conf /etc/nginx/sites-enabled/
 systemctl restart nginx
 waitOrStop 0 "Restarting nginx service failed"
 
-if [[ -f /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem ]]; then
-	cat << EOF > /etc/rabbitmq/rabbitmq.conf
+if [[ -f /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem ]]; then 
+      	sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${rabbitmqDomain}/chain.pem|" /etc/nginx/sites-available/rab
+	at << EOF > /etc/rabbitmq/rabbitmq.conf
 
 listeners.ssl.default = 5671
 management.ssl.port   = 15671
@@ -108,6 +104,7 @@ management.ssl.keyfile    = /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem
 EOF
 
 else
+	sed -i '/ssl_trusted_certificate \/path\/to\/your.chain;/d' /etc/nginx/sites-available/rabbitmq.conf
 	cat << EOF > /etc/rabbitmq/rabbitmq.conf
 
 listeners.ssl.default = 5671
