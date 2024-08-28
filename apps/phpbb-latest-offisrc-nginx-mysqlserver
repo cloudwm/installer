@@ -11,6 +11,8 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
+installPackage bzip2
+
 appVersion=3.3.3
 appArchive=phpBB-$appVersion.tar.bz2
 appPath=/var/www/html
