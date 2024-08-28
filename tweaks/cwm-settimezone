@@ -38,9 +38,6 @@ timezones[EU-ST]="Europe/Stockholm"
 timezones[US-AT]="America/Atlanta"
 timezones[US-LA]="America/Los_Angeles"
 timezones[US-SE]="America/Seattle"
-timezones[DEV]="Asia/Jerusalem"
-timezones[DEV2]="Asia/Jerusalem"
-timezones[CWM]="Asia/Jerusalem"
 
 if [ ! ${timezones[$CWM_ZONE]} ]; then
 
