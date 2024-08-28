@@ -32,10 +32,9 @@ waitOrStop 0 "Failed apt install: rabbitmq-server"
 # enable web ui plugin
 rabbitmq-plugins enable rabbitmq_management
 
-hostname=$(echo "hostname")
-sed -i 's|#NODENAME=rabbit|NODENAME=rabbit@${hostname})|' /etc/rabbitmq/rabbitmq-env.conf
+echo "NODENAME=rabbit@$HOSTNAME" > /etc/rabbitmq/rabbitmq-env.conf
 rm -rf /var/lib/rabbitmq/mnesia/rabbit@local*
-
+rm -rf /var/log/rabbitmq/rabbit@local*
 
 echo "Adding admin user" | log
 rabbitmqctl add_user admin ${ADMINPASSWORD}
