@@ -111,7 +111,7 @@ echo "Adding descriptions" | log
 descriptionAppend " "
 descriptionAppend "Database = zabbix"
 descriptionAppend "DBUser = zabbixuser"
-descriptionAppend "Zabbix Admin Web UI: https://${CWM_DOMAIN}/zabbix"
+descriptionAppend "Zabbix Admin Web UI: http://${CWM_DOMAIN}/zabbix"
 descriptionAppend "Zabbix default credentials: User=Admin | Pass=zabbix"
 descriptionAppend " "
 
