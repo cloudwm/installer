@@ -115,6 +115,7 @@ descriptionAppend "Zabbix Admin Web UI: http://${CWM_DOMAIN}/zabbix"
 descriptionAppend "Zabbix default credentials: User=Admin | Pass=zabbix"
 descriptionAppend " "
 
+
 tagScript success
 
 exit 0
