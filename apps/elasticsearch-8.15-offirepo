@@ -1,0 +1,108 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+checkTagExist nginx.success
+checkTagExist ssl-ready.success
+elasticVersion="8.15.0"
+kibanaVersion="8.15.0"
+
+echo "Adding repo to apt" | log
+curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch
+waitOrStop 0 "File not downloaded from official source"
+apt-key add GPG-KEY-elasticsearch
+echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list
+apt update
+
+echo "Installing Elasticsearch and Kibana web UI" | log
+packages=(elasticsearch=$elasticVersion kibana=$kibanaVersion)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Tweaking Elasticsearch configuration" | log
+elasticPort=8881
+elasticConfigPath=/etc/elasticsearch/elasticsearch.yml
+# tweak network.host
+sed -i '/network.host:/s/^#//g' $elasticConfigPath
+sed -i '/network.host:/s/192.168.0.1/127.0.0.1/g' $elasticConfigPath
+# tweak http.port
+sed -i '/http.port:/s/^#//g' $elasticConfigPath
+sed -i '/http.port:/s/9200/'"${elasticPort}"'/g' $elasticConfigPath
+# tweak xpack security
+sed -i 's/^xpack\.security\.\(enabled\|enrollment.enabled\): true/xpack.security.\1: false/' $elasticConfigPath
+
+echo "Tweaking Kibana web UI configuration" | log
+kibanaPort=8882
+kibanaConfigPath=/etc/kibana/kibana.yml
+# tweak server.port
+sed -i '/server.port:/s/^#//g' $kibanaConfigPath
+sed -i '/server.port:/s/5601/'"${kibanaPort}"'/g' $kibanaConfigPath
+# tweak server.host
+sed -i '/server.host:/s/^#//g' $kibanaConfigPath
+sed -i '/server.host:/s/localhost/127.0.0.1/g' $kibanaConfigPath
+# tweak elasticsearch.hosts
+sed -i '/elasticsearch.hosts:/s/^#//g' $kibanaConfigPath
+sed -i '/elasticsearch.hosts:/s/localhost/127.0.0.1/g' $kibanaConfigPath
+sed -i '/elasticsearch.hosts:/s/9200/'"${elasticPort}"'/g' $kibanaConfigPath
+
+echo "Creating basic auth to secure Kibana web UI" | log
+echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" > /etc/nginx/htpasswd.users
+
+echo "Setting nginx configuration" | log
+nginxConfigPath=/etc/nginx/sites-available
+# copy readymade config to nginx sites
+cp -f $rootDir/tweaks/extras/elasticsearch-nginx/kibana.conf $nginxConfigPath/
+# place elasticPort for elasticsearch upstream
+sed -i '/server/s/ELASTIC_PLACEHOLDER/127.0.0.1:'"${elasticPort}"'/g' $nginxConfigPath/kibana.conf
+# place kibanaPort for kibana upstream
+sed -i '/server/s/KIBANA_PLACEHOLDER/127.0.0.1:'"${kibanaPort}"'/g' $nginxConfigPath/kibana.conf
+# link site to enable
+ln -s $nginxConfigPath/kibana.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
+waitOrStop 0 "Reload nginx service failed"
+
+echo "Tweaking optimal performance settings" | log
+# reduce vm swappiness to minimum
+sysctl vm.swappiness=1
+# check heap size and change to 50% RAM
+totalram=$(cat /proc/meminfo | grep MemTotal | awk '{print int($2/1024)}')
+sed -i '/-Xms/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
+sed -i '/-Xmx/s/1g/'"$(($totalram / 2))"'m/g' /etc/elasticsearch/jvm.options
+# keep memory from switching away from elasticsearch
+sed -i '/bootstrap.memory_lock:/s/^#//g' $elasticConfigPath
+mkdir -p /etc/systemd/system/elasticsearch.service.d/
+cat << EOF > /etc/systemd/system/elasticsearch.service.d/override.conf
+[Service]
+LimitMEMLOCK=infinity
+EOF
+systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
+
+echo "Starting and enabling services"
+systemctl enable elasticsearch.service
+systemctl enable kibana.service
+systemctl restart elasticsearch.service
+waitOrStop 0 "Restart elasticsearch service failed"
+systemctl restart kibana.service
+waitOrStop 0 "Restart kibana service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Elasticsearch Username: admin"
+descriptionAppend "Elasticsearch Password: ${ADMINPASSWORD}"
+descriptionAppend "Elasticsearch (Kibana) Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend " "
+descriptionAppend "Elasticsearch config files location: /etc/elasticsearch/"
+descriptionAppend "Kibana config file: /etc/kibana/kibana.yml"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
