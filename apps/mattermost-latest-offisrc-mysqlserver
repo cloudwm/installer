@@ -9,11 +9,17 @@ fi
 
 checkTagExist mysqld.success
 
-appVersion=5.35.3
 appPath=/opt/mattermost
 rootDir=$(rootDir)
 mmuser_name="mmuser"
 mmuser_password=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo ''`
+ubuntu_version=$(lsb_release -rs)
+
+if [[ $ubuntu_version == 24.04 ]]; then
+	appVersion=9.10.1
+else
+	appVersion=5.35.3
+fi
 
 echo "Preparing database for application" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
