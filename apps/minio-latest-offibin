@@ -98,7 +98,7 @@ ufw allow from any to any
 ufw --force enable
 waitOrStop 0 "Minio service did not restart"
 
-descriptionAppend "Minio Web UI: https://${CWM_DISPLAYED_ADDRESS}:9000"
+descriptionAppend "Minio Web UI: http://${CWM_DISPLAYED_ADDRESS}:9000"
 descriptionAppend "Minio Access key: $access_key"
 descriptionAppend "Minio Secret key: $secret_key"
 descriptionAppend " "
