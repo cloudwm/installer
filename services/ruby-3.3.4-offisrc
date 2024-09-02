@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rubyVersion=3.3.4
+rubyInstallPath=/opt/ruby-$rubyVersion
+rootDir=$(rootDir)
+
+echo "Installing dependencies" | log
+packages=(autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Donwloading & installing Ruby build tool" | log
+cd $rootDir/temp
+git clone https://github.com/rbenv/ruby-build.git | log
+waitOrStop 0 "File not downloaded from Github"
+PREFIX=/usr/local ./ruby-build/install.sh
+waitOrStop 0 "Ruby build tool failed"
+
+echo "Installing Ruby" | log
+ruby-build $rubyVersion $rubyInstallPath --verbose | log
+waitOrStop 0 "Failed to install application"
+
+echo "Adding Ruby path to global environment" | log
+sed -i "s|\"$|:${rubyInstallPath}/bin\"|" /etc/environment
+
+echo "Adding descriptions" | log
+descriptionAppend "Ruby install path: ${rubyInstallPath}"
+
+tag ruby.success
+tagScript success
+exit 0
