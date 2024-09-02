@@ -12,8 +12,8 @@ cd $rootDir/temp
 
 echo "Downloading ISPConfig installlation package" | log
 if [[ $ubuntu_version == "24.04" ]]; then
-	curlDownload https://sourceforge.net/projects/ispconfig/files/ISPConfig%203/ISPConfig-3.2.11/ISPConfig-3.2.11.tar.gz/download
-	tar xfz ispconfig.tar.gz
+	curlDownload https://sourceforge.net/projects/ispconfig/files/ISPConfig%203/ISPConfig-3.2.11/ISPConfig-3.2.11.tar.gz
+	tar xfz ISPConfig-3.2.11.tar.gz
 else	
 	curlDownload https://www.ispconfig.org/downloads/ISPConfig-3-stable.tar.gz ispconfig.tar.gz
 	tar xfz ispconfig.tar.gz
