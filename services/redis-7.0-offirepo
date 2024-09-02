@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Adding Redis to apt" | log
+add-apt-repository ppa:chris-lea/redis-server -y | log
+waitOrStop 0 "Repository not added to source list"
+apt update
+
+echo "Installing Latest Redis-Server" | log
+installPackage redis
+waitOrStop 0 "Failed apt install: redis"
+
+echo "Enabling Redis service" | log
+systemctl enable redis-server.service
+
+echo "Adding descriptions" | log
+descriptionAppend "Redis IP Address: ${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend " "
+
+tag redis.success
+tagScript success
+
+exit 0
