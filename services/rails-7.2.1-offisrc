@@ -14,10 +14,9 @@ railsVersion=7.2.1
 export PATH=`cat /etc/environment | cut -d'"' -f 2`
 rootDir=$(rootDir)
 
-echo "Installing Yarn for package management" | log
+echo "Installing Dependencies" | log
 cd $rootDir/temp
-curlDownload https://github.com/rails/rails/archive/refs/tags/v7.2.1.tar.gz
-packages=(software-properties-common libpq-dev libmysqlclient-dev ruby-railties ruby-dev build-essential zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn)
+packages=(software-properties-common libpq-dev libmysqlclient-dev ruby-railties ruby-dev build-essential zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev)
 installPackage "${packages[@]}"
 waitOrStop "Failed apt install: ${packages[@]}"
 
