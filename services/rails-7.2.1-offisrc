@@ -16,18 +16,14 @@ rootDir=$(rootDir)
 
 echo "Installing Yarn for package management" | log
 cd $rootDir/temp
-curlDownload https://dl.yarnpkg.com/debian/pubkey.gpg
-apt-key add pubkey.gpg
-echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-apt update
-packages=(software-properties-common ruby-railties zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn)
+curlDownload https://github.com/rails/rails/archive/refs/tags/v7.2.1.tar.gz
+packages=(software-properties-common libpq-dev libmysqlclient-dev ruby-railties ruby-dev build-essential zlib1g-dev libssl-dev libreadline-dev libyaml-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev libffi-dev yarn)
 installPackage "${packages[@]}"
 waitOrStop "Failed apt install: ${packages[@]}"
 
 echo "Installing Bundler and Rails" | log
 gem install bundler
 gem install rails -v $railsVersion
-gem update --system
 bundler update --bundler
 
 echo "Initiating demo app" | log

@@ -7,20 +7,21 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rubyVersion=3.3.4
-rubyInstallPath=/opt/ruby-$rubyVersion
+rubyVersion=3.3.5
+rubyInstallPath=/opt/ruby-build-*
 rootDir=$(rootDir)
 
 echo "Installing dependencies" | log
-packages=(autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev)
+packages=(autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev)
 installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp
-git clone https://github.com/rbenv/ruby-build.git | log
+curlDownload https://github.com/rbenv/ruby-build/archive/refs/tags/v20240903.tar.gz | log
 waitOrStop 0 "File not downloaded from Github"
-PREFIX=/usr/local ./ruby-build/install.sh
+tar -xzf ruby-build-*.tar.gz
+PREFIX=/usr/local ./$rubyInstallPath/install.sh
 waitOrStop 0 "Ruby build tool failed"
 
 echo "Installing Ruby" | log
