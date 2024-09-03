@@ -13,7 +13,7 @@ rubyInstallPath=ruby-build-20240903
 rootDir=$(rootDir)
 
 echo "Installing dependencies" | log
-packages=(autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev)
+packages=(autoconf bison rbenv build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev)
 installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
@@ -27,10 +27,13 @@ waitOrStop 0 "Ruby build tool failed"
 
 echo "Installing Ruby" | log
 ruby-build $rubyVersion $rubyPath --verbose | log
+rbenv install 3.3.5
+rbenv global 3.3.5
+rbenv rehash
 waitOrStop 0 "Failed to install application"
 
-echo "Adding Ruby path to global environment" | log
-sed -i "s|\"$|:${rubyPath}/bin\"|" /etc/environment
+#echo "Adding Ruby path to global environment" | log
+#sed -i "s|\"$|:${rubyPath}/bin\"|" /etc/environment
 
 echo "Adding descriptions" | log
 descriptionAppend "Ruby install path: ${rubyPath}"
