@@ -21,7 +21,7 @@ echo "Donwloading & installing Ruby build tool" | log
 cd $rootDir/temp
 curlDownload https://github.com/rbenv/ruby-build/archive/refs/tags/v20240903.tar.gz | log
 waitOrStop 0 "File not downloaded from Github"
-tar -xzf tar -xzf v2024*
+tar -xzf v2024*
 PREFIX=/usr/local ./$rubyInstallPath/install.sh
 waitOrStop 0 "Ruby build tool failed"
 
