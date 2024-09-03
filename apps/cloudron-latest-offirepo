@@ -11,7 +11,7 @@ rootDir=$(rootDir)
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod +x cloudron-setup
-bash cloudron-setup
+echo N | bash cloudron-setup
 sleep 5
 
 rm -rf /home/yellowtent/box/dashboard/dist/setupdns.html
