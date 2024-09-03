@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+WEB_PATH="/var/www/html"
+if [ ! -d "$WEB_PATH" ]; then
+	echo "$WEB_PATH does not exists. Creating directory..."
+	mkdir -p "$WEB_PATH"
+fi
+
+if [ -f "$WEB_PATH/redmine.conf" ]; then
+    echo "redmine.conf file exists. Skipping." | log
+    tagScript success
+    exit 99
+fi
+
+echo "Updating header..."
+updateStatus="include/updateInstallStatus.sh"
+html_file="$WEB_PATH/index.html"
+
+LOGO_IMG_ROOT="include/Logos"
+LOGO_IMG_NAME="Redmine_logo.png"
+LOGO_IMG_ROOT_PATH="$LOGO_IMG_ROOT/$LOGO_IMG_NAME"
+
+# Copy CloudRon logo
+cp -r "$LOGO_IMG_ROOT_PATH" "$WEB_PATH/$LOGO_IMG_NAME"
+chmod 644 "$WEB_PATH/$LOGO_IMG_NAME"
+
+"$updateStatus" "$html_file" -ui "$LOGO_IMG_NAME"
+"$updateStatus" "$html_file" -uh "Please wait. Installing Redmine 5.1.1"
+"$updateStatus" "$html_file" -ap "Installing dependencies (this stage takes time)..."
+
+tagScript success
+exit 0
