@@ -38,6 +38,10 @@ timezones[EU-ST]="Europe/Stockholm"
 timezones[US-AT]="America/Atlanta"
 timezones[US-LA]="America/Los_Angeles"
 timezones[US-SE]="America/Seattle"
+timezones[SG-SG]="Asia/Singapore"
+timezones[JP-TK]="Asia/Tokyo"
+timezones[AU-SY]="Australia/Sydney"
+
 
 if [ ! ${timezones[$CWM_ZONE]} ]; then
 
