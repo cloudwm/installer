@@ -46,7 +46,11 @@ EOF
 
 echo "Installing Bundle" | log
 cd $appPath
-gem install bundler --no-document
+gem install nokogiri -v 1.15.6
+gem install net-imap -v 0.3.7
+gem install rails -v 6.1.7.7
+gem install bundler -v 2.4.22
+
 bundle install --without development test postgresql sqlite
 bundle exec rake generate_secret_token
 RAILS_ENV=production bundle exec rake db:migrate

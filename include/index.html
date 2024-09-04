@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="icon" href="" type="image/x-icon">
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #E0E0E0;
+            min-height: 100vh;
+            justify-content: flex-start;
+        }
+        .wrapper {
+            width: 80%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .container {
+            background-color: #1E1E1E;
+            padding: 5px;
+            width: 60%;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .logo-space {
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .status-container {
+            max-height: 250px;
+            overflow-y: auto;
+            width: 60%;
+            background-color: #000000;
+            border: 2px solid #169307;
+            border-radius: 5px;
+            padding: 20px 10px 10px 10px;
+            color: #00cc00;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            line-height: 1.5;
+        }
+        .status {
+            font-size: 16px;
+            font-weight: normal;
+            color: #ECF0F1; 
+            width: 100%;
+            text-align: left;
+            margin: 5px 0;
+        }
+        .credentials-container {
+            max-height: 100px;
+            width: 60%;
+            background-color: #000000;
+            border: 2px solid #008CBA;
+            border-radius: 5px;
+            padding: 20px 10px 10px 10px;
+            color: #00cc00;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.5;
+            margin-top: 20px;
+        }
+        .credential {
+            font-size: 16px;
+            font-weight: normal;
+            color: #ECF0F1; 
+            width: 100%;
+            text-align: center;
+            margin: 5px 0;
+        }
+        .redirect-container {
+            width: 60%;
+            background-color: #000000;
+            border: 2px solid #F5A940;
+            border-radius: 5px;
+            padding: 10px;
+            color: #F5A940;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.5;
+            margin-top: 20px;
+        }
+		.redirect {
+            font-size: 16px;
+            font-weight: normal;
+            color: #F5A940; 
+            width: 100%;
+            text-align: center;
+            margin: 5px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        /* Scrollbar styles */
+        .status-container::-webkit-scrollbar, .credentials-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .status-container::-webkit-scrollbar-track, .credentials-container::-webkit-scrollbar-track {
+            background: #2A2A2A;
+        }
+        .status-container::-webkit-scrollbar-thumb, .credentials-container::-webkit-scrollbar-thumb {
+            background-color: #444;
+            border-radius: 10px;
+            border: 2px solid #2A2A2A;
+        }
+        .status-container, .credentials-container {
+            scrollbar-width: thin;
+            scrollbar-color: #444 #2A2A2A;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="logo-space">
+            <img src="" alt="Company Logo" style="max-height: 100%;">
+        </div>
+        <div class="container">
+            <h1></h1>
+        </div>
+        <div class="container status-container">
+            <div id="statusList"></div>
+        </div>
+        <div class="container credentials-container hidden">
+            <div id="credentialsList"></div>
+        </div>
+        <div class="container redirect-container hidden">
+			<div id="redirection"></div>
+        </div>
+    </div>
+
+    <script>
+        setInterval(function() {
+            window.location.reload(true);
+        }, 10000);
+    </script>
+</body>
+</html>
