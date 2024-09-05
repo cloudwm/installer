@@ -23,4 +23,5 @@ waitOrStop 0 "Failed to restart mysql"
 
 tagScript success
 
-exit 0
+exit 0 
+
