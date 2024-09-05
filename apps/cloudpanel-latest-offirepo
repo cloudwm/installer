@@ -22,6 +22,7 @@ waitOrStop 0 "Failed to restart mysql"
 
 
 echo "Adding descriptions" | log
+sed -i '/\* CloudPanel:/d' /etc/update-motd.d/10-cloudpanel
 descriptionAppend "CloudPanel UI: https://${CWM_DOMAIN}:8443"
 
 
