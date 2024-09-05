@@ -8,7 +8,6 @@ fi
 
 echo "Downloading and installing CloudPanel" | log
 curlDownload https://installer.cloudpanel.io/ce/v2/install.sh install.sh
-sed -i '/^showSuccessMessage()/,/^}/d' /opt/installer/install.sh
 echo "2aefee646f988877a31198e0d84ed30e2ef7a454857b606608a1f0b8eb6ec6b6 install.sh" | sha256sum -c -
 bash install.sh
 waitOrStop 0 "Failed to install CloudPanel"
@@ -20,15 +19,6 @@ waitOrStop 0 "Failed to restart nginx"
 systemctl enable mysql
 systemctl restart mysql
 waitOrStop 0 "Failed to restart mysql"
-
-
-descriptionAppend "Website: https://www.cloudpanel.io"
-descriptionAppend "Documentation: https://www.cloudpanel.io/docs/v2/"
-descriptionAppend "Best Practices: https://www.cloudpanel.io/docs/v2/best-practices/"
-descriptionAppend "CloudPanel CLI: clpctl"
-descriptionAppend "CloudPanel Web UI: https://${CWM_DOMAIN}:8443"
-
-tagScript success
 
 exit 0 
 
