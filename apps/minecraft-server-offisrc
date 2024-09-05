@@ -10,8 +10,15 @@ appPath=/opt/minecraft/survival
 
 echo "Creating directory and installing dependencies" | log
 mkdir -p $appPath
-installPackage openjdk-16-jre-headless screen default-jdk nmap | log
-waitOrStop 0 "Failed to install dependencies"
+ubuntu_version=$(lsb_release -rs)
+
+if [[ "$ubuntu_version" == "24.04" ]]; then
+	installPackage openjdk-17-jre-headless screen default-jdk nmap | log	
+	waitOrStop 0 "Failed to install dependencies"
+else
+	installPackage openjdk-16-jre-headless screen default-jdk nmap | log
+	waitOrStop 0 "Failed to install dependencies"
+fi
 
 echo "Creating MineCraft User" | log
 useradd -m -r -d /opt/minecraft minecraft
@@ -52,14 +59,15 @@ EOF
 echo "Adding FW rules"
 ufw allow 25565
 
-sed -i "s/server-ip=/server-ip=${CWM_SERVERIP}/g" ${appPath}/server.properties
-
 echo "Enabling MineCraft Service" | log
 systemctl start minecraft@survival
 sleep 3
 waitOrStop 0 "Failed to start MineCraft service"
 systemctl enable minecraft@survival
 sleep 3
+
+sed -i "s/server-ip=/server-ip=${CWM_SERVERIP}/g" ${appPath}/server.properties
+systemctl restart minecraft@survival
 
 echo "Adding descriptions" | log
 descriptionAppend "MineCraft Server Directory: ${appPath}"
