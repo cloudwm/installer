@@ -12,8 +12,14 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-appVersion=2.4.6
 rootDir=$(rootDir)
+ubuntu_version=$(lsb_release -rs)
+
+if [[ $ubuntu_version == "24.04" ]]; then
+	appVersion=2.4.7
+else
+	appVersion=2.4.6
+fi
 
 echo "Creating Magento Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
