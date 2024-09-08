@@ -31,6 +31,26 @@ if [[ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
       sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/nginx/sites-enabled/zulip.conf
       sed -i '1i include /etc/zulip/nginx_sharding_map.conf;' /etc/nginx/sites-enabled/zulip.conf
       sed -i '/include \/etc\/zulip\/nginx_sharding.conf;/d' /etc/nginx/sites-enabled/zulip.conf
+      sed -i '/ssl_certificate/d; /ssl_certificate_key/d; /ssl_trusted_certificate/d' /etc/nginx/nginx.conf
+      sed -i '/http {/a\
+    map $args $s3_disposition_cache_key {\n\
+        default "";\n\
+    }\n\
+    map $http_x_proxy_misconfiguration $x_proxy_misconfiguration {\n\
+        default "not_misconfigured";\n\
+        "true" "misconfigured";\n\
+        "false" "configured";\n\
+    }\n\
+    map $http_x_forwarded_proto $trusted_x_forwarded_proto {\n\
+        default "http";\n\
+        "https" "https";\n\
+        "http" "http";\n\
+    }\n\
+' /etc/nginx/nginx.conf
+      sed -i '/http {/a \
+	      ssl_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem;\
+	      ssl_certificate_key /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem;\
+	      ssl_trusted_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/chain.pem;' /etc/nginx/nginx.conf
 fi
 
 service nginx restart
