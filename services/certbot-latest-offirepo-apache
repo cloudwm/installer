@@ -7,11 +7,18 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist apache2.success
+ubuntu_version=$(lsb_release -rs)
 
 echo "Installing certbot for apache" | log
-add-apt-repository -k hkp://keyserver.ubuntu.com:80 -y ppa:certbot/certbot | log
-installPackage python-certbot-apache
-waitOrStop 0 "Failed apt install: python-certbot-apache"
+
+if [[ $ubuntu_version == "24.04" ]]; then
+	apt-get install -y certbot python3-certbot-apache
+	waitOrStop 0 "Failed apt install: python3-certbot-apache"
+else
+	add-apt-repository -k hkp://keyserver.ubuntu.com:80 -y ppa:certbot/certbot | log
+	installPackage python-certbot-apache
+	waitOrStop 0 "Failed apt install: python-certbot-apache"
+fi
 
 tag certbot-apache2.success
 tagScript success
