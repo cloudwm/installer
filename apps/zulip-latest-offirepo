@@ -47,8 +47,10 @@ if [[ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
         "http" "http";\n\
     }\n\
 ' /etc/nginx/nginx.conf
-    sed -i "s/http {/&ssl_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem;ssl_certificate_key /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem;ssl_trusted_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/chain.pem;/"   
- /etc/nginx/nginx.conf
+   sed -i "/http {/a \\
+ssl_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem;\\
+ssl_certificate_key /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem;\\
+ssl_trusted_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/chain.pem;" /etc/nginx/nginx.conf 
 
 fi
 
