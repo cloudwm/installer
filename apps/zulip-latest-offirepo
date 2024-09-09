@@ -28,6 +28,8 @@ echo "Configuring Nginx VirtualHost" | log
 if [[ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
       cp $rootDir/tweaks/extras/zulip/zulip.conf /etc/nginx/sites-enabled/
       unlink /etc/nginx/sites-enabled/zulip-enterprise
+      mkdir -p /var/cache/nginx/uploads
+      chown -R zulip:zulip /var/cache/nginx/uploads
       sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/nginx/sites-enabled/zulip.conf
       sed -i '1i include /etc/zulip/nginx_sharding_map.conf;' /etc/nginx/sites-enabled/zulip.conf
       sed -i '/include \/etc\/zulip\/nginx_sharding.conf;/d' /etc/nginx/sites-enabled/zulip.conf
@@ -47,10 +49,11 @@ if [[ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
         "http" "http";\n\
     }\n\
 ' /etc/nginx/nginx.conf
-   sed -i "/http {/a \\
+      sed -i "/http {/a \\
 ssl_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem;\\
 ssl_certificate_key /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem;\\
 ssl_trusted_certificate /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/chain.pem;" /etc/nginx/nginx.conf 
+      sed -i '/http {/a\    proxy_cache_path /var/cache/nginx/uploads levels=1:2 keys_zone=uploads:10m max_size=10g inactive=60m use_temp_path=off;' /etc/nginx/nginx.conf
 
 fi
 
