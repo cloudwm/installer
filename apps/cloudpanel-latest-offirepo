@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading and installing CloudPanel" | log
+curlDownload https://installer.cloudpanel.io/ce/v2/install.sh install.sh
+echo "2aefee646f988877a31198e0d84ed30e2ef7a454857b606608a1f0b8eb6ec6b6 install.sh" | sha256sum -c -
+bash install.sh
+waitOrStop 0 "Failed to install CloudPanel"
+
+echo "Restarting and enabling  services" | log
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart nginx"
+systemctl enable mysql
+systemctl restart mysql
+waitOrStop 0 "Failed to restart mysql"
+
+exit 0 
+

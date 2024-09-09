@@ -19,13 +19,25 @@ echo "Installing dependencies" | log
 installPackage software-properties-common
 waitOrStop 0 "Failed apt install: software-properties-common"
 
+ubuntu_version=$(lsb_release -rs)
+
 echo "Adding repository to OS package manager" | log
-add-apt-repository ppa:vbernat/haproxy-2.4 -y
-apt update
+if [[ $ubuntu_version == 24.04 ]]; then
+	add-apt-repository ppa:vbernat/haproxy-2.9 -y
+	apt update
+else
+	add-apt-repository ppa:vbernat/haproxy-2.4 -y
+	apt update
+fi
 
 echo "Installing main application" | log
-installPackage haproxy=2.4.\* | log
-waitOrStop 0 "Failed apt install: haproxy 2.4.*"
+if [[ $ubuntu_version == 24.04 ]]; then
+	installPackage haproxy=2.9.\* | log
+	waitOrStop 0 "Failed apt install: haproxy 2.9.*"
+else
+	installPackage haproxy=2.4.\* | log
+	waitOrStop 0 "Failed apt install: haproxy 2.4.*"
+fi
 
 echo "Open port for stats web ui" | log
 ufw allow 8404
@@ -39,10 +51,17 @@ sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
 sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
 
 echo "Generating proper haproxy certificate" | log
-cd ${certsArchivePath}
-cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
-cd ${certsPath}
-ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+
+if [[ ! -d ${certsArchivePath} ]]; then
+        cd ${certsPath}
+        cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+else
+        cd ${certsArchivePath}
+        cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+        cd ${certsPath}
+        ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+fi
+
 service haproxy reload
 waitOrStop 0 "Reload haproxy service failed"
 

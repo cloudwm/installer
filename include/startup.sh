@@ -207,9 +207,9 @@ function waitOrStop() {
     local exitCode=${PIPESTATUS[0]}
     waitExitCode=$1
 
-    if [ $waitExitCode -ne $exitCode ]; then
+    if [ ${waitExitCode} -ne ${exitCode} ]; then
 
-        echo "ExitCode $exitCode (expecting $waitExitCode). ${2:-Undefined error.}" | log 1
+        echo "ExitCode ${exitCode} (expecting ${waitExitCode}). ${2:-Undefined error.}" | log 1
         exit 1
 
     fi

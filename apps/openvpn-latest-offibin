@@ -9,8 +9,8 @@ fi
 checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
-appVersion=2.8.7
-appPackage=openvpn-as-latest-ubuntu20.amd_64.deb
+appVersion=3.1.0
+appPackage=openvpn-as-latest-ubuntu24.amd_64.deb
 rootDir=$(rootDir)
 
 echo "Downloading binary" | log

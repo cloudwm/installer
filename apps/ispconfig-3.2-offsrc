@@ -6,11 +6,17 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+ubuntu_version=$(lsb_release -rs)
 rootDir=$(rootDir)
 cd $rootDir/temp
 
 echo "Downloading ISPConfig installlation package" | log
-curlDownload https://www.ispconfig.org/downloads/ISPConfig-3-stable.tar.gz ispconfig.tar.gz
+if [[ $ubuntu_version == "24.04" ]]; then
+	curlDownload https://sourceforge.net/projects/ispconfig/files/ISPConfig%203/ISPConfig-3.2.11/ISPConfig-3.2.11.tar.gz ispconfig.tar.gz
+else	
+	curlDownload https://www.ispconfig.org/downloads/ISPConfig-3-stable.tar.gz ispconfig.tar.gz
+fi
+
 tar xfz ispconfig.tar.gz
 cd $rootDir/temp/ispconfig3*/install/
 
@@ -24,6 +30,11 @@ sed   -i "/^ispconfig_admin_password/c\ispconfig_admin_password=${ADMINPASSWORD}
 sed   -i "s/apache/nginx/" ./autoinstall.ini
 php install.php --autoinstall=autoinstall.ini
 systemctl start mysql.service
+
+sed -i 's/^\(\s*fastcgi_pass\s*\).*/\1127.0.0.1:9000;/' /etc/nginx/sites-available/ispconfig.vhost
+chown -R www-data:www-data /usr/local/ispconfig
+systemctl restart php7.4-fpm.service
+systemctl reload nginx.service
 
 echo "adding descriptions" | log
 descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"

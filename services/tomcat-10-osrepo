@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
-appPath=/etc/tomcat9
+appPath=/etc/tomcat10
 assignedPort=9090
 
 echo "Installing main application" | log
@@ -47,11 +47,11 @@ service nginx reload
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Apache Tomcat9 Web UI: https://${CWM_DISPLAYED_ADDRESS}"
-descriptionAppend "Apache Tomcat9 Username: admin"
-descriptionAppend "Apache Tomcat9 Password: ${ADMINPASSWORD}"
+descriptionAppend "Apache Tomcat10 Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Apache Tomcat10 Username: admin"
+descriptionAppend "Apache Tomcat10 Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "Apache Tomcat9 config files location: ${appPath}"
+descriptionAppend "Apache Tomcat10 config files location: ${appPath}"
 descriptionAppend " "
 
 tagScript success
