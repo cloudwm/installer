@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export DEBIAN_FRONTEND=noninteractive
-
 # Add this at the beginning of all scripts.
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -11,7 +9,7 @@ fi
 
 # Update system and install required packages
 apt-get update
-apt-get install -yq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" libmariadb-dev-compat apt-transport-https
+apt-get install -y libmariadb-dev-compat apt-transport-https
 
 # Variables
 DB_REDMINE_PASS="redmine"
@@ -49,7 +47,7 @@ production:
 _EOF_
 
 # Install gems
-gem install bundler --no-interaction
+gem install bundler
 bundle config set --local without 'development test'
 bundle install
 
@@ -61,9 +59,9 @@ RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
 # Install ImageMagic for Redmine
 echo "Installing ImageMagic & ghostscript..."
 apt update
-apt install -yq imagemagick libmagickwand-dev
+apt install -y imagemagick libmagickwand-dev
 convert -version
-apt install -yq ghostscript
+apt install -y ghostscript
 
 echo "Writing apache configuration file..."
 cat <<_EOF_ > $WEBAPP_CONF/redmine.conf
