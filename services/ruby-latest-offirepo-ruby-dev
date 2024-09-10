@@ -15,8 +15,8 @@ waitOrStop 0 "Failed to install ruby"
 installPackage ruby-dev | log
 waitOrStop 0 "Failed to install ruby-dev"
 
-installPackage ruby-bundler | log
-waitOrStop 0 "Failed to install ruby-bundler"
+# installPackage ruby-bundler | log
+# waitOrStop 0 "Failed to install ruby-bundler"
 
 installPackage build-essential | log
 waitOrStop 0 "Failed to install build-essential"
