@@ -9,14 +9,17 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing Ruby from apt" | log
-installPackage ruby | log
-waitOrStop 0 "Failed to install ruby"
+export DEBIAN_FRONTEND="noninteractive"
+apt install -y ruby ruby-dev build-essential
 
-installPackage ruby-dev | log
-waitOrStop 0 "Failed to install ruby-dev"
+# installPackage ruby | log
+# waitOrStop 0 "Failed to install ruby"
 
-installPackage build-essential | log
-waitOrStop 0 "Failed to install build-essential"
+# installPackage ruby-dev | log
+# waitOrStop 0 "Failed to install ruby-dev"
+
+# installPackage build-essential | log
+# waitOrStop 0 "Failed to install build-essential"
 
 
 tag ruby.success
