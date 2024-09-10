@@ -19,27 +19,39 @@ WEBAPP_CONF="/etc/apache2/sites-available"
 
 # Secure MySQL and set up Redmine database
 echo "Creating redmine database..." | log
-mysql --user=root --skip-password <<_EOF_
+mysql -u root <<_EOF_
+-- Set the root password to empty and use mysql_native_password for authentication
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';
+FLUSH PRIVILEGES;
+
+-- Delete anonymous users for security reasons
 DELETE FROM mysql.user WHERE User='';
+
+-- Create the Redmine database and user
 CREATE DATABASE redmine CHARACTER SET utf8mb4;
 CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${DB_REDMINE_PASS}';
 GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';
 FLUSH PRIVILEGES;
 _EOF_
 
+# Continue with Redmine setup or other steps
+echo "Database setup completed successfully." | log
+
 # Install Redmine
 echo "Creating redmine dir ${REPO_DIR}..." | log
 mkdir -p ${REPO_DIR}
 
-echo "Downloading  ${REPO_DIR}..." | log
+echo "Downloading from ${REPO_URL} to ${REPO_DIR}..." | log
 curl -s ${REPO_URL} | sudo tar xz -C ${REPO_DIR} --strip-components=1
+echo "Download Complete." | log
 
 # Configuring permissions
-echo "Configuring permissions..."
+echo "Configuring permissions..." | log
 chown -R www-data:www-data /opt/redmine/
 
 cd ${REPO_DIR}
 # Configure database connection
+echo "Configure database connection..." | log
 cat <<_EOF_ > ${REPO_DIR}/config/database.yml
 production:
   adapter: mysql2
