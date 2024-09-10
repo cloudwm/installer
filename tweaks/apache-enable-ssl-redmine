@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist apache.success
+checkTagExist apache2.success
 
 echo "Installing openssl and generating certificate..."
 installPackage openssl
