@@ -18,10 +18,10 @@ sudo swapon /swapfile
 sleep 5
 
 echo "Installing mysql from apt" | log
-ADMINPASSWORD=""
+DB_ADMINPASSWORD=""
 export DEBIAN_FRONTEND="noninteractive"
-debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password password ${ADMINPASSWORD}"
-debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password_again password ${ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password password ${DB_ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password_again password ${DB_ADMINPASSWORD}"
 
 installPackage mysql-server
 waitOrStop 0 "Failed apt install: mysql-server-8.0"
@@ -55,7 +55,7 @@ EOF
 
 echo "Set Password method for root" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_ADMINPASSWORD}';
 EOF
 
 echo "Setting some defaults to mysqld-installer.cnf" | log
@@ -76,7 +76,7 @@ waitOrStop 0 "Restart mysql service failed"
 echo "Adding descriptions" | log
 descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
-descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend "mySQL Server Password: ${DB_ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "mySQL Server config global files location: /etc/mysql/"
 descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
