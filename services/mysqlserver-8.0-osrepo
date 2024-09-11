@@ -55,7 +55,7 @@ EOF
 
 echo "Set Password method for root" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_ADMINPASSWORD}';
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
 EOF
 
 echo "Setting some defaults to mysqld-installer.cnf" | log
@@ -76,7 +76,7 @@ waitOrStop 0 "Restart mysql service failed"
 echo "Adding descriptions" | log
 descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
 descriptionAppend "mySQL Server Username: root"
-descriptionAppend "mySQL Server Password: ${DB_ADMINPASSWORD}"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "mySQL Server config global files location: /etc/mysql/"
 descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
