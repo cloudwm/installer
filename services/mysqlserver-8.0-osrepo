@@ -2,6 +2,7 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
@@ -17,22 +18,23 @@ sudo swapon /swapfile
 sleep 5
 
 echo "Installing mysql from apt" | log
+ADMINPASSWORD=""
 export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password_again password ${ADMINPASSWORD}"
+
 installPackage mysql-server
 waitOrStop 0 "Failed apt install: mysql-server-8.0"
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
-if [ ! -f ~/.my.cnf ]; then
-
-cat << EOF > ~/.my.cnf
+if [ ! -f /root/.my.cnf ]; then
+    cat << EOF > /root/.my.cnf
 [client]
 user=root
-password='${ADMINPASSWORD}'
+password=""
 EOF
-
 fi
+chmod 600 /root/.my.cnf
 
 echo "Running first setup process" | log
 mysql_secure_installation --defaults-file=/root/.my.cnf -h localhost << EOF
