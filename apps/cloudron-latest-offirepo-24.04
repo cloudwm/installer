@@ -88,7 +88,7 @@ sudo systemctl enable cron
 sudo systemctl start cron
 
 echo "Adding shutdown cron job to root's crontab..." | log
-CRON_JOB="@reboot /sbin/shutdown now"
+CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
 (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
 echo "Shutdown cron job added successfully. The system will shut down on next reboot."
 
