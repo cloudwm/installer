@@ -15,6 +15,7 @@ updateAndFinalize() {
 
     # Target directories and files
     local html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
+	local setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
     local js_target_dir="/home/yellowtent/box/dashboard/dist/js"
     local js_target="${js_target_dir}/setupdns.js"
 
@@ -36,8 +37,9 @@ updateAndFinalize() {
     cp "${rootDir}/tweaks/extras/cloudron/setupdns.js" "$js_target"
 
     # Replace placeholders in HTML and JS files
-    sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" "$html_target"
-    sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" "$js_target"
+	sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
+    sed -i "s/example.com/${CWM_DOMAIN}/g" "$html_target"
+    sed -i "s/example.com/${CWM_DOMAIN}/g" "$js_target"
 
     echo "Setup DNS files have been updated." | log
 	
