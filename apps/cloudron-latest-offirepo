@@ -1,30 +1,131 @@
 #!/bin/bash
 
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
 
+updateAndFinalize() {
+    local rootDir="$1"
+    local CWM_DOMAIN="$2"
+
+    # Target directories and files
+    local html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
+    local js_target_dir="/home/yellowtent/box/dashboard/dist/js"
+    local js_target="${js_target_dir}/setupdns.js"
+
+    # Check every if the directories and files exist
+    while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
+        #echo "Waiting for Cloud-Ron's app directory..."
+        sleep 3
+    done
+
+    # Perform operations once the directories exist
+    echo "Cloud-Ron Directories found. Performing operations..." | log
+
+    # Ensure target files do not exist before copying new ones
+    rm -rf "$html_target"
+    rm -rf "$js_target"
+
+    # Copy new files from source to target locations
+    cp "${rootDir}/tweaks/extras/cloudron/setupdns.html" "$html_target"
+    cp "${rootDir}/tweaks/extras/cloudron/setupdns.js" "$js_target"
+
+    # Replace placeholders in HTML and JS files
+    sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" "$html_target"
+    sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" "$js_target"
+
+    echo "Setup DNS files have been updated." | log
+	
+	# Touchups
+	bash tweaks/motd-description-append
+	bash tweaks/cwm-description-autoconfig
+	
+	echo "Adding descriptions" | log
+	descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
+	descriptionAppend "SSL will be configured after the first step."
+	
+	# Cleanup
+	echo "Cleaning up..." | log
+	sleep 5
+	systemctl stop apache2
+	apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
+	rm -rf /etc/apache2
+	apt-get autoremove -y
+	apt-get autoclean -y
+	
+	end_time=$(date +%s)
+	duration=$((end_time - start_time))
+	echo "Installation completed in $duration seconds." | log
+	
+	tagScript success
+	exit 0
+}
+
+# Define variables
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/cloudron-setup.log"
+WEB_PATH="/var/www/html"
+HTML_PATH="/var/www/html/index.html"
+
+clear
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
-chmod +x cloudron-setup
-bash cloudron-setup
-sleep 5
+chmod u+x cloudron-setup
 
-rm -rf /home/yellowtent/box/dashboard/dist/setupdns.html
-rm -rf /home/yellowtent/box/dashboard/dist/js/setupdns.html
-cp $rootDir/tweaks/extras/cloudron/setupdns.html /home/yellowtent/box/dashboard/dist/setupdns.html
-cp $rootDir/tweaks/extras/cloudron/setupdns.js /home/yellowtent/box/dashboard/dist/js/setupdns.js
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /home/yellowtent/box/dashboard/dist/setupdns.html
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /home/yellowtent/box/dashboard/dist/js/setupdns.js
+# Run the Cloudron setup and tee the output to both stdout and the log file
+if [ ! -f "$LOG_PATH" ]; then
+	touch "$LOG_PATH"
+fi
 
-echo "Adding descriptions" | log
-descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
-descriptionAppend "SSL will be configured after the first step."
+# Wait for App dir and replace files
+echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
+updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
-tagScript success
+echo "Running CloudRon setup..." | log
+start_time=$(date +%s)
+echo Y | bash cloudron-setup | tee "$LOG_PATH" &
 
-exit 0
+# Define lists to hold log messages
+declare -a pre_display_list=()
+declare -A seen # associative array to track seen lines
+
+# Start tailing the log file and process lines as they come
+while read line; do
+	# Locate the line to display
+    if [[ "$line" == *"==> "* ]]; then
+        # if [[ "$line" == *"Pulling docker images"* ]]; then
+            # line="Pulling docker images (Takes some time)..."
+			
+        # else
+            # line="${line#*==> }"
+        # fi
+        
+		# Clean the line from extras
+        line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
+
+        # Check if the line has been seen already
+        if [[ -z "${seen[$line]}" ]]; then
+            seen[$line]=1
+            pre_display_list+=("$line")
+
+			"$updateStatus" "$HTML_PATH" -cp
+			for stage in "${pre_display_list[@]}"; do
+				 # Remove all trailing dots first
+				cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
+				
+				# Append exactly three dots
+				final_stage="${cleaned_stage}..."
+				
+				# Update the installation landing page
+				"$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+			done
+        fi
+    fi
+done < <(tail -f "$LOG_PATH")
+
