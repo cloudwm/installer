@@ -87,59 +87,33 @@ fi
 echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
 updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
-sleep 10
 echo "Running CloudRon setup..." | log
 start_time=$(date +%s)
 echo N | bash cloudron-setup | tee "$LOG_PATH" &
 
 # Define lists to hold log messages
 declare -a pre_display_list=()
-declare -A seen # associative array to track seen lines
 
 # Start tailing the log file and process lines as they come
 while read line; do
-	if [[ "$line" == *"==> "* ]]; then
-        # if [[ "$line" == *"Pulling docker images"* ]]; then
-            # line="Pulling docker images (Takes some time)..."
-			
-        # else
-            # line="${line#*==> }"
-        # fi
-        
-		# Clean the line from extras
-        line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
-
-        # Check if the line has been seen already
-        if [[ -z "${seen[$line]}" ]]; then
-            seen[$line]=1
-            pre_display_list+=("$line")
-
-			"$updateStatus" "$HTML_PATH" -cp
-			for stage in "${pre_display_list[@]}"; do
-				 # Remove all trailing dots first
-				cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
-				
-				# Append exactly three dots
-				final_stage="${cleaned_stage}..."
-				
-				# Update the installation landing page
-				"$updateStatus" "$HTML_PATH" -ap "${final_stage}"
-			done
-        fi
-    fi
+	if [[ "${line}" == *"Visit one of the following URLs and accept the self-signed certificate to finish setup"* ]]; then
+        echo "Installation complete, stopping all services..."
+		exit 0
+	fi
 	
-	# pre_display_list+=("$line")
-	# "$updateStatus" "$HTML_PATH" -cp
-	# for stage in "${pre_display_list[@]}"; do
-		 # # Remove all trailing dots first
-		# cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
+	line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
+	pre_display_list+=("$line")
+	"$updateStatus" "$HTML_PATH" -cp
+	for stage in "${pre_display_list[@]}"; do
+		 # Remove all trailing dots first
+		cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
 		
-		# # Append exactly three dots
-		# final_stage="${cleaned_stage}..."
+		# Append exactly three dots
+		final_stage="${cleaned_stage}..."
 		
-		# # Update the installation landing page
-		# "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
-	# done
+		# Update the installation landing page
+		"$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+	done
 
 done < <(tail -f "$LOG_PATH")
 
