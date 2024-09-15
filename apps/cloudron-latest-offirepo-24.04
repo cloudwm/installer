@@ -89,9 +89,9 @@ updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
 echo "Running CloudRon setup..." | log
 start_time=$(date +%s)
-echo N | bash cloudron-setup | tee "$LOG_PATH" &
-INSTALLER_PID=$(pgrep -f 'bash cloudron-setup')
+echo N | bash cloudron-setup | tee "$LOG_PATH"
 
+INSTALLER_PID=$(pgrep -f 'bash cloudron-setup')
 # Define lists to hold log messages
 declare -a pre_display_list=()
 
