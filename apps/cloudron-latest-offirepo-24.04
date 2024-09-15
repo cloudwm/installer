@@ -8,6 +8,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/cloudron-setup.log"
+WEB_PATH="/var/www/html"
+HTML_PATH="/var/www/html/index.html"
+
 
 updateAndFinalize() {
     local rootDir="$1"
@@ -21,20 +27,11 @@ updateAndFinalize() {
 
     # Check every if the directories and files exist
     while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
-        #echo "Waiting for Cloud-Ron's app directory..."
         sleep 3
     done
 
     # Perform operations once the directories exist
     echo "Cloud-Ron Directories found. Performing operations..." | log
-
-    # Ensure target files do not exist before copying new ones
-    rm -rf "$html_target"
-    rm -rf "$js_target"
-
-    # Copy new files from source to target locations
-    cp "${rootDir}/tweaks/extras/cloudron/setupdns.html" "$html_target"
-    cp "${rootDir}/tweaks/extras/cloudron/setupdns.js" "$js_target"
 
     # Replace placeholders in HTML and JS files
 	sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
@@ -68,14 +65,7 @@ updateAndFinalize() {
 	exit 0
 }
 
-# Define variables
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-LOG_PATH="/var/log/cloudron-setup.log"
-WEB_PATH="/var/www/html"
-HTML_PATH="/var/www/html/index.html"
-
-clear
+#clear
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
