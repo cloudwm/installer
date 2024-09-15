@@ -77,6 +77,7 @@ clear
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
+sed -i '/if \[\[ "${rebootServer}" == "true" \]\]; then/,/fi/d' cloudron-setup
 
 # Run the Cloudron setup and tee the output to both stdout and the log file
 if [ ! -f "$LOG_PATH" ]; then
@@ -89,31 +90,13 @@ updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
 echo "Running CloudRon setup..." | log
 start_time=$(date +%s)
-echo N | bash cloudron-setup | tee "$LOG_PATH"
+echo Y | bash cloudron-setup | tee "$LOG_PATH"
 
-INSTALLER_PID=$(pgrep -f 'bash cloudron-setup')
 # Define lists to hold log messages
 declare -a pre_display_list=()
 
 # Start tailing the log file and process lines as they come
 while read line; do
-	if [[ "$line" == *"Visit one of the following URLs and accept the self-signed certificate to finish setup"* ]]; then
-        echo "Installation complete, stopping all services..."
-
-        # Stop all services (customize this command as per your system needs)
-        sudo systemctl stop packagekit
-        sudo systemctl stop systemd-update-utmp
-
-        # Kill the background installation process (just in case it's still running)
-        kill "$INSTALLER_PID"
-
-        # Echo the shutdown message
-        echo "Please shutdown"
-
-        # Exit the loop
-        break
-    fi
-	
 	line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
 	pre_display_list+=("$line")
 	"$updateStatus" "$HTML_PATH" -cp
