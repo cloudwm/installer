@@ -17,9 +17,9 @@ mv .env $appDir
 mv docker-compose.yaml $appDir
 
 echo "Tweaking the downloaded files" | log
-sed -i 's/^FRONTEND_URL=.*/FRONTEND_URL=${CWM_DOMAIN}:3000/' $appDir/.env
-sed -i 's/^REDIS_PASSWORD=.*/REDIS_PASSWORD=${ADMINPASSWORD}/' $appDir/.env
-sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${ADMINPASSWORD}/' $appDir/.env
+sed -i "s/^FRONTEND_URL=.*/FRONTEND_URL=${CWM_DOMAIN}:3000/" $appDir/.env
+sed -i "s/^REDIS_PASSWORD=.*/REDIS_PASSWORD=${ADMINPASSWORD}/" $appDir/.env
+sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${ADMINPASSWORD}/" $appDir/.env
 sed -i "s|^REDIS_URL=.*|REDIS_URL=redis:${CWM_DISPLAYED_ADDRESS}:6379|" $appDir/.env
 sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${ADMINPASSWORD}|" $appDir/docker-compose.yaml
 cp /opt/installer/tweaks/extras/chatwoot/chatwoot.conf /etc/nginx/sites-enabled/
@@ -33,6 +33,7 @@ echo "Reloading Nginx" | log
 systemctl reload nginx
 waitOrStop 0 "Failed to reload nginx"
 echo "Prepare the database by running the migrations" | log
+cd $appDir
 docker compose run --rm rails bundle exec rails db:chatwoot_prepare
 waitOrStop 0 "Failed to prepare database"
 echo "Getting the services up and running"
