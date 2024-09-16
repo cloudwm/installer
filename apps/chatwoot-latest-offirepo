@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appDir="/opt/chatwoot"
+
+echo "Downloading docker-compose and .env files" | log
+curlDownload https://raw.githubusercontent.com/chatwoot/chatwoot/develop/.env.example .env
+curlDownload https://raw.githubusercontent.com/chatwoot/chatwoot/develop/docker-compose.production.yaml docker-compose.yaml
+waitOrStop 0 "Failed to download chatwoot files" 
+mkdir -p $appDir
+mv .env $appDir
+mv docker-compose.yaml $appDir
+
+echo "Tweaking the downloaded files" | log
+sed -i "s/^ENABLE_ACCOUNT_SIGNUP=.*/ENABLE_ACCOUNT_SIGNUP=true/" $appDir/.env
+sed -i "s/^FRONTEND_URL=.*/FRONTEND_URL=https://${CWM_DOMAIN}:3000/" $appDir/.env
+sed -i "s/^REDIS_PASSWORD=.*/REDIS_PASSWORD=${ADMINPASSWORD}/" $appDir/.env
+sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${ADMINPASSWORD}/" $appDir/.env
+sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${ADMINPASSWORD}|" $appDir/docker-compose.yaml
+cp /opt/installer/tweaks/extras/chatwoot/chatwoot.conf /etc/nginx/sites-enabled/
+sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/nginx/sites-enabled/chatwoot.conf 
+
+if [[ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
+	sed -i 's/fullchain.pem/cert.pem/g' /etc/nginx/sites-enabled/chatwoot.conf
+fi
+
+echo "Reloading Nginx" | log
+systemctl reload nginx
+waitOrStop 0 "Failed to reload nginx"
+echo "Prepare the database by running the migrations" | log
+cd $appDir
+docker compose run --rm rails bundle exec rails db:chatwoot_prepare
+waitOrStop 0 "Failed to prepare database"
+echo "Getting the services up and running"
+docker compose up -d
+waitOrStop 0 "Failed to run docker compose"
+sleep 10
+
+descriptionAppend "ChatWoot Web UI:https://${CWM_DISPLAYED_ADDRESS}"
+
+tagScript success
+
+exit 0
