@@ -52,8 +52,8 @@ REPO_DIR="/opt/redmine"
 WEBAPP_CONF="/etc/apache2/sites-available"
 
 # Update system and install required packages
-apt-get update && apt-get upgrade -y
-apt-get install -y libmariadb-dev-compat apt-transport-https
+apt-get update
+apt-get install -y libmysqlclient-dev apt-transport-https
 
 # Secure MySQL and set up Redmine database
 mysql --user=root <<_EOF_
