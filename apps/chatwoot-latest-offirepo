@@ -42,6 +42,11 @@ waitOrStop 0 "Failed to run docker compose"
 sleep 10
 
 descriptionAppend "ChatWoot Web UI:https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "ChatWoot directory: $appDir"
+descriptionAppend "To add/remove features for the app edit the .env file in the chatwoot directory"
+descriptionAppend "After changes is made, run this command inside the chatwoot directory: docker compose up -d"
+
+
 
 tagScript success
 
