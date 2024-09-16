@@ -41,7 +41,7 @@ docker compose up -d
 waitOrStop 0 "Failed to run docker compose"
 sleep 10
 
-descriptionAppend "ChatWoot Web UI:${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "ChatWoot Web UI:https://${CWM_DISPLAYED_ADDRESS}"
 
 tagScript success
 
