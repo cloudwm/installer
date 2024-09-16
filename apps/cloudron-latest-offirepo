@@ -83,6 +83,11 @@ if [ ! -f "$LOG_PATH" ]; then
 	touch "$LOG_PATH"
 fi
 
+echo "Adding shutdown cron job to root's crontab..." | log
+CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
+(crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
+echo "Shutdown cron job added successfully. The system will shut down on next reboot."
+
 # Wait for App dir and replace files
 echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
 updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
@@ -99,12 +104,12 @@ declare -A seen # associative array to track seen lines
 while read line; do
 	# Locate the line to display
     if [[ "$line" == *"==> "* ]]; then
-        # if [[ "$line" == *"Pulling docker images"* ]]; then
-            # line="Pulling docker images (Takes some time)..."
+        if [[ "$line" == *"Pulling docker images"* ]]; then
+            line="Pulling docker images (Takes some time)..."
 			
-        # else
-            # line="${line#*==> }"
-        # fi
+        else
+            line="${line#*==> }"
+        fi
         
 		# Clean the line from extras
         line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')

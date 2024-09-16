@@ -27,7 +27,7 @@ updateAndFinalize() {
 
     # Check every if the directories and files exist
     while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
-        sleep 3
+        sleep 2
     done
 
     # Perform operations once the directories exist
@@ -90,7 +90,7 @@ updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
 echo "Running CloudRon setup..." | log
 start_time=$(date +%s)
-echo Y | bash cloudron-setup | tee "$LOG_PATH"
+echo Y | bash cloudron-setup | tee "$LOG_PATH" &
 
 # Define lists to hold log messages
 declare -a pre_display_list=()
