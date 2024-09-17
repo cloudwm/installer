@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing docker.io package" | log
-installPackage docker.io 
+installPackage docker.io docker-compose-v2
 waitOrStop 0 "Docker didnt installed successfully"
 
 
