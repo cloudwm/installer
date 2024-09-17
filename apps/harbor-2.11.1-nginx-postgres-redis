@@ -197,6 +197,22 @@ finalize_harbor_installation() {
 }
 
 
+monitor_docker_containers() {
+  # Check for any stopped or exited containers
+  if docker ps -a | grep -q -E 'Exited|Created'; then
+    echo "Stopped or exited containers found. Restarting containers..."
+    
+    # Bring down and bring up the containers
+    docker compose down
+    docker compose up -d
+
+    echo "Containers restarted successfully."
+  else
+    echo "All containers are running."
+  fi
+}
+
+
 main() {
 	lines=()
 	done_lines=()
@@ -281,6 +297,8 @@ main() {
 	echo "Finalizing Harbor 2.11.1 installation..." | log
 	finalize_harbor_installation
 	
+	
+	monitor_docker_containers
 	echo "Install script completed successfully!"
 	
 	descriptionAppend "Harbor Web UI: https://${CWM_DOMAIN}"
