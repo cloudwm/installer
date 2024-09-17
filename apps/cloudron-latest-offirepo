@@ -47,7 +47,7 @@ updateAndFinalize() {
 	
 	echo "Adding descriptions" | log
 	descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
-	descriptionAppend "SSL will be configured after the first step."
+	descriptionAppend "It might take some time for the web interface to load so please be patient."
 	
 	# Cleanup
 	echo "Cleaning up..." | log
