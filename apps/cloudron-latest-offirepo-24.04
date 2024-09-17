@@ -81,7 +81,7 @@ sudo systemctl start cron
 
 # Signal the host that the policy phase completed.
 echo "Adding shutdown cron job to root's crontab..." | log
-FLAG_FILE="/tmp/one_time_shutdown_flag"
+FLAG_FILE="/var/run/one_time_shutdown_flag"
 CRON_JOB="@reboot ( [ ! -f $FLAG_FILE ] && /sbin/shutdown now && touch $FLAG_FILE )"
 (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
 echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
