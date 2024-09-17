@@ -95,20 +95,24 @@ declare -a pre_display_list=()
 
 start_time=$(date +%s)
 echo Y | bash cloudron-setup | while IFS= read -r line; do
-    # Process each line of output
-    line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
-    pre_display_list+=("$line")
-    "$updateStatus" "$HTML_PATH" -cp
-    
-    for stage in "${pre_display_list[@]}"; do
-        # Clean and append dots to the output
-        cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
-        final_stage="${cleaned_stage}..."
+    # Check if the line contains "=>"
+    if [[ "$line" == *"=>"* ]]; then
+        # Process each line that contains "=>"
+        line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
+        pre_display_list+=("$line")
+        "$updateStatus" "$HTML_PATH" -cp
         
-        # Update the installation landing page
-        "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
-    done
+        for stage in "${pre_display_list[@]}"; do
+            # Clean and append dots to the output
+            cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
+            final_stage="${cleaned_stage}..."
+            
+            # Update the installation landing page
+            "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+        done
+    fi
 done
+
 
 # echo Y | bash cloudron-setup | tee "$LOG_PATH" &
 
