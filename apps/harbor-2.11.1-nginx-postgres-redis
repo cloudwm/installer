@@ -1,0 +1,290 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+DOMAIN="${CWM_DOMAIN}"
+DOMAIN_CERT_PATH="/opt/${DOMAIN}.crt"
+DOMAIN_KEY_PATH="/opt/${DOMAIN}.key"
+CURRENT_HOSTNAME=$(hostname)
+OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
+ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
+ADMIN_PASSWORD="${ADMINPASSWORD}"
+INSTALL_TYPE="online"
+
+declare -a REMOVE_PACKAGES=("docker.io" "docker-doc" "docker-compose" "docker-compose-v2" "podman-docker" "containerd" "runc")
+declare -a INSTALL_PACKAGES=("ca-certificates" "curl" "ufw")
+
+pre_install() {
+	echo "Removing possible conflicting packages..." | log
+	for pkg in "${REMOVE_PACKAGES[@]}"; do
+        apt remove "$pkg" -y &> /dev/null || echo "Failed to remove $pkg" | log
+    done
+	
+	echo "Updating packages..." | log
+	apt update &> /dev/null
+	
+	echo "Installing ca-certificates curl ufw..." | log
+	apt install -y "${INSTALL_PACKAGES[@]}" &> /dev/null
+	
+	echo "Opening ports for Harbor..." | log
+	ufw allow 80/tcp &> /dev/null
+	ufw allow 443/tcp &> /dev/null
+	ufw allow 4443/tcp &> /dev/null
+	ufw allow ssh &> /dev/null
+
+	echo "Enabling UFW..." | log
+	echo "y" | ufw enable &> /dev/null
+	ufw status
+}
+
+
+install_docker() {
+	echo "Adding GPG Key..."
+	install -m 0755 -d /etc/apt/keyrings &> /dev/null
+	curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc &> /dev/null
+	chmod a+r /etc/apt/keyrings/docker.asc &> /dev/null
+
+	echo "Adding repository..."
+	echo \
+	  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+	  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+	  tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+	apt update &> /dev/null
+	
+	echo "Installing Docker-CE & Compose..."
+	apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin &> /dev/null
+	docker -v
+}
+
+
+generate_certs() {
+    # Generate a Certificate Authority Certificate
+    openssl genrsa -out ca.key 4096 &> /dev/null
+    openssl req -x509 -new -nodes -sha512 -days 3650 \
+        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=MyPersonal Root CA" \
+        -key ca.key \
+        -out ca.crt &> /dev/null
+
+    # Generate a Server Certificate
+    openssl genrsa -out $DOMAIN.key 4096 &> /dev/null
+    openssl req -sha512 -new \
+        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=${DOMAIN}" \
+        -key $DOMAIN.key \
+        -out $DOMAIN.csr &> /dev/null
+
+    cat > v3.ext <<-EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1=${DOMAIN}
+DNS.2=${CURRENT_HOSTNAME}
+EOF
+
+    openssl x509 -req -sha512 -days 3650 \
+        -extfile v3.ext \
+        -CA ca.crt -CAkey ca.key -CAcreateserial \
+        -in ${DOMAIN}.csr \
+        -out ${DOMAIN}.crt &> /dev/null
+
+    # Provide the Certificates to Harbor and Docker
+    DATA_DIR="/data/cert"
+    if [ ! -d "${DATA_DIR}" ]; then
+        mkdir -p "${DATA_DIR}"
+        echo "Directory created: ${DATA_DIR}"
+    fi
+
+    cp $DOMAIN.crt ${DATA_DIR} &> /dev/null
+    cp $DOMAIN.key ${DATA_DIR} &> /dev/null
+    
+    DOCKER_DATA_DIR="/etc/docker/certs.d/${DOMAIN}"
+    if [ ! -d "${DOCKER_DATA_DIR}" ]; then
+        mkdir -p "${DOCKER_DATA_DIR}"
+        echo "Directory created: ${DOCKER_DATA_DIR}"
+    fi
+    
+    openssl x509 -inform PEM -in $DOMAIN.crt -out $DOMAIN.cert &> /dev/null
+    cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
+    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
+    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
+}
+
+
+configure_harbor() {
+	echo "Configuring harbor YML file..."
+	cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
+	
+	sed -i "s/^hostname:.*/hostname: ${CURRENT_HOSTNAME}/" /opt/harbor/harbor.yml &> /dev/null
+	sed -i "s|^  certificate:.*|  certificate: ${DOMAIN_CERT_PATH}|" /opt/harbor/harbor.yml &> /dev/null
+	sed -i "s|^  private_key:.*|  private_key: ${DOMAIN_KEY_PATH}|" /opt/harbor/harbor.yml &> /dev/null
+	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
+	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
+}
+
+
+download_and_extract() {
+    local url=$1
+    local filename=$(basename "$url")
+
+    echo "Downloading $filename..."
+    if curl -L -O "$url"; then
+        echo "$filename downloaded successfully."
+		
+    else
+        echo "Failed to download $filename. Exiting."
+        exit 1
+    fi
+
+    echo "Extracting $filename..."
+    if tar xzvf "$filename" &> /dev/null; then
+        echo "$filename extracted successfully."
+		
+    else
+        echo "Failed to extract $filename. Exiting."
+        exit 1
+    fi
+
+    echo "Removing tar file..."
+    if rm "$filename" &> /dev/null; then
+        echo "Tar file removed successfully."
+		
+    else
+        echo "Failed to remove $filename."
+    fi
+}
+
+
+install_harbor() {
+	if [ "$INSTALL_TYPE" = "offline" ]; then
+		download_and_extract "$OFFLINE_APP_URL"
+
+	elif [ "$INSTALL_TYPE" = "online" ]; then
+		download_and_extract "$ONLINE_APP_URL"
+		
+	else
+		echo "Invalid INSTALL_TYPE. Please specify 'offline' or 'online'. Exiting."
+		exit 1
+	fi
+}
+
+
+prepare_harbor() {
+	echo "Running harbor prep phase..."
+	bash /opt/harbor/prepare
+}
+
+
+finalize_harbor_installation() {
+	echo "Running harbor install phase..." | log
+    bash /opt/harbor/install.sh | while IFS= read -r line; do
+        echo "$line"
+
+        if [[ "$line" == *"Clean up the input dir"* ]]; then
+            echo "Stopping Apache2..." | log
+            systemctl stop apache2
+        fi
+    done
+}
+
+
+main() {
+	lines=()
+	done_lines=()
+	
+	mark_previous_done() {
+	    for (( i=0; i<${#lines[@]}; i++ )); do
+	        # Check if the line is not already marked as [DONE]
+	        if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then
+	            lines[$i]="${lines[$i]} [DONE]"
+	            done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
+	        fi
+	    done
+	}
+
+	display_all_lines() {
+		"$update_status" "$HTML_PATH" -cp
+	    for line in "${lines[@]}"; do
+	        "$update_status" "$HTML_PATH" -ap "$line"
+	    done
+	}
+	
+	update_status="$rootDir/include/updateInstallStatus.sh"
+	HTML_PATH="/var/www/html/index.html"
+
+	lines+=("Getting Ready...")
+	"$update_status" "$HTML_PATH" -cp
+	display_all_lines
+	
+	pre_install
+	
+	mark_previous_done
+	lines+=("Installing Docker-CE & Docker-Compose...")
+	display_all_lines
+
+	echo "Installing Docker-CE & Docker-Compose..." | log
+	install_docker
+	
+	echo "Switching to /opt..."
+	cd /opt
+	
+	mark_previous_done
+	lines+=("Generating certificates...")
+	display_all_lines
+	
+	echo "Generating certificates..." | log
+	generate_certs
+	
+	echo "Restarting docker..."
+	systemctl restart docker
+	
+	mark_previous_done
+	lines+=("Downloading Harbor 2.11.1...")
+	display_all_lines
+	
+	echo "Downloading Harbor 2.11.1..." | log
+	install_harbor
+	
+	mark_previous_done
+	lines+=("Configuring Harbor 2.11.1...")
+	display_all_lines
+	
+	echo "Configuring Harbor 2.11.1..." | log
+	configure_harbor
+	
+	mark_previous_done
+	lines+=("Preparing Harbor 2.11.1...")
+	display_all_lines
+	
+	"$update_status" "$HTML_PATH" -ur "You will be re-directed when the installation is complete. if not, please refresh the page every few seconds."
+	"$update_status" "$HTML_PATH" -sr
+	
+	echo "Preparing Harbor 2.11.1..." | log
+	prepare_harbor
+	
+	mark_previous_done
+	lines+=("Finalizing Harbor 2.11.1 installation...")
+	display_all_lines
+	
+	"$update_status" "$HTML_PATH" -ur "You will be re-directed when the installation is complete. if not, please refresh the page every few seconds."
+	"$update_status" "$HTML_PATH" -sr
+	
+	echo "Finalizing Harbor 2.11.1 installation..." | log
+	finalize_harbor_installation
+	
+	echo "Install script completed successfully!"
+	
+	exit 0
+}
+
+
+main
