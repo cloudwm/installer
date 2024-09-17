@@ -86,12 +86,6 @@ CRON_JOB="@reboot ( [ ! -f $FLAG_FILE ] && /sbin/shutdown now && touch $FLAG_FIL
 (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
 echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
 
-
-
-# CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
-# (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-# echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
-
 # Wait for App dir and replace files
 echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
 updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
