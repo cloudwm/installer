@@ -94,8 +94,7 @@ echo "Running CloudRon setup..." | log
 declare -a pre_display_list=()
 
 start_time=$(date +%s)
-(
-  echo Y | bash cloudron-setup | while IFS= read -r line; do
+while IFS= read -r line; do
     # Process each line of output directly from the install script
     pre_display_list+=("$line")
     
@@ -110,8 +109,8 @@ start_time=$(date +%s)
 
     # Also log to a file if necessary
     echo "$line" >> "$LOG_PATH"
-  done
-) &
+
+done < <(echo Y | bash cloudron-setup) &
 
 #echo Y | bash cloudron-setup | tee "$LOG_PATH" &
 

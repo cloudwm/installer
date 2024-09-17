@@ -20,6 +20,7 @@ echo "Enabling SSL..." | log
 a2enmod ssl
 
 echo "Reloading Apache2..." | log
+sleep 2
 systemctl start apache2
 systemctl reload apache2
 
