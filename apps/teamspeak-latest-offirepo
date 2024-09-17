@@ -12,10 +12,10 @@ installPackage bzip2
 echo "Downloading TeamSpeak from official source"
 curlDownload https://files.teamspeak-services.com/releases/server/3.13.7/teamspeak3-server_linux_amd64-3.13.7.tar.bz2
 mkdir -p $appDir
-mv teamspeak-server.tar.bz2 $appDir
+mv teamspeak3-server_linux_amd64-3.13.7.tar.bz2 $appDir
 cd $appDir
-tar -xvfj teamspeak-server.tar.bz2
-rm -f teamspeak-server.tar.bz2
+tar -xjvf teamspeak3-server_linux_amd64-3.13.7.tar.bz2
+rm -f teamspeak3-server_linux_amd64-3.13.7.tar.bz2
 cd teamspeak3-server_linux_amd64
 touch ~/.ts3server_license_accepted
 
@@ -43,9 +43,6 @@ waitOrStop 0 "Failed to reload daemon"
 systemctl enable --now teamspeak
 waitOrStop 0 "Failed to enable teamspeak service"
 
-echo "Extracting token" | log
-TS3_TOKEN=$(grep "token=" /opt/teamspeak/teamspeak3-server_linux_amd64/logs/ts3server_*.log | awk -F'=' '{print $2}')
-
 echo "Passing password to teamspeak" | log
 ./ts3server_startscript.sh start serveradmin_password=$ADMINPASSWORD
 
@@ -53,12 +50,15 @@ echo "Restarting teamspeak service"
 systemctl restart teamspeak 
 waitOrStop 0 "Failed to restart teamspeak service"
 
+echo "Extracting token" | log
+TS3_TOKEN=$(grep "token=" /opt/teamspeak/teamspeak3-server_linux_amd64/logs/ts3server_*.log | awk -F'=' '{print $2}')
+
 echo "Adding descriptions" | log
 
 descriptionAppend "Use your machine IP to connect via TeamSpeak client"
 descriptionAppend "This is the token you need to confirm your connection: $TS3_TOKEN"
 descriptionAppend "TeamSpeak config files located here: $appDir"
-descriptionAppend "You can allow IPs in this config file: query_ip_allowlist.txt, one IP per line
+descriptionAppend "You can allow IPs in this config file: query_ip_allowlist.txt, one IP per line"
 
 tagScript success
 
