@@ -90,27 +90,52 @@ echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
 updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
 echo "Running CloudRon setup..." | log
-start_time=$(date +%s)
-echo Y | bash cloudron-setup | tee "$LOG_PATH" &
-
 # Define lists to hold log messages
 declare -a pre_display_list=()
 
-# Start tailing the log file and process lines as they come
-while read line; do
-	line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
-	pre_display_list+=("$line")
-	"$updateStatus" "$HTML_PATH" -cp
-	for stage in "${pre_display_list[@]}"; do
-		 # Remove all trailing dots first
-		cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
-		
-		# Append exactly three dots
-		final_stage="${cleaned_stage}..."
-		
-		# Update the installation landing page
-		"$updateStatus" "$HTML_PATH" -ap "${final_stage}"
-	done
+start_time=$(date +%s)
+(
+  echo Y | bash cloudron-setup | while IFS= read -r line; do
+    # Process each line of output directly from the install script
+    pre_display_list+=("$line")
+    
+    # Remove extra characters or trailing dots
+    cleaned_stage=$(echo "$line" | sed 's/\.*$//')
+    
+    # Append exactly three dots
+    final_stage="${cleaned_stage}..."
+    
+    # Update the installation landing page with current status
+    "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
 
-done < <(tail -f "$LOG_PATH")
+    # Also log to a file if necessary
+    echo "$line" >> "$LOG_PATH"
+  done
+) &
 
+#echo Y | bash cloudron-setup | tee "$LOG_PATH" &
+
+# # Start tailing the log file and process lines as they come
+# while read line; do
+	# line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
+	# pre_display_list+=("$line")
+	# "$updateStatus" "$HTML_PATH" -cp
+	# for stage in "${pre_display_list[@]}"; do
+		 # # Remove all trailing dots first
+		# cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
+		
+		# # Append exactly three dots
+		# final_stage="${cleaned_stage}..."
+		
+		# # Update the installation landing page
+		# "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+	# done
+
+# done < <(tail -f "$LOG_PATH")
+
+
+# => Updating apt and installing script dependencies
+# => Validating setup token
+# => Checking version
+# => Downloading Cloudron version 8.0.5 ...
+# => Installing base dependencies (this takes some time)
