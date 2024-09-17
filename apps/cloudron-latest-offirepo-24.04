@@ -81,9 +81,16 @@ sudo systemctl start cron
 
 # Signal the host that the policy phase completed.
 echo "Adding shutdown cron job to root's crontab..." | log
-CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
+FLAG_FILE="/tmp/one_time_shutdown_flag"
+CRON_JOB="@reboot ( [ ! -f $FLAG_FILE ] && /sbin/shutdown now && touch $FLAG_FILE )"
 (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
 echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
+
+
+
+# CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
+# (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
+# echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
 
 # Wait for App dir and replace files
 echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
@@ -112,31 +119,3 @@ echo Y | bash cloudron-setup | while IFS= read -r line; do
         done
     fi
 done
-
-
-# echo Y | bash cloudron-setup | tee "$LOG_PATH" &
-
-# # Start tailing the log file and process lines as they come
-# while read line; do
-	# line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
-	# pre_display_list+=("$line")
-	# "$updateStatus" "$HTML_PATH" -cp
-	# for stage in "${pre_display_list[@]}"; do
-		 # # Remove all trailing dots first
-		# cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
-		
-		# # Append exactly three dots
-		# final_stage="${cleaned_stage}..."
-		
-		# # Update the installation landing page
-		# "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
-	# done
-
-# done < <(tail -f "$LOG_PATH")
-
-
-# => Updating apt and installing script dependencies
-# => Validating setup token
-# => Checking version
-# => Downloading Cloudron version 8.0.5 ...
-# => Installing base dependencies (this takes some time)
