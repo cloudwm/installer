@@ -283,6 +283,11 @@ main() {
 	
 	echo "Install script completed successfully!"
 	
+	descriptionAppend "Harbor Web UI: https://${CWM_DOMAIN}"
+	descriptionAppend "Harbor Username: admin"
+	descriptionAppend "Harbor Password: ${ADMINPASSWORD}"
+	
+	tag Script.success
 	exit 0
 }
 
