@@ -94,25 +94,23 @@ echo "Running CloudRon setup..." | log
 declare -a pre_display_list=()
 
 start_time=$(date +%s)
-while IFS= read -r line; do
-    # Process each line of output directly from the install script
+echo Y | bash cloudron-setup | while IFS= read -r line; do
+    # Process each line of output
+    line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
     pre_display_list+=("$line")
+    "$updateStatus" "$HTML_PATH" -cp
     
-    # Remove extra characters or trailing dots
-    cleaned_stage=$(echo "$line" | sed 's/\.*$//')
-    
-    # Append exactly three dots
-    final_stage="${cleaned_stage}..."
-    
-    # Update the installation landing page with current status
-    "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+    for stage in "${pre_display_list[@]}"; do
+        # Clean and append dots to the output
+        cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
+        final_stage="${cleaned_stage}..."
+        
+        # Update the installation landing page
+        "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+    done
+done
 
-    # Also log to a file if necessary
-    echo "$line" >> "$LOG_PATH"
-
-done < <(echo Y | bash cloudron-setup) &
-
-#echo Y | bash cloudron-setup | tee "$LOG_PATH" &
+# echo Y | bash cloudron-setup | tee "$LOG_PATH" &
 
 # # Start tailing the log file and process lines as they come
 # while read line; do
