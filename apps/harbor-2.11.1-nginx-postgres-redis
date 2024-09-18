@@ -203,18 +203,18 @@ monitor_docker_containers() {
     elapsed=0
 
     while (( elapsed < timeout )); do
-        if [ "$(docker ps --filter 'status=running' -q)" ]; then
+        if [ "$(docker ps --filter 'status=Exited' -q)" ]; then
+			echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
+			docker compose up -d
+            sleep $interval
+            elapsed=$((elapsed + interval))
+			
+        else
 			echo "Stopping Apache2..." | log
             systemctl stop apache2
 			
             echo "All containers are running." | log
             return 0
-			
-        else
-            echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
-			docker compose up -d
-            sleep $interval
-            elapsed=$((elapsed + interval))
         fi
 		
     done
