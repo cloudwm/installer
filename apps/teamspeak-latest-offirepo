@@ -58,7 +58,7 @@ waitOrStop 0 "Failed to start teamspeak"
 sleep 5
 
 echo "Extracting token" | log
-TS3_TOKEN=$(grep "token=" /opt/teamspeak/teamspeak3-server_linux_amd64/logs/ts3server_*.log | awk -F'=' '{print $2}')
+TS3_TOKEN=$(grep "token=" ${appDir}/logs/ts3server_*.log | awk -F'=' '{print $2}')
 my_ip=$(curl -s ifconfig.me)
 
 echo "Adding descriptions" | log
