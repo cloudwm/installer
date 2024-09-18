@@ -32,9 +32,9 @@ Wants=network.target
 Environment=TS3SERVER_LICENSE=accept
 WorkingDirectory=${appDir}/teamspeak3-server_linux_amd64
 User=root
-ExecStart=${appDir}/teamspeak3-server_linux_amd64/ts3server_startscript.sh start
+ExecStart=${appDir}/teamspeak3-server_linux_amd64/ts3server_minimal_runscript.sh
 ExecStop=${appDir}/teamspeak3-server_linux_amd64/ts3server_startscript.sh stop
-ExecReload=${appDir}/teamspeak3-server_linux_amd64/ts3server_startscript.sh reload
+ExecReload=${appDir}/teamspeak3-server_linux_amd64/ts3server_startscript.sh restart
 Restart=always
 RestartSec=15
 
