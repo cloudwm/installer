@@ -9,8 +9,8 @@ fi
 
 
 DOMAIN="${CWM_DOMAIN}"
-DOMAIN_CERT_PATH="/opt/${DOMAIN}.crt"
-DOMAIN_KEY_PATH="/opt/${DOMAIN}.key"
+DOMAIN_CERT_PATH="/etc/ssl/certs/${DOMAIN}.crt"
+DOMAIN_KEY_PATH="/etc/ssl/certs/${DOMAIN}.key"
 CURRENT_HOSTNAME=$(hostname)
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
