@@ -306,9 +306,9 @@ main() {
 	echo "Finalizing Harbor 2.11.1 installation..." | log
 	finalize_harbor_installation
 	
-	echo "Monitoring containers..." | log
-	cd /opt/harbor
-	monitor_docker_containers
+	# echo "Monitoring containers..." | log
+	# cd /opt/harbor
+	# monitor_docker_containers
 	
 	echo "Install script completed successfully!"
 	
@@ -322,3 +322,4 @@ main() {
 
 
 main
+shutdown now
