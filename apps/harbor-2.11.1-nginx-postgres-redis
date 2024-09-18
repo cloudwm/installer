@@ -306,7 +306,7 @@ main() {
 	echo "Finalizing Harbor 2.11.1 installation..." | log
 	finalize_harbor_installation
 	
-	echo "Monitoring containers for 'Up' status..." | log
+	echo "Monitoring containers..." | log
 	cd /opt/harbor
 	monitor_docker_containers
 	
