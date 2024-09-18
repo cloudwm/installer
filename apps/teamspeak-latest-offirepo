@@ -25,8 +25,8 @@ echo "Starting teamspeak" | log
 
 cat <<EOF | tee /etc/systemd/system/teamspeak.service
 [Unit]
-Description=TeamSpeak 3 Server
-After=network.target
+Description=Teamspeak Service
+Wants=network.target
 
 [Service]
 Environment=TS3SERVER_LICENSE=accept
@@ -35,7 +35,8 @@ User=root
 ExecStart=${appDir}/teamspeak3-server_linux_amd64/ts3server_startscript.sh start
 ExecStop=${appDir}/teamspeak3-server_linux_amd64/ts3server_startscript.sh stop
 ExecReload=${appDir}/teamspeak3-server_linux_amd64/ts3server_startscript.sh reload
-Restart=on-failure
+Restart=always
+RestartSec=15
 
 [Install]
 WantedBy=multi-user.target
