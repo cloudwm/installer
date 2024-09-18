@@ -185,19 +185,53 @@ prepare_harbor() {
 
 
 finalize_harbor_installation() {
-	echo "Running harbor install phase..." | log
+	timeout=120
+	interval=20
+	elapsed=0
+			
+    echo "Running harbor install phase..." | log
+    
+    # Execute install script and monitor output
     bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
+        
+        if [[ "$line" == *"Clean up the input dir"* ]]; then
+            echo "Clean up phase detected, starting container status check..." | log
+            cd /opt/harbor
 
+            while (( elapsed < timeout )); do
+                container_status=$(docker ps --filter 'status=exited' --filter 'status=starting' -q)
+                
+                if [ -n "$container_status" ]; then
+                    echo "Some containers are not up or still starting. Waiting $interval seconds before checking again..." | log
+					echo "Container Status: ${container_status}" | log
+					
+                    docker compose up -d
+					
+                    sleep $interval
+                    elapsed=$((elapsed + interval))
+					
+                else
+                    echo "All containers are running." | log
+					
+					echo "Stopping Apache2..." | log
+                    systemctl stop apache2
+                    return 0
+                fi
+            done
+
+            echo "Timeout reached." | log
+        fi
     done
 }
-
 
 monitor_docker_containers() {
     timeout=120
     interval=20
     elapsed=0
-
+	
+	cd /opt/harbor
+	
     while (( elapsed < timeout )); do
 		exited_containers=$(docker ps --filter 'status=exited' -q)
 		if [ -n "$exited_containers" ]; then
@@ -301,9 +335,8 @@ main() {
 	echo "Finalizing Harbor 2.11.1 installation..." | log
 	finalize_harbor_installation
 	
-	echo "Monitoring containers..." | log
-	cd /opt/harbor
-	monitor_docker_containers
+	# echo "Monitoring containers..." | log
+	# monitor_docker_containers
 	
 	echo "Install script completed successfully!"
 	
