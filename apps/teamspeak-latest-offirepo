@@ -8,13 +8,16 @@ fi
 
 serviceFile="/lib/systemd/system/teamspeak.service"
 appDir="/home/teamspeak"
-installPackage bzip2
 
-echo "Creating TeamSpeak User"
+echo "Installing bzip2" | log
+installPackage bzip2
+waitOrStop 0 "Failed to install package"
+
+echo "Creating TeamSpeak User" | log 
 adduser --disabled-login --gecos "" teamspeak
 cd /home/teamspeak
 
-echo "Downloading TeamSpeak from official source"
+echo "Downloading TeamSpeak from official source" | log 
 curlDownload https://files.teamspeak-services.com/releases/server/3.13.7/teamspeak3-server_linux_amd64-3.13.7.tar.bz2
 tar xvf teamspeak3-server_linux_amd64-3.13.7.tar.bz2
 rm -f teamspeak3-server_linux_amd64-3.13.7.tar.bz2
@@ -22,6 +25,7 @@ cd teamspeak3-server_linux_amd64 && mv * /home/teamspeak
 touch .ts3server_license_accepted
 echo "license_accepted=1" > .ts3server_license_accepted
 
+echo "Creating TeamSpeak Service" | log
 tee "$serviceFile" <<EOF
 [Unit]
 Description=TeamSpeak 3 Server
