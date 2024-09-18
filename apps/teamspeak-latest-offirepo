@@ -46,6 +46,11 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+echo "Allowing ports" | log 
+ufw allow 9987
+ufw allow 10011
+ufw allow 30033
+
 systemctl enable teamspeak
 waitOrStop 0 "Failed to enable teamspeak service"
 systemctl start teamspeak
