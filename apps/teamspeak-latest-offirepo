@@ -55,7 +55,7 @@ systemctl restart teamspeak
 waitOrStop 0 "Failed to start teamspeak"
 echo "Extracting token" | log
 TS3_TOKEN=$(grep "token=" /opt/teamspeak/teamspeak3-server_linux_amd64/logs/ts3server_*.log | awk -F'=' '{print $2}')
-my_ip=${curl -s ifconfig.me}
+my_ip=$(curl -s ifconfig.me)
 echo "Adding descriptions" | log
 
 descriptionAppend "Use your machine IP to connect via TeamSpeak client: $myip"
