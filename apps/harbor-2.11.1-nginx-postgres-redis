@@ -212,6 +212,8 @@ monitor_docker_containers() {
             echo "Stopping Apache2..." | log
             systemctl stop apache2
 			
+			docker compose up -d
+
             echo "All containers are running." | log
             return 0
         fi
