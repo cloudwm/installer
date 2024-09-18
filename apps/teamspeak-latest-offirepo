@@ -16,8 +16,12 @@ mv teamspeak3-server_linux_amd64-3.13.7.tar.bz2 $appDir
 cd $appDir
 tar -xjvf teamspeak3-server_linux_amd64-3.13.7.tar.bz2
 rm -f teamspeak3-server_linux_amd64-3.13.7.tar.bz2
+useradd -m -d $appDir -s /bin/bash -c "TeamSpeak Server User" teamspeak
+chown -R teamspeak:teamspeak $appDir
 cd teamspeak3-server_linux_amd64
-touch ~/.ts3server_license_accepted
+touch $appDir/teamspeak3-server_linux_amd64/.ts3server_license_accepted
+echo "license_accepted=1" > .ts3server_license_accepted
+echo "Starting teamspeak" | log
 
 cat <<EOF | tee /etc/systemd/system/teamspeak.service
 [Unit]
@@ -42,20 +46,19 @@ systemctl daemon-reload
 waitOrStop 0 "Failed to reload daemon"
 systemctl enable --now teamspeak
 waitOrStop 0 "Failed to enable teamspeak service"
-
-echo "Passing password to teamspeak" | log
+systemctl stop teamspeak
+waitOrStop 0 "Failed to stop teamspeak"
 ./ts3server_startscript.sh start serveradmin_password=$ADMINPASSWORD
-
-echo "Restarting teamspeak service"
-systemctl restart teamspeak 
-waitOrStop 0 "Failed to restart teamspeak service"
-
+waitOrStop 0 "Failed to pass serveradmin password"
+systemctl restart teamspeak
+waitOrStop 0 "Failed to start teamspeak"
 echo "Extracting token" | log
 TS3_TOKEN=$(grep "token=" /opt/teamspeak/teamspeak3-server_linux_amd64/logs/ts3server_*.log | awk -F'=' '{print $2}')
-
+my_ip=${curl -s ifconfig.me}
 echo "Adding descriptions" | log
 
-descriptionAppend "Use your machine IP to connect via TeamSpeak client"
+descriptionAppend "Use your machine IP to connect via TeamSpeak client: $myip"
+descriptionAppend "Teamspeak password: $ADMINPASSWORD"
 descriptionAppend "This is the token you need to confirm your connection: $TS3_TOKEN"
 descriptionAppend "TeamSpeak config files located here: $appDir"
 descriptionAppend "You can allow IPs in this config file: query_ip_allowlist.txt, one IP per line"
