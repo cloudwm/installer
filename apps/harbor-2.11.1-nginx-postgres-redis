@@ -184,6 +184,16 @@ prepare_harbor() {
 }
 
 
+clear_apache() {
+	echo "Stopping Apache2..." | log
+	systemctl stop apache2
+	apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
+	rm -rf /etc/apache2
+	apt-get autoremove -y
+	apt-get autoclean -y
+}
+
+
 finalize_harbor_installation() {
     timeout=120
     interval=20
@@ -196,9 +206,10 @@ finalize_harbor_installation() {
         echo "$line" | log
         
         if [[ "$line" == *"Clean up the input dir"* ]]; then
+			clear_apache
+			
             echo "Starting container status check in $interval seconds..." | log
 			sleep $interval
-			
 
             while (( elapsed < timeout )); do
                 exited_containers=$(/usr/bin/docker ps -a --filter 'status=exited' -q)
@@ -229,18 +240,21 @@ finalize_harbor_installation() {
 							
                         else
                             echo "All containers are running." | log
-                            echo "Stopping Apache2..." | log
-                            /usr/bin/systemctl stop apache2
+                            
+							
                             return 0
                         fi
                     fi
                 fi
             done
-
+		
             echo "Timeout reached." | log
         fi
     done
 }
+
+
+
 
 
 main() {
