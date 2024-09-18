@@ -185,6 +185,9 @@ prepare_harbor() {
 
 
 finalize_harbor_installation() {
+	echo "Replacing docker-compose variable..." | log
+	sed -i 's/docker-compose/docker compose/g' /opt/harbor/install.sh
+
 	echo "Running harbor install phase..." | log
     bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
@@ -205,7 +208,7 @@ monitor_docker_containers() {
     while (( elapsed < timeout )); do
         if docker ps --filter 'status=exited' -q | grep -q .; then
             echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
-            docker compose up -d
+            docker compose up --privileged -d
             sleep $interval
             elapsed=$((elapsed + interval))
 			
