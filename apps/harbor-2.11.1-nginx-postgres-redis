@@ -185,24 +185,20 @@ prepare_harbor() {
 
 
 finalize_harbor_installation() {
-	echo "Replacing docker-compose variable..." | log
-	sed -i 's/docker-compose/docker compose/g' /opt/harbor/install.sh
+	echo "Settging memory overcommit to 1..." | log
+	sysctl vm.overcommit_memory=1
 
 	echo "Running harbor install phase..." | log
     bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
 
-        # if [[ "$line" == *"Clean up the input dir"* ]]; then
-            # echo "Stopping Apache2..." | log
-            # systemctl stop apache2
-        # fi
     done
 }
 
 
 monitor_docker_containers() {
-    timeout=60
-    interval=10
+    timeout=120
+    interval=20
     elapsed=0
 
     while (( elapsed < timeout )); do
