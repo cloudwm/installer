@@ -201,16 +201,16 @@ monitor_docker_containers() {
     timeout=60
     interval=10
     elapsed=0
-	
+
     while (( elapsed < timeout )); do
-        if [ "$(docker ps --filter 'status=Exited' -q)" ]; then
-			echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
-			docker compose up -d
+        if docker ps --filter 'status=exited' -q | grep -q .; then
+            echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
+            docker compose up -d
             sleep $interval
             elapsed=$((elapsed + interval))
 			
         else
-			echo "Stopping Apache2..." | log
+            echo "Stopping Apache2..." | log
             systemctl stop apache2
 			
             echo "All containers are running." | log
@@ -220,7 +220,6 @@ monitor_docker_containers() {
 
     echo "Timeout reached." | log
 }
-
 
 main() {
 	lines=()
@@ -306,9 +305,9 @@ main() {
 	echo "Finalizing Harbor 2.11.1 installation..." | log
 	finalize_harbor_installation
 	
-	# echo "Monitoring containers..." | log
-	# cd /opt/harbor
-	# monitor_docker_containers
+	echo "Monitoring containers..." | log
+	cd /opt/harbor
+	monitor_docker_containers
 	
 	echo "Install script completed successfully!"
 	
@@ -317,9 +316,7 @@ main() {
 	descriptionAppend "Harbor Password: ${ADMINPASSWORD}"
 	
 	tag Script.success
-	#exit 0
+	exit 0
 }
 
-
 main
-shutdown now
