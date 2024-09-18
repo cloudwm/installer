@@ -50,6 +50,7 @@ echo "Allowing ports" | log
 ufw allow 9987
 ufw allow 10011
 ufw allow 30033
+ufw reload
 
 systemctl enable teamspeak
 waitOrStop 0 "Failed to enable teamspeak service"
