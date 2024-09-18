@@ -202,24 +202,23 @@ monitor_docker_containers() {
     elapsed=0
 
     while (( elapsed < timeout )); do
-        if docker ps --filter 'status=exited' -q | grep -q .; then
-            echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
-            docker compose up --privileged -d
+		exited_containers=$(docker ps --filter 'status=exited' -q)
+		if [ -n "$exited_containers" ]; then
+			echo "Some containers are not up. Waiting $interval seconds before checking again..."
+            docker compose up -d
             sleep $interval
             elapsed=$((elapsed + interval))
 			
-        else
-            echo "Stopping Apache2..." | log
+		else
+			echo "Stopping Apache2..."
             systemctl stop apache2
-			
-			docker compose up -d
 
-            echo "All containers are running." | log
+            echo "All containers are running."
             return 0
-        fi
+		fi
     done
 
-    echo "Timeout reached." | log
+    echo "Timeout reached."
 }
 
 main() {
@@ -228,8 +227,7 @@ main() {
 	
 	mark_previous_done() {
 	    for (( i=0; i<${#lines[@]}; i++ )); do
-	        # Check if the line is not already marked as [DONE]
-	        if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then
+	        if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
 	            lines[$i]="${lines[$i]} [DONE]"
 	            done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
 	        fi
