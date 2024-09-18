@@ -1,0 +1,33 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist apache2.success
+
+echo "Installing openssl and generating certificate..." | log
+installPackage openssl
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt -subj "/CN=localhost"
+
+descriptionAppend "SSL certificates location: /etc/ssl/certs/"
+descriptionAppend " "
+
+echo "Enabling SSL..." | log
+a2enmod ssl
+
+echo "Reloading Apache2..." | log
+<<<<<<< HEAD
+=======
+sleep 2
+>>>>>>> origin/master
+systemctl start apache2
+systemctl reload apache2
+
+tag ssl-ready.success
+tagScript success
+
+exit 0
