@@ -211,7 +211,7 @@ monitor_docker_containers() {
             return 0
 			
         else
-            echo "Some containers are not up. Waiting 3 seconds before checking again..." | log
+            echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
 			docker compose up -d
             sleep $interval
             elapsed=$((elapsed + interval))
@@ -307,7 +307,9 @@ main() {
 	echo "Finalizing Harbor 2.11.1 installation..." | log
 	finalize_harbor_installation
 	
+	echo "Monitoring containers for 'Up' status..." | log
 	monitor_docker_containers
+	
 	echo "Install script completed successfully!"
 	
 	descriptionAppend "Harbor Web UI: https://${CWM_DOMAIN}"
