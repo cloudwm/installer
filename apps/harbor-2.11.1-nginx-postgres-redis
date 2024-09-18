@@ -184,30 +184,18 @@ prepare_harbor() {
 }
 
 
-clear_apache() {
-	echo "Stopping Apache2..." | log
-	systemctl stop apache2
-	apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
-	rm -rf /etc/apache2
-	apt-get autoremove -y
-	apt-get autoclean -y
-}
-
-
 finalize_harbor_installation() {
     timeout=120
-    interval=20
+    interval=10
     elapsed=0
 	
-    echo "Running harbor install phase..." | log
     cd /opt/harbor
+    echo "Running harbor install phase..." | log
     
     /usr/bin/bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
         
         if [[ "$line" == *"Clean up the input dir"* ]]; then
-			clear_apache
-			
             echo "Starting container status check in $interval seconds..." | log
 			sleep $interval
 
@@ -227,7 +215,11 @@ finalize_harbor_installation() {
                     other_containers=$(/usr/bin/docker ps -a --filter 'status=restarting' --filter 'health=unhealthy' --filter 'status=created' -q)
                     if [ -n "$other_containers" ]; then
                         echo "Some containers are restarting, unhealthy, or in the creation process. Container IDs: ${other_containers}" | log
-                        sleep $interval
+						elapsed=0
+                        sleep 5
+						/usr/bin/docker compose up -d
+						
+						sleep $interval
                         elapsed=$((elapsed + interval))
 						
                     else
@@ -235,21 +227,29 @@ finalize_harbor_installation() {
                         total_containers=$(/usr/bin/docker ps -a -q)
                     
                         if [ -z "$total_containers" ]; then
-                            echo "ERROR: No containers found. Deploying..." | log
+                            echo "No containers found. Deploying..." | log
                             /usr/bin/docker compose up -d
 							
                         else
                             echo "All containers are running." | log
+                            echo "Stopping Apache2..." | log
+							systemctl stop apache2
+							apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
+							rm -rf /etc/apache2
+							apt-get autoremove -y
+							apt-get autoclean -y
+							
                             return 0
                         fi
                     fi
                 fi
             done
-		
+
             echo "Timeout reached." | log
         fi
     done
 }
+
 
 main() {
 	lines=()
