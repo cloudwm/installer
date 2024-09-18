@@ -201,7 +201,7 @@ monitor_docker_containers() {
     timeout=60
     interval=10
     elapsed=0
-
+	
     while (( elapsed < timeout )); do
         if [ "$(docker ps --filter 'status=Exited' -q)" ]; then
 			echo "Some containers are not up. Waiting $interval seconds before checking again..." | log
@@ -216,7 +216,6 @@ monitor_docker_containers() {
             echo "All containers are running." | log
             return 0
         fi
-		
     done
 
     echo "Timeout reached." | log
@@ -308,6 +307,7 @@ main() {
 	finalize_harbor_installation
 	
 	echo "Monitoring containers for 'Up' status..." | log
+	cd /opt/harbor
 	monitor_docker_containers
 	
 	echo "Install script completed successfully!"
