@@ -185,36 +185,42 @@ prepare_harbor() {
 
 
 finalize_harbor_installation() {
-	timeout=120
-	interval=20
-	elapsed=0
-			
-    echo "Running harbor install phase..." | log
+    timeout=120
+    interval=20
+    elapsed=0
+	
+	cd /opt/harbor
+    echo "Running harbor install phase..."
     
-    # Execute install script and monitor output
     bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
         
         if [[ "$line" == *"Clean up the input dir"* ]]; then
             echo "Clean up phase detected, starting container status check..." | log
-            cd /opt/harbor
 
             while (( elapsed < timeout )); do
-                container_status=$(docker ps --filter 'status=exited' --filter 'status=starting' -q)
+                # Check if any containers are created, exited, restarting, unhealthy, or creating
+                container_status=$(docker ps -a --filter 'status=exited' --filter 'status=restarting' --filter 'health=unhealthy' --filter 'status=created' -q)
                 
                 if [ -n "$container_status" ]; then
-                    echo "Some containers are not up or still starting. Waiting $interval seconds before checking again..." | log
-					echo "Container Status: ${container_status}" | log
-					
+                    echo "Some containers are not up, still restarting, or in the creation process. Container IDs: ${container_status}" | log
+                    echo "Attempting to restart containers..." | log
                     docker compose up -d
-					
+                    
                     sleep $interval
                     elapsed=$((elapsed + interval))
-					
-                else
+                
+				else
+                    echo "Checking if there are ANY containers at all..." | log
+                    total_containers=$(docker ps -a -q)
+                    
+                    if [ -z "$total_containers" ]; then
+                        echo "ERROR: No containers found. Deploying..." | log
+						docker compose up -d
+                    fi
+
                     echo "All containers are running." | log
-					
-					echo "Stopping Apache2..." | log
+                    echo "Stopping Apache2..." | log
                     systemctl stop apache2
                     return 0
                 fi
