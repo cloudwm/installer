@@ -199,8 +199,8 @@ finalize_harbor_installation() {
     interval=20
     elapsed=0
 	
-    cd /opt/harbor || exit
     echo "Running harbor install phase..." | log
+    cd /opt/harbor
     
     /usr/bin/bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
@@ -240,8 +240,6 @@ finalize_harbor_installation() {
 							
                         else
                             echo "All containers are running." | log
-                            
-							
                             return 0
                         fi
                     fi
@@ -252,10 +250,6 @@ finalize_harbor_installation() {
         fi
     done
 }
-
-
-
-
 
 main() {
 	lines=()
