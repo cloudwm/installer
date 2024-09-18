@@ -317,7 +317,7 @@ main() {
 	descriptionAppend "Harbor Password: ${ADMINPASSWORD}"
 	
 	tag Script.success
-	exit 0
+	#exit 0
 }
 
 
