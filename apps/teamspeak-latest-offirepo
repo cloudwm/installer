@@ -21,7 +21,7 @@ echo "Downloading TeamSpeak from official source" | log
 curlDownload https://files.teamspeak-services.com/releases/server/3.13.7/teamspeak3-server_linux_amd64-3.13.7.tar.bz2
 tar xvf teamspeak3-server_linux_amd64-3.13.7.tar.bz2
 rm -f teamspeak3-server_linux_amd64-3.13.7.tar.bz2
-cd teamspeak3-server_linux_amd64 && mv * /home/teamspeak
+cd teamspeak3-server_linux_amd64 && mv * /home/teamspeak && cd ..
 touch .ts3server_license_accepted
 echo "license_accepted=1" > .ts3server_license_accepted
 
