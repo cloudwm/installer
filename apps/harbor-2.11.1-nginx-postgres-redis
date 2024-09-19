@@ -252,8 +252,13 @@ finalize_harbor_installation() {
             echo "Timeout reached." | log
         fi
     done
+	
+	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24...\n" | log
+    CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
+    (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
+    echo "Docker Compose cron job added successfully. It will run on next reboot.\n" | log
+	
 }
-
 
 main() {
 	lines=()
