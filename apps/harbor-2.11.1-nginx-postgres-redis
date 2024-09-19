@@ -45,7 +45,6 @@ pre_install() {
 	ufw status
 }
 
-
 install_docker() {
 	echo "Adding GPG Key..."
 	install -m 0755 -d /etc/apt/keyrings &> /dev/null
@@ -64,7 +63,6 @@ install_docker() {
 	apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin &> /dev/null
 	docker -v
 }
-
 
 generate_certs() {
     DATA_DIR="/data/cert"
@@ -237,6 +235,13 @@ finalize_harbor_installation() {
 							sleep 10
 							
                         else
+							mark_previous_done
+							lines+=("Generating certificates...")
+							display_all_lines
+							
+							echo "Generating certificates..." | log
+							generate_certs
+	
                             echo "All containers are running." | log
                             echo "Stopping Apache2..." | log
 							systemctl stop apache2
@@ -254,13 +259,6 @@ finalize_harbor_installation() {
             echo "Timeout reached." | log
         fi
     done
-	
-	mark_previous_done
-	lines+=("Generating certificates...")
-	display_all_lines
-	
-	echo "Generating certificates..." | log
-	generate_certs
 	
 	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24...\n" | log
     CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
