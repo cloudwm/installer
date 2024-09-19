@@ -137,7 +137,6 @@ configure_harbor() {
 	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
 }
 
-
 download_and_extract() {
     local url=$1
     local filename=$(basename "$url")
@@ -169,7 +168,6 @@ download_and_extract() {
     fi
 }
 
-
 install_harbor() {
 	if [ "$INSTALL_TYPE" = "offline" ]; then
 		download_and_extract "$OFFLINE_APP_URL"
@@ -183,12 +181,10 @@ install_harbor() {
 	fi
 }
 
-
 prepare_harbor() {
 	echo "Running harbor prep phase..."
 	bash /opt/harbor/prepare
 }
-
 
 finalize_harbor_installation() {
     timeout=120
@@ -357,8 +353,3 @@ main() {
 }
 
 main
-
-
-
-
-192-168-30-182.cloud-xip.com
