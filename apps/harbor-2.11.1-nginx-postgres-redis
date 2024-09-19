@@ -11,9 +11,9 @@ fi
 DOMAIN="${CWM_DOMAIN}"
 DOMAIN_CERT_PATH="/opt/${DOMAIN}.crt"
 DOMAIN_KEY_PATH="/opt/${DOMAIN}.key"
-FINAL_CERT="/etc/ssl/certs/${DOMAIN}.crt"
-FINAL_KEY="/etc/ssl/certs/${DOMAIN}.key"
+CERT_DESTINATION="/opt/harbor/common/config/shared/trust-certificates"
 CURRENT_HOSTNAME=$(hostname)
+CONFIG_FILE="/opt/harbor/harbor.yml"
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
 ADMIN_PASSWORD="${ADMINPASSWORD}"
@@ -124,13 +124,31 @@ EOF
 
 configure_harbor() {
 	echo "Configuring harbor YML file..."
+	
 	cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
 	
-	sed -i "s/^hostname:.*/hostname: ${CURRENT_HOSTNAME}/" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s|^  certificate:.*|  certificate: ${DOMAIN_CERT_PATH}|" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s|^  private_key:.*|  private_key: ${DOMAIN_KEY_PATH}|" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
+	# Update configuration file with hostname and certificate paths
+	sed -i "s/^hostname:.*/hostname: ${CURRENT_HOSTNAME}/" $CONFIG_FILE &> /dev/null
+	sed -i "s|^  certificate:.*|  certificate: ${DOMAIN_CERT_PATH}|" $CONFIG_FILE &> /dev/null
+	sed -i "s|^  private_key:.*|  private_key: ${DOMAIN_KEY_PATH}|" $CONFIG_FILE &> /dev/null
+	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
+	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
+	
+	if [[ -d $CERT_DESTINATION ]]; then
+		echo "Copying certificates to $CERT_DESTINATION..." | log
+		
+		if [[ -f $DOMAIN_CERT_PATH && -f $DOMAIN_KEY_PATH ]]; then
+			cp $DOMAIN_CERT_PATH $CERT_DESTINATION && echo "Certificate copied successfully" | log
+			cp $DOMAIN_KEY_PATH $CERT_DESTINATION && echo "Key copied successfully" | log
+			
+		else
+			echo "Error: Certificate or Key not found at specified paths: ${DOMAIN_CERT_PATH}, ${DOMAIN_KEY_PATH}" | log
+		fi
+		
+	else
+		echo "Error: Certificate destination directory $CERT_DESTINATION does not exist." | log
+		
+	fi
 }
 
 
@@ -181,7 +199,7 @@ install_harbor() {
 
 
 prepare_harbor() {
-	echo "Running harbor prep phase..."
+	echo "Running harbor prep phase..." | log
 	bash /opt/harbor/prepare
 }
 
@@ -289,7 +307,7 @@ main() {
 	echo "Installing Docker-CE & Docker-Compose..." | log
 	install_docker
 	
-	echo "Switching to /opt..."
+	echo "Switching to /opt..." | log
 	cd /opt
 	
 	mark_previous_done
@@ -299,7 +317,7 @@ main() {
 	echo "Generating certificates..." | log
 	generate_certs
 	
-	echo "Restarting docker..."
+	echo "Restarting docker..." | log
 	systemctl restart docker
 	
 	mark_previous_done
@@ -336,8 +354,10 @@ main() {
 	echo "Finalizing Harbor 2.11.1 installation..." | log
 	finalize_harbor_installation
 	
-	echo "Install script completed successfully!"
+	echo "Install script completed successfully!" | log
 	
+	descriptionAppend " "
+	descriptionAppend " ==================================== "
 	descriptionAppend "Harbor Web UI: https://${CWM_DOMAIN}"
 	descriptionAppend "Harbor Username: admin"
 	descriptionAppend "Harbor Password: ${ADMINPASSWORD}"
