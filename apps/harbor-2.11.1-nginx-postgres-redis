@@ -68,6 +68,14 @@ install_docker() {
 
 
 generate_certs() {
+	GUEST_CONF_FILE="~/guest.conf"
+    GUEST_IP=$(grep -oP '(?<=ip0=)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' $GUEST_CONF_FILE)
+
+    if [ -z "$GUEST_IP" ]; then
+        echo "Error: IP not found in guest.conf" | log
+		
+    fi
+	
     # Generate a Certificate Authority Certificate
     openssl genrsa -out ca.key 4096 &> /dev/null
     openssl req -x509 -new -nodes -sha512 -days 3650 \
@@ -82,6 +90,7 @@ generate_certs() {
         -key $DOMAIN.key \
         -out $DOMAIN.csr &> /dev/null
 
+    # Update v3.ext to include the IP address in the SAN section
     cat > v3.ext <<-EOF
 authorityKeyIdentifier=keyid,issuer
 basicConstraints=CA:FALSE
@@ -92,6 +101,7 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1=${DOMAIN}
 DNS.2=${CURRENT_HOSTNAME}
+IP.1=${GUEST_IP}
 EOF
 
     openssl x509 -req -sha512 -days 3650 \
@@ -113,13 +123,31 @@ EOF
     DOCKER_DATA_DIR="/etc/docker/certs.d/${DOMAIN}"
     if [ ! -d "${DOCKER_DATA_DIR}" ]; then
         mkdir -p "${DOCKER_DATA_DIR}"
-        echo "Directory created: ${DOCKER_DATA_DIR}"
+        echo "Directory created: ${DOCKER_DATA_DIR}" | log
     fi
     
     openssl x509 -inform PEM -in $DOMAIN.crt -out $DOMAIN.cert &> /dev/null
     cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
     cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
     cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
+	
+	HARBOR_CONFIG_PATH="/opt/harbor/common/config"
+	echo "Copying certs to Core..." | log
+	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
+	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
+	
+	echo "Copying certs to Registry..." | log
+	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/registry &> /dev/null
+	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/registry &> /dev/null
+	
+	echo "Copying certs to Shared..." | log
+	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
+	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
+	
+	echo "Removing temp certificates..." | log
+	rm -rf /opt/$DOMAIN.cert
+	rm -rf /opt/$DOMAIN.key
+	
 }
 
 
