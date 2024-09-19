@@ -11,7 +11,6 @@ fi
 DOMAIN="${CWM_DOMAIN}"
 DOMAIN_CERT_PATH="/opt/${DOMAIN}.crt"
 DOMAIN_KEY_PATH="/opt/${DOMAIN}.key"
-CERT_DESTINATION="/opt/harbor/common/config/shared/trust-certificates"
 CURRENT_HOSTNAME=$(hostname)
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
@@ -171,6 +170,7 @@ configure_harbor() {
 	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
 	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
 	
+	CERT_DESTINATION="/opt/harbor/common/config/shared/trust-certificates"
 	if [[ -d $CERT_DESTINATION ]]; then
 		echo "Copying certificates to $CERT_DESTINATION..." | log
 		
