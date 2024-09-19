@@ -68,16 +68,17 @@ generate_certs() {
     DATA_DIR="/data/cert"
     DOCKER_DATA_DIR="/etc/docker/certs.d/${DOMAIN}"
     HARBOR_CERT_DIR="/opt/harbor/common/config/shared/trust-certificates"
+	EMAIL=$(grep 'email=' /root/guest.conf | sed 's/email=//')
 
     # Install Certbot (if not already installed)
     if ! command -v certbot &> /dev/null; then
         echo "Installing Certbot..."
-        sudo apt update && sudo apt install -y certbot
+        apt update && apt install -y certbot
     fi
 
     # Use Certbot to generate SSL certificates for the domain
     echo "Requesting SSL certificates for ${DOMAIN} using Certbot..."
-    sudo certbot certonly --standalone --non-interactive --agree-tos --email youremail@example.com -d "${DOMAIN}" &> /dev/null
+    certbot certonly --standalone --non-interactive --agree-tos --email $EMAIL -d "${DOMAIN}" &> /dev/null
 
     if [ $? -ne 0 ]; then
         echo "Certbot failed to generate certificates for ${DOMAIN}" >&2
@@ -95,36 +96,39 @@ generate_certs() {
     # Copy the Let's Encrypt certificates to the necessary directories
     echo "Copying certificates to ${DATA_DIR}..."
     mkdir -p "${DATA_DIR}"
-    sudo cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.crt"
-    sudo cp "${CERT_DIR}/privkey.pem" "${DATA_DIR}/${DOMAIN}.key"
+    cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.crt"
+    cp "${CERT_DIR}/privkey.pem" "${DATA_DIR}/${DOMAIN}.key"
 
     # Convert the certificate to .cert format (Docker requires .cert format)
-    sudo cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.cert"
+    cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.cert"
 
     # Copy certificates for Docker
     echo "Copying certificates to Docker's cert directory: ${DOCKER_DATA_DIR}..."
     mkdir -p "${DOCKER_DATA_DIR}"
-    sudo cp "${CERT_DIR}/fullchain.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.cert"
-    sudo cp "${CERT_DIR}/privkey.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.key"
+    cp "${CERT_DIR}/fullchain.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.cert"
+    cp "${CERT_DIR}/privkey.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.key"
 
     # Copy certificates to Harbor's trust-certificates directory
     echo "Copying certificates to Harbor's trust-certificates directory: ${HARBOR_CERT_DIR}..."
     mkdir -p "${HARBOR_CERT_DIR}"
-    sudo cp "${CERT_DIR}/fullchain.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.cert"
-    sudo cp "${CERT_DIR}/privkey.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.key"
+    cp "${CERT_DIR}/fullchain.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.cert"
+    cp "${CERT_DIR}/privkey.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.key"
 
     # Restart Docker to ensure it's using the new certificates
     echo "Restarting Docker to apply new certificates..."
-    sudo systemctl restart docker
+    systemctl restart docker
 
     # Optionally restart Harbor if required
     echo "Restarting Harbor to apply new certificates..."
     cd /opt/harbor
-    sudo docker-compose down
-    sudo docker-compose up -d
+    docker-compose down
+    docker-compose up -d
 }
+    
 
 configure_harbor() {
+	cd /opt/harbor
+	
 	echo "Configuring harbor YML file..."
 	cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
 	
