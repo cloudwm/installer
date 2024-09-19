@@ -71,14 +71,14 @@ generate_certs() {
     # Generate a Certificate Authority Certificate
     openssl genrsa -out ca.key 4096 &> /dev/null
     openssl req -x509 -new -nodes -sha512 -days 3650 \
-        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=MyPersonal Root CA" \
+        -subj "/CN=${DOMAIN}" \
         -key ca.key \
         -out ca.crt &> /dev/null
 
     # Generate a Server Certificate
     openssl genrsa -out $DOMAIN.key 4096 &> /dev/null
     openssl req -sha512 -new \
-        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=${DOMAIN}" \
+        -subj "/CN=${DOMAIN}" \
         -key $DOMAIN.key \
         -out $DOMAIN.csr &> /dev/null
 
