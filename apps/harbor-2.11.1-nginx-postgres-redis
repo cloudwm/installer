@@ -65,7 +65,7 @@ install_docker() {
 
 
 generate_certs() {
-	GUEST_CONF_FILE="~/guest.conf"
+	GUEST_CONF_FILE="/root/guest.conf"
     GUEST_IP=$(grep -oP '(?<=ip0=)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' $GUEST_CONF_FILE)
 
     if [ -z "$GUEST_IP" ]; then
