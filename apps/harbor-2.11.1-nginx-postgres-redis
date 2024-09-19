@@ -211,23 +211,23 @@ finalize_harbor_installation() {
     echo "Running harbor install phase..." | log
     /usr/bin/bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
+		
+		 if [[ "$line" == *"Clean up the input dir"* ]]; then
+			echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24..." | log
+			#CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
+			CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d && sleep 15 && /usr/bin/bash -c 'if [ ! -f /opt/scripts/.certs_copied ]; then cp /opt/\$DOMAIN.cert \$DOCKER_DATA_DIR/ && cp /opt/\$DOMAIN.key \$DOCKER_DATA_DIR/ && cp ca.crt \$DOCKER_DATA_DIR/ && HARBOR_CONFIG_PATH=/opt/harbor/common/config && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/core/certificates && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/core/certificates && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/registry && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/registry && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/shared/trust-certificates && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/shared/trust-certificates && touch /opt/scripts/.certs_copied; fi')"
+			(crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
+			echo "Docker Compose cron job added successfully. It will run on next reboot." | log
+			
+			echo "Stopping Apache2..." | log
+			systemctl stop apache2
+			apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
+			rm -rf /etc/apache2
+			apt-get autoremove -y
+			apt-get autoclean -y
+		 fi
     done
-	
-	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24..." | log
-	#CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
-	CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d && sleep 15 && /usr/bin/bash -c 'if [ ! -f /opt/scripts/.certs_copied ]; then cp /opt/\$DOMAIN.cert \$DOCKER_DATA_DIR/ && cp /opt/\$DOMAIN.key \$DOCKER_DATA_DIR/ && cp ca.crt \$DOCKER_DATA_DIR/ && HARBOR_CONFIG_PATH=/opt/harbor/common/config && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/core/certificates && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/core/certificates && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/registry && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/registry && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/shared/trust-certificates && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/shared/trust-certificates && touch /opt/scripts/.certs_copied; fi')"
-	(crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-	echo "Docker Compose cron job added successfully. It will run on next reboot." | log
-	
-	echo "Stopping Apache2..." | log
-	systemctl stop apache2
-	apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
-	rm -rf /etc/apache2
-	apt-get autoremove -y
-	apt-get autoclean -y
-
 }	
-
 
 main() {
 	lines=()
