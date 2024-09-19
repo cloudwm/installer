@@ -13,6 +13,7 @@ DOMAIN_CERT_PATH="/opt/${DOMAIN}.crt"
 DOMAIN_KEY_PATH="/opt/${DOMAIN}.key"
 CERT_DESTINATION="/opt/harbor/common/config/shared/trust-certificates"
 CURRENT_HOSTNAME=$(hostname)
+TEMP_CONFIG_FILE="/opt/harbor/harbor.yml.tmpl"
 CONFIG_FILE="/opt/harbor/harbor.yml"
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
@@ -123,9 +124,17 @@ EOF
 
 
 configure_harbor() {
-	echo "Configuring harbor YML file..."
+	echo "Configuring harbor YML file..." | log
 	
-	cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
+	if [[ -f $TEMP_CONFIG_FILE ]]; then
+		echo "Copying config file..." | log
+		cp $TEMP_CONFIG_FILE $CONFIG_FILE &> /dev/null
+	
+	else
+		echo "ERROR: $TEMP_CONFIG_FILE not found!" | log
+		return 1
+		
+	fi
 	
 	# Update configuration file with hostname and certificate paths
 	sed -i "s/^hostname:.*/hostname: ${CURRENT_HOSTNAME}/" $CONFIG_FILE &> /dev/null
@@ -199,6 +208,12 @@ install_harbor() {
 
 
 prepare_harbor() {
+	# Set memory overcommit to allow background processes
+	echo "Configuring memory overcommit..." | log
+	sed -i '/^vm.overcommit_memory[[:space:]]*=.*/d' /etc/sysctl.conf && echo "vm.overcommit_memory = 1" | tee -a /etc/sysctl.conf
+	sysctl -w vm.overcommit_memory=1
+	sysctl vm.overcommit_memory
+
 	echo "Running harbor prep phase..." | log
 	bash /opt/harbor/prepare
 }
