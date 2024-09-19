@@ -124,27 +124,6 @@ EOF
     fi
     
     openssl x509 -inform PEM -in $DOMAIN.crt -out $DOMAIN.cert &> /dev/null
-    cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
-    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
-    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
-	
-	HARBOR_CONFIG_PATH="/opt/harbor/common/config"
-	echo "Copying certs to Core..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
-	
-	echo "Copying certs to Registry..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/registry &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/registry &> /dev/null
-	
-	echo "Copying certs to Shared..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
-	
-	echo "Removing temp certificates..." | log
-	rm -rf /opt/$DOMAIN.cert
-	rm -rf /opt/$DOMAIN.key
-	
 }
 
 
@@ -170,22 +149,6 @@ configure_harbor() {
 	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
 	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
 	
-	CERT_DESTINATION="/opt/harbor/common/config/shared/trust-certificates"
-	if [[ -d $CERT_DESTINATION ]]; then
-		echo "Copying certificates to $CERT_DESTINATION..." | log
-		
-		if [[ -f $DOMAIN_CERT_PATH && -f $DOMAIN_KEY_PATH ]]; then
-			cp $DOMAIN_CERT_PATH $CERT_DESTINATION && echo "Certificate copied successfully" | log
-			cp $DOMAIN_KEY_PATH $CERT_DESTINATION && echo "Key copied successfully" | log
-			
-		else
-			echo "Error: Certificate or Key not found at specified paths: ${DOMAIN_CERT_PATH}, ${DOMAIN_KEY_PATH}" | log
-		fi
-		
-	else
-		echo "Error: Certificate destination directory $CERT_DESTINATION does not exist." | log
-		
-	fi
 }
 
 
@@ -311,6 +274,44 @@ finalize_harbor_installation() {
             echo "Timeout reached." | log
         fi
     done
+	
+	CERT_DESTINATION="/opt/harbor/common/config/shared/trust-certificates"
+	if [[ -d $CERT_DESTINATION ]]; then
+		echo "Copying certificates to $CERT_DESTINATION..." | log
+		
+		if [[ -f $DOMAIN_CERT_PATH && -f $DOMAIN_KEY_PATH ]]; then
+			cp $DOMAIN_CERT_PATH $CERT_DESTINATION && echo "Certificate copied successfully" | log
+			cp $DOMAIN_KEY_PATH $CERT_DESTINATION && echo "Key copied successfully" | log
+			
+		else
+			echo "Error: Certificate or Key not found at specified paths: ${DOMAIN_CERT_PATH}, ${DOMAIN_KEY_PATH}" | log
+		fi
+		
+	else
+		echo "Error: Certificate destination directory $CERT_DESTINATION does not exist." | log
+		
+	fi
+	
+	cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
+    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
+    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
+	
+	HARBOR_CONFIG_PATH="/opt/harbor/common/config"
+	echo "Copying certs to Core..." | log
+	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
+	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
+	
+	echo "Copying certs to Registry..." | log
+	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/registry &> /dev/null
+	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/registry &> /dev/null
+	
+	echo "Copying certs to Shared..." | log
+	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
+	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
+	
+	echo "Removing temp certificates..." | log
+	rm -rf /opt/$DOMAIN.cert
+	rm -rf /opt/$DOMAIN.key
 	
 	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24..." | log
 	CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
