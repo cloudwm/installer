@@ -15,7 +15,7 @@ CURRENT_HOSTNAME=$(hostname)
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
 ADMIN_PASSWORD="${ADMINPASSWORD}"
-INSTALL_TYPE="offline"
+INSTALL_TYPE="online"
 lines=()
 done_lines=()
 	
