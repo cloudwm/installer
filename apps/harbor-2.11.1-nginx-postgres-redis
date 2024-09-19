@@ -43,7 +43,6 @@ pre_install() {
 	ufw status
 }
 
-
 install_docker() {
 	echo "Adding GPG Key..."
 	install -m 0755 -d /etc/apt/keyrings &> /dev/null
@@ -62,7 +61,6 @@ install_docker() {
 	apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin &> /dev/null
 	docker -v
 }
-
 
 generate_certs() {
 	GUEST_CONF_FILE="/root/guest.conf"
@@ -124,8 +122,10 @@ EOF
     fi
     
     openssl x509 -inform PEM -in $DOMAIN.crt -out $DOMAIN.cert &> /dev/null
+	cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
+    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
+    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
 }
-
 
 configure_harbor() {
 	echo "Configuring harbor YML file..." | log
@@ -141,16 +141,13 @@ configure_harbor() {
 		
 	fi
 	
-	# Update configuration file with hostname and certificate paths
 	CONFIG_FILE="/opt/harbor/harbor.yml"
 	sed -i "s/^hostname:.*/hostname: ${CURRENT_HOSTNAME}/" $CONFIG_FILE &> /dev/null
 	sed -i "s|^  certificate:.*|  certificate: ${DOMAIN_CERT_PATH}|" $CONFIG_FILE &> /dev/null
 	sed -i "s|^  private_key:.*|  private_key: ${DOMAIN_KEY_PATH}|" $CONFIG_FILE &> /dev/null
 	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
 	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" $CONFIG_FILE &> /dev/null
-	
 }
-
 
 download_and_extract() {
     local url=$1
@@ -183,7 +180,6 @@ download_and_extract() {
     fi
 }
 
-
 install_harbor() {
 	if [ "$INSTALL_TYPE" = "offline" ]; then
 		download_and_extract "$OFFLINE_APP_URL"
@@ -194,9 +190,9 @@ install_harbor() {
 	else
 		echo "Invalid INSTALL_TYPE. Please specify 'offline' or 'online'. Exiting."
 		exit 1
+		
 	fi
 }
-
 
 prepare_harbor() {
 	# Set memory overcommit to allow background processes
@@ -209,115 +205,28 @@ prepare_harbor() {
 	bash /opt/harbor/prepare
 }
 
-
 finalize_harbor_installation() {
-    timeout=120
-    interval=10
-    elapsed=0
-	
     cd /opt/harbor
+	
     echo "Running harbor install phase..." | log
-    
     /usr/bin/bash /opt/harbor/install.sh | while IFS= read -r line; do
         echo "$line" | log
-        
-        if [[ "$line" == *"Clean up the input dir"* ]]; then
-            echo "Starting container status check in $interval seconds..." | log
-			sleep $interval
-
-            while (( elapsed < timeout )); do
-                exited_containers=$(/usr/bin/docker ps -a --filter 'status=exited' -q)
-                if [ -n "$exited_containers" ]; then
-                    echo "Some containers have exited. Container IDs: ${exited_containers}" | log
-                    echo "Attempting to restart exited containers..." | log
-                    /usr/bin/docker compose up -d
-
-                    sleep $interval
-                    elapsed=$((elapsed + interval))
-					
-                else
-                    echo "No exited containers found. Checking other container statuses..." | log
-
-                    other_containers=$(/usr/bin/docker ps -a --filter 'status=restarting' --filter 'health=unhealthy' --filter 'status=created' -q)
-                    if [ -n "$other_containers" ]; then
-                        echo "Some containers are restarting, unhealthy, or in the creation process. Container IDs: ${other_containers}" | log
-						elapsed=0
-                        sleep 5
-						/usr/bin/docker compose up -d
-						
-						sleep $interval
-                        elapsed=$((elapsed + interval))
-						
-                    else
-                        echo "Checking if there are ANY containers at all..." | log
-                        total_containers=$(/usr/bin/docker ps -a -q)
-                    
-                        if [ -z "$total_containers" ]; then
-                            echo "No containers found. Deploying..." | log
-                            /usr/bin/docker compose up -d
-							
-                        else
-                            echo "All containers are running." | log
-                            echo "Stopping Apache2..." | log
-							systemctl stop apache2
-							apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
-							rm -rf /etc/apache2
-							apt-get autoremove -y
-							apt-get autoclean -y
-							
-                            return 0
-                        fi
-                    fi
-                fi
-            done
-
-            echo "Timeout reached." | log
-        fi
     done
 	
-	CERT_DESTINATION="/opt/harbor/common/config/shared/trust-certificates"
-	if [[ -d $CERT_DESTINATION ]]; then
-		echo "Copying certificates to $CERT_DESTINATION..." | log
-		
-		if [[ -f $DOMAIN_CERT_PATH && -f $DOMAIN_KEY_PATH ]]; then
-			cp $DOMAIN_CERT_PATH $CERT_DESTINATION && echo "Certificate copied successfully" | log
-			cp $DOMAIN_KEY_PATH $CERT_DESTINATION && echo "Key copied successfully" | log
-			
-		else
-			echo "Error: Certificate or Key not found at specified paths: ${DOMAIN_CERT_PATH}, ${DOMAIN_KEY_PATH}" | log
-		fi
-		
-	else
-		echo "Error: Certificate destination directory $CERT_DESTINATION does not exist." | log
-		
-	fi
-	
-	cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
-    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
-    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
-	
-	HARBOR_CONFIG_PATH="/opt/harbor/common/config"
-	echo "Copying certs to Core..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/core/certificates &> /dev/null
-	
-	echo "Copying certs to Registry..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/registry &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/registry &> /dev/null
-	
-	echo "Copying certs to Shared..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CONFIG_PATH/shared/trust-certificates &> /dev/null
-	
-	echo "Removing temp certificates..." | log
-	rm -rf /opt/$DOMAIN.cert
-	rm -rf /opt/$DOMAIN.key
-	
 	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24..." | log
-	CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
+	#CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
+	CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d && sleep 15 && /usr/bin/bash -c 'if [ ! -f /opt/scripts/.certs_copied ]; then cp /opt/\$DOMAIN.cert \$DOCKER_DATA_DIR/ && cp /opt/\$DOMAIN.key \$DOCKER_DATA_DIR/ && cp ca.crt \$DOCKER_DATA_DIR/ && HARBOR_CONFIG_PATH=/opt/harbor/common/config && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/core/certificates && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/core/certificates && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/registry && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/registry && cp /opt/\$DOMAIN.cert \$HARBOR_CONFIG_PATH/shared/trust-certificates && cp /opt/\$DOMAIN.key \$HARBOR_CONFIG_PATH/shared/trust-certificates && touch /opt/scripts/.certs_copied; fi')"
 	(crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
 	echo "Docker Compose cron job added successfully. It will run on next reboot." | log
-}
+	
+	echo "Stopping Apache2..." | log
+	systemctl stop apache2
+	apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
+	rm -rf /etc/apache2
+	apt-get autoremove -y
+	apt-get autoclean -y
+
+}	
 
 
 main() {
