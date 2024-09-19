@@ -16,7 +16,9 @@ OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/ha
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
 ADMIN_PASSWORD="${ADMINPASSWORD}"
 INSTALL_TYPE="online"
-
+lines=()
+done_lines=()
+	
 declare -a REMOVE_PACKAGES=("docker.io" "docker-doc" "docker-compose" "docker-compose-v2" "podman-docker" "containerd" "runc")
 declare -a INSTALL_PACKAGES=("ca-certificates" "certbot" "curl" "ufw")
 
@@ -65,71 +67,64 @@ install_docker() {
 
 
 generate_certs() {
-	
-    # Generate a Certificate Authority Certificate
-    openssl genrsa -out ca.key 4096 &> /dev/null
-    openssl req -x509 -new -nodes -sha512 -days 3650 \
-        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=MyPersonal Root CA" \
-        -key ca.key \
-        -out ca.crt &> /dev/null
-
-    # Generate a Server Certificate
-    openssl genrsa -out $DOMAIN.key 4096 &> /dev/null
-    openssl req -sha512 -new \
-        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=${DOMAIN}" \
-        -key $DOMAIN.key \
-        -out $DOMAIN.csr &> /dev/null
-
-    cat > v3.ext <<-EOF
-authorityKeyIdentifier=keyid,issuer
-basicConstraints=CA:FALSE
-keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
-extendedKeyUsage = serverAuth
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1=${DOMAIN}
-DNS.2=${CURRENT_HOSTNAME}
-EOF
-
-    openssl x509 -req -sha512 -days 3650 \
-        -extfile v3.ext \
-        -CA ca.crt -CAkey ca.key -CAcreateserial \
-        -in ${DOMAIN}.csr \
-        -out ${DOMAIN}.crt &> /dev/null
-
-    # Provide the Certificates to Harbor and Docker
     DATA_DIR="/data/cert"
-    if [ ! -d "${DATA_DIR}" ]; then
-        mkdir -p "${DATA_DIR}"
-        echo "Directory created: ${DATA_DIR}"
-    fi
-
-    cp $DOMAIN.crt ${DATA_DIR} &> /dev/null
-    cp $DOMAIN.key ${DATA_DIR} &> /dev/null
-    
     DOCKER_DATA_DIR="/etc/docker/certs.d/${DOMAIN}"
-    if [ ! -d "${DOCKER_DATA_DIR}" ]; then
-        mkdir -p "${DOCKER_DATA_DIR}"
-        echo "Directory created: ${DOCKER_DATA_DIR}"
-    fi
-    
-    openssl x509 -inform PEM -in $DOMAIN.crt -out $DOMAIN.cert &> /dev/null
-    cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
-    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
-    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
+    HARBOR_CERT_DIR="/opt/harbor/common/config/shared/trust-certificates"
 
-	HARBOR_CERT_DIR="/opt/harbor/common/config/shared/trust-certificates"
-	if [ ! -d "${DOCKER_DATA_DIR}" ]; then
-        echo "$HARBOR_CERT_DIR not found" | log 
+    # Install Certbot (if not already installed)
+    if ! command -v certbot &> /dev/null; then
+        echo "Installing Certbot..."
+        sudo apt update && sudo apt install -y certbot
     fi
-	
-	echo "Copying to $HARBOR_CERT_DIR..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CERT_DIR &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CERT_DIR &> /dev/null
-	
+
+    # Use Certbot to generate SSL certificates for the domain
+    echo "Requesting SSL certificates for ${DOMAIN} using Certbot..."
+    sudo certbot certonly --standalone --non-interactive --agree-tos --email youremail@example.com -d "${DOMAIN}" &> /dev/null
+
+    if [ $? -ne 0 ]; then
+        echo "Certbot failed to generate certificates for ${DOMAIN}" >&2
+        return 1
+    fi
+
+    # Certbot stores the certificates in /etc/letsencrypt/live/<domain>/
+    CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
+
+    if [ ! -d "${CERT_DIR}" ]; then
+        echo "Certificate directory ${CERT_DIR} not found." >&2
+        return 1
+    fi
+
+    # Copy the Let's Encrypt certificates to the necessary directories
+    echo "Copying certificates to ${DATA_DIR}..."
+    mkdir -p "${DATA_DIR}"
+    sudo cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.crt"
+    sudo cp "${CERT_DIR}/privkey.pem" "${DATA_DIR}/${DOMAIN}.key"
+
+    # Convert the certificate to .cert format (Docker requires .cert format)
+    sudo cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.cert"
+
+    # Copy certificates for Docker
+    echo "Copying certificates to Docker's cert directory: ${DOCKER_DATA_DIR}..."
+    mkdir -p "${DOCKER_DATA_DIR}"
+    sudo cp "${CERT_DIR}/fullchain.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.cert"
+    sudo cp "${CERT_DIR}/privkey.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.key"
+
+    # Copy certificates to Harbor's trust-certificates directory
+    echo "Copying certificates to Harbor's trust-certificates directory: ${HARBOR_CERT_DIR}..."
+    mkdir -p "${HARBOR_CERT_DIR}"
+    sudo cp "${CERT_DIR}/fullchain.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.cert"
+    sudo cp "${CERT_DIR}/privkey.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.key"
+
+    # Restart Docker to ensure it's using the new certificates
+    echo "Restarting Docker to apply new certificates..."
+    sudo systemctl restart docker
+
+    # Optionally restart Harbor if required
+    echo "Restarting Harbor to apply new certificates..."
+    cd /opt/harbor
+    sudo docker-compose down
+    sudo docker-compose up -d
 }
-
 
 configure_harbor() {
 	echo "Configuring harbor YML file..."
@@ -264,6 +259,13 @@ finalize_harbor_installation() {
         fi
     done
 	
+	mark_previous_done
+	lines+=("Generating certificates...")
+	display_all_lines
+	
+	echo "Generating certificates..." | log
+	generate_certs
+	
 	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24...\n" | log
     CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
     (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
@@ -271,11 +273,7 @@ finalize_harbor_installation() {
 	
 }
 
-main() {
-	lines=()
-	done_lines=()
-	
-	mark_previous_done() {
+mark_previous_done() {
 	    for (( i=0; i<${#lines[@]}; i++ )); do
 	        if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
 	            lines[$i]="${lines[$i]} [DONE]"
@@ -284,13 +282,14 @@ main() {
 	    done
 	}
 
-	display_all_lines() {
-		"$update_status" "$HTML_PATH" -cp
-	    for line in "${lines[@]}"; do
-	        "$update_status" "$HTML_PATH" -ap "$line"
-	    done
-	}
+display_all_lines() {
+	"$update_status" "$HTML_PATH" -cp
+	for line in "${lines[@]}"; do
+		"$update_status" "$HTML_PATH" -ap "$line"
+	done
+}
 	
+main() {
 	update_status="$rootDir/include/updateInstallStatus.sh"
 	HTML_PATH="/var/www/html/index.html"
 
@@ -309,13 +308,6 @@ main() {
 	
 	echo "Switching to /opt..."
 	cd /opt
-	
-	mark_previous_done
-	lines+=("Generating certificates...")
-	display_all_lines
-	
-	echo "Generating certificates..." | log
-	generate_certs
 	
 	echo "Restarting docker..."
 	systemctl restart docker
