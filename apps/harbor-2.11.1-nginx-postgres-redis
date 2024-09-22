@@ -9,8 +9,11 @@ fi
 
 
 DOMAIN="${CWM_DOMAIN}"
-DOMAIN_CERT_PATH="/opt/${DOMAIN}.crt"
-DOMAIN_KEY_PATH="/opt/${DOMAIN}.key"
+IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
+
+CERT_DIR="/opt/certs"
+DOMAIN_CERT_PATH="$CERT_DIR/${DOMAIN}.crt"
+DOMAIN_KEY_PATH="$CERT_DIR/${DOMAIN}.key"
 CURRENT_HOSTNAME=$(hostname)
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
@@ -65,69 +68,15 @@ install_docker() {
 
 
 generate_certs() {
+	if [[ ! -d $CERT_DIR ]]; then
+		mkdir -p $CERT_DIR
+		echo "Created Cert directory: ${CERT_DIR}" | log
+	fi
 	
-    # Generate a Certificate Authority Certificate
-    openssl genrsa -out ca.key 4096 &> /dev/null
-    openssl req -x509 -new -nodes -sha512 -days 3650 \
-        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=MyPersonal Root CA" \
-        -key ca.key \
-        -out ca.crt &> /dev/null
-
-    # Generate a Server Certificate
-    openssl genrsa -out $DOMAIN.key 4096 &> /dev/null
-    openssl req -sha512 -new \
-        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=${DOMAIN}" \
-        -key $DOMAIN.key \
-        -out $DOMAIN.csr &> /dev/null
-
-    cat > v3.ext <<-EOF
-authorityKeyIdentifier=keyid,issuer
-basicConstraints=CA:FALSE
-keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
-extendedKeyUsage = serverAuth
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1=${DOMAIN}
-DNS.2=${CURRENT_HOSTNAME}
-EOF
-
-    openssl x509 -req -sha512 -days 3650 \
-        -extfile v3.ext \
-        -CA ca.crt -CAkey ca.key -CAcreateserial \
-        -in ${DOMAIN}.csr \
-        -out ${DOMAIN}.crt &> /dev/null
-
-    # Provide the Certificates to Harbor and Docker
-    DATA_DIR="/data/cert"
-    if [ ! -d "${DATA_DIR}" ]; then
-        mkdir -p "${DATA_DIR}"
-        echo "Directory created: ${DATA_DIR}"
-    fi
-
-    cp $DOMAIN.crt ${DATA_DIR} &> /dev/null
-    cp $DOMAIN.key ${DATA_DIR} &> /dev/null
-    
-    DOCKER_DATA_DIR="/etc/docker/certs.d/${DOMAIN}"
-    if [ ! -d "${DOCKER_DATA_DIR}" ]; then
-        mkdir -p "${DOCKER_DATA_DIR}"
-        echo "Directory created: ${DOCKER_DATA_DIR}"
-    fi
-    
-    openssl x509 -inform PEM -in $DOMAIN.crt -out $DOMAIN.cert &> /dev/null
-    cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
-    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
-    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
-
-	HARBOR_CERT_DIR="/opt/harbor/common/config/shared/trust-certificates"
-	if [ ! -d "${DOCKER_DATA_DIR}" ]; then
-        echo "$HARBOR_CERT_DIR not found" | log 
-    fi
+	echo "Creating SAN file..." | log
+	echo "subjectAltName=IP:${IP_ADDR}" > "$CERT_DIR/san.txt"
 	
-	echo "Copying to $HARBOR_CERT_DIR..." | log
-	cp /opt/$DOMAIN.cert $HARBOR_CERT_DIR &> /dev/null
-	cp /opt/$DOMAIN.key $HARBOR_CERT_DIR &> /dev/null
-	
+	openssl x509 -req -days 3650 -in $CERT_DIR/$DOMAIN.csr -signkey $CERT_DIR/$DOMAIN.key -out $CERT_DIR/$DOMAIN.crt -extfile $CERT_DIR/san.txt
 }
 
 
@@ -310,13 +259,6 @@ main() {
 	echo "Switching to /opt..."
 	cd /opt
 	
-	mark_previous_done
-	lines+=("Generating certificates...")
-	display_all_lines
-	
-	echo "Generating certificates..." | log
-	generate_certs
-	
 	echo "Restarting docker..."
 	systemctl restart docker
 	
@@ -326,6 +268,13 @@ main() {
 	
 	echo "Downloading Harbor 2.11.1..." | log
 	install_harbor
+	
+	mark_previous_done
+	lines+=("Generating certificates...")
+	display_all_lines
+	
+	echo "Generating certificates..." | log
+	generate_certs
 	
 	mark_previous_done
 	lines+=("Configuring Harbor 2.11.1...")
