@@ -84,6 +84,15 @@ DNS.1=${DOMAIN}
 DNS.2=${CURRENT_HOSTNAME}.${DOMAIN}
 IP.1=${IP_ADDR}
 EOF
+	
+	# Generate private key
+	openssl genrsa -out "$CERT_DIR/${DOMAIN}.key" 4096
+
+	# Generate CSR using the private key
+	openssl req -new -sha512 \
+		-subj "/CN=${DOMAIN}" \
+		-key "$CERT_DIR/${DOMAIN}.key" \
+		-out "$CERT_DIR/${DOMAIN}.csr"
 
     # Generating the final certificate signed by the CA
     echo "Generating certificate for ${DOMAIN}..." | log
