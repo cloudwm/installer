@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+mkdir -p /opt/traefik
+cp /opt/installer/tweaks/extras/traefik/docker-compose.yaml /opt/traefik
+cd /opt/traefik
+sed -i "s/ServerDomain/${CWM_DOMAIN}/g" docker-compose.yaml
+sed -i "s/ServerEmail/${ADMINEMAIL}/g" docker-compose.yaml
+echo "Starting the docker compose file"
+docker compose up -d 
+waitOrStop 0 "Failed to start docker-compose.yaml"
+
+descriptionAppend "Traefik web page: http://${CWM_DOMAIN}
