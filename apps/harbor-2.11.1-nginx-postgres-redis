@@ -68,15 +68,47 @@ install_docker() {
 
 
 generate_certs() {
-	if [[ ! -d $CERT_DIR ]]; then
-		mkdir -p $CERT_DIR
-		echo "Created Cert directory: ${CERT_DIR}" | log
-	fi
-	
-	echo "Creating SAN file..." | log
-	echo "subjectAltName=IP:${IP_ADDR}" > "$CERT_DIR/san.txt"
-	
-	openssl x509 -req -days 3650 -in $CERT_DIR/$DOMAIN.csr -signkey $CERT_DIR/$DOMAIN.key -out $CERT_DIR/$DOMAIN.crt -extfile $CERT_DIR/san.txt
+    # Check if the CERT_DIR exists, create if not
+    if [[ ! -d $CERT_DIR ]]; then
+        mkdir -p $CERT_DIR
+        echo "Created Cert directory: ${CERT_DIR}" | log
+    fi
+
+    # Creating a private key for the domain
+    echo "Creating key for ${DOMAIN}..." | log
+    openssl genrsa -out "$CERT_DIR/${DOMAIN}.key" 4096 &> /dev/null
+
+    # Creating a CSR (Certificate Signing Request) for the domain
+    echo "Creating CSR for ${DOMAIN}..." | log
+    openssl req -new -sha512 \
+        -subj "/CN=${DOMAIN}" \
+        -key "$CERT_DIR/${DOMAIN}.key" \
+        -out "$CERT_DIR/${DOMAIN}.csr" &> /dev/null
+
+    # Create the SAN file
+    echo "Creating SAN file..." | log
+    cat > "$CERT_DIR/v3.ext" <<-EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1=${DOMAIN}
+DNS.2=${CURRENT_HOSTNAME}.${DOMAIN}
+IP.1=${IP_ADDR}
+EOF
+
+    # Generating the final certificate signed by the CA
+    echo "Generating certificate for ${DOMAIN}..." | log
+    openssl x509 -req -sha512 -days 3650 \
+        -in "$CERT_DIR/${DOMAIN}.csr" \
+        -signkey "$CERT_DIR/${DOMAIN}.key" \
+        -out "$CERT_DIR/${DOMAIN}.crt" \
+        -extfile "$CERT_DIR/v3.ext" &> /dev/null
+
+    echo "Certificate generation complete!" | log
 }
 
 
