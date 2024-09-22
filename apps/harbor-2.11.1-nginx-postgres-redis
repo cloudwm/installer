@@ -9,16 +9,14 @@ fi
 
 
 DOMAIN="${CWM_DOMAIN}"
-DOMAIN_CERT_PATH="/opt/harbor/common/config/shared/trust-certificates/${DOMAIN}.crt"
-DOMAIN_KEY_PATH="/opt/harbor/common/config/shared/trust-certificates/${DOMAIN}.key"
+DOMAIN_CERT_PATH="/opt/${DOMAIN}.crt"
+DOMAIN_KEY_PATH="/opt/${DOMAIN}.key"
 CURRENT_HOSTNAME=$(hostname)
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.11.1.tgz"
 ADMIN_PASSWORD="${ADMINPASSWORD}"
 INSTALL_TYPE="online"
-lines=()
-done_lines=()
-	
+
 declare -a REMOVE_PACKAGES=("docker.io" "docker-doc" "docker-compose" "docker-compose-v2" "podman-docker" "containerd" "runc")
 declare -a INSTALL_PACKAGES=("ca-certificates" "certbot" "curl" "ufw")
 
@@ -45,6 +43,7 @@ pre_install() {
 	ufw status
 }
 
+
 install_docker() {
 	echo "Adding GPG Key..."
 	install -m 0755 -d /etc/apt/keyrings &> /dev/null
@@ -64,71 +63,75 @@ install_docker() {
 	docker -v
 }
 
+
 generate_certs() {
+	
+    # Generate a Certificate Authority Certificate
+    openssl genrsa -out ca.key 4096 &> /dev/null
+    openssl req -x509 -new -nodes -sha512 -days 3650 \
+        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=MyPersonal Root CA" \
+        -key ca.key \
+        -out ca.crt &> /dev/null
+
+    # Generate a Server Certificate
+    openssl genrsa -out $DOMAIN.key 4096 &> /dev/null
+    openssl req -sha512 -new \
+        -subj "/C=CN/ST=Beijing/L=Beijing/O=example/OU=Personal/CN=${DOMAIN}" \
+        -key $DOMAIN.key \
+        -out $DOMAIN.csr &> /dev/null
+
+    cat > v3.ext <<-EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1=${DOMAIN}
+DNS.2=${CURRENT_HOSTNAME}
+EOF
+
+    openssl x509 -req -sha512 -days 3650 \
+        -extfile v3.ext \
+        -CA ca.crt -CAkey ca.key -CAcreateserial \
+        -in ${DOMAIN}.csr \
+        -out ${DOMAIN}.crt &> /dev/null
+
+    # Provide the Certificates to Harbor and Docker
     DATA_DIR="/data/cert"
-    DOCKER_DATA_DIR="/etc/docker/certs.d/${DOMAIN}"
-    HARBOR_CERT_DIR="/opt/harbor/common/config/shared/trust-certificates"
-	EMAIL=$(grep 'email=' /root/guest.conf | sed 's/email=//')
-
-    # Install Certbot (if not already installed)
-    if ! command -v certbot &> /dev/null; then
-        echo "Installing Certbot..."
-        apt update && apt install -y certbot
+    if [ ! -d "${DATA_DIR}" ]; then
+        mkdir -p "${DATA_DIR}"
+        echo "Directory created: ${DATA_DIR}"
     fi
 
-    # Use Certbot to generate SSL certificates for the domain
-    echo "Requesting SSL certificates for ${DOMAIN} using Certbot..."
-    certbot certonly --standalone --non-interactive --agree-tos --email $EMAIL -d "${DOMAIN}" &> /dev/null
-
-    if [ $? -ne 0 ]; then
-        echo "Certbot failed to generate certificates for ${DOMAIN}" >&2
-        return 1
-    fi
-
-    # Certbot stores the certificates in /etc/letsencrypt/live/<domain>/
-    CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
-
-    if [ ! -d "${CERT_DIR}" ]; then
-        echo "Certificate directory ${CERT_DIR} not found." >&2
-        return 1
-    fi
-
-    # Copy the Let's Encrypt certificates to the necessary directories
-    echo "Copying certificates to ${DATA_DIR}..."
-    mkdir -p "${DATA_DIR}"
-    cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.crt"
-    cp "${CERT_DIR}/privkey.pem" "${DATA_DIR}/${DOMAIN}.key"
-
-    # Convert the certificate to .cert format (Docker requires .cert format)
-    cp "${CERT_DIR}/fullchain.pem" "${DATA_DIR}/${DOMAIN}.cert"
-
-    # Copy certificates for Docker
-    echo "Copying certificates to Docker's cert directory: ${DOCKER_DATA_DIR}..."
-    mkdir -p "${DOCKER_DATA_DIR}"
-    cp "${CERT_DIR}/fullchain.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.cert"
-    cp "${CERT_DIR}/privkey.pem" "${DOCKER_DATA_DIR}/${DOMAIN}.key"
-
-    # Copy certificates to Harbor's trust-certificates directory
-    echo "Copying certificates to Harbor's trust-certificates directory: ${HARBOR_CERT_DIR}..."
-    mkdir -p "${HARBOR_CERT_DIR}"
-    cp "${CERT_DIR}/fullchain.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.cert"
-    cp "${CERT_DIR}/privkey.pem" "${HARBOR_CERT_DIR}/${DOMAIN}.key"
-
-    # Restart Docker to ensure it's using the new certificates
-    echo "Restarting Docker to apply new certificates..."
-    systemctl restart docker
-
-    # Optionally restart Harbor if required
-    echo "Restarting Harbor to apply new certificates..."
-    cd /opt/harbor
-    docker-compose down
-    docker-compose up -d
-}
+    cp $DOMAIN.crt ${DATA_DIR} &> /dev/null
+    cp $DOMAIN.key ${DATA_DIR} &> /dev/null
     
+    DOCKER_DATA_DIR="/etc/docker/certs.d/${DOMAIN}"
+    if [ ! -d "${DOCKER_DATA_DIR}" ]; then
+        mkdir -p "${DOCKER_DATA_DIR}"
+        echo "Directory created: ${DOCKER_DATA_DIR}"
+    fi
+    
+    openssl x509 -inform PEM -in $DOMAIN.crt -out $DOMAIN.cert &> /dev/null
+    cp /opt/$DOMAIN.cert $DOCKER_DATA_DIR/ &> /dev/null
+    cp /opt/$DOMAIN.key $DOCKER_DATA_DIR/ &> /dev/null
+    cp ca.crt $DOCKER_DATA_DIR/ &> /dev/null
+
+	HARBOR_CERT_DIR="/opt/harbor/common/config/shared/trust-certificates"
+	if [ ! -d "${DOCKER_DATA_DIR}" ]; then
+        echo "$HARBOR_CERT_DIR not found" | log 
+    fi
+	
+	echo "Copying to $HARBOR_CERT_DIR..." | log
+	cp /opt/$DOMAIN.cert $HARBOR_CERT_DIR &> /dev/null
+	cp /opt/$DOMAIN.key $HARBOR_CERT_DIR &> /dev/null
+	
+}
+
 
 configure_harbor() {
-	cd /opt/harbor
-	
 	echo "Configuring harbor YML file..."
 	cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
 	
@@ -138,6 +141,7 @@ configure_harbor() {
 	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
 	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
 }
+
 
 download_and_extract() {
     local url=$1
@@ -170,6 +174,7 @@ download_and_extract() {
     fi
 }
 
+
 install_harbor() {
 	if [ "$INSTALL_TYPE" = "offline" ]; then
 		download_and_extract "$OFFLINE_APP_URL"
@@ -183,10 +188,12 @@ install_harbor() {
 	fi
 }
 
+
 prepare_harbor() {
 	echo "Running harbor prep phase..."
 	bash /opt/harbor/prepare
 }
+
 
 finalize_harbor_installation() {
     timeout=120
@@ -239,13 +246,6 @@ finalize_harbor_installation() {
 							sleep 10
 							
                         else
-							mark_previous_done
-							lines+=("Generating certificates...")
-							display_all_lines
-							
-							echo "Generating certificates..." | log
-							generate_certs
-	
                             echo "All containers are running." | log
                             echo "Stopping Apache2..." | log
 							systemctl stop apache2
@@ -271,7 +271,11 @@ finalize_harbor_installation() {
 	
 }
 
-mark_previous_done() {
+main() {
+	lines=()
+	done_lines=()
+	
+	mark_previous_done() {
 	    for (( i=0; i<${#lines[@]}; i++ )); do
 	        if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
 	            lines[$i]="${lines[$i]} [DONE]"
@@ -280,14 +284,13 @@ mark_previous_done() {
 	    done
 	}
 
-display_all_lines() {
-	"$update_status" "$HTML_PATH" -cp
-	for line in "${lines[@]}"; do
-		"$update_status" "$HTML_PATH" -ap "$line"
-	done
-}
+	display_all_lines() {
+		"$update_status" "$HTML_PATH" -cp
+	    for line in "${lines[@]}"; do
+	        "$update_status" "$HTML_PATH" -ap "$line"
+	    done
+	}
 	
-main() {
 	update_status="$rootDir/include/updateInstallStatus.sh"
 	HTML_PATH="/var/www/html/index.html"
 
@@ -306,6 +309,13 @@ main() {
 	
 	echo "Switching to /opt..."
 	cd /opt
+	
+	mark_previous_done
+	lines+=("Generating certificates...")
+	display_all_lines
+	
+	echo "Generating certificates..." | log
+	generate_certs
 	
 	echo "Restarting docker..."
 	systemctl restart docker
@@ -355,3 +365,8 @@ main() {
 }
 
 main
+
+
+
+
+192-168-30-182.cloud-xip.com
