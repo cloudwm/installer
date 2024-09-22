@@ -69,6 +69,13 @@ install_docker() {
 
 
 generate_certs() {
+    # Variable definitions
+    CERT_DIR="/opt/certs"
+    DOMAIN="192.168.30.182"
+    IP_ADDR="192.168.30.182"
+    DOMAIN_CERT_PATH="$CERT_DIR/${DOMAIN}.crt"
+    DOMAIN_KEY_PATH="$CERT_DIR/${DOMAIN}.key"
+
     # Check if the CERT_DIR exists, create if not
     if [[ ! -d $CERT_DIR ]]; then
         mkdir -p $CERT_DIR
@@ -80,47 +87,39 @@ generate_certs() {
 subjectAltName = @alt_names
 
 [alt_names]
-DNS.1=${DOMAIN}
-DNS.2=${CURRENT_HOSTNAME}.${DOMAIN}
-IP.1=${IP_ADDR}
+DNS.1 = ${DOMAIN}
+IP.1 = ${IP_ADDR}
 EOF
-	
-	# Generate private key
-	openssl genrsa -out "$CERT_DIR/${DOMAIN}.key" 4096
 
-	# Generate CSR using the private key
-	openssl req -new -sha512 \
-		-subj "/CN=${DOMAIN}" \
-		-key "$CERT_DIR/${DOMAIN}.key" \
-		-out "$CERT_DIR/${DOMAIN}.csr"
+    # Generate private key
+    echo "Generating private key..." | log
+    openssl genrsa -out "$CERT_DIR/${DOMAIN}.key" 4096
 
-    # Generating the final certificate signed by the CA
-    echo "Generating certificate for ${DOMAIN}..." | log
+    # Generate CSR using the private key
+    echo "Generating CSR..." | log
+    openssl req -new -sha512 \
+        -subj "/CN=${DOMAIN}" \
+        -key "$CERT_DIR/${DOMAIN}.key" \
+        -out "$CERT_DIR/${DOMAIN}.csr"
+
+    # Generate the self-signed certificate
+    echo "Generating self-signed certificate for ${DOMAIN}..." | log
     openssl x509 -req -sha512 -days 3650 \
         -in "$CERT_DIR/${DOMAIN}.csr" \
         -signkey "$CERT_DIR/${DOMAIN}.key" \
         -out "$CERT_DIR/${DOMAIN}.crt" \
-        -extfile "$CERT_DIR/v3.ext" &> /dev/null
-	
-	DOCKER_CERT_PATH="/etc/docker/certs.d/$DOMAIN"
-	if [ ! -d $DOCKER_CERT_PATH ]; then
-		echo "Creating directory ${DOCKER_CERT_PATH}..." | log
-		mkdir -p /etc/docker/certs.d/$DOMAIN
-	fi
-	
-	echo "Copying certs to Docker..." | log
-	cp $DOMAIN_CERT_PATH $DOCKER_CERT_PATH
-	cp $DOMAIN_KEY_PATH $DOCKER_CERT_PATH
-	
+        -extfile "$CERT_DIR/v3.ext"
+
     echo "Certificate generation complete!" | log
 }
+
 
 
 configure_harbor() {
 	echo "Configuring harbor YML file..."
 	cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
 	
-	sed -i "s/^hostname:.*/hostname: ${CURRENT_HOSTNAME}/" /opt/harbor/harbor.yml &> /dev/null
+	sed -i "s/^hostname:.*/hostname: ${IP_ADDR}/" /opt/harbor/harbor.yml &> /dev/null
 	sed -i "s|^  certificate:.*|  certificate: ${DOMAIN_CERT_PATH}|" /opt/harbor/harbor.yml &> /dev/null
 	sed -i "s|^  private_key:.*|  private_key: ${DOMAIN_KEY_PATH}|" /opt/harbor/harbor.yml &> /dev/null
 	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
