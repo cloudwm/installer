@@ -11,6 +11,9 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
+tz=$(timedatectl | grep -oP '(?<=Time zone: ).*?(?= \()')
+echo "$tz" > /etc/timezone
+
 appPath=/var/www/html
 rootDir=$(rootDir)
 ubuntu_version=$(lsb_release -rs)
