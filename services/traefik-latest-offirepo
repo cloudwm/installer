@@ -15,6 +15,10 @@ echo "Starting the docker compose file"
 docker compose up -d 
 waitOrStop 0 "Failed to start docker-compose.yaml"
 
+echo "Enabling docker service"
+systemctl enable docker
+waitOrStop 0 "Failed to enable docker service"
+
 descriptionAppend "Traefik web page: ${CWM_DOMAIN}:8080"
 
 tagScript success
