@@ -10,11 +10,8 @@ fi
 
 DOMAIN="${CWM_DOMAIN}"
 IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
-
+EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
 CERT_DIR="/opt/certs"
-DOMAIN_CERT_PATH="$CERT_DIR/${DOMAIN}.crt"
-DOMAIN_KEY_PATH="$CERT_DIR/${DOMAIN}.key"
-CURRENT_HOSTNAME=$(hostname)
 ADMIN_PASSWORD="${ADMINPASSWORD}"
 
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.11.1.tgz"
@@ -69,20 +66,47 @@ install_docker() {
 
 
 generate_certs() {
-    # Variable definitions
-    CERT_DIR="/opt/certs"
-    DOMAIN="192.168.30.182"
-    IP_ADDR="192.168.30.182"
-    DOMAIN_CERT_PATH="$CERT_DIR/${DOMAIN}.crt"
-    DOMAIN_KEY_PATH="$CERT_DIR/${DOMAIN}.key"
-
-    # Check if the CERT_DIR exists, create if not
     if [[ ! -d $CERT_DIR ]]; then
         mkdir -p $CERT_DIR
         echo "Created Cert directory: ${CERT_DIR}" | log
     fi
 
-    echo "Creating SAN file..." | log
+    if ! command -v certbot &> /dev/null; then
+        echo "Certbot not found. Installing Certbot..." | log
+        sudo apt-get update
+        sudo apt-get install -y certbot
+    fi
+
+    echo "Obtaining Let's Encrypt certificate for ${DOMAIN}..." | log
+    if systemctl is-active --quiet nginx; then
+        sudo systemctl stop nginx
+        NGINX_STOPPED=true
+    fi
+	
+    if systemctl is-active --quiet apache2; then
+        sudo systemctl stop apache2
+        APACHE_STOPPED=true
+    fi
+
+	echo "DEBUG: Email: ${EMAIL_ADDR}" | log
+    sudo certbot certonly --standalone -d "${DOMAIN}" \
+        --non-interactive --agree-tos --email "${EMAIL_ADDR}"
+
+    if [ "$NGINX_STOPPED" = true ]; then
+        sudo systemctl start nginx
+    fi
+	
+    if [ "$APACHE_STOPPED" = true ]; then
+        sudo systemctl start apache2
+    fi
+
+    echo "Copying certificates to ${CERT_DIR}..." | log
+    CERTBOT_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+    sudo cp "${CERTBOT_LIVE_DIR}/fullchain.pem" "${CERT_DIR}"
+    sudo cp "${CERTBOT_LIVE_DIR}/privkey.pem" "${CERT_DIR}"
+    sudo chown $(whoami):$(whoami) "${CERT_DIR}"
+	
+	echo "Creating SAN file..." | log
     cat > "$CERT_DIR/v3.ext" <<-EOF
 subjectAltName = @alt_names
 
@@ -90,42 +114,20 @@ subjectAltName = @alt_names
 DNS.1 = ${DOMAIN}
 IP.1 = ${IP_ADDR}
 EOF
-
-    # Generate private key
-    echo "Generating private key..." | log
-    openssl genrsa -out "$CERT_DIR/${DOMAIN}.key" 4096
-
-    # Generate CSR using the private key
-    echo "Generating CSR..." | log
-    openssl req -new -sha512 \
-        -subj "/CN=${DOMAIN}" \
-        -key "$CERT_DIR/${DOMAIN}.key" \
-        -out "$CERT_DIR/${DOMAIN}.csr"
-
-    # Generate the self-signed certificate
-    echo "Generating self-signed certificate for ${DOMAIN}..." | log
-    openssl x509 -req -sha512 -days 3650 \
-        -in "$CERT_DIR/${DOMAIN}.csr" \
-        -signkey "$CERT_DIR/${DOMAIN}.key" \
-        -out "$CERT_DIR/${DOMAIN}.crt" \
-        -extfile "$CERT_DIR/v3.ext"
-
-    echo "Certificate generation complete!" | log
+    
+	echo "Certificate generation complete!" | log
 }
-
-
 
 configure_harbor() {
-	echo "Configuring harbor YML file..."
-	cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
-	
-	sed -i "s/^hostname:.*/hostname: ${IP_ADDR}/" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s|^  certificate:.*|  certificate: ${DOMAIN_CERT_PATH}|" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s|^  private_key:.*|  private_key: ${DOMAIN_KEY_PATH}|" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
-	sed -i "s/^  password:.*/  password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
-}
+    echo "Configuring harbor YML file..."
+    cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
 
+    sed -i "s/^hostname:.*/hostname: ${DOMAIN}/" /opt/harbor/harbor.yml &> /dev/null
+    sed -i "s|^\([ \t]*\)certificate:.*|\1certificate: ${CERT_DIR}/fullchain.pem|" /opt/harbor/harbor.yml &> /dev/null
+    sed -i "s|^\([ \t]*\)private_key:.*|\1private_key: ${CERT_DIR}/privkey.pem|" /opt/harbor/harbor.yml &> /dev/null
+    sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
+    sed -i "s/^\([ \t]*\)password:.*/\1password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
+}
 
 download_and_extract() {
     local url=$1
@@ -158,7 +160,6 @@ download_and_extract() {
     fi
 }
 
-
 install_harbor() {
 	if [ "$INSTALL_TYPE" = "offline" ]; then
 		download_and_extract "$OFFLINE_APP_URL"
@@ -172,12 +173,10 @@ install_harbor() {
 	fi
 }
 
-
 prepare_harbor() {
 	echo "Running harbor prep phase..."
 	bash /opt/harbor/prepare
 }
-
 
 finalize_harbor_installation() {
     timeout=120
@@ -191,6 +190,14 @@ finalize_harbor_installation() {
         echo "$line" | log
         
         if [[ "$line" == *"Clean up the input dir"* ]]; then
+			echo "Stopping & Removing Apache2..." | log
+			systemctl stop apache2
+			apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
+			rm -rf /etc/apache2
+			apt-get autoremove -y
+			apt-get autoclean -y
+			return 0
+			
             echo "Starting container status check in $interval seconds..." | log
 			sleep $interval
 
@@ -228,17 +235,6 @@ finalize_harbor_installation() {
                             echo "No containers found. Deploying..." | log
                             /usr/bin/docker compose up -d
 							sleep 10
-							
-                        else
-                            echo "All containers are running." | log
-                            echo "Stopping Apache2..." | log
-							systemctl stop apache2
-							apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
-							rm -rf /etc/apache2
-							apt-get autoremove -y
-							apt-get autoclean -y
-							
-                            return 0
                         fi
                     fi
                 fi
@@ -350,7 +346,3 @@ main() {
 
 main
 
-
-
-
-192-168-30-182.cloud-xip.com
