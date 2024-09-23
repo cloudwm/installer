@@ -16,3 +16,7 @@ docker compose up -d
 waitOrStop 0 "Failed to start docker-compose.yaml"
 
 descriptionAppend "Traefik web page: http://${CWM_DOMAIN}
+
+tagScript success
+
+exit 0
