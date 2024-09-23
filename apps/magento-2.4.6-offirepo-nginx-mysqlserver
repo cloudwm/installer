@@ -131,7 +131,9 @@ echo "Adding index.php to document root"
 cp $appPath/pub/index.php $appPath/
 cd $appPath && sed -i "s/\/..\/app/\/app/g" index.php
 
+echo "Reindexing and Cleaning Cache" | log
 bin/magento cache:clean
+bin/magento cache:flush
 waitOrStop 0 "Cleanup actions failed"
 sleep 5
 bin/magento indexer:reindex
