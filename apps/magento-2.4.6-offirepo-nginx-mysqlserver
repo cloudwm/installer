@@ -11,8 +11,8 @@ checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
-tz=$(timedatectl | grep -oP '(?<=Time zone: ).*?(?= \()')
-echo "$tz" > /etc/timezone
+TZ=$(timedatectl | grep -oP '(?<=Time zone: ).*?(?= \()')
+echo "${TZ}" > /etc/timezone
 
 appPath=/var/www/html
 rootDir=$(rootDir)
@@ -86,7 +86,7 @@ systemctl stop elasticsearch.service
 echo "Installing Magento" | log
 systemctl start elasticsearch.service
 sleep 5
-$appPath/bin/magento setup:install --base-url-secure=https://${CWM_DISPLAYED_ADDRESS}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD}  --language=en_US  --currency=USD --timezone=$(cat /etc/timezone) --use-rewrites=1 --use-secure=1 --use-secure-admin=1 --search-engine=elasticsearch7 --elasticsearch-host=localhost --elasticsearch-port=9200 | log
+$appPath/bin/magento setup:install --base-url-secure=https://${CWM_DISPLAYED_ADDRESS}/ --db-host=localhost --db-name=magentodb --db-user=magentouser --db-password=${ADMINPASSWORD} --admin-firstname=admin --admin-lastname=admin --admin-email=${ADMINEMAIL} --admin-user=admin --admin-password=${ADMINPASSWORD}  --language=en_US  --currency=USD --timezone=${TZ} --use-rewrites=1 --use-secure=1 --use-secure-admin=1 --search-engine=elasticsearch7 --elasticsearch-host=localhost --elasticsearch-port=9200 | log
 
 ADMIN_URI=`grep "Admin URI:" $CWM_LOGDIR/*.log | rev | cut -d ' ' -f 1 | rev | head -1`
 # ADMIN_URI=`php /var/www/html/bin/magento info:adminuri | rev | cut -d ' ' -f 1 | rev`
