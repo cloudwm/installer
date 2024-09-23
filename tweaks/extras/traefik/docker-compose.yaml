@@ -5,6 +5,7 @@ services:
   traefik:
     image: "traefik:v3.1"
     container_name: "traefik"
+    restart: "always"
     command:
       - "--log.level=DEBUG"
       - "--api.insecure=true"
@@ -25,6 +26,7 @@ services:
   whoami:
     image: "traefik/whoami"
     container_name: "simple-service"
+    restart: "always"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.whoami.rule=Host(`ServerDomain`)"
