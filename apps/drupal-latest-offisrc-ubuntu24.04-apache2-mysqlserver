@@ -1,0 +1,204 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+
+fi
+
+IP_ADDR="185.159.72.99"
+EMAIL_ADDR="gils@omc.co.il"
+
+CERT_DIR="/opt/certs"
+DRUPAL_DIR="/opt/drupal-site"
+DB_NAME="drupal_db"
+DB_USER="drupal_user"
+DB_PASS="Pass12344321!!"
+DOMAIN="185-159-72-99.cloud-xip.com"
+USER_NAME="admin"
+#IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
+#EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
+
+generate_certs() {
+    if [[ ! -d $CERT_DIR ]]; then
+        mkdir -p $CERT_DIR
+        echo "Created Cert directory: ${CERT_DIR}" | log
+    fi
+
+    if ! command -v certbot &> /dev/null; then
+        echo "Certbot not found. Installing Certbot..." | log
+        sudo apt-get update
+        sudo apt-get install -y certbot
+    fi
+
+    echo "Obtaining Let's Encrypt certificate for ${ }..." | log
+    if systemctl is-active --quiet nginx; then
+        sudo systemctl stop nginx
+        NGINX_STOPPED=true
+    fi
+	
+    if systemctl is-active --quiet apache2; then
+        sudo systemctl stop apache2
+        APACHE_STOPPED=true
+    fi
+
+	echo "DEBUG: Email: ${EMAIL_ADDR}" | log
+    sudo certbot certonly --standalone -d "${DOMAIN}" \
+        --non-interactive --agree-tos --email "${EMAIL_ADDR}"
+
+    if [ "$NGINX_STOPPED" = true ]; then
+        sudo systemctl start nginx
+    fi
+	
+    if [ "$APACHE_STOPPED" = true ]; then
+        sudo systemctl start apache2
+    fi
+
+    echo "Copying certificates to ${CERT_DIR}..." | log
+    CERTBOT_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+    sudo cp "${CERTBOT_LIVE_DIR}/fullchain.pem" "${CERT_DIR}"
+    sudo cp "${CERTBOT_LIVE_DIR}/privkey.pem" "${CERT_DIR}"
+    sudo chown $(whoami):$(whoami) "${CERT_DIR}"
+	
+	echo "Creating SAN file..." | log
+    cat > "$CERT_DIR/v3.ext" <<-EOF
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${DOMAIN}
+IP.1 = ${IP_ADDR}
+EOF
+    
+	echo "Certificate generation complete!" | log
+}
+
+install_php() {
+	echo "Updating system packages..." | log
+	apt update
+
+	echo "Installing PHP 8.3 and required extensions..."
+	apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
+	#installPackages php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
+}
+
+install_composer() {
+	echo "Installing Composer..."
+	export COMPOSER_ALLOW_SUPERUSER=1
+	
+	cd /tmp
+	php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+	HASH="$(curl -sS https://composer.github.io/installer.sig)"
+	php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
+	php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+	php -r "unlink('composer-setup.php');"
+}
+
+install_apache2() {
+	echo "Installing Apache web server..."
+	apt install -y apache2 libapache2-mod-php8.3
+	systemctl start apache2
+	a2enmod rewrite
+	systemctl restart apache2
+}
+
+
+apt install -y unzip
+install_php
+install_composer
+install_apache2
+
+# Create Drupal directory
+echo "Creating Drupal project directory..."
+mkdir -p "$DRUPAL_DIR"
+cd "$DRUPAL_DIR"
+
+# Install Drupal using Composer
+echo "Installing Drupal..."
+composer create-project --no-interaction drupal/recommended-project $DRUPAL_DIR || { echo "Composer failed to install Drupal."; exit 1; }
+echo "yes" | composer install
+
+# Set permissions
+echo "Adjusting file permissions..."
+chown -R www-data:www-data "$DRUPAL_DIR"
+find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
+find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
+
+# Create Apache Virtual Host
+echo "Configuring Apache Virtual Host..."
+bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+<VirtualHost *:80>
+     ServerAdmin ${EMAIL_ADDR}
+     DocumentRoot ${DRUPAL_DIR}/web
+     ServerName ${DOMAIN}
+     ServerAlias www.${DOMAIN}
+
+     ErrorLog ${APACHE_LOG_DIR}/error.log
+     CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+     <Directory ${DRUPAL_DIR}/web>
+            Options FollowSymlinks
+            AllowOverride All
+            Require all granted
+     </Directory>
+
+     <Directory ${DRUPAL_DIR}/web>
+            RewriteEngine on
+            RewriteBase /
+            RewriteCond %{REQUEST_FILENAME} !-f
+            RewriteCond %{REQUEST_FILENAME} !-d
+            RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    </Directory>
+</VirtualHost>
+EOF"
+
+# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+# <VirtualHost *:80>
+    # ServerName ${DOMAIN}
+    # Redirect permanent / https://${DOMAIN}/
+# </VirtualHost>
+
+# <VirtualHost *:443>
+    # ServerName ${DOMAIN}
+    # DocumentRoot $DRUPAL_DIR/web
+
+    # <Directory $DRUPAL_DIR/web>
+        # AllowOverride All
+        # Require all granted
+    # </Directory>
+
+    # SSLEngine on
+    # SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+    # SSLCertificateKeyFile /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+
+    # ErrorLog \${APACHE_LOG_DIR}/drupal_error.log
+    # CustomLog \${APACHE_LOG_DIR}/drupal_access.log combined
+
+    # <IfModule mod_rewrite.c>
+        # RewriteEngine On
+        # RewriteCond %{HTTPS} !=on
+        # RewriteRule ^/?(.*) https://%{DOMAIN}/$1 [R,L]
+    # </IfModule>
+# </VirtualHost>
+# EOF"
+
+# Enable Drupal site and disable default site
+a2ensite drupal.conf
+a2dissite 000-default.conf
+systemctl reload apache2
+systemctl restart apache2
+
+# Create Drupal database and user
+echo "Creating Drupal database and user..."
+mysql <<MYSQL_SCRIPT
+CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
+
+#generate_certs
+
+echo "Installation complete!"
+echo "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
