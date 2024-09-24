@@ -78,13 +78,13 @@ install_php() {
 	echo "Updating system packages..." | log
 	apt update
 
-	echo "Installing PHP 8.3 and required extensions..."
+	echo "Installing PHP 8.3 and required extensions..." | log
 	apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
 	#installPackages php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
 }
 
 install_composer() {
-	echo "Installing Composer..."
+	echo "Installing Composer..." | log
 	export COMPOSER_ALLOW_SUPERUSER=1
 	
 	cd /tmp
@@ -96,7 +96,7 @@ install_composer() {
 }
 
 install_apache2() {
-	echo "Installing Apache web server..."
+	echo "Installing Apache web server..." | log
 	apt install -y apache2 libapache2-mod-php8.3
 	systemctl start apache2
 	a2enmod rewrite
@@ -110,23 +110,23 @@ install_composer
 install_apache2
 
 # Create Drupal directory
-echo "Creating Drupal project directory..."
+echo "Creating Drupal project directory..." | log
 mkdir -p "$DRUPAL_DIR"
 cd "$DRUPAL_DIR"
 
 # Install Drupal using Composer
-echo "Installing Drupal..."
+echo "Installing Drupal..." | log
 composer create-project --no-interaction drupal/recommended-project $DRUPAL_DIR || { echo "Composer failed to install Drupal."; exit 1; }
 echo "yes" | composer install
 
 # Set permissions
-echo "Adjusting file permissions..."
+echo "Adjusting file permissions..." | log
 chown -R www-data:www-data "$DRUPAL_DIR"
 find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
 find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
 
 # Create Apache Virtual Host
-echo "Configuring Apache Virtual Host..."
+echo "Configuring Apache Virtual Host..." | log
 bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
      ServerAdmin ${EMAIL_ADDR}
@@ -190,7 +190,7 @@ systemctl reload apache2
 systemctl restart apache2
 
 # Create Drupal database and user
-echo "Creating Drupal database and user..."
+echo "Creating Drupal database and user..." | log
 mysql <<MYSQL_SCRIPT
 CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
@@ -200,5 +200,9 @@ MYSQL_SCRIPT
 
 #generate_certs
 
-echo "Installation complete!"
-echo "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
+descriptionAppend ""
+descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
+descriptionAppend ""
+	
+echo "Installation complete!" | log
+echo "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser." | log
