@@ -127,6 +127,8 @@ chown -R www-data:www-data "$DRUPAL_DIR"
 find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
 find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
 
+generate_certs
+
 # Create Apache Virtual Host
 echo "Configuring Apache Virtual Host..." | log
 # bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
@@ -157,7 +159,6 @@ echo "Configuring Apache Virtual Host..." | log
 
 bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
-     ServerAdmin ${EMAIL_ADDR}
      DocumentRoot ${DRUPAL_DIR}/web
      ServerName ${DOMAIN}
      ServerAlias www.${DOMAIN}
@@ -186,7 +187,6 @@ bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 </VirtualHost>
 
 <VirtualHost *:443>
-    ServerAdmin ${EMAIL_ADDR}
     DocumentRoot ${DRUPAL_DIR}/web
     ServerName ${DOMAIN}
     ServerAlias www.${DOMAIN}
@@ -303,7 +303,6 @@ GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 
-#generate_certs
 
 descriptionAppend ""
 descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
