@@ -21,52 +21,53 @@ LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
 
 install_php() {
-    echo "Updating system packages..." | log
-    apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
 
-    echo "Installing PHP 8.3 and required extensions..." | log
-	apt install software-properties-common -y
-	add-apt-repository ppa:ondrej/php
+    # echo "Updating system packages..." | log
+    # apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
 
-    apt install -y php8.3 php-cli php-fpm php-mysql php-xml php-gd php-mbstring php-curl php-zip php-json php-opcache || {
-        echo "Failed to install PHP or required extensions. Exiting.";
-        exit 1;
-    }
+    # echo "Installing PHP 8.3 and required extensions..." | log
+	# apt install software-properties-common -y
+	# add-apt-repository ppa:ondrej/php
+
+    # apt install -y php8.3 php-cli php-fpm php-mysql php-xml php-gd php-mbstring php-curl php-zip php-json php-opcache || {
+        # echo "Failed to install PHP or required extensions. Exiting.";
+        # exit 1;
+    # }
 	
-	sudo systemctl restart php-fpm || {
-        echo "Failed to start php-fpm. Exiting." | log;
-        exit 1;
-    }
+	# sudo systemctl restart php-fpm || {
+        # echo "Failed to start php-fpm. Exiting." | log;
+        # exit 1;
+    # }
 
-    echo "Validating PHP installation..." | log
-    PHP_VERSION=$(php -v | grep "^PHP 8.3")
-    if [ -z "$PHP_VERSION" ]; then
-        echo "PHP 8.3 is not installed correctly. Exiting." | log
-        exit 1
+    # echo "Validating PHP installation..." | log
+    # PHP_VERSION=$(php -v | grep "^PHP 8.3")
+    # if [ -z "$PHP_VERSION" ]; then
+        # echo "PHP 8.3 is not installed correctly. Exiting." | log
+        # exit 1
 		
-    fi
-    echo "PHP version: $PHP_VERSION" | log
+    # fi
+    # echo "PHP version: $PHP_VERSION" | log
 
-    echo "Checking installed PHP extensions..." | log
-    REQUIRED_EXTENSIONS=(cli fpm mysql xml gd mbstring curl zip json opcache)
-    MISSING_EXTENSIONS=()
+    # echo "Checking installed PHP extensions..." | log
+    # REQUIRED_EXTENSIONS=(cli fpm mysql xml gd mbstring curl zip json opcache)
+    # MISSING_EXTENSIONS=()
     
-    for EXT in "${REQUIRED_EXTENSIONS[@]}"; do
-        php -m | grep "$EXT" > /dev/null
-        if [ $? -ne 0 ]; then
-            MISSING_EXTENSIONS+=("$EXT")
+    # for EXT in "${REQUIRED_EXTENSIONS[@]}"; do
+        # php -m | grep "$EXT" > /dev/null
+        # if [ $? -ne 0 ]; then
+            # MISSING_EXTENSIONS+=("$EXT")
 			
-        fi
-    done
+        # fi
+    # done
 
-    if [ ${#MISSING_EXTENSIONS[@]} -gt 0 ]; then
-        echo "Missing PHP extensions: ${MISSING_EXTENSIONS[@]}. Exiting." | log
-        exit 1
+    # if [ ${#MISSING_EXTENSIONS[@]} -gt 0 ]; then
+        # echo "Missing PHP extensions: ${MISSING_EXTENSIONS[@]}. Exiting." | log
+        # exit 1
 		
-    else
-        echo "All required PHP extensions are installed." | log
+    # else
+        # echo "All required PHP extensions are installed." | log
 		
-    fi
+    # fi
 }
 
 install_composer() {
@@ -162,7 +163,6 @@ install_drupal() {
 
     echo "Drupal installation and permission setup completed successfully." | log
 }
-
 
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
@@ -298,74 +298,131 @@ MYSQL_SCRIPT
 
 
 main () {
-	update_status="$rootDir/include/updateInstallStatus.sh"
-	HTML_PATH="/var/www/html/index.html"
-	if [ ! -f $HTML_PATH ]; then
-		echo "${HTML_PATH} does not exist."
-		exit 1
-	fi
+	apt install php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json -y
 	
-	lines=()
-	done_lines=()
-	
-	mark_previous_done() {
-		for (( i=0; i<${#lines[@]}; i++ )); do
-			if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
-				lines[$i]="${lines[$i]} [DONE]"
-				done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
-			fi
-		done
-	}
+	mysql <<MYSQL_SCRIPT
+CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
 
-	display_all_lines() {
-		"$update_status" "$HTML_PATH" -cp
-		for line in "${lines[@]}"; do
-			"$update_status" "$HTML_PATH" -ap "$line"
-		done
-	}
+	cd /var/www/
+	apt install wget -y
+	wget https://www.drupal.org/download-latest/tar.gz -O drupal.tar.gz
+	tar -xvf drupal.tar.gz
+	mv drupal-* drupal
+	chown -R www-data:www-data /var/www/drupal
+	find /var/www/drupal -type d -exec chmod 755 {} \;
+	find /var/www/drupal -type f -exec chmod 644 {} \;
+
+bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+server {
+    listen 80;
+    server_name your_domain.com;  # Replace with your domain or server IP
+
+    root /var/www/drupal;
+    index index.php index.html index.htm;
+
+    location / {
+        try_files $uri /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOF"
 	
-	APACHE_STATUS=$(systemctl status apache2 --no-pager)
-	printf "%s\n" "$APACHE_STATUS" | log
+	ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/
+	systemctl restart apache2
 	
-	lines+=("Getting Ready...")
-	echo "Getting Ready..." | log
-	"$update_status" "$HTML_PATH" -cp
-	display_all_lines
+	sudo cp /etc/php/8.3/fpm/php.ini /etc/php/8.3/fpm/php.ini.bak
+	sudo grep -q '^memory_limit' /etc/php/8.3/fpm/php.ini && sudo sed -i 's/^memory_limit = .*/memory_limit = 256M/' /etc/php/8.3/fpm/php.ini || echo 'memory_limit = 256M' | sudo tee -a /etc/php/8.3/fpm/php.ini
+	sudo grep -q '^upload_max_filesize' /etc/php/8.3/fpm/php.ini && sudo sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 100M/' /etc/php/8.3/fpm/php.ini || echo 'upload_max_filesize = 100M' | sudo tee -a /etc/php/8.3/fpm/php.ini
+	sudo grep -q '^max_execution_time' /etc/php/8.3/fpm/php.ini && sudo sed -i 's/^max_execution_time = .*/max_execution_time = 300/' /etc/php/8.3/fpm/php.ini || echo 'max_execution_time = 300' | sudo tee -a /etc/php/8.3/fpm/php.ini
+	sudo systemctl restart php8.3-fpm
+	echo "PHP settings updated and PHP-FPM restarted."
+
 	
-	mark_previous_done
-	lines+=("Installing Unzip...")
-	apt install -y unzip
-	display_all_lines
 	
-	mark_previous_done
-	lines+=("Installing PHP 8.3...")
-	install_php
-	display_all_lines
 	
-	mark_previous_done
-	lines+=("Installing Composer...")
-	install_composer
-	display_all_lines
 	
-	mark_previous_done
-	lines+=("Installing Drupal...")
-	install_drupal
-	display_all_lines
+	# update_status="$rootDir/include/updateInstallStatus.sh"
+	# HTML_PATH="/var/www/html/index.html"
+	# if [ ! -f $HTML_PATH ]; then
+		# echo "${HTML_PATH} does not exist."
+		# exit 1
+	# fi
 	
-	mark_previous_done
-	lines+=("Generating certificates...")
-	generate_certs
-	display_all_lines
+	# lines=()
+	# done_lines=()
 	
-	mark_previous_done
-	lines+=("Configuring Apache...")
-	config_apache
-	display_all_lines
+	# mark_previous_done() {
+		# for (( i=0; i<${#lines[@]}; i++ )); do
+			# if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
+				# lines[$i]="${lines[$i]} [DONE]"
+				# done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
+			# fi
+		# done
+	# }
+
+	# display_all_lines() {
+		# "$update_status" "$HTML_PATH" -cp
+		# for line in "${lines[@]}"; do
+			# "$update_status" "$HTML_PATH" -ap "$line"
+		# done
+	# }
 	
-	mark_previous_done
-	lines+=("Creating Drupal database...")
-	create_db
-	display_all_lines
+	# APACHE_STATUS=$(systemctl status apache2 --no-pager)
+	# printf "%s\n" "$APACHE_STATUS" | log
+	
+	# lines+=("Getting Ready...")
+	# echo "Getting Ready..." | log
+	# "$update_status" "$HTML_PATH" -cp
+	# display_all_lines
+	
+	# mark_previous_done
+	# lines+=("Installing Unzip...")
+	# apt install -y unzip
+	# display_all_lines
+	
+	# mark_previous_done
+	# lines+=("Installing PHP 8.3...")
+	# install_php
+	# display_all_lines
+	
+	# mark_previous_done
+	# lines+=("Installing Composer...")
+	# install_composer
+	# display_all_lines
+	
+	# mark_previous_done
+	# lines+=("Installing Drupal...")
+	# install_drupal
+	# display_all_lines
+	
+	# mark_previous_done
+	# lines+=("Generating certificates...")
+	# generate_certs
+	# display_all_lines
+	
+	# mark_previous_done
+	# lines+=("Configuring Apache...")
+	# config_apache
+	# display_all_lines
+	
+	# mark_previous_done
+	# lines+=("Creating Drupal database...")
+	# create_db
+	# display_all_lines
 	
 	descriptionAppend ""
 	descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
