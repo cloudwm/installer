@@ -19,6 +19,45 @@ DOMAIN="${CWM_DOMAIN}"
 LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
 LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
+
+install_php() {
+	echo "Updating system packages..." | log
+	apt update
+
+	echo "Installing PHP 8.3 and required extensions..." | log
+	apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
+}
+
+install_composer() {
+	echo "Installing Composer..." | log
+	export COMPOSER_ALLOW_SUPERUSER=1
+	
+	cd /tmp
+	php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+	HASH="$(curl -sS https://composer.github.io/installer.sig)"
+	php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
+	php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+	php -r "unlink('composer-setup.php');"
+}
+
+install_drupal() {
+	# Create Drupal directory
+	echo "Creating Drupal project directory..." | log
+	mkdir -p "$DRUPAL_DIR"
+	cd "$DRUPAL_DIR"
+
+	# Install Drupal using Composer
+	echo "Installing Drupal..." | log
+	composer create-project --no-interaction drupal/recommended-project $DRUPAL_DIR || { echo "Composer failed to install Drupal."; exit 1; }
+	echo "yes" | composer install
+
+	# Set permissions
+	echo "Adjusting file permissions..." | log
+	chown -R www-data:www-data "$DRUPAL_DIR"
+	find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
+	find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
+}
+
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
         mkdir -p $CERT_DIR
@@ -70,45 +109,6 @@ IP.1 = ${IP_ADDR}
 EOF
     
 	echo "Certificate generation complete!" | log
-}
-
-install_php() {
-	echo "Updating system packages..." | log
-	apt update
-
-	echo "Installing PHP 8.3 and required extensions..." | log
-	apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
-}
-
-install_composer() {
-	echo "Installing Composer..." | log
-	export COMPOSER_ALLOW_SUPERUSER=1
-	
-	cd /tmp
-	php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-	HASH="$(curl -sS https://composer.github.io/installer.sig)"
-	php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
-	php composer-setup.php --install-dir=/usr/local/bin --filename=composer
-	php -r "unlink('composer-setup.php');"
-}
-
-
-install_drupal() {
-	# Create Drupal directory
-	echo "Creating Drupal project directory..." | log
-	mkdir -p "$DRUPAL_DIR"
-	cd "$DRUPAL_DIR"
-
-	# Install Drupal using Composer
-	echo "Installing Drupal..." | log
-	composer create-project --no-interaction drupal/recommended-project $DRUPAL_DIR || { echo "Composer failed to install Drupal."; exit 1; }
-	echo "yes" | composer install
-
-	# Set permissions
-	echo "Adjusting file permissions..." | log
-	chown -R www-data:www-data "$DRUPAL_DIR"
-	find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
-	find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
 }
 
 config_apache() {
@@ -192,6 +192,13 @@ MYSQL_SCRIPT
 
 
 main () {
+	update_status="$rootDir/include/updateInstallStatus.sh"
+	HTML_PATH="/var/www/html/index.html"
+	if [ ! -f $HTML_PATH ]; then
+		echo "${HTML_PATH} does not exist."
+		exit 1
+	fi
+	
 	lines=()
 	done_lines=()
 	
@@ -211,9 +218,9 @@ main () {
 		done
 	}
 	
-	update_status="$rootDir/include/updateInstallStatus.sh"
-	HTML_PATH="/var/www/html/index.html"
-
+	APACHE_STATUS=$(systemctl status apache2 --no-pager)
+	printf "%s\n" "$APACHE_STATUS" | log
+	
 	lines+=("Getting Ready...")
 	echo "Getting Ready..." | log
 	"$update_status" "$HTML_PATH" -cp
@@ -221,7 +228,7 @@ main () {
 	
 	mark_previous_done
 	lines+=("Installing Unzip...")
-	installPackage unzip
+	apt install -y unzip
 	display_all_lines
 	
 	mark_previous_done
