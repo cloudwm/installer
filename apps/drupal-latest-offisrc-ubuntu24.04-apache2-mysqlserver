@@ -340,7 +340,7 @@ server {
 }
 EOF"
 	
-	ln -s /etc/nginx/sites-available/drupal /etc/nginx/sites-enabled/
+	ln -s /etc/apache2/sites-available/drupal /etc/nginx/sites-enabled/
 	systemctl restart apache2
 	
 	sudo cp /etc/php/8.3/fpm/php.ini /etc/php/8.3/fpm/php.ini.bak
