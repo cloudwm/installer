@@ -20,6 +20,8 @@ DOMAIN="185-159-72-99.cloud-xip.com"
 USER_NAME="admin"
 #IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
 #EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
+LE_FULLCHAIN_PATH="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
+LE_PRIVKEY_PATH="/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
 
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
@@ -46,7 +48,7 @@ generate_certs() {
 
 	echo "DEBUG: Email: ${EMAIL_ADDR}" | log
     sudo certbot certonly --standalone -d "${DOMAIN}" \
-        --non-interactive --agree-tos --email "${EMAIL_ADDR}"
+        --non-interactive --agree-tos --email "${EMAIL_ADDR}" --staging
 
     if [ "$NGINX_STOPPED" = true ]; then
         sudo systemctl start nginx
@@ -153,6 +155,14 @@ echo "Configuring Apache Virtual Host..." | log
 # </VirtualHost>
 # EOF"
 
+
+# Revert to lets-encrypt once the limit reset.
+#sudo mkdir -p /etc/ssl/certs /etc/ssl/private
+#sudo openssl req -x509 -newkey rsa:4096 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt -days 365 -nodes -subj "/CN=${DOMAIN}"
+#TEMP_CERT="/etc/ssl/certs/apache-selfsigned.crt"
+#TEMP_KEY="/etc/ssl/private/apache-selfsigned.key"
+
+
 bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 # <VirtualHost *:80>
     # ServerName ${DOMAIN}
@@ -196,8 +206,8 @@ bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
     </Directory>
 
     SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+    SSLCertificateFile ${LE_FULLCHAIN_PATH}
+    SSLCertificateKeyFile ${LE_PRIVKEY_PATH}
 
     ErrorLog \${APACHE_LOG_DIR}/drupal_error.log
     CustomLog \${APACHE_LOG_DIR}/drupal_access.log combined
@@ -210,9 +220,13 @@ bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 </VirtualHost>
 EOF"
 
+
+
 # Enable Drupal site and disable default site
+if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
 a2ensite drupal.conf
 a2dissite 000-default.conf
+a2enmod rewrite
 systemctl reload apache2
 systemctl restart apache2
 
