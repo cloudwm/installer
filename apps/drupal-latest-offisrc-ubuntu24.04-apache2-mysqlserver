@@ -48,7 +48,7 @@ generate_certs() {
 
 	echo "DEBUG: Email: ${EMAIL_ADDR}" | log
     sudo certbot certonly --standalone -d "${DOMAIN}" \
-        --non-interactive --agree-tos --email "${EMAIL_ADDR}" --staging
+        --non-interactive --agree-tos --email "${EMAIL_ADDR}"
 
     if [ "$NGINX_STOPPED" = true ]; then
         sudo systemctl start nginx
@@ -157,10 +157,10 @@ echo "Configuring Apache Virtual Host..." | log
 
 
 # Revert to lets-encrypt once the limit reset.
-#sudo mkdir -p /etc/ssl/certs /etc/ssl/private
-#sudo openssl req -x509 -newkey rsa:4096 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt -days 365 -nodes -subj "/CN=${DOMAIN}"
-#TEMP_CERT="/etc/ssl/certs/apache-selfsigned.crt"
-#TEMP_KEY="/etc/ssl/private/apache-selfsigned.key"
+sudo mkdir -p /etc/ssl/certs /etc/ssl/private
+sudo openssl req -x509 -newkey rsa:4096 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt -days 365 -nodes -subj "/CN=${DOMAIN}"
+TEMP_CERT="/etc/ssl/certs/apache-selfsigned.crt"
+TEMP_KEY="/etc/ssl/private/apache-selfsigned.key"
 
 
 bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
@@ -206,8 +206,8 @@ bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
     </Directory>
 
     SSLEngine on
-    SSLCertificateFile ${LE_FULLCHAIN_PATH}
-    SSLCertificateKeyFile ${LE_PRIVKEY_PATH}
+    SSLCertificateFile ${TEMP_CERT}
+    SSLCertificateKeyFile ${TEMP_KEY}
 
     ErrorLog \${APACHE_LOG_DIR}/drupal_error.log
     CustomLog \${APACHE_LOG_DIR}/drupal_access.log combined
@@ -239,7 +239,7 @@ GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 
-generate_certs
+#generate_certs
 
 descriptionAppend ""
 descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
