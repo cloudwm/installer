@@ -127,7 +127,38 @@ find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
 
 # Create Apache Virtual Host
 echo "Configuring Apache Virtual Host..." | log
+# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+# <VirtualHost *:80>
+     # ServerAdmin ${EMAIL_ADDR}
+     # DocumentRoot ${DRUPAL_DIR}/web
+     # ServerName ${DOMAIN}
+     # ServerAlias www.${DOMAIN}
+
+     # ErrorLog ${APACHE_LOG_DIR}/error.log
+     # CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+     # <Directory ${DRUPAL_DIR}/web>
+            # Options FollowSymlinks
+            # AllowOverride All
+            # Require all granted
+     # </Directory>
+
+     # <Directory ${DRUPAL_DIR}/web>
+            # RewriteEngine on
+            # RewriteBase /
+            # RewriteCond %{REQUEST_FILENAME} !-f
+            # RewriteCond %{REQUEST_FILENAME} !-d
+            # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    # </Directory>
+# </VirtualHost>
+# EOF"
+
 bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+# <VirtualHost *:80>
+    # ServerName ${DOMAIN}
+    # Redirect permanent / https://${DOMAIN}/
+# </VirtualHost>
+
 <VirtualHost *:80>
      ServerAdmin ${EMAIL_ADDR}
      DocumentRoot ${DRUPAL_DIR}/web
@@ -151,37 +182,33 @@ bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
             RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
     </Directory>
 </VirtualHost>
+
+<VirtualHost *:443>
+	ServerAdmin ${EMAIL_ADDR}
+    ServerName ${DOMAIN}
+    DocumentRoot $DRUPAL_DIR/web
+	ServerAlias www.${DOMAIN}
+
+    <Directory $DRUPAL_DIR/web>
+		Options FollowSymlinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+
+    ErrorLog \${APACHE_LOG_DIR}/drupal_error.log
+    CustomLog \${APACHE_LOG_DIR}/drupal_access.log combined
+
+    <IfModule mod_rewrite.c>
+        RewriteEngine On
+        RewriteCond %{HTTPS} !=on
+        RewriteRule ^/?(.*) https://%{DOMAIN}/$1 [R,L]
+    </IfModule>
+</VirtualHost>
 EOF"
-
-# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
-# <VirtualHost *:80>
-    # ServerName ${DOMAIN}
-    # Redirect permanent / https://${DOMAIN}/
-# </VirtualHost>
-
-# <VirtualHost *:443>
-    # ServerName ${DOMAIN}
-    # DocumentRoot $DRUPAL_DIR/web
-
-    # <Directory $DRUPAL_DIR/web>
-        # AllowOverride All
-        # Require all granted
-    # </Directory>
-
-    # SSLEngine on
-    # SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
-    # SSLCertificateKeyFile /etc/letsencrypt/live/${DOMAIN}/privkey.pem
-
-    # ErrorLog \${APACHE_LOG_DIR}/drupal_error.log
-    # CustomLog \${APACHE_LOG_DIR}/drupal_access.log combined
-
-    # <IfModule mod_rewrite.c>
-        # RewriteEngine On
-        # RewriteCond %{HTTPS} !=on
-        # RewriteRule ^/?(.*) https://%{DOMAIN}/$1 [R,L]
-    # </IfModule>
-# </VirtualHost>
-# EOF"
 
 # Enable Drupal site and disable default site
 a2ensite drupal.conf
@@ -198,7 +225,7 @@ GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 
-#generate_certs
+generate_certs
 
 descriptionAppend ""
 descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
