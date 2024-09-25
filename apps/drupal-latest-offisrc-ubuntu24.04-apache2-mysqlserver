@@ -21,42 +21,142 @@ LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
 
 install_php() {
-	echo "Updating system packages..." | log
-	apt update
+    echo "Updating system packages..." | log
+    apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
 
-	echo "Installing PHP 8.3 and required extensions..." | log
-	apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
+    echo "Installing PHP 8.3 and required extensions..." | log
+    apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache || {
+        echo "Failed to install PHP or required extensions. Exiting.";
+        exit 1;
+		
+    }
+
+    echo "Validating PHP installation..." | log
+    PHP_VERSION=$(php -v | grep "^PHP 8.3")
+    if [ -z "$PHP_VERSION" ]; then
+        echo "PHP 8.3 is not installed correctly. Exiting." | log
+        exit 1
+		
+    fi
+    echo "PHP version: $PHP_VERSION" | log
+
+    echo "Checking installed PHP extensions..." | log
+    REQUIRED_EXTENSIONS=(cli fpm mysql xml gd mbstring curl zip json opcache)
+    MISSING_EXTENSIONS=()
+    
+    for EXT in "${REQUIRED_EXTENSIONS[@]}"; do
+        php -m | grep "$EXT" > /dev/null
+        if [ $? -ne 0 ]; then
+            MISSING_EXTENSIONS+=("$EXT")
+			
+        fi
+    done
+
+    if [ ${#MISSING_EXTENSIONS[@]} -gt 0 ]; then
+        echo "Missing PHP extensions: ${MISSING_EXTENSIONS[@]}. Exiting." | log
+        exit 1
+		
+    else
+        echo "All required PHP extensions are installed." | log
+		
+    fi
 }
 
+
 install_composer() {
-	echo "Installing Composer..." | log
-	export COMPOSER_ALLOW_SUPERUSER=1
-	
-	cd /tmp
-	php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-	HASH="$(curl -sS https://composer.github.io/installer.sig)"
-	php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
-	php composer-setup.php --install-dir=/usr/local/bin --filename=composer
-	php -r "unlink('composer-setup.php');"
+    echo "Installing Composer..." | log
+    export COMPOSER_ALLOW_SUPERUSER=1
+
+    cd /tmp || { echo "Failed to change directory to /tmp. Exiting."; exit 1; }
+
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    
+    HASH="$(curl -sS https://composer.github.io/installer.sig)"
+    if [ -z "$HASH" ]; then
+        echo "Failed to retrieve installer signature. Exiting." | log
+        exit 1
+		
+    fi
+
+    echo "Validating Composer installer hash..." | log
+    php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;" || {
+        echo "Composer installer verification failed. Exiting." | log
+        exit 1
+		
+    }
+
+    echo "Running Composer setup..." | log
+    php composer-setup.php --install-dir=/usr/local/bin --filename=composer || {
+        echo "Composer installation failed. Exiting." | log
+        exit 1
+		
+    }
+
+    echo "Cleaning up Composer setup files..." | log
+    php -r "unlink('composer-setup.php');"
+
+    # Validate Composer Installation
+    echo "Validating Composer installation..." | log
+    if [ ! -f "/usr/local/bin/composer" ]; then
+        echo "Composer was not found in /usr/local/bin. Exiting." | log
+        exit 1
+		
+    fi
+
+    COMPOSER_VERSION=$(composer --version 2>/dev/null)
+    if [ -z "$COMPOSER_VERSION" ]; then
+        echo "Composer installation failed or is not working correctly. Exiting." | log
+        exit 1
+		
+    else
+        echo "Composer installed successfully: $COMPOSER_VERSION" | log
+		
+    fi
 }
 
 install_drupal() {
-	# Create Drupal directory
-	echo "Creating Drupal project directory..." | log
-	mkdir -p "$DRUPAL_DIR"
-	cd "$DRUPAL_DIR"
+    # Create Drupal directory
+    echo "Creating Drupal project directory..." | log
+    mkdir -p "$DRUPAL_DIR"
+    cd "$DRUPAL_DIR" || { echo "Failed to change directory to $DRUPAL_DIR. Exiting." | log; exit 1; }
 
-	# Install Drupal using Composer
-	echo "Installing Drupal..." | log
-	composer create-project --no-interaction drupal/recommended-project $DRUPAL_DIR || { echo "Composer failed to install Drupal."; exit 1; }
-	echo "yes" | composer install
+    # Install Drupal using Composer
+    echo "Installing Drupal..." | log
+    composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
 
-	# Set permissions
-	echo "Adjusting file permissions..." | log
-	chown -R www-data:www-data "$DRUPAL_DIR"
-	find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
-	find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
+    # Validate Drupal installation by checking if core files exist
+    echo "Validating Drupal installation..." | log
+    if [ ! -d "$DRUPAL_DIR/web/core" ]; then
+        echo "Drupal core files were not found. Installation failed. Exiting." | log
+        exit 1
+		
+    fi
+
+    echo "Installing additional dependencies..." | log
+    composer install --no-interaction || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
+
+    # Set permissions
+    echo "Adjusting file permissions..." | log
+    chown -R www-data:www-data "$DRUPAL_DIR" || { echo "Failed to set ownership for $DRUPAL_DIR. Exiting." | log; exit 1; }
+    find "$DRUPAL_DIR" -type d -exec chmod 755 {} \; || { echo "Failed to set directory permissions for $DRUPAL_DIR. Exiting." | log; exit 1; }
+    find "$DRUPAL_DIR" -type f -exec chmod 644 {} \; || { echo "Failed to set file permissions for $DRUPAL_DIR. Exiting." | log; exit 1; }
+
+    # Validate that permissions are set correctly
+    echo "Validating file and directory permissions..." | log
+    PERMISSION_ERRORS=0
+
+    find "$DRUPAL_DIR" -type d ! -perm 755 -exec echo "Directory {} has incorrect permissions"  | log \; && PERMISSION_ERRORS=1
+    find "$DRUPAL_DIR" -type f ! -perm 644 -exec echo "File {} has incorrect permissions"  | log \; && PERMISSION_ERRORS=1
+
+    if [ $PERMISSION_ERRORS -eq 1 ]; then
+        echo "Some files or directories have incorrect permissions. Exiting." | log
+        exit 1
+		
+    fi
+
+    echo "Drupal installation and permission setup completed successfully." | log
 }
+
 
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
