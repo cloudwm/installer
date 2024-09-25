@@ -25,10 +25,17 @@ install_php() {
     apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
 
     echo "Installing PHP 8.3 and required extensions..." | log
-    apt install -y php8.3 php8.3-cli php-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache || {
+	apt install software-properties-common -y
+	add-apt-repository ppa:ondrej/php
+
+    apt install -y php8.3 php-cli php-fpm php-mysql php-xml php-gd php-mbstring php-curl php-zip php-json php-opcache || {
         echo "Failed to install PHP or required extensions. Exiting.";
         exit 1;
-		
+    }
+	
+	sudo systemctl restart php-fpm || {
+        echo "Failed to start php-fpm. Exiting." | log;
+        exit 1;
     }
 
     echo "Validating PHP installation..." | log
@@ -61,7 +68,6 @@ install_php() {
 		
     fi
 }
-
 
 install_composer() {
     echo "Installing Composer..." | log
