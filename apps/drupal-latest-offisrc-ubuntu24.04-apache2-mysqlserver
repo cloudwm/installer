@@ -8,9 +8,6 @@ elif [ -f "../include/startup.sh" ]; then
 
 fi
 
-# IP_ADDR="185.159.72.99"
-# EMAIL_ADDR="gils@omc.co.il"
-
 IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
 EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
 CERT_DIR="/opt/certs"
@@ -19,9 +16,8 @@ DB_NAME="drupal_db"
 DB_USER="drupal_user"
 DB_PASS="${ADMINPASSWORD}"
 DOMAIN="${CWM_DOMAIN}"
-USER_NAME="${EMAIL_ADDR}"
-LE_FULLCHAIN_PATH="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
-LE_PRIVKEY_PATH="/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
+LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
+LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
@@ -82,7 +78,6 @@ install_php() {
 
 	echo "Installing PHP 8.3 and required extensions..." | log
 	apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
-	#installPackages php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml php8.3-gd php8.3-mbstring php8.3-curl php8.3-zip php-json php8.3-opcache
 }
 
 install_composer() {
@@ -97,67 +92,36 @@ install_composer() {
 	php -r "unlink('composer-setup.php');"
 }
 
-install_apache2() {
+install_apache2-php() {
 	echo "Installing Apache web server..." | log
-	apt install -y apache2 libapache2-mod-php8.3
-	systemctl start apache2
-	a2enmod rewrite
-	systemctl restart apache2
+	installPackage libapache2-mod-php8.3
+	waitOrStop 0
+	
+	if ! systemctl is-active --quiet apache2; then systemctl start apache2; else systemctl restart apache2; fi
+	
 }
 
+install_drupal() {
+	# Create Drupal directory
+	echo "Creating Drupal project directory..." | log
+	mkdir -p "$DRUPAL_DIR"
+	cd "$DRUPAL_DIR"
 
-installPackage unzip
-install_php
-install_composer
-install_apache2
+	# Install Drupal using Composer
+	echo "Installing Drupal..." | log
+	composer create-project --no-interaction drupal/recommended-project $DRUPAL_DIR || { echo "Composer failed to install Drupal."; exit 1; }
+	echo "yes" | composer install
 
-# Create Drupal directory
-echo "Creating Drupal project directory..." | log
-mkdir -p "$DRUPAL_DIR"
-cd "$DRUPAL_DIR"
+	# Set permissions
+	echo "Adjusting file permissions..." | log
+	chown -R www-data:www-data "$DRUPAL_DIR"
+	find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
+	find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
+}
 
-# Install Drupal using Composer
-echo "Installing Drupal..." | log
-composer create-project --no-interaction drupal/recommended-project $DRUPAL_DIR || { echo "Composer failed to install Drupal."; exit 1; }
-echo "yes" | composer install
-
-# Set permissions
-echo "Adjusting file permissions..." | log
-chown -R www-data:www-data "$DRUPAL_DIR"
-find "$DRUPAL_DIR" -type d -exec chmod 755 {} \;
-find "$DRUPAL_DIR" -type f -exec chmod 644 {} \;
-
-generate_certs
-
-# Create Apache Virtual Host
-echo "Configuring Apache Virtual Host..." | log
-# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
-# <VirtualHost *:80>
-     # ServerAdmin ${EMAIL_ADDR}
-     # DocumentRoot ${DRUPAL_DIR}/web
-     # ServerName ${DOMAIN}
-     # ServerAlias www.${DOMAIN}
-
-     # ErrorLog ${APACHE_LOG_DIR}/error.log
-     # CustomLog ${APACHE_LOG_DIR}/access.log combined
-
-     # <Directory ${DRUPAL_DIR}/web>
-            # Options FollowSymlinks
-            # AllowOverride All
-            # Require all granted
-     # </Directory>
-
-     # <Directory ${DRUPAL_DIR}/web>
-            # RewriteEngine on
-            # RewriteBase /
-            # RewriteCond %{REQUEST_FILENAME} !-f
-            # RewriteCond %{REQUEST_FILENAME} !-d
-            # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    # </Directory>
-# </VirtualHost>
-# EOF"
-
-bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+config_apache() {
+	echo "Configuring Apache Virtual Host..." | log
+	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
      DocumentRoot ${DRUPAL_DIR}/web
      ServerName ${DOMAIN}
@@ -181,9 +145,9 @@ bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
     </Directory>
 
     # Redirect all HTTP traffic to HTTPS
-    RewriteEngine on
-    RewriteCond %{HTTPS} !=on
-    RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+    #RewriteEngine on
+    #RewriteCond %{HTTPS} !=on
+    #RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
 </VirtualHost>
 
 <VirtualHost *:443>
@@ -212,14 +176,134 @@ bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
         RewriteCond %{REQUEST_FILENAME} !-d
         RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
     </IfModule>
-
-    # Strong SSL Security Settings (optional, but recommended)
-    SSLCipherSuite HIGH:!aNULL:!MD5
-    SSLProtocol All -SSLv2 -SSLv3
-    SSLHonorCipherOrder on
-
 </VirtualHost>
 EOF"
+
+	if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
+	a2enmod rewrite
+	a2ensite drupal.conf
+	a2dissite 000-default.conf
+	systemctl reload apache2
+	systemctl restart apache2
+}
+
+create_db() {
+	echo "Creating Drupal database and user..." | log
+	mysql <<MYSQL_SCRIPT
+CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
+
+}
+
+
+main () {
+	lines=()
+	done_lines=()
+	
+	mark_previous_done() {
+		for (( i=0; i<${#lines[@]}; i++ )); do
+			if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
+				lines[$i]="${lines[$i]} [DONE]"
+				done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
+			fi
+		done
+	}
+
+	display_all_lines() {
+		"$update_status" "$HTML_PATH" -cp
+		for line in "${lines[@]}"; do
+			"$update_status" "$HTML_PATH" -ap "$line"
+		done
+	}
+	
+	update_status="$rootDir/include/updateInstallStatus.sh"
+	HTML_PATH="/var/www/html/index.html"
+
+	lines+=("Getting Ready...")
+	"$update_status" "$HTML_PATH" -cp
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Installing Unzip...")
+	installPackage unzip
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Installing PHP 8.3...")
+	install_php
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Installing Composer...")
+	install_composer
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Installing Apache-PHP...")
+	install_apache2-php
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Installing Drupal...")
+	install_drupal
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Generating certificates...")
+	generate_certs
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Configuring Apache...")
+	config_apache
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Creating Drupal database...")
+	create_db
+	display_all_lines
+	
+	descriptionAppend ""
+	descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
+	descriptionAppend ""
+		
+	echo "Installation complete!" | log
+	echo "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser." | log
+}
+
+main
+
+# Create Apache Virtual Host
+# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+# <VirtualHost *:80>
+     # ServerAdmin ${EMAIL_ADDR}
+     # DocumentRoot ${DRUPAL_DIR}/web
+     # ServerName ${DOMAIN}
+     # ServerAlias www.${DOMAIN}
+
+     # ErrorLog ${APACHE_LOG_DIR}/error.log
+     # CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+     # <Directory ${DRUPAL_DIR}/web>
+            # Options FollowSymlinks
+            # AllowOverride All
+            # Require all granted
+     # </Directory>
+
+     # <Directory ${DRUPAL_DIR}/web>
+            # RewriteEngine on
+            # RewriteBase /
+            # RewriteCond %{REQUEST_FILENAME} !-f
+            # RewriteCond %{REQUEST_FILENAME} !-d
+            # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    # </Directory>
+# </VirtualHost>
+# EOF"
+
+
 
 # Revert to lets-encrypt once the limit reset.
 # TEMP_CERT="/etc/ssl/certs/apache-selfsigned.crt"
@@ -285,28 +369,3 @@ EOF"
 # EOF"
 
 
-
-# Enable Drupal site and disable default site
-if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
-a2enmod rewrite
-a2ensite drupal.conf
-a2dissite 000-default.conf
-systemctl reload apache2
-systemctl restart apache2
-
-# Create Drupal database and user
-echo "Creating Drupal database and user..." | log
-mysql <<MYSQL_SCRIPT
-CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
-GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
-FLUSH PRIVILEGES;
-MYSQL_SCRIPT
-
-
-descriptionAppend ""
-descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
-descriptionAppend ""
-	
-echo "Installation complete!" | log
-echo "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser." | log
