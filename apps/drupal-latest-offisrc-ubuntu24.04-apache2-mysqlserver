@@ -21,53 +21,52 @@ LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
 
 install_php() {
+    echo "Updating system packages..." | log
+    apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
 
-    # echo "Updating system packages..." | log
-    # apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
+    echo "Installing PHP 8.3 and required extensions..." | log
+	apt install software-properties-common -y
+	add-apt-repository ppa:ondrej/php
 
-    # echo "Installing PHP 8.3 and required extensions..." | log
-	# apt install software-properties-common -y
-	# add-apt-repository ppa:ondrej/php
-
-    # apt install -y php8.3 php-cli php-fpm php-mysql php-xml php-gd php-mbstring php-curl php-zip php-json php-opcache || {
-        # echo "Failed to install PHP or required extensions. Exiting.";
-        # exit 1;
-    # }
+    apt install -y php8.3 php-cli php-fpm php-mysql php-xml php-gd php-mbstring php-curl php-zip php-json php-opcache || {
+        echo "Failed to install PHP or required extensions. Exiting.";
+        exit 1;
+    }
 	
-	# sudo systemctl restart php-fpm || {
-        # echo "Failed to start php-fpm. Exiting." | log;
-        # exit 1;
-    # }
+	sudo systemctl restart php-fpm || {
+        echo "Failed to start php-fpm. Exiting." | log;
+        exit 1;
+    }
 
-    # echo "Validating PHP installation..." | log
-    # PHP_VERSION=$(php -v | grep "^PHP 8.3")
-    # if [ -z "$PHP_VERSION" ]; then
-        # echo "PHP 8.3 is not installed correctly. Exiting." | log
-        # exit 1
+    echo "Validating PHP installation..." | log
+    PHP_VERSION=$(php -v | grep "^PHP 8.3")
+    if [ -z "$PHP_VERSION" ]; then
+        echo "PHP 8.3 is not installed correctly. Exiting." | log
+        exit 1
 		
-    # fi
-    # echo "PHP version: $PHP_VERSION" | log
+    fi
+    echo "PHP version: $PHP_VERSION" | log
 
-    # echo "Checking installed PHP extensions..." | log
-    # REQUIRED_EXTENSIONS=(cli fpm mysql xml gd mbstring curl zip json opcache)
-    # MISSING_EXTENSIONS=()
+    echo "Checking installed PHP extensions..." | log
+    REQUIRED_EXTENSIONS=(cli fpm mysql xml gd mbstring curl zip json opcache)
+    MISSING_EXTENSIONS=()
     
-    # for EXT in "${REQUIRED_EXTENSIONS[@]}"; do
-        # php -m | grep "$EXT" > /dev/null
-        # if [ $? -ne 0 ]; then
-            # MISSING_EXTENSIONS+=("$EXT")
+    for EXT in "${REQUIRED_EXTENSIONS[@]}"; do
+        php -m | grep "$EXT" > /dev/null
+        if [ $? -ne 0 ]; then
+            MISSING_EXTENSIONS+=("$EXT")
 			
-        # fi
-    # done
+        fi
+    done
 
-    # if [ ${#MISSING_EXTENSIONS[@]} -gt 0 ]; then
-        # echo "Missing PHP extensions: ${MISSING_EXTENSIONS[@]}. Exiting." | log
-        # exit 1
+    if [ ${#MISSING_EXTENSIONS[@]} -gt 0 ]; then
+        echo "Missing PHP extensions: ${MISSING_EXTENSIONS[@]}. Exiting." | log
+        exit 1
 		
-    # else
-        # echo "All required PHP extensions are installed." | log
+    else
+        echo "All required PHP extensions are installed." | log
 		
-    # fi
+    fi
 }
 
 install_composer() {
@@ -176,7 +175,7 @@ generate_certs() {
         sudo apt-get install -y certbot
     fi
 
-    echo "Obtaining Let's Encrypt certificate for ${ }..." | log
+    echo "Obtaining Let's Encrypt certificate for ${DOMAIN}..." | log
     if systemctl is-active --quiet nginx; then
         sudo systemctl stop nginx
         NGINX_STOPPED=true
