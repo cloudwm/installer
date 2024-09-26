@@ -82,22 +82,18 @@ install_drupal() {
     fi
     sudo chown -R "$TEMP_USER:$TEMP_USER" "$DRUPAL_DIR"
 
-    # Run Composer as the temporary user
     echo "Installing Drupal using Composer as $TEMP_USER..." | log
     sudo -u "$TEMP_USER" bash -c "composer create-project --no-interaction drupal/recommended-project '$DRUPAL_DIR'" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
 
-    # Validate Drupal installation
     echo "Validating Drupal installation..." | log
     if [ ! -d "$DRUPAL_DIR/web/core" ]; then
         echo "Drupal core files were not found. Installation failed. Exiting." | log
         exit 1
     fi
 
-    # Run `composer install` as the temporary user
     echo "Installing additional dependencies..." | log
     sudo -u "$TEMP_USER" bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
-   # Adjust permissions for www-data	
     echo "Adjusting file permissions..." | log
     sudo chown -Rf www-data:www-data "$DRUPAL_DIR"
 
@@ -141,8 +137,6 @@ generate_certs() {
     fi
 	
     CERTBOT_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
-    # sudo cp "${CERTBOT_LIVE_DIR}/fullchain.pem" "${CERT_DIR}"
-    # sudo cp "${CERTBOT_LIVE_DIR}/privkey.pem" "${CERT_DIR}"
     sudo chown $(whoami):$(whoami) "${CERTBOT_LIVE_DIR}"
 	
 	echo "Creating SAN file..." | log
@@ -249,9 +243,9 @@ main () {
 	
 	mark_previous_done() {
 		for (( i=0; i<${#lines[@]}; i++ )); do
-			if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
+			if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then
 				lines[$i]="${lines[$i]} [DONE]"
-				done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
+				done_lines+=("${lines[$i]}")
 			fi
 		done
 	}
@@ -313,6 +307,8 @@ main () {
 	display_all_lines
 	config_apache
 	
+	descriptionAppend "Drupal Results:"
+	descriptionAppend "---------------------"
 	descriptionAppend ""
 	descriptionAppend "Database name: ${DB_NAME}"
 	descriptionAppend "Database Username: ${DB_USER}"
