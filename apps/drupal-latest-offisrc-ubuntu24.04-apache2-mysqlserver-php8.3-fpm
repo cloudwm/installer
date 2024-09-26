@@ -1,0 +1,325 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+	
+fi
+
+
+CERT_DIR="/opt/certs"
+DRUPAL_DIR="/opt/drupal-site"
+DB_NAME="drupal_db"
+DB_USER="drupal_user"
+DB_PASS="${ADMINPASSWORD}"
+DOMAIN="${CWM_DOMAIN}"
+IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
+EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
+LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
+LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
+
+
+dependencies() {
+	echo "Installing dependencies..." | log
+    apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
+
+    echo "Installing PHP 8.3 and required extensions..." | log
+	apt install -y software-properties-common unzip libapache2-mod-php8.3
+
+}
+
+install_php() {
+    echo "Adding PHP 8.3 Repository..." | log
+    add-apt-repository ppa:ondrej/php -y
+    
+    echo "Installing PHP 8.3 & plugins..." | log
+    apt install -y php8.3 php-cli php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json || { echo "Failed to install PHP or required extensions. Exiting." | log; exit 1; }
+    
+    echo "Restarting php8.3-fpm service..." | log
+    sudo systemctl restart php8.3-fpm || { echo "Failed to start php8.3-fpm. Exiting." | log; exit 1; }
+
+    echo "Validating PHP installation..." | log
+    PHP_VERSION=$(php -v | grep "^PHP 8.3")
+    if [ -z "$PHP_VERSION" ]; then
+        echo "PHP 8.3 is not installed correctly. Exiting." | log
+        exit 1
+    fi
+    
+    echo "PHP version: $PHP_VERSION" | log
+}
+
+install_composer() {
+	echo "Installing Composer..." | log
+	cd /tmp
+
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    HASH="$(curl -sS https://composer.github.io/installer.sig)"
+
+    echo "Validating Composer installer hash..." | log
+    php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
+
+    echo "Running Composer setup..." | log
+    yes | COMPOSER_ALLOW_SUPERUSER=1 sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+
+    echo "Cleaning up Composer setup files..." | log
+    yes | sudo php -r "unlink('composer-setup.php');"
+
+    echo "Composer Version: $(sudo composer --version)" | log
+}
+
+install_drupal() {
+    TEMP_USER="temp_composer_user"
+
+    echo "Creating Drupal project directory..." | log
+    if [ ! -d "$DRUPAL_DIR" ]; then
+        sudo mkdir -p "$DRUPAL_DIR"
+    fi
+
+    if ! id -u "$TEMP_USER" >/dev/null 2>&1; then
+        sudo useradd -m "$TEMP_USER"
+    fi
+    sudo chown -R "$TEMP_USER:$TEMP_USER" "$DRUPAL_DIR"
+
+    echo "Installing Drupal using Composer as $TEMP_USER..." | log
+    sudo -u "$TEMP_USER" bash -c "composer create-project --no-interaction drupal/recommended-project '$DRUPAL_DIR'" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
+
+    echo "Validating Drupal installation..." | log
+    if [ ! -d "$DRUPAL_DIR/web/core" ]; then
+        echo "Drupal core files were not found. Installation failed. Exiting." | log
+        exit 1
+    fi
+
+    echo "Installing additional dependencies..." | log
+    sudo -u "$TEMP_USER" bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
+
+    echo "Adjusting file permissions..." | log
+    sudo chown -Rf www-data:www-data "$DRUPAL_DIR"
+
+    sudo userdel -r "$TEMP_USER"
+
+    echo "Drupal installation and permission setup completed successfully." | log
+}
+
+generate_certs() {
+    if [[ ! -d $CERT_DIR ]]; then
+        mkdir -p $CERT_DIR
+        echo "Created Cert directory: ${CERT_DIR}" | log
+    fi
+
+    if ! command -v certbot &> /dev/null; then
+        echo "Certbot not found. Installing Certbot..." | log
+        sudo apt-get update
+        sudo apt-get install -y certbot
+    fi
+
+    echo "Obtaining Let's Encrypt certificate for ${DOMAIN}..." | log
+    if systemctl is-active --quiet nginx; then
+        sudo systemctl stop nginx
+        NGINX_STOPPED=true
+    fi
+	
+    if systemctl is-active --quiet apache2; then
+        sudo systemctl stop apache2
+        APACHE_STOPPED=true
+    fi
+
+    sudo certbot certonly --standalone -d "${DOMAIN}" \
+        --non-interactive --agree-tos --email "${EMAIL_ADDR}"
+
+    if [ "$NGINX_STOPPED" = true ]; then
+        sudo systemctl start nginx
+    fi
+	
+    if [ "$APACHE_STOPPED" = true ]; then
+        sudo systemctl start apache2
+    fi
+	
+    CERTBOT_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+    sudo chown $(whoami):$(whoami) "${CERTBOT_LIVE_DIR}"
+	
+	echo "Creating SAN file..." | log
+    cat > "$CERT_DIR/v3.ext" <<-EOF
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${DOMAIN}
+IP.1 = ${IP_ADDR}
+EOF
+    
+	echo "Certificate generation complete!" | log
+}
+
+config_apache() {
+	echo "Configuring Apache Virtual Host..." | log
+	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+<VirtualHost *:80>
+	ServerAdmin ${EMAIL_ADDR}
+	DocumentRoot ${DRUPAL_DIR}/web
+	ServerName ${DOMAIN}
+	ServerAlias www.${DOMAIN}
+
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+	<Directory ${DRUPAL_DIR}/web>
+		Options FollowSymlinks
+		AllowOverride All
+		Require all granted
+	</Directory>
+
+	<Directory ${DRUPAL_DIR}/web>
+		RewriteEngine on
+		RewriteBase /
+		RewriteCond %{REQUEST_FILENAME} !-f
+		RewriteCond %{REQUEST_FILENAME} !-d
+		RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+	</Directory>
+	
+	# Redirect all HTTP traffic to HTTPS
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R=301,L]
+
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerAdmin ${EMAIL_ADDR}
+    DocumentRoot ${DRUPAL_DIR}/web
+    ServerName ${DOMAIN}
+    ServerAlias www.${DOMAIN}
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+    SSLCertificateChainFile /etc/letsencrypt/live/${DOMAIN}/chain.pem
+
+    <Directory ${DRUPAL_DIR}/web>
+        Options FollowSymlinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    <Directory ${DRUPAL_DIR}/web>
+        RewriteEngine on
+        RewriteBase /
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteCond %{REQUEST_FILENAME} !-d
+        RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    </Directory>
+</VirtualHost>
+# EOF"
+
+	if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
+	a2enmod rewrite
+	a2ensite drupal.conf
+	a2dissite 000-default.conf
+	systemctl reload apache2
+	systemctl restart apache2
+}
+
+create_db() {
+	echo "Creating Drupal database and user..." | log
+	mysql <<MYSQL_SCRIPT
+CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
+
+}
+
+
+main () {
+	update_status="$rootDir/include/updateInstallStatus.sh"
+	HTML_PATH="/var/www/html/index.html"
+
+	lines=()
+	done_lines=()
+	
+	mark_previous_done() {
+		for (( i=0; i<${#lines[@]}; i++ )); do
+			if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then
+				lines[$i]="${lines[$i]} [DONE]"
+				done_lines+=("${lines[$i]}")
+			fi
+		done
+	}
+
+	display_all_lines() {
+		"$update_status" "$HTML_PATH" -cp
+		for line in "${lines[@]}"; do
+			"$update_status" "$HTML_PATH" -ap "$line"
+		done
+	}
+	
+	lines+=("Getting Ready...")
+	"$update_status" "$HTML_PATH" -cp
+	display_all_lines
+	
+	mark_previous_done
+	lines+=("Installing dependencies...") 
+	display_all_lines
+	dependencies
+	
+	mark_previous_done
+	lines+=("Installing MySQL 8.0...") 
+	display_all_lines
+	services/mysqlserver-8.0-osrepo
+	
+	"$update_status" "$HTML_PATH" -ur "The system will restart soon, finish the Drupal setup by visiting https://$DOMAIN in your web browser when the system is back online."
+	"$update_status" "$HTML_PATH" -sr
+	
+	"$update_status" "$HTML_PATH" -uc "Database name: ${DB_NAME}\nDatabase user: ${DB_USER}\nDatabase user Password: ${DB_PASS}"
+	"$update_status" "$HTML_PATH" -sc
+	
+	mark_previous_done
+	lines+=("Installing PHP 8.3...")
+	display_all_lines
+	install_php
+	
+	mark_previous_done
+	lines+=("Installing Composer...")
+	display_all_lines
+	install_composer
+	
+	mark_previous_done
+	lines+=("Installing Drupal...")
+	display_all_lines
+	install_drupal
+	
+	mark_previous_done
+	lines+=("Generating certificates...")
+	display_all_lines
+	generate_certs
+	
+	mark_previous_done
+	lines+=("Creating Drupal database...")
+	display_all_lines
+	create_db
+	
+	mark_previous_done
+	lines+=("Configuring Apache...")
+	display_all_lines
+	config_apache
+	
+	descriptionAppend "Drupal Results:"
+	descriptionAppend "---------------------"
+	descriptionAppend ""
+	descriptionAppend "Database name: ${DB_NAME}"
+	descriptionAppend "Database Username: ${DB_USER}"
+	descriptionAppend "Database user Password: ${DB_PASS}"
+	descriptionAppend "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
+	descriptionAppend ""
+	descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
+	descriptionAppend ""
+		
+	echo "Installation complete!" | log
+	echo "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser." | log
+}
+
+main
