@@ -19,24 +19,29 @@ DOMAIN="${CWM_DOMAIN}"
 LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
 LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
+update_status="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="${DRUPAL_DIR}/web/index.html"
+if [ ! -f $HTML_PATH ]; then
+	echo "${HTML_PATH} does not exist."
+	exit 1
+fi
 
-install_php() {
-    echo "Updating system packages..." | log
+dependencies() {
+	echo "Installing dependencies..." | log
     apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
 
     echo "Installing PHP 8.3 and required extensions..." | log
-	apt install software-properties-common -y
-	add-apt-repository ppa:ondrej/php
+	apt install software-properties-common unzip -y
 
-    apt install -y php8.3 php-cli php-fpm php-mysql php-xml php-gd php-mbstring php-curl php-zip php-json php-opcache || {
-        echo "Failed to install PHP or required extensions. Exiting.";
-        exit 1;
-    }
+}
+
+install_php() {
+	echo "Adding PHP 8.3 Repository..." | log
+	add-apt-repository ppa:ondrej/php
 	
-	sudo systemctl restart php-fpm || {
-        echo "Failed to start php-fpm. Exiting." | log;
-        exit 1;
-    }
+	echo "Installing PHP 8.3 & plugins..." | log
+    apt install -y php8.3 php-cli php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json php-opcache || {echo "Failed to install PHP or required extensions. Exiting."; exit 1;}
+	sudo systemctl restart php-fpm || {echo "Failed to start php-fpm. Exiting." | log; exit 1;}
 
     echo "Validating PHP installation..." | log
     PHP_VERSION=$(php -v | grep "^PHP 8.3")
@@ -46,30 +51,10 @@ install_php() {
 		
     fi
     echo "PHP version: $PHP_VERSION" | log
-
-    echo "Checking installed PHP extensions..." | log
-    REQUIRED_EXTENSIONS=(cli fpm mysql xml gd mbstring curl zip json opcache)
-    MISSING_EXTENSIONS=()
-    
-    for EXT in "${REQUIRED_EXTENSIONS[@]}"; do
-        php -m | grep "$EXT" > /dev/null
-        if [ $? -ne 0 ]; then
-            MISSING_EXTENSIONS+=("$EXT")
-			
-        fi
-    done
-
-    if [ ${#MISSING_EXTENSIONS[@]} -gt 0 ]; then
-        echo "Missing PHP extensions: ${MISSING_EXTENSIONS[@]}. Exiting." | log
-        exit 1
-		
-    else
-        echo "All required PHP extensions are installed." | log
-		
-    fi
 }
 
 install_composer() {
+	if [ ! -z "$PHP_VERSION" ] 
     echo "Installing Composer..." | log
     export COMPOSER_ALLOW_SUPERUSER=1
 
@@ -218,8 +203,10 @@ EOF
 
 config_apache() {
 	echo "Configuring Apache Virtual Host..." | log
+	
 	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
+     ServerAdmin ${EMAIL_ADDR}
      DocumentRoot ${DRUPAL_DIR}/web
      ServerName ${DOMAIN}
      ServerAlias www.${DOMAIN}
@@ -240,41 +227,66 @@ config_apache() {
             RewriteCond %{REQUEST_FILENAME} !-d
             RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
     </Directory>
-
-    # Redirect all HTTP traffic to HTTPS
-    #RewriteEngine on
-    #RewriteCond %{HTTPS} !=on
-    #RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
-</VirtualHost>
-
-<VirtualHost *:443>
-    DocumentRoot ${DRUPAL_DIR}/web
-    ServerName ${DOMAIN}
-    ServerAlias www.${DOMAIN}
-
-    ErrorLog ${APACHE_LOG_DIR}/error.log
-    CustomLog ${APACHE_LOG_DIR}/access.log combined
-
-    <Directory ${DRUPAL_DIR}/web>
-        Options FollowSymlinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    # SSL Configuration
-    SSLEngine on
-    SSLCertificateFile ${LE_FULLCHAIN_PATH}
-    SSLCertificateKeyFile ${LE_PRIVKEY_PATH}
-
-    <IfModule mod_rewrite.c>
-        RewriteEngine On
-        RewriteBase /
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    </IfModule>
 </VirtualHost>
 EOF"
+
+	# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+# <VirtualHost *:80>
+     # DocumentRoot ${DRUPAL_DIR}/web
+     # ServerName ${DOMAIN}
+     # ServerAlias www.${DOMAIN}
+
+     # ErrorLog ${APACHE_LOG_DIR}/error.log
+     # CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+     # <Directory ${DRUPAL_DIR}/web>
+            # Options FollowSymlinks
+            # AllowOverride All
+            # Require all granted
+     # </Directory>
+
+     # <Directory ${DRUPAL_DIR}/web>
+            # RewriteEngine on
+            # RewriteBase /
+            # RewriteCond %{REQUEST_FILENAME} !-f
+            # RewriteCond %{REQUEST_FILENAME} !-d
+            # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    # </Directory>
+
+    # # Redirect all HTTP traffic to HTTPS
+    # #RewriteEngine on
+    # #RewriteCond %{HTTPS} !=on
+    # #RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+# </VirtualHost>
+
+# <VirtualHost *:443>
+    # DocumentRoot ${DRUPAL_DIR}/web
+    # ServerName ${DOMAIN}
+    # ServerAlias www.${DOMAIN}
+
+    # ErrorLog ${APACHE_LOG_DIR}/error.log
+    # CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+    # <Directory ${DRUPAL_DIR}/web>
+        # Options FollowSymlinks
+        # AllowOverride All
+        # Require all granted
+    # </Directory>
+
+    # # SSL Configuration
+    # SSLEngine on
+    # SSLCertificateFile ${LE_FULLCHAIN_PATH}
+    # SSLCertificateKeyFile ${LE_PRIVKEY_PATH}
+
+    # <IfModule mod_rewrite.c>
+        # RewriteEngine On
+        # RewriteBase /
+        # RewriteCond %{REQUEST_FILENAME} !-f
+        # RewriteCond %{REQUEST_FILENAME} !-d
+        # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    # </IfModule>
+# </VirtualHost>
+# EOF"
 
 	if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
 	a2enmod rewrite
@@ -297,128 +309,69 @@ MYSQL_SCRIPT
 
 
 main () {
-	apt install php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json -y
+	lines=()
+	done_lines=()
 	
-	mysql <<MYSQL_SCRIPT
-CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
-GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
-FLUSH PRIVILEGES;
-MYSQL_SCRIPT
+	mark_previous_done() {
+		for (( i=0; i<${#lines[@]}; i++ )); do
+			if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
+				lines[$i]="${lines[$i]} [DONE]"
+				done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
+			fi
+		done
+	}
 
-	cd /var/www/
-	apt install wget -y
-	wget https://www.drupal.org/download-latest/tar.gz -O drupal.tar.gz
-	tar -xvf drupal.tar.gz
-	mv drupal-* drupal
-	chown -R www-data:www-data /var/www/drupal
-	find /var/www/drupal -type d -exec chmod 755 {} \;
-	find /var/www/drupal -type f -exec chmod 644 {} \;
-
-bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
-server {
-    listen 80;
-    server_name ${DOMAIN};
-
-    root /var/www/drupal;
-    index index.php index.html index.htm;
-
-    location / {
-        try_files $uri /index.php?$query_string;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\.ht {
-        deny all;
-    }
-}
-EOF"
+	display_all_lines() {
+		"$update_status" "$HTML_PATH" -cp
+		for line in "${lines[@]}"; do
+			"$update_status" "$HTML_PATH" -ap "$line"
+		done
+	}
 	
-	ln -s /etc/apache2/sites-available/drupal /etc/nginx/sites-enabled/
-	systemctl restart apache2
+	lines+=("Getting Ready...")
+	echo "Getting Ready..." | log
+	"$update_status" "$HTML_PATH" -cp
+	display_all_lines
 	
-	sudo cp /etc/php/8.3/fpm/php.ini /etc/php/8.3/fpm/php.ini.bak
-	sudo grep -q '^memory_limit' /etc/php/8.3/fpm/php.ini && sudo sed -i 's/^memory_limit = .*/memory_limit = 256M/' /etc/php/8.3/fpm/php.ini || echo 'memory_limit = 256M' | sudo tee -a /etc/php/8.3/fpm/php.ini
-	sudo grep -q '^upload_max_filesize' /etc/php/8.3/fpm/php.ini && sudo sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 100M/' /etc/php/8.3/fpm/php.ini || echo 'upload_max_filesize = 100M' | sudo tee -a /etc/php/8.3/fpm/php.ini
-	sudo grep -q '^max_execution_time' /etc/php/8.3/fpm/php.ini && sudo sed -i 's/^max_execution_time = .*/max_execution_time = 300/' /etc/php/8.3/fpm/php.ini || echo 'max_execution_time = 300' | sudo tee -a /etc/php/8.3/fpm/php.ini
-	sudo systemctl restart php8.3-fpm
-	echo "PHP settings updated and PHP-FPM restarted."
-
+	mark_previous_done
+	echo "Installing dependencies..." | log
+	dependencies
+	display_all_lines
 	
-	# update_status="$rootDir/include/updateInstallStatus.sh"
-	# HTML_PATH="/var/www/html/index.html"
-	# if [ ! -f $HTML_PATH ]; then
-		# echo "${HTML_PATH} does not exist."
-		# exit 1
-	# fi
+	mark_previous_done
+	lines+=("Installing Unzip...")
+	apt install -y unzip
+	display_all_lines
 	
-	# lines=()
-	# done_lines=()
+	mark_previous_done
+	lines+=("Installing PHP 8.3...")
+	install_php
+	display_all_lines
 	
-	# mark_previous_done() {
-		# for (( i=0; i<${#lines[@]}; i++ )); do
-			# if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
-				# lines[$i]="${lines[$i]} [DONE]"
-				# done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
-			# fi
-		# done
-	# }
-
-	# display_all_lines() {
-		# "$update_status" "$HTML_PATH" -cp
-		# for line in "${lines[@]}"; do
-			# "$update_status" "$HTML_PATH" -ap "$line"
-		# done
-	# }
+	mark_previous_done
+	lines+=("Installing Composer...")
+	install_composer
+	display_all_lines
 	
-	# APACHE_STATUS=$(systemctl status apache2 --no-pager)
-	# printf "%s\n" "$APACHE_STATUS" | log
+	mark_previous_done
+	lines+=("Installing Drupal...")
+	install_drupal
+	display_all_lines
 	
-	# lines+=("Getting Ready...")
-	# echo "Getting Ready..." | log
-	# "$update_status" "$HTML_PATH" -cp
-	# display_all_lines
+	mark_previous_done
+	lines+=("Generating certificates...")
+	generate_certs
+	display_all_lines
 	
-	# mark_previous_done
-	# lines+=("Installing Unzip...")
-	# apt install -y unzip
-	# display_all_lines
+	mark_previous_done
+	lines+=("Configuring Apache...")
+	config_apache
+	display_all_lines
 	
-	# mark_previous_done
-	# lines+=("Installing PHP 8.3...")
-	# install_php
-	# display_all_lines
-	
-	# mark_previous_done
-	# lines+=("Installing Composer...")
-	# install_composer
-	# display_all_lines
-	
-	# mark_previous_done
-	# lines+=("Installing Drupal...")
-	# install_drupal
-	# display_all_lines
-	
-	# mark_previous_done
-	# lines+=("Generating certificates...")
-	# generate_certs
-	# display_all_lines
-	
-	# mark_previous_done
-	# lines+=("Configuring Apache...")
-	# config_apache
-	# display_all_lines
-	
-	# mark_previous_done
-	# lines+=("Creating Drupal database...")
-	# create_db
-	# display_all_lines
+	mark_previous_done
+	lines+=("Creating Drupal database...")
+	create_db
+	display_all_lines
 	
 	descriptionAppend ""
 	descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
@@ -431,31 +384,7 @@ EOF"
 main
 
 # Create Apache Virtual Host
-# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
-# <VirtualHost *:80>
-     # ServerAdmin ${EMAIL_ADDR}
-     # DocumentRoot ${DRUPAL_DIR}/web
-     # ServerName ${DOMAIN}
-     # ServerAlias www.${DOMAIN}
 
-     # ErrorLog ${APACHE_LOG_DIR}/error.log
-     # CustomLog ${APACHE_LOG_DIR}/access.log combined
-
-     # <Directory ${DRUPAL_DIR}/web>
-            # Options FollowSymlinks
-            # AllowOverride All
-            # Require all granted
-     # </Directory>
-
-     # <Directory ${DRUPAL_DIR}/web>
-            # RewriteEngine on
-            # RewriteBase /
-            # RewriteCond %{REQUEST_FILENAME} !-f
-            # RewriteCond %{REQUEST_FILENAME} !-d
-            # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    # </Directory>
-# </VirtualHost>
-# EOF"
 
 
 
