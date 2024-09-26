@@ -280,6 +280,9 @@ main () {
 	"$update_status" "$HTML_PATH" -ur "The system will restart soon, finish the Drupal setup by visiting https://$DOMAIN in your web browser when the system is back online."
 	"$update_status" "$HTML_PATH" -sr
 	
+	"$update_status" "$HTML_PATH" -uc "Database name: ${DB_NAME}\nDatabase user: ${DB_USER}\nDatabase user Password: ${DB_PASS}"
+	"$update_status" "$HTML_PATH" -uc ""
+	
 	mark_previous_done
 	lines+=("Installing PHP 8.3...")
 	display_all_lines
