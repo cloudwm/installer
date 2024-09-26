@@ -26,7 +26,7 @@ dependencies() {
     apt update || { echo "Failed to update system packages. Exiting."; exit 1; }
 
     echo "Installing PHP 8.3 and required extensions..." | log
-	apt install software-properties-common unzip -y
+	apt install -y software-properties-common unzip libapache2-mod-php8.3
 
 }
 
@@ -188,27 +188,33 @@ config_apache() {
 
 	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
- ServerAdmin ${EMAIL_ADDR}
- DocumentRoot ${DRUPAL_DIR}/web
- ServerName ${DOMAIN}
- ServerAlias www.${DOMAIN}
+	ServerAdmin ${EMAIL_ADDR}
+	DocumentRoot ${DRUPAL_DIR}/web
+	ServerName ${DOMAIN}
+	ServerAlias www.${DOMAIN}
 
- ErrorLog ${APACHE_LOG_DIR}/error.log
- CustomLog ${APACHE_LOG_DIR}/access.log combined
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	CustomLog ${APACHE_LOG_DIR}/access.log combined
 
- <Directory ${DRUPAL_DIR}/web>
+	<Directory ${DRUPAL_DIR}/web>
 		Options FollowSymlinks
 		AllowOverride All
 		Require all granted
- </Directory>
+	</Directory>
 
- <Directory ${DRUPAL_DIR}/web>
+	<Directory ${DRUPAL_DIR}/web>
 		RewriteEngine on
 		RewriteBase /
 		RewriteCond %{REQUEST_FILENAME} !-f
 		RewriteCond %{REQUEST_FILENAME} !-d
 		RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-</Directory>
+	</Directory>
+	
+	# Redirect all HTTP traffic to HTTPS
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R=301,L]
+
 </VirtualHost>
 
 <VirtualHost *:443>
