@@ -123,7 +123,6 @@ install_drupal() {
     if [ ! -d "$DRUPAL_DIR/web/core" ]; then
         echo "Drupal core files were not found. Installation failed. Exiting." | log
         exit 1
-		
     fi
 
     echo "Installing additional dependencies..." | log
@@ -139,17 +138,17 @@ install_drupal() {
     echo "Validating file and directory permissions..." | log
     PERMISSION_ERRORS=0
 
-    find "$DRUPAL_DIR" -type d ! -perm 755 -exec echo "Directory {} has incorrect permissions"  | log \; && PERMISSION_ERRORS=1
-    find "$DRUPAL_DIR" -type f ! -perm 644 -exec echo "File {} has incorrect permissions"  | log \; && PERMISSION_ERRORS=1
+    find "$DRUPAL_DIR" -type d ! -perm 755 -exec echo "Directory {} has incorrect permissions" \; | log && PERMISSION_ERRORS=1
+    find "$DRUPAL_DIR" -type f ! -perm 644 -exec echo "File {} has incorrect permissions" \; | log && PERMISSION_ERRORS=1
 
     if [ $PERMISSION_ERRORS -eq 1 ]; then
         echo "Some files or directories have incorrect permissions. Exiting." | log
         exit 1
-		
     fi
 
     echo "Drupal installation and permission setup completed successfully." | log
 }
+
 
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
