@@ -127,7 +127,10 @@ generate_certs() {
 
     sudo certbot certonly --standalone -d "${DOMAIN}" \
         --non-interactive --agree-tos --email "${EMAIL_ADDR}"
-
+	
+	# Future testing
+	#sudo certbot --apache -d ${DOMAIN} -d www.${DOMAIN} --email ${EMAIL_ADDR} --agree-tos --non-interactive
+	
     if [ "$NGINX_STOPPED" = true ]; then
         sudo systemctl start nginx
     fi
