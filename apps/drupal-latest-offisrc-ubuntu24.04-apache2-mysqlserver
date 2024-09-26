@@ -61,30 +61,16 @@ install_composer() {
 	echo "Installing Composer..." | log
 	export COMPOSER_ALLOW_SUPERUSER=1
 
-    cd /tmp || { echo "Failed to change directory to /tmp. Exiting."; exit 1; }
+    cd /tmp
 
     php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-    
     HASH="$(curl -sS https://composer.github.io/installer.sig)"
-    if [ -z "$HASH" ]; then
-        echo "Failed to retrieve installer signature. Exiting." | log
-        exit 1
-		
-    fi
 
     echo "Validating Composer installer hash..." | log
-    php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;" || {
-        echo "Composer installer verification failed. Exiting." | log
-        exit 1
-		
-    }
+    php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
 
     echo "Running Composer setup..." | log
-    php composer-setup.php --install-dir=/usr/local/bin --filename=composer || {
-        echo "Composer installation failed. Exiting." | log
-        exit 1
-		
-    }
+    php composer-setup.php --install-dir=/usr/local/bin --filename=composer
 
     echo "Cleaning up Composer setup files..." | log
     php -r "unlink('composer-setup.php');"
@@ -97,15 +83,7 @@ install_composer() {
 		
     fi
 
-    COMPOSER_VERSION=$(composer --version 2>/dev/null)
-    if [ -z "$COMPOSER_VERSION" ]; then
-        echo "Composer installation failed or is not working correctly. Exiting." | log
-        exit 1
-		
-    else
-        echo "Composer installed successfully: $COMPOSER_VERSION" | log
-		
-    fi
+    echo "Composer Version: $(composer --version)" | log
 }
 
 install_drupal() {
