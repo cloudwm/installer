@@ -323,6 +323,9 @@ main () {
 	display_all_lines
 	install_drupal
 	
+	"$update_status" "$HTML_PATH" -ur "This might take some time, please be patient."
+	"$update_status" "$HTML_PATH" -sr
+	
 	# mark_previous_done
 	# lines+=("Generating certificates...")
 	# display_all_lines
@@ -332,6 +335,8 @@ main () {
 	lines+=("Creating Drupal database...")
 	display_all_lines
 	create_db
+	
+	"$update_status" "$HTML_PATH" -ur "This page will soon become unavailable. When it does, navigate to ${DOMAIN}"
 	
 	mark_previous_done
 	lines+=("Configuring Apache...")
