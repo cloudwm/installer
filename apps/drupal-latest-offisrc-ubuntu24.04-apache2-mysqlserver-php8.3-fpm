@@ -97,11 +97,9 @@ install_drupal() {
     echo "Installing additional dependencies..." | log
     sudo -u "$TEMP_USER" bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
-    # Adjust permissions for www-data
+   # Adjust permissions for www-data	
     echo "Adjusting file permissions..." | log
-    sudo chown -R www-data:www-data "$DRUPAL_DIR"
-    find "$DRUPAL_DIR" -type d -exec sudo chmod 755 {} \;
-    find "$DRUPAL_DIR" -type f -exec sudo chmod 644 {} \;
+    sudo chown -Rf www-data:www-data "$DRUPAL_DIR"
 
     # Validate permissions and correct if needed
     echo "Validating and correcting file and directory permissions if necessary..." | log
