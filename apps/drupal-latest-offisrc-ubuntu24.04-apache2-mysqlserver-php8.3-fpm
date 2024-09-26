@@ -311,6 +311,11 @@ main () {
 	config_apache
 	
 	descriptionAppend ""
+	descriptionAppend "Database name: ${DB_NAME}"
+	descriptionAppend "Database Username: ${DB_USER}"
+	descriptionAppend "Database user Password: ${DB_PASS}"
+	descriptionAppend "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
+	descriptionAppend ""
 	descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
 	descriptionAppend ""
 		
