@@ -20,13 +20,6 @@ EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
 LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
 LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
-update_status="$rootDir/include/updateInstallStatus.sh"
-HTML_PATH="/var/www/html/index.html"
-if [ ! -f $HTML_PATH ]; then
-	echo "${HTML_PATH} does not exist."
-	exit 1
-fi
-
 
 dependencies() {
 	echo "Installing dependencies..." | log
@@ -59,7 +52,7 @@ install_php() {
 
 install_composer() {
 	echo "Installing Composer..." | log
-	#export COMPOSER_ALLOW_SUPERUSER=1
+	export COMPOSER_ALLOW_SUPERUSER=1
 
     cd /tmp
 
@@ -281,6 +274,9 @@ MYSQL_SCRIPT
 
 
 main () {
+	update_status="$rootDir/include/updateInstallStatus.sh"
+	HTML_PATH="/var/www/html/index.html"
+
 	lines=()
 	done_lines=()
 	
@@ -301,43 +297,69 @@ main () {
 	}
 	
 	lines+=("Getting Ready...")
-	echo "Getting Ready..." | log
 	"$update_status" "$HTML_PATH" -cp
 	display_all_lines
 	
 	lines+=("Installing dependencies...") 
-	dependencies
 	display_all_lines
+	dependencies
 	
 	mark_previous_done
 	lines+=("Installing PHP 8.3...")
-	install_php
 	display_all_lines
+	install_php
 	
 	mark_previous_done
 	lines+=("Installing Composer...")
-	install_composer
 	display_all_lines
+	
+	echo "Installing Composer..." | log
+	export COMPOSER_ALLOW_SUPERUSER=1
+
+    cd /tmp
+
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    HASH="$(curl -sS https://composer.github.io/installer.sig)"
+
+    echo "Validating Composer installer hash..." | log
+    php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
+
+    echo "Running Composer setup..." | log
+    php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+
+    echo "Cleaning up Composer setup files..." | log
+    php -r "unlink('composer-setup.php');"
+
+    # Validate Composer Installation
+    echo "Validating Composer installation..." | log
+    if [ ! -f "/usr/local/bin/composer" ]; then
+        echo "Composer was not found in /usr/local/bin. Exiting." | log
+        exit 1
+		
+    fi
+
+    echo "Composer Version: $(composer --version)" | log
+	# install_composer
 	
 	mark_previous_done
 	lines+=("Installing Drupal...")
-	install_drupal
 	display_all_lines
+	install_drupal
 	
 	mark_previous_done
 	lines+=("Generating certificates...")
-	generate_certs
 	display_all_lines
+	generate_certs
 	
 	mark_previous_done
 	lines+=("Configuring Apache...")
-	config_apache
 	display_all_lines
+	config_apache
 	
 	mark_previous_done
 	lines+=("Creating Drupal database...")
-	create_db
 	display_all_lines
+	create_db
 	
 	descriptionAppend ""
 	descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
