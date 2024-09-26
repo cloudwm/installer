@@ -129,7 +129,7 @@ generate_certs() {
         APACHE_STOPPED=true
     fi
 
-    sudo certbot certonly --staging --standalone -d "${DOMAIN}" \
+    sudo certbot certonly --standalone -d "${DOMAIN}" \
         --non-interactive --agree-tos --email "${EMAIL_ADDR}"
 
     if [ "$NGINX_STOPPED" = true ]; then
