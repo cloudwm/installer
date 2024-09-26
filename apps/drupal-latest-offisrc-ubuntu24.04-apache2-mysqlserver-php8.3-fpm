@@ -139,12 +139,11 @@ generate_certs() {
     if [ "$APACHE_STOPPED" = true ]; then
         sudo systemctl start apache2
     fi
-
-    echo "Copying certificates to ${CERT_DIR}..." | log
+	
     CERTBOT_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
-    sudo cp "${CERTBOT_LIVE_DIR}/fullchain.pem" "${CERT_DIR}"
-    sudo cp "${CERTBOT_LIVE_DIR}/privkey.pem" "${CERT_DIR}"
-    sudo chown $(whoami):$(whoami) "${CERT_DIR}"
+    # sudo cp "${CERTBOT_LIVE_DIR}/fullchain.pem" "${CERT_DIR}"
+    # sudo cp "${CERTBOT_LIVE_DIR}/privkey.pem" "${CERT_DIR}"
+    sudo chown $(whoami):$(whoami) "${CERTBOT_LIVE_DIR}"
 	
 	echo "Creating SAN file..." | log
     cat > "$CERT_DIR/v3.ext" <<-EOF
@@ -189,34 +188,31 @@ config_apache() {
 
 	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
-     DocumentRoot ${DRUPAL_DIR}/web
-     ServerName ${DOMAIN}
-     ServerAlias www.${DOMAIN}
+ ServerAdmin ${EMAIL_ADDR}
+ DocumentRoot ${DRUPAL_DIR}/web
+ ServerName ${DOMAIN}
+ ServerAlias www.${DOMAIN}
 
-     ErrorLog ${APACHE_LOG_DIR}/error.log
-     CustomLog ${APACHE_LOG_DIR}/access.log combined
+ ErrorLog ${APACHE_LOG_DIR}/error.log
+ CustomLog ${APACHE_LOG_DIR}/access.log combined
 
-     <Directory ${DRUPAL_DIR}/web>
-            Options FollowSymlinks
-            AllowOverride All
-            Require all granted
-     </Directory>
+ <Directory ${DRUPAL_DIR}/web>
+		Options FollowSymlinks
+		AllowOverride All
+		Require all granted
+ </Directory>
 
-     <Directory ${DRUPAL_DIR}/web>
-            RewriteEngine on
-            RewriteBase /
-            RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteCond %{REQUEST_FILENAME} !-d
-            RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    </Directory>
-
-    # Redirect all HTTP traffic to HTTPS
-    #RewriteEngine on
-    #RewriteCond %{HTTPS} !=on
-    #RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+ <Directory ${DRUPAL_DIR}/web>
+		RewriteEngine on
+		RewriteBase /
+		RewriteCond %{REQUEST_FILENAME} !-f
+		RewriteCond %{REQUEST_FILENAME} !-d
+		RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+</Directory>
 </VirtualHost>
 
 <VirtualHost *:443>
+    ServerAdmin ${EMAIL_ADDR}
     DocumentRoot ${DRUPAL_DIR}/web
     ServerName ${DOMAIN}
     ServerAlias www.${DOMAIN}
@@ -224,26 +220,26 @@ config_apache() {
     ErrorLog ${APACHE_LOG_DIR}/error.log
     CustomLog ${APACHE_LOG_DIR}/access.log combined
 
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+    SSLCertificateChainFile /etc/letsencrypt/live/${DOMAIN}/chain.pem
+
     <Directory ${DRUPAL_DIR}/web>
         Options FollowSymlinks
         AllowOverride All
         Require all granted
     </Directory>
 
-    # SSL Configuration
-    SSLEngine on
-    SSLCertificateFile ${LE_FULLCHAIN_PATH}
-    SSLCertificateKeyFile ${LE_PRIVKEY_PATH}
-
-    <IfModule mod_rewrite.c>
-        RewriteEngine On
+    <Directory ${DRUPAL_DIR}/web>
+        RewriteEngine on
         RewriteBase /
         RewriteCond %{REQUEST_FILENAME} !-f
         RewriteCond %{REQUEST_FILENAME} !-d
         RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    </IfModule>
+    </Directory>
 </VirtualHost>
-EOF"
+# EOF"
 
 	if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
 	a2enmod rewrite
