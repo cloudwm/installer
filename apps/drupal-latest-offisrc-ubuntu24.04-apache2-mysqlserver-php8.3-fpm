@@ -70,16 +70,13 @@ install_composer() {
 }
 
 install_drupal() {
-    # Create Drupal directory
     echo "Creating Drupal project directory..." | log
     mkdir -p "$DRUPAL_DIR"
-    cd "$DRUPAL_DIR" || { echo "Failed to change directory to $DRUPAL_DIR. Exiting." | log; exit 1; }
+    cd "$DRUPAL_DIR"
 
-    # Install Drupal using Composer
     echo "Installing Drupal..." | log
-    COMPOSER_ALLOW_SUPERUSER=1 composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
+    COMPOSER_ALLOW_SUPERUSER=1 composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR"
 
-    # Validate Drupal installation by checking if core files exist
     echo "Validating Drupal installation..." | log
     if [ ! -d "$DRUPAL_DIR/web/core" ]; then
         echo "Drupal core files were not found. Installation failed. Exiting." | log
@@ -87,13 +84,12 @@ install_drupal() {
     fi
 
     echo "Installing additional dependencies..." | log
-    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
+    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction
 
-    # Set permissions
     echo "Adjusting file permissions..." | log
     sudo chown -R www-data:www-data "$DRUPAL_DIR" || { echo "Failed to set ownership for $DRUPAL_DIR. Exiting." | log; exit 1; }
-    find "$DRUPAL_DIR" -type d -exec sudo chmod 755 {} \; || { echo "Failed to set directory permissions for $DRUPAL_DIR. Exiting." | log; exit 1; }
-    find "$DRUPAL_DIR" -type f -exec sudo chmod 644 {} \; || { echo "Failed to set file permissions for $DRUPAL_DIR. Exiting." | log; exit 1; }
+    find "$DRUPAL_DIR" -type d -exec sudo chmod 755 {} \;
+    find "$DRUPAL_DIR" -type f -exec sudo chmod 644 {} \;
 
     # Validate that permissions are set correctly and correct if needed
     echo "Validating and correcting file and directory permissions if necessary..." | log
@@ -290,6 +286,7 @@ main () {
 	"$update_status" "$HTML_PATH" -cp
 	display_all_lines
 	
+	mark_previous_done
 	lines+=("Installing dependencies...") 
 	display_all_lines
 	dependencies
