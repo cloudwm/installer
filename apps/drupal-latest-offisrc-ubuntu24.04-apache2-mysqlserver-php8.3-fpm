@@ -159,33 +159,6 @@ EOF
 
 config_apache() {
 	echo "Configuring Apache Virtual Host..." | log
-	
-	# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
-# <VirtualHost *:80>
-     # ServerAdmin ${EMAIL_ADDR}
-     # DocumentRoot ${DRUPAL_DIR}/web
-     # ServerName ${DOMAIN}
-     # ServerAlias www.${DOMAIN}
-
-     # ErrorLog ${APACHE_LOG_DIR}/error.log
-     # CustomLog ${APACHE_LOG_DIR}/access.log combined
-
-     # <Directory ${DRUPAL_DIR}/web>
-            # Options FollowSymlinks
-            # AllowOverride All
-            # Require all granted
-     # </Directory>
-
-     # <Directory ${DRUPAL_DIR}/web>
-            # RewriteEngine on
-            # RewriteBase /
-            # RewriteCond %{REQUEST_FILENAME} !-f
-            # RewriteCond %{REQUEST_FILENAME} !-d
-            # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    # </Directory>
-# </VirtualHost>
-# EOF"
-
 	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
 	ServerAdmin ${EMAIL_ADDR}
@@ -304,6 +277,9 @@ main () {
 	display_all_lines
 	services/mysqlserver-8.0-osrepo
 	
+	"$update_status" "$HTML_PATH" -ur "The system will restart soon, finish the Drupal setup by visiting https://$DOMAIN in your web browser when the system is back online."
+	"$update_status" "$HTML_PATH" -sr
+	
 	mark_previous_done
 	lines+=("Installing PHP 8.3...")
 	display_all_lines
@@ -313,9 +289,6 @@ main () {
 	lines+=("Installing Composer...")
 	display_all_lines
 	install_composer
-	
-	"$update_status" "$HTML_PATH" -ur "The system will restart soon, finish the Drupal setup by visiting https://$DOMAIN in your web browser when the system is back online."
-	"$update_status" "$HTML_PATH" -sr
 	
 	mark_previous_done
 	lines+=("Installing Drupal...")
