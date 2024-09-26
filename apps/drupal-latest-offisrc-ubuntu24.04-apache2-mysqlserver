@@ -20,7 +20,7 @@ LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
 LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
 update_status="$rootDir/include/updateInstallStatus.sh"
-HTML_PATH="${DRUPAL_DIR}/web/index.html"
+HTML_PATH="/var/www/html/index.html"
 if [ ! -f $HTML_PATH ]; then
 	echo "${HTML_PATH} does not exist."
 	exit 1
@@ -342,11 +342,6 @@ main () {
 	display_all_lines
 	
 	mark_previous_done
-	lines+=("Installing Unzip...")
-	apt install -y unzip
-	display_all_lines
-	
-	mark_previous_done
 	lines+=("Installing PHP 8.3...")
 	install_php
 	display_all_lines
@@ -387,9 +382,6 @@ main () {
 main
 
 # Create Apache Virtual Host
-
-
-
 
 # Revert to lets-encrypt once the limit reset.
 # TEMP_CERT="/etc/ssl/certs/apache-selfsigned.crt"
