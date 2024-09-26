@@ -59,7 +59,7 @@ install_php() {
 
 install_composer() {
 	echo "Installing Composer..." | log
-	export COMPOSER_ALLOW_SUPERUSER=1
+	#export COMPOSER_ALLOW_SUPERUSER=1
 
     cd /tmp
 
@@ -305,8 +305,7 @@ main () {
 	"$update_status" "$HTML_PATH" -cp
 	display_all_lines
 	
-	mark_previous_done
-	echo "Installing dependencies..." | log
+	lines+=("Installing dependencies...") 
 	dependencies
 	display_all_lines
 	
