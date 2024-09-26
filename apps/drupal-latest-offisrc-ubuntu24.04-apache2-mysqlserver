@@ -44,8 +44,8 @@ install_php() {
     echo "Installing PHP 8.3 & plugins..." | log
     apt install -y php8.3 php-cli php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json || { echo "Failed to install PHP or required extensions. Exiting." | log; exit 1; }
     
-    echo "Restarting php-fpm service..." | log
-    sudo systemctl restart php-fpm || { echo "Failed to start php-fpm. Exiting." | log; exit 1; }
+    echo "Restarting php8.3-fpm service..." | log
+    sudo systemctl restart php8.3-fpm || { echo "Failed to start php8.3-fpm. Exiting." | log; exit 1; }
 
     echo "Validating PHP installation..." | log
     PHP_VERSION=$(php -v | grep "^PHP 8.3")
@@ -56,7 +56,6 @@ install_php() {
     
     echo "PHP version: $PHP_VERSION" | log
 }
-
 
 install_composer() {
 	echo "Installing Composer..." | log
