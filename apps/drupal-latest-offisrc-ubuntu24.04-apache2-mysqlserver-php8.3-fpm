@@ -127,7 +127,10 @@ generate_certs() {
 
     sudo certbot certonly --standalone -d "${DOMAIN}" \
         --non-interactive --agree-tos --email "${EMAIL_ADDR}"
-
+	
+	# Future testing
+	#sudo certbot --apache -d ${DOMAIN} -d www.${DOMAIN} --email ${EMAIL_ADDR} --agree-tos --non-interactive
+	
     if [ "$NGINX_STOPPED" = true ]; then
         sudo systemctl start nginx
     fi
@@ -158,7 +161,7 @@ config_apache() {
 	ServerAdmin ${EMAIL_ADDR}
 	DocumentRoot ${DRUPAL_DIR}/web
 	ServerName ${DOMAIN}
-	ServerAlias www.${DOMAIN}
+	#ServerAlias www.${DOMAIN}
 
 	ErrorLog ${APACHE_LOG_DIR}/error.log
 	CustomLog ${APACHE_LOG_DIR}/access.log combined
@@ -188,7 +191,7 @@ config_apache() {
     ServerAdmin ${EMAIL_ADDR}
     DocumentRoot ${DRUPAL_DIR}/web
     ServerName ${DOMAIN}
-    ServerAlias www.${DOMAIN}
+    #ServerAlias www.${DOMAIN}
 
     ErrorLog ${APACHE_LOG_DIR}/error.log
     CustomLog ${APACHE_LOG_DIR}/access.log combined
