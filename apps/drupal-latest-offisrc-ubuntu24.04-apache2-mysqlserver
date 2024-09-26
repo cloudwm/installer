@@ -8,14 +8,15 @@ elif [ -f "../include/startup.sh" ]; then
 
 fi
 
-IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
-EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
+
 CERT_DIR="/opt/certs"
 DRUPAL_DIR="/opt/drupal-site"
 DB_NAME="drupal_db"
 DB_USER="drupal_user"
 DB_PASS="${ADMINPASSWORD}"
 DOMAIN="${CWM_DOMAIN}"
+IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
+EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
 LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
 LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
@@ -25,6 +26,7 @@ if [ ! -f $HTML_PATH ]; then
 	echo "${HTML_PATH} does not exist."
 	exit 1
 fi
+
 
 dependencies() {
 	echo "Installing dependencies..." | log
@@ -37,10 +39,10 @@ dependencies() {
 
 install_php() {
     echo "Adding PHP 8.3 Repository..." | log
-    add-apt-repository ppa:ondrej/php
+    add-apt-repository ppa:ondrej/php -y
     
     echo "Installing PHP 8.3 & plugins..." | log
-    apt install -y php8.3 php-cli php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json php-opcache || { echo "Failed to install PHP or required extensions. Exiting." | log; exit 1; }
+    apt install -y php8.3 php-cli php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json || { echo "Failed to install PHP or required extensions. Exiting." | log; exit 1; }
     
     echo "Restarting php-fpm service..." | log
     sudo systemctl restart php-fpm || { echo "Failed to start php-fpm. Exiting." | log; exit 1; }
@@ -57,9 +59,8 @@ install_php() {
 
 
 install_composer() {
-	if [ ! -z "$PHP_VERSION" ] 
-    echo "Installing Composer..." | log
-    export COMPOSER_ALLOW_SUPERUSER=1
+	echo "Installing Composer..." | log
+	export COMPOSER_ALLOW_SUPERUSER=1
 
     cd /tmp || { echo "Failed to change directory to /tmp. Exiting."; exit 1; }
 
