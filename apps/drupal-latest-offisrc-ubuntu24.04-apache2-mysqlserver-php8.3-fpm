@@ -64,7 +64,7 @@ install_composer() {
     yes | COMPOSER_ALLOW_SUPERUSER=1 sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
 
     echo "Cleaning up Composer setup files..." | log
-    yes | COMPOSER_ALLOW_SUPERUSER=1 sudo php -r "unlink('composer-setup.php');"
+    yes | sudo php -r "unlink('composer-setup.php');"
 
     echo "Composer Version: $(sudo composer --version)" | log
 }
@@ -77,7 +77,7 @@ install_drupal() {
 
     # Install Drupal using Composer
     echo "Installing Drupal..." | log
-    yes | COMPOSER_ALLOW_SUPERUSER=1 sudo composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
+    yes | sudo composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
 
     # Validate Drupal installation by checking if core files exist
     echo "Validating Drupal installation..." | log
@@ -87,7 +87,7 @@ install_drupal() {
     fi
 
     echo "Installing additional dependencies..." | log
-    COMPOSER_ALLOW_SUPERUSER=1 sudo composer install --no-interaction || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
+    yes | sudo composer install --no-interaction || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
     # Set permissions
     echo "Adjusting file permissions..." | log
