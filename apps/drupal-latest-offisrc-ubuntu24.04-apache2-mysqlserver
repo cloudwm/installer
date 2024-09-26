@@ -36,22 +36,25 @@ dependencies() {
 }
 
 install_php() {
-	echo "Adding PHP 8.3 Repository..." | log
-	add-apt-repository ppa:ondrej/php
-	
-	echo "Installing PHP 8.3 & plugins..." | log
-    apt install -y php8.3 php-cli php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json php-opcache || {echo "Failed to install PHP or required extensions. Exiting."; exit 1;}
-	sudo systemctl restart php-fpm || {echo "Failed to start php-fpm. Exiting." | log; exit 1;}
+    echo "Adding PHP 8.3 Repository..." | log
+    add-apt-repository ppa:ondrej/php
+    
+    echo "Installing PHP 8.3 & plugins..." | log
+    apt install -y php8.3 php-cli php-fpm php-mysql php-gd php-xml php-mbstring php-curl php-zip php-json php-opcache || { echo "Failed to install PHP or required extensions. Exiting." | log; exit 1; }
+    
+    echo "Restarting php-fpm service..." | log
+    sudo systemctl restart php-fpm || { echo "Failed to start php-fpm. Exiting." | log; exit 1; }
 
     echo "Validating PHP installation..." | log
     PHP_VERSION=$(php -v | grep "^PHP 8.3")
     if [ -z "$PHP_VERSION" ]; then
         echo "PHP 8.3 is not installed correctly. Exiting." | log
         exit 1
-		
     fi
+    
     echo "PHP version: $PHP_VERSION" | log
 }
+
 
 install_composer() {
 	if [ ! -z "$PHP_VERSION" ] 
