@@ -318,7 +318,7 @@ MYSQL_SCRIPT
 bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 server {
     listen 80;
-    server_name your_domain.com;  # Replace with your domain or server IP
+    server_name ${DOMAIN};
 
     root /var/www/drupal;
     index index.php index.html index.htm;
@@ -350,9 +350,6 @@ EOF"
 	sudo systemctl restart php8.3-fpm
 	echo "PHP settings updated and PHP-FPM restarted."
 
-	
-	
-	
 	
 	# update_status="$rootDir/include/updateInstallStatus.sh"
 	# HTML_PATH="/var/www/html/index.html"
