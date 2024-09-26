@@ -61,10 +61,10 @@ install_composer() {
     php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
 
     echo "Running Composer setup..." | log
-    COMPOSER_ALLOW_SUPERUSER=1 sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    yes | COMPOSER_ALLOW_SUPERUSER=1 sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
 
     echo "Cleaning up Composer setup files..." | log
-    php -r "unlink('composer-setup.php');"
+    yes | COMPOSER_ALLOW_SUPERUSER=1 sudo php -r "unlink('composer-setup.php');"
 
     echo "Composer Version: $(sudo composer --version)" | log
 }
@@ -73,11 +73,11 @@ install_drupal() {
     # Create Drupal directory
     echo "Creating Drupal project directory..." | log
     mkdir -p "$DRUPAL_DIR"
-    cd "$DRUPAL_DIR" || { echo "Failed to change directory to $DRUPAL_DIR. Exiting." | log; exit 1; }
+    cd "$DRUPAL_DIR"
 
     # Install Drupal using Composer
     echo "Installing Drupal..." | log
-    composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
+    yes | COMPOSER_ALLOW_SUPERUSER=1 sudo composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
 
     # Validate Drupal installation by checking if core files exist
     echo "Validating Drupal installation..." | log
@@ -87,7 +87,7 @@ install_drupal() {
     fi
 
     echo "Installing additional dependencies..." | log
-    composer install --no-interaction || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
+    COMPOSER_ALLOW_SUPERUSER=1 sudo composer install --no-interaction || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
     # Set permissions
     echo "Adjusting file permissions..." | log
@@ -102,6 +102,7 @@ install_drupal() {
 
     echo "Drupal installation and permission setup completed successfully." | log
 }
+
 
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
