@@ -70,33 +70,45 @@ install_composer() {
 }
 
 install_drupal() {
+    TEMP_USER="temp_composer_user"
+
     echo "Creating Drupal project directory..." | log
-    mkdir -p "$DRUPAL_DIR"
-    cd "$DRUPAL_DIR"
+    if [ ! -d "$DRUPAL_DIR" ]; then
+        sudo mkdir -p "$DRUPAL_DIR"
+    fi
 
-    echo "Installing Drupal..." | log
-    #COMPOSER_ALLOW_SUPERUSER=1 composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR"
-	sudo composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR"
+    if ! id -u "$TEMP_USER" >/dev/null 2>&1; then
+        sudo useradd -m "$TEMP_USER"
+    fi
+    sudo chown -R "$TEMP_USER:$TEMP_USER" "$DRUPAL_DIR"
 
+    # Run Composer as the temporary user
+    echo "Installing Drupal using Composer as $TEMP_USER..." | log
+    sudo -u "$TEMP_USER" bash -c "composer create-project --no-interaction drupal/recommended-project '$DRUPAL_DIR'" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
+
+    # Validate Drupal installation
     echo "Validating Drupal installation..." | log
     if [ ! -d "$DRUPAL_DIR/web/core" ]; then
         echo "Drupal core files were not found. Installation failed. Exiting." | log
         exit 1
     fi
 
+    # Run `composer install` as the temporary user
     echo "Installing additional dependencies..." | log
-    #COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction
-	sudo composer install --no-interaction
+    sudo -u "$TEMP_USER" bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
+    # Adjust permissions for www-data
     echo "Adjusting file permissions..." | log
     sudo chown -R www-data:www-data "$DRUPAL_DIR"
     find "$DRUPAL_DIR" -type d -exec sudo chmod 755 {} \;
     find "$DRUPAL_DIR" -type f -exec sudo chmod 644 {} \;
 
-    # Validate that permissions are set correctly and correct if needed
+    # Validate permissions and correct if needed
     echo "Validating and correcting file and directory permissions if necessary..." | log
     find "$DRUPAL_DIR" -type d ! -perm 755 -exec echo "Directory {} has incorrect permissions. Correcting..." \; -exec sudo chmod 755 {} \; | log
     find "$DRUPAL_DIR" -type f ! -perm 644 -exec echo "File {} has incorrect permissions. Correcting..." \; -exec sudo chmod 644 {} \; | log
+
+    sudo userdel -r "$TEMP_USER"
 
     echo "Drupal installation and permission setup completed successfully." | log
 }
