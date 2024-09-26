@@ -162,34 +162,9 @@ EOF
 config_apache() {
 	echo "Configuring Apache Virtual Host..." | log
 	
-	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
-<VirtualHost *:80>
-     ServerAdmin ${EMAIL_ADDR}
-     DocumentRoot ${DRUPAL_DIR}/web
-     ServerName ${DOMAIN}
-     ServerAlias www.${DOMAIN}
-
-     ErrorLog ${APACHE_LOG_DIR}/error.log
-     CustomLog ${APACHE_LOG_DIR}/access.log combined
-
-     <Directory ${DRUPAL_DIR}/web>
-            Options FollowSymlinks
-            AllowOverride All
-            Require all granted
-     </Directory>
-
-     <Directory ${DRUPAL_DIR}/web>
-            RewriteEngine on
-            RewriteBase /
-            RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteCond %{REQUEST_FILENAME} !-d
-            RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    </Directory>
-</VirtualHost>
-EOF"
-
 	# bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 # <VirtualHost *:80>
+     # ServerAdmin ${EMAIL_ADDR}
      # DocumentRoot ${DRUPAL_DIR}/web
      # ServerName ${DOMAIN}
      # ServerAlias www.${DOMAIN}
@@ -210,41 +185,66 @@ EOF"
             # RewriteCond %{REQUEST_FILENAME} !-d
             # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
     # </Directory>
-
-    # # Redirect all HTTP traffic to HTTPS
-    # #RewriteEngine on
-    # #RewriteCond %{HTTPS} !=on
-    # #RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
-# </VirtualHost>
-
-# <VirtualHost *:443>
-    # DocumentRoot ${DRUPAL_DIR}/web
-    # ServerName ${DOMAIN}
-    # ServerAlias www.${DOMAIN}
-
-    # ErrorLog ${APACHE_LOG_DIR}/error.log
-    # CustomLog ${APACHE_LOG_DIR}/access.log combined
-
-    # <Directory ${DRUPAL_DIR}/web>
-        # Options FollowSymlinks
-        # AllowOverride All
-        # Require all granted
-    # </Directory>
-
-    # # SSL Configuration
-    # SSLEngine on
-    # SSLCertificateFile ${LE_FULLCHAIN_PATH}
-    # SSLCertificateKeyFile ${LE_PRIVKEY_PATH}
-
-    # <IfModule mod_rewrite.c>
-        # RewriteEngine On
-        # RewriteBase /
-        # RewriteCond %{REQUEST_FILENAME} !-f
-        # RewriteCond %{REQUEST_FILENAME} !-d
-        # RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
-    # </IfModule>
 # </VirtualHost>
 # EOF"
+
+	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+<VirtualHost *:80>
+     DocumentRoot ${DRUPAL_DIR}/web
+     ServerName ${DOMAIN}
+     ServerAlias www.${DOMAIN}
+
+     ErrorLog ${APACHE_LOG_DIR}/error.log
+     CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+     <Directory ${DRUPAL_DIR}/web>
+            Options FollowSymlinks
+            AllowOverride All
+            Require all granted
+     </Directory>
+
+     <Directory ${DRUPAL_DIR}/web>
+            RewriteEngine on
+            RewriteBase /
+            RewriteCond %{REQUEST_FILENAME} !-f
+            RewriteCond %{REQUEST_FILENAME} !-d
+            RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    </Directory>
+
+    # Redirect all HTTP traffic to HTTPS
+    #RewriteEngine on
+    #RewriteCond %{HTTPS} !=on
+    #RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    DocumentRoot ${DRUPAL_DIR}/web
+    ServerName ${DOMAIN}
+    ServerAlias www.${DOMAIN}
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+    <Directory ${DRUPAL_DIR}/web>
+        Options FollowSymlinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    # SSL Configuration
+    SSLEngine on
+    SSLCertificateFile ${LE_FULLCHAIN_PATH}
+    SSLCertificateKeyFile ${LE_PRIVKEY_PATH}
+
+    <IfModule mod_rewrite.c>
+        RewriteEngine On
+        RewriteBase /
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteCond %{REQUEST_FILENAME} !-d
+        RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+    </IfModule>
+</VirtualHost>
+EOF"
 
 	if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
 	a2enmod rewrite
@@ -313,7 +313,7 @@ main () {
 	display_all_lines
 	install_composer
 	
-	"$update_status" "$HTML_PATH" -ur "This might take some time, please be patient."
+	"$update_status" "$HTML_PATH" -ur "The system will restart soon, finish the Drupal setup by visiting https://$DOMAIN in your web browser when the system is back online."
 	"$update_status" "$HTML_PATH" -sr
 	
 	mark_previous_done
@@ -321,17 +321,15 @@ main () {
 	display_all_lines
 	install_drupal
 	
-	# mark_previous_done
-	# lines+=("Generating certificates...")
-	# display_all_lines
-	# generate_certs
+	mark_previous_done
+	lines+=("Generating certificates...")
+	display_all_lines
+	generate_certs
 	
 	mark_previous_done
 	lines+=("Creating Drupal database...")
 	display_all_lines
 	create_db
-	
-	"$update_status" "$HTML_PATH" -ur "This page will soon become unavailable. When it does, navigate to ${DOMAIN}"
 	
 	mark_previous_done
 	lines+=("Configuring Apache...")
