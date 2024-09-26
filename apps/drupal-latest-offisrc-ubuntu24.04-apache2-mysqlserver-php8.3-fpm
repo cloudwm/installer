@@ -75,7 +75,8 @@ install_drupal() {
     cd "$DRUPAL_DIR"
 
     echo "Installing Drupal..." | log
-    COMPOSER_ALLOW_SUPERUSER=1 composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR"
+    #COMPOSER_ALLOW_SUPERUSER=1 composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR"
+	sudo composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR"
 
     echo "Validating Drupal installation..." | log
     if [ ! -d "$DRUPAL_DIR/web/core" ]; then
@@ -84,10 +85,11 @@ install_drupal() {
     fi
 
     echo "Installing additional dependencies..." | log
-    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction
+    #COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction
+	sudo composer install --no-interaction
 
     echo "Adjusting file permissions..." | log
-    sudo chown -R www-data:www-data "$DRUPAL_DIR" || { echo "Failed to set ownership for $DRUPAL_DIR. Exiting." | log; exit 1; }
+    sudo chown -R www-data:www-data "$DRUPAL_DIR"
     find "$DRUPAL_DIR" -type d -exec sudo chmod 755 {} \;
     find "$DRUPAL_DIR" -type f -exec sudo chmod 644 {} \;
 
