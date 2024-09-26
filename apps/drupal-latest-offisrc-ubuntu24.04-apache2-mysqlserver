@@ -134,21 +134,13 @@ install_drupal() {
     find "$DRUPAL_DIR" -type d -exec chmod 755 {} \; || { echo "Failed to set directory permissions for $DRUPAL_DIR. Exiting." | log; exit 1; }
     find "$DRUPAL_DIR" -type f -exec chmod 644 {} \; || { echo "Failed to set file permissions for $DRUPAL_DIR. Exiting." | log; exit 1; }
 
-    # Validate that permissions are set correctly
-    echo "Validating file and directory permissions..." | log
-    PERMISSION_ERRORS=0
-
-    find "$DRUPAL_DIR" -type d ! -perm 755 -exec echo "Directory {} has incorrect permissions" \; | log && PERMISSION_ERRORS=1
-    find "$DRUPAL_DIR" -type f ! -perm 644 -exec echo "File {} has incorrect permissions" \; | log && PERMISSION_ERRORS=1
-
-    if [ $PERMISSION_ERRORS -eq 1 ]; then
-        echo "Some files or directories have incorrect permissions. Exiting." | log
-        exit 1
-    fi
+    # Validate that permissions are set correctly and correct if needed
+    echo "Validating and correcting file and directory permissions if necessary..." | log
+    find "$DRUPAL_DIR" -type d ! -perm 755 -exec echo "Directory {} has incorrect permissions. Correcting..." \; -exec chmod 755 {} \; | log
+    find "$DRUPAL_DIR" -type f ! -perm 644 -exec echo "File {} has incorrect permissions. Correcting..." \; -exec chmod 644 {} \; | log
 
     echo "Drupal installation and permission setup completed successfully." | log
 }
-
 
 generate_certs() {
     if [[ ! -d $CERT_DIR ]]; then
