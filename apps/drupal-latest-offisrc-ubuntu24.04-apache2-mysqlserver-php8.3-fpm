@@ -101,11 +101,6 @@ install_drupal() {
     echo "Adjusting file permissions..." | log
     sudo chown -Rf www-data:www-data "$DRUPAL_DIR"
 
-    # # Validate permissions and correct if needed
-    # echo "Validating and correcting file and directory permissions if necessary..." | log
-    # find "$DRUPAL_DIR" -type d ! -perm 755 -exec echo "Directory {} has incorrect permissions. Correcting..." \; -exec sudo chmod 755 {} \; | log
-    # find "$DRUPAL_DIR" -type f ! -perm 644 -exec echo "File {} has incorrect permissions. Correcting..." \; -exec sudo chmod 644 {} \; | log
-
     sudo userdel -r "$TEMP_USER"
 
     echo "Drupal installation and permission setup completed successfully." | log
@@ -318,13 +313,13 @@ main () {
 	display_all_lines
 	install_composer
 	
+	"$update_status" "$HTML_PATH" -ur "This might take some time, please be patient."
+	"$update_status" "$HTML_PATH" -sr
+	
 	mark_previous_done
 	lines+=("Installing Drupal...")
 	display_all_lines
 	install_drupal
-	
-	"$update_status" "$HTML_PATH" -ur "This might take some time, please be patient."
-	"$update_status" "$HTML_PATH" -sr
 	
 	# mark_previous_done
 	# lines+=("Generating certificates...")
