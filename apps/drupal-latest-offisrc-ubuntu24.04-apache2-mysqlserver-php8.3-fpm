@@ -5,7 +5,7 @@ if [ -f "include/startup.sh" ]; then
 	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
-
+	
 fi
 
 
@@ -295,6 +295,11 @@ main () {
 	dependencies
 	
 	mark_previous_done
+	lines+=("Installing MySQL 8.0...") 
+	display_all_lines
+	services/mysqlserver-8.0-osrepo
+	
+	mark_previous_done
 	lines+=("Installing PHP 8.3...")
 	display_all_lines
 	install_php
@@ -335,13 +340,6 @@ main () {
 main
 
 # Create Apache Virtual Host
-
-# Revert to lets-encrypt once the limit reset.
-# TEMP_CERT="/etc/ssl/certs/apache-selfsigned.crt"
-# TEMP_KEY="/etc/ssl/private/apache-selfsigned.key"
-# sudo mkdir -p /etc/ssl/certs /etc/ssl/private
-# sudo openssl req -x509 -newkey rsa:4096 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt -days 365 -nodes -subj "/CN=${DOMAIN}"
-
 # bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
 # # <VirtualHost *:80>
     # # ServerName ${DOMAIN}
