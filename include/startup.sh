@@ -255,7 +255,7 @@ function checkPackageInstalled() {
 function curlDownload() {
 
     checkPackageInstalled curl
-    curlBaseParams=(--fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 15 --speed-time 300 --speed-limit 1000)
+    curlBaseParams=(--fail --location --write-out %{http_code} --max-redirs 5 --retry 3 --retry-connrefused --retry-delay 15 --speed-time 300 --speed-limit 1000)
 
     # check if url is given
     if [ -z "$1" ]; then
