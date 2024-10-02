@@ -18,7 +18,6 @@ sudo swapon /swapfile
 sleep 5
 
 echo "Installing mysql from apt" | log
-ADMINPASSWORD=""
 export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password_again password ${ADMINPASSWORD}"
