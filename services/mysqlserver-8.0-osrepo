@@ -30,7 +30,7 @@ if [ ! -f /root/.my.cnf ]; then
     cat << EOF > /root/.my.cnf
 [client]
 user=root
-password=""
+password="${ADMINPASSWORD}"
 EOF
 fi
 chmod 600 /root/.my.cnf
