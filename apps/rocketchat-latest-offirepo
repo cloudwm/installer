@@ -86,7 +86,7 @@ waitOrStop 0 "Restarting MongoDB failed"
 sleep 5
 
 echo "Initalizing MongoDB" | log
-mongo --eval "printjson(rs.initiate())"
+mongosh --eval "printjson(rs.initiate())"
 sleep 1
 systemctl daemon-reload
 waitOrStop 0 "Reloading daemon failed"
