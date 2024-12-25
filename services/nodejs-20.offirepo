@@ -1,0 +1,40 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Downloading Node.js repository" | log
+curlDownload https://deb.nodesource.com/setup_20.x
+waitOrStop 0 "Setup script not downloaded from official source"
+bash setup_20.x | log
+waitOrStop 0 "Failed to install application"
+
+echo "Install Node.js" | log
+apt-get install -y nodejs build-essential | log
+checkPackageInstalled nodejs build-essential
+
+echo "Copying files for testing" | log
+cp $rootDir/tweaks/extras/nodejs/hello-world.js ~/
+chmod 775 ~/hello-world.js
+
+echo "Adding descriptions" | log
+descriptionAppend "To test basic functionality, go to home folder"
+descriptionAppend "# cd ~"
+descriptionAppend " "
+descriptionAppend "Run node with a basic test file which outputs Hello World"
+descriptionAppend "# node hello-world.js &"
+descriptionAppend " "
+descriptionAppend "Access server with curl to see a respone"
+descriptionAppend "# curl http://localhost:3000"
+descriptionAppend " "
+
+tag nodejs.success
+tagScript success
+
+exit 0
+
