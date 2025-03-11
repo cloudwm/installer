@@ -9,7 +9,8 @@ fi
 echo "Installing docker.io package" | log
 installPackage docker.io
 waitOrStop 0 "Docker didnt installed successfully"
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -L "https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
 chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
 systemctl enable docker
