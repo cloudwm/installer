@@ -15,6 +15,8 @@ apt upgrade -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force
 apt autoclean -qy | log
 apt upgrade -y | log
 apt autoremove -y | log
+rm -f /var/lib/dpkg/info/linux-firmware.list | log
+apt reinstall -y linux-firmware | log
 
 # Clean up old journalctl logs
 echo "Cleaning up old journalctl logs" | log
