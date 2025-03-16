@@ -25,6 +25,9 @@ metadata:
 type: Opaque
 data:
 EOF
+
+cp /root/guest.conf $rootDir/guest.conf 
+
 cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
 export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
 export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
