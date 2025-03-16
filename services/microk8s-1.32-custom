@@ -25,18 +25,18 @@ metadata:
 type: Opaque
 data:
 EOF
-cat guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> guest.yaml
-export apiClientId=`cat guest.conf | grep apiClientId | cut -d '=' -f 2`
-export apiSecret=`cat guest.conf | grep apiSecret | cut -d '=' -f 2`
-export apiUrl=`cat guest.conf | grep url | cut -d '=' -f 2`
-export apiZone=`cat guest.conf | grep 'zone=' | cut -d '=' -f 2`
+cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
+export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
+export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
+export apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`
+export apiZone=`cat $rootDir/guest.conf | grep 'zone=' | cut -d '=' -f 2`
 export apiToken=`curl -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication`
-curl -o server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}" 
-export imageID=`cat server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
-export trafficPackage=`cat server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
-echo "  imageid: $imageID" >> guest.yaml 
-echo "  trafficpackage: $trafficPackage" >> guest.yaml
-microk8s kubectl apply -f guest.yaml
+curl -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}" 
+export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
+export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
+echo "  imageid: $imageID" >> $rootDir/guest.yaml 
+echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
+microk8s kubectl apply -f $rootDir/guest.yaml
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
@@ -45,7 +45,7 @@ microk8s addons repo add core-fork https://github.com/ddark-il/microk8s-core-add
 waitOrStop 0 "Repository addition failed"
 
 echo "Generating admin-user and login token" | log
-cat << EOF > user.yaml
+cat << EOF > $rootDir/user.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -76,18 +76,18 @@ metadata:
     kubernetes.io/service-account.name: "admin-user"   
 type: kubernetes.io/service-account-token  
 EOF
-microk8s kubectl apply -f user.yaml
+microk8s kubectl apply -f $rootDir/user.yaml
 waitOrStop 0 "Unable to apply admin-user yaml"
 
 export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
 export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Cloning dashboard repository" | log
-git clone https://github.com/ddark-il/k8s-dashboard.git
+cd $rootDir && git clone https://github.com/ddark-il/k8s-dashboard.git
 waitOrStop 0 "Reload haproxy service failed"
 
 echo "Downloading helm dependencies" | log
-cd k8s-dashboard/charts/kubernetes-dashboard
+cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
 microk8s helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 microk8s helm repo add jetstack.io https://charts.jetstack.io
 microk8s helm repo add kubernetes-sigs https://kubernetes-sigs.github.io/metrics-server/
