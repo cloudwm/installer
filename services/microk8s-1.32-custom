@@ -11,6 +11,9 @@ checkTagExist ubuntu-updateos.success
 
 rootDir=$(rootDir)
 
+systemctl reload-daemon
+systemctl restart snapd
+
 echo "Installing microk8s snap" | log
 snap install microk8s --classic --channel=1.32
 waitOrStop 0 "snap install failed"
@@ -101,20 +104,7 @@ waitOrStop 0 "dependency build failed"
 echo "Installing dashboard helm chart" | log
 sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
 sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
-case $apiZone in
-  AS | AS-SG | AS-TY)
-   sed -i 's/harbor-il.cloudwm.com/harbor-as-sg.cloudwm.com/g' values.yaml;;
-  AU-SY)
-   sed -i 's/harbor-il.cloudwm.com/harbor-au-sy.cloudwm.com/g' values.yaml;;
-  EU | EU-FR | EU-LO | EU-MD | EU-ML | EU-ST)
-   sed -i 's/harbor-il.cloudwm.com/harbor-eu-fr.cloudwm.com/g' values.yaml;;
-  CA-TR | US-NY2 | US-MI | US-MI2 | US-AT | US-CH)
-   sed -i 's/harbor-il.cloudwm.com/harbor-us-ny.cloudwm.com/g' values.yaml;;
-  US-LA | US-SC | US-SE | US-TX)
-   sed -i 's/harbor-il.cloudwm.com/harbor-us-la.cloudwm.com/g' values.yaml;;
-  *)
-   echo "Using default docker registry";; 
-esac
+
 microk8s helm install dashboard . --namespace kube-system
 waitOrStop 0 "Dashboard install failed"
 
