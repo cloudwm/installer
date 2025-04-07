@@ -11,8 +11,10 @@ checkTagExist ubuntu-updateos.success
 
 rootDir=$(rootDir)
 
-systemctl reload-daemon
-systemctl restart snapd
+# testing different fix for snap
+apt purge snapd -y
+apt install snapd -y 
+waitOrStop 0 "snap install failed"
 
 echo "Installing microk8s snap" | log
 snap install microk8s --classic --channel=1.32
