@@ -49,7 +49,7 @@ waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
 microk8s addons repo remove core
-microk8s addons repo add core-fork https://github.com/ddark-il/microk8s-core-addons.git
+microk8s addons repo add core-fork https://github.com/cloudwm/microk8s-core-addons.git
 waitOrStop 0 "Repository addition failed"
 
 echo "Generating admin-user and login token" | log
@@ -91,7 +91,7 @@ export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
 export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Cloning dashboard repository" | log
-cd $rootDir && git clone https://github.com/ddark-il/k8s-dashboard.git
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git
 waitOrStop 0 "Reload haproxy service failed"
 
 echo "Downloading helm dependencies" | log
