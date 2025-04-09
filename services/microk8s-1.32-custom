@@ -11,9 +11,9 @@ checkTagExist ubuntu-updateos.success
 
 rootDir=$(rootDir)
 
-# testing different fix for snap
+# fix for snap
 apt purge snapd -y
-apt install snapd -y 
+apt install snapd jq -y 
 waitOrStop 0 "snap install failed"
 
 echo "Installing microk8s snap" | log
