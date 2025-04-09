@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ubuntu-updateos.success
+
+rootDir=$(rootDir)
+
+# fix for snap
+apt purge snapd -y
+apt install snapd jq -y 
+waitOrStop 0 "snap install failed"
+
+echo "Installing microk8s snap" | log
+snap install microk8s --classic --channel=1.32
+waitOrStop 0 "snap install failed"
+
+echo "Generating Provider Secret" | log
+cat << EOF > guest.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: provider-guest-secret
+  namespace: kube-system
+type: Opaque
+data:
+EOF
+
+cp /root/guest.conf $rootDir/guest.conf 
+
+cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
+export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
+export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
+export apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`
+export apiZone=`cat $rootDir/guest.conf | grep 'zone=' | cut -d '=' -f 2`
+export apiToken=`curl -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication`
+curl -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}" 
+export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
+export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
+echo "  imageid: $imageID" >> $rootDir/guest.yaml 
+echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
+microk8s kubectl apply -f $rootDir/guest.yaml
+waitOrStop 0 "Unable to apply provider secret"
+
+echo "Modifying microk8s repository" | log
+microk8s addons repo remove core
+microk8s addons repo add core-fork https://github.com/cloudwm/microk8s-core-addons.git
+waitOrStop 0 "Repository addition failed"
+
+echo "Generating admin-user and login token" | log
+cat << EOF > $rootDir/user.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: "admin-user"   
+type: kubernetes.io/service-account-token  
+EOF
+microk8s kubectl apply -f $rootDir/user.yaml
+waitOrStop 0 "Unable to apply admin-user yaml"
+
+export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
+export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
+
+echo "Cloning dashboard repository" | log
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git
+waitOrStop 0 "Reload haproxy service failed"
+
+echo "Downloading helm dependencies" | log
+cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
+microk8s helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+microk8s helm repo add jetstack.io https://charts.jetstack.io
+microk8s helm repo add kubernetes-sigs https://kubernetes-sigs.github.io/metrics-server/
+microk8s helm repo add kong https://charts.konghq.com
+microk8s helm dependency build
+waitOrStop 0 "dependency build failed"
+
+echo "Installing dashboard helm chart" | log
+sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
+sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
+
+microk8s helm install dashboard . --namespace kube-system
+waitOrStop 0 "Dashboard install failed"
+
+export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
+descriptionAppend " "
+descriptionAppend "Kubernetest admin-user token: ${ADMINTOKEN}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
