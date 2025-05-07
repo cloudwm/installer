@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+VERSION=8.1.1
+INSTALL_DIR="/usr/local/valkey"
+CONFIG_DIR="/etc/valkey"
+CWM_DOMAIN=$(hostname -f)
+
+# Ensure tar is installed
+if ! command -v tar &> /dev/null; then
+    echo "Error: tar is required but not installed. Please install tar."
+    exit 1
+fi
+
+# Create directories
+mkdir -p "$INSTALL_DIR" "$CONFIG_DIR"
+
+# Download and extract Valkey
+curlDownload https://github.com/valkey-io/valkey/archive/refs/tags/$VERSION.tar.gz
+waitOrStop 0 "Failed to download Valkey from official github repo"
+tar -xzvf $VERSION.tar.gz
+
+# Move extracted files to install directory
+mv valkey-$VERSION/* "$INSTALL_DIR/"
+
+# Create a basic configuration file
+cat << EOF > "$CONFIG_DIR/valkey.conf"
+port 6379
+bind 0.0.0.0
+dir $INSTALL_DIR
+EOF
+
+# Clean up
+rm -rf $VERSION.tar.gz valkey-$VERSION
+
+# Ensure valkey-cli and valkey-server are executable
+chmod +x "$INSTALL_DIR/bin/valkey-cli" "$INSTALL_DIR/bin/valkey-server"
+
+descriptionAppend "Basic Usage: Use 'valkey-cli' for command-line interaction"
+descriptionAppend "Example: 'SET key value' to store data"
+descriptionAppend "Example: 'GET key' to retrieve data"
+descriptionAppend "Check Version: 'INFO SERVER' (look for server_version)"
+descriptionAppend "For more commands visit: https://valkey.io/commands/"
