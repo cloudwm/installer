@@ -1,11 +1,12 @@
 #!/bin/bash
 
-#!/bin/bash
-
+# Include startup.sh if it exists
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
+else
+    echo "Warning: startup.sh not found. Some functions (curlDownload, waitOrStop, descriptionAppend) may be unavailable."
 fi
 
 VERSION=8.1.1
@@ -30,38 +31,50 @@ install_dependencies() {
 }
 
 # Install dependencies if not present
-if ! command -v tar &> /dev/null || ! command -v make &> /dev/null || ! command -v gcc &>   install_dependencies
+if ! command -v tar &> /dev/null || ! command -v make &> /dev/null || ! command -v gcc &> /dev/null; then
+    install_dependencies
+fi
 
 # Verify dependencies
-if ! command -v tar &> /dev/null; then
-    echo "Error: tar is required but not installed."
-    exit 1
-fi
-if ! command -v make &> /dev/null; then
-    echo "Error: make is required but not installed."
-    exit 1
-fi
-if ! command -v gcc &> /dev/null; then
-    echo "Error: gcc is required but not installed."
-    exit 1
-fi
+for cmd in tar make gcc; do
+    if ! command -v "$cmd" &> /dev/null; then
+        echo "Error: $cmd is required but not installed."
+        exit 1
+    fi
+done
 
 # Create directories
 mkdir -p "$INSTALL_DIR/bin" "$CONFIG_DIR" "$LOG_DIR"
 
 # Download and extract Valkey
-curlDownload https://github.com/valkey-io/valkey/archive/refs/tags/$VERSION.tar.gz
-waitOrStop 0 "Failed to download Valkey from official github repo"
+# Fallback to curl if curlDownload is not defined
+if type curlDownload &> /dev/null; then
+    curlDownload https://github.com/valkey-io/valkey/archive/refs/tags/$VERSION.tar.gz
+else
+    curl -L -o $VERSION.tar.gz https://github.com/valkey-io/valkey/archive/refs/tags/$VERSION.tar.gz
+fi
+# Fallback for waitOrStop
+if type waitOrStop &> /dev/null; then
+    waitOrStop 0 "Failed to download Valkey from official GitHub repo"
+else
+    if [ $? -ne 0 ]; then
+        echo "Failed to download Valkey from official GitHub repo"
+        exit 1
+    fi
+fi
 tar -xzvf $VERSION.tar.gz
 
 # Compile and install Valkey
-cd valkey-$VERSION
-make > /tmp/valkey-make.log 2>&1
+echo "Entering valkey-$VERSION directory"
+cd valkey-$VERSION || { echo "Error: Failed to enter valkey-$VERSION directory"; exit 1; }
+echo "Running make..."
+make | tee /tmp/valkey-make.log
 if [ $? -ne 0 ]; then
     echo "Error: Compilation failed. Check /tmp/valkey-make.log for details."
     exit 1
 fi
-make PREFIX="$INSTALL_DIR" install >> /tmp/valkey-make.log 2>&1
+echo "Running make install..."
+make PREFIX="$INSTALL_DIR" install | tee -a /tmp/valkey-make.log
 if [ $? -ne 0 ]; then
     echo "Error: Installation failed. Check /tmp/valkey-make.log for details."
     exit 1
@@ -80,19 +93,14 @@ EOF
 rm -rf $VERSION.tar.gz valkey-$VERSION
 
 # Verify binaries exist
-if [ ! -f "$INSTALL_DIR/bin/valkey-cli" ]; then
-    echo "Error: valkey-cli not found in $INSTALL_DIR/bin. Compilation or installation failed."
-    echo "Check /tmp/valkey-make.log for errors."
-    exit 1
-fi
-if [ ! -f "$INSTALL_DIR/bin/valkey-server" ]; then
-    echo "Error: valkey-server not found in $INSTALL_DIR/bin. Compilation or installation failed."
-    echo "Check /tmp/valkey-make.log for errors."
-    exit 1
-fi
-
-# Ensure binaries are executable
-chmod +x "$INSTALL_DIR/bin/valkey-cli" "$INSTALL_DIR/bin/valkey-server"
+for bin in valkey-cli valkey-server; do
+    if [ ! -f "$INSTALL_DIR/bin/$bin" ]; then
+        echo "Error: $bin not found in $INSTALL_DIR/bin. Compilation or installation failed."
+        echo "Check /tmp/valkey-make.log for errors."
+        exit 1
+    fi
+    chmod +x "$INSTALL_DIR/bin/$bin"
+done
 
 # Start Valkey server in the background
 $INSTALL_DIR/bin/valkey-server $CONFIG_DIR/valkey.conf &
@@ -110,6 +118,8 @@ if ! $INSTALL_DIR/bin/valkey-cli PING | grep -q PONG; then
     exit 1
 fi
 
+# Update PATH for current session and future sessions
+export PATH=$PATH:$INSTALL_DIR/bin
 echo 'export PATH=$PATH:/usr/local/valkey/bin' >> /root/.bashrc
 
 descriptionAppend "Valkey CLI: Connect using 'valkey-cli' or 'valkey-cli -h ${CWM_DOMAIN} -p 6379'"
@@ -118,4 +128,3 @@ descriptionAppend "Basic Usage: Use 'valkey-cli' for command-line interaction"
 descriptionAppend "Example: 'SET key value' to store data"
 descriptionAppend "Example: 'GET key' to retrieve data"
 descriptionAppend "For more commands visit: https://valkey.io/commands/"
-
