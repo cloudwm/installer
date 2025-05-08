@@ -16,14 +16,10 @@ LOG_DIR="/usr/local/valkey"
 
 # Function to install dependencies
 install_dependencies() {
-    # Detect OS
     if command -v apt-get &> /dev/null; then
         # Debian/Ubuntu
         apt-get update
         apt-get install -y tar make gcc
-    elif command -v yum &> /dev/null; then
-        # CentOS/RHEL
-        yum install -y tar make gcc
     else
         echo "Error: Unsupported package manager. Please install tar, make, and gcc manually."
         exit 1
