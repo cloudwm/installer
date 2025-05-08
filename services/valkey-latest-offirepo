@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#!/bin/bash
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -9,40 +11,111 @@ fi
 VERSION=8.1.1
 INSTALL_DIR="/usr/local/valkey"
 CONFIG_DIR="/etc/valkey"
-CWM_DOMAIN=$(hostname -f)
+LOG_DIR="/usr/local/valkey"
 
-# Ensure tar is installed
+# Function to install dependencies
+install_dependencies() {
+    # Detect OS
+    if command -v apt-get &> /dev/null; then
+        # Debian/Ubuntu
+        apt-get update
+        apt-get install -y tar make gcc
+    elif command -v yum &> /dev/null; then
+        # CentOS/RHEL
+        yum install -y tar make gcc
+    else
+        echo "Error: Unsupported package manager. Please install tar, make, and gcc manually."
+        exit 1
+    fi
+}
+
+# Install dependencies if not present
+if ! command -v tar &> /dev/null || ! command -v make &> /dev/null || ! command -v gcc &>   install_dependencies
+
+# Verify dependencies
 if ! command -v tar &> /dev/null; then
-    echo "Error: tar is required but not installed. Please install tar."
+    echo "Error: tar is required but not installed."
+    exit 1
+fi
+if ! command -v make &> /dev/null; then
+    echo "Error: make is required but not installed."
+    exit 1
+fi
+if ! command -v gcc &> /dev/null; then
+    echo "Error: gcc is required but not installed."
     exit 1
 fi
 
 # Create directories
-mkdir -p "$INSTALL_DIR" "$CONFIG_DIR"
+mkdir -p "$INSTALL_DIR/bin" "$CONFIG_DIR" "$LOG_DIR"
 
 # Download and extract Valkey
 curlDownload https://github.com/valkey-io/valkey/archive/refs/tags/$VERSION.tar.gz
 waitOrStop 0 "Failed to download Valkey from official github repo"
 tar -xzvf $VERSION.tar.gz
 
-# Move extracted files to install directory
-mv valkey-$VERSION/* "$INSTALL_DIR/"
+# Compile and install Valkey
+cd valkey-$VERSION
+make > /tmp/valkey-make.log 2>&1
+if [ $? -ne 0 ]; then
+    echo "Error: Compilation failed. Check /tmp/valkey-make.log for details."
+    exit 1
+fi
+make PREFIX="$INSTALL_DIR" install >> /tmp/valkey-make.log 2>&1
+if [ $? -ne 0 ]; then
+    echo "Error: Installation failed. Check /tmp/valkey-make.log for details."
+    exit 1
+fi
+cd ..
 
-# Create a basic configuration file
+# Create a basic configuration file with logging
 cat << EOF > "$CONFIG_DIR/valkey.conf"
 port 6379
 bind 0.0.0.0
 dir $INSTALL_DIR
+logfile $LOG_DIR/valkey.log
 EOF
 
 # Clean up
 rm -rf $VERSION.tar.gz valkey-$VERSION
 
-# Ensure valkey-cli and valkey-server are executable
+# Verify binaries exist
+if [ ! -f "$INSTALL_DIR/bin/valkey-cli" ]; then
+    echo "Error: valkey-cli not found in $INSTALL_DIR/bin. Compilation or installation failed."
+    echo "Check /tmp/valkey-make.log for errors."
+    exit 1
+fi
+if [ ! -f "$INSTALL_DIR/bin/valkey-server" ]; then
+    echo "Error: valkey-server not found in $INSTALL_DIR/bin. Compilation or installation failed."
+    echo "Check /tmp/valkey-make.log for errors."
+    exit 1
+fi
+
+# Ensure binaries are executable
 chmod +x "$INSTALL_DIR/bin/valkey-cli" "$INSTALL_DIR/bin/valkey-server"
 
+# Start Valkey server in the background
+$INSTALL_DIR/bin/valkey-server $CONFIG_DIR/valkey.conf &
+
+# Wait briefly and verify server is running
+sleep 2
+if ! ps aux | grep -v grep | grep valkey-server > /dev/null; then
+    echo "Error: Valkey server failed to start. Check logs in $LOG_DIR/valkey.log."
+    exit 1
+fi
+
+# Test valkey-cli connectivity
+if ! $INSTALL_DIR/bin/valkey-cli PING | grep -q PONG; then
+    echo "Error: valkey-cli failed to connect to server. Check server status and logs in $LOG_DIR/valkey.log."
+    exit 1
+fi
+
+echo 'export PATH=$PATH:/usr/local/valkey/bin' >> /root/.bashrc
+
+descriptionAppend "Valkey CLI: Connect using 'valkey-cli' or 'valkey-cli -h ${CWM_DOMAIN} -p 6379'"
+descriptionAppend " "
 descriptionAppend "Basic Usage: Use 'valkey-cli' for command-line interaction"
 descriptionAppend "Example: 'SET key value' to store data"
 descriptionAppend "Example: 'GET key' to retrieve data"
-descriptionAppend "Check Version: 'INFO SERVER' (look for server_version)"
 descriptionAppend "For more commands visit: https://valkey.io/commands/"
+
