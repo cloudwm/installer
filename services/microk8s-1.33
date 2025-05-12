@@ -1,0 +1,163 @@
+#!/bin/bash
+
+# Include startup.sh if it exists
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+else
+    echo "Warning: startup.sh not found."
+fi
+
+# Check for prior OS update
+type checkTagExist &> /dev/null && checkTagExist ubuntu-updateos.success
+
+rootDir=$(rootDir)
+
+# Install prerequisites and containerd
+echo "Installing prerequisites and containerd" | log
+apt-get update && apt-get install -y apt-transport-https ca-certificates curl gnupg jq git containerd
+waitOrStop 0 "Failed to install prerequisites or containerd"
+mkdir -p /etc/containerd
+containerd config default > /etc/containerd/config.toml
+systemctl restart containerd && systemctl enable containerd
+
+# Add Kubernetes apt repository for 1.33
+echo "Adding Kubernetes apt repository" | log
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /" | tee /etc/apt/sources.list.d/kubernetes.list
+apt-get update
+
+# Install Kubernetes components
+echo "Installing Kubernetes components" | log
+apt-get install -y kubeadm=1.33.0-1.1 kubelet=1.33.0-1.1 kubectl=1.33.0-1.1
+waitOrStop 0 "Failed to install Kubernetes components"
+apt-mark hold kubeadm kubelet kubectl
+systemctl enable kubelet && systemctl start kubelet
+
+# Initialize Kubernetes cluster
+echo "Initializing Kubernetes cluster" | log
+kubeadm init --pod-network-cidr=10.244.0.0/16 --kubernetes-version=v1.33.0
+waitOrStop 0 "Failed to initialize Kubernetes cluster"
+
+# Set up kubectl
+mkdir -p $HOME/.kube
+cp /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Allow workloads on control plane
+kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule-
+
+# Install Flannel CNI
+echo "Installing Flannel CNI" | log
+kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/v0.25.7/Documentation/kube-flannel.yml
+waitOrStop 0 "Failed to install Flannel"
+
+# Install Helm
+echo "Installing Helm" | log
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+chmod +x get_helm.sh
+./get_helm.sh
+rm get_helm.sh
+waitOrStop 0 "Failed to install Helm"
+
+# Generate Provider Secret
+echo "Generating Provider Secret" | log
+cat << EOF > $rootDir/guest.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: provider-guest-secret
+  namespace: kube-system
+type: Opaque
+data:
+EOF
+cp /root/guest.conf $rootDir/guest.conf
+cat $rootDir/guest.conf | awk -F '=' '{cmd="echo "$2" | base64";cmd|getline x;close(cmd);print "  "$1": "x}' >> $rootDir/guest.yaml
+export apiClientId=$(cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2)
+export apiSecret=$(cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2)
+export apiUrl=$(cat $rootDir/guest.conf | grep url | cut -d '=' -f 2)
+export apiZone=$(cat $rootDir/guest.conf | grep 'zone=' | cut -d '=' -f 2)
+export apiToken=$(curl -s -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication)
+curl -s -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}"
+export imageID=$(cat $rootDir/server.json | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] | select([.description | contains("ubuntu_server_24.04_64-bit")] | any) | .id' | base64)
+export trafficPackage=$(cat $rootDir/server.json | jq '.traffic | .["'"$apiZone"'"]' | jq -r '.[] | select([.info | contains("traffic")] | any) | .name' | base64)
+echo "  imageid: $imageID" >> $rootDir/guest.yaml
+echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
+kubectl apply -f $rootDir/guest.yaml
+waitOrStop 0 "Unable to apply provider secret"
+
+# Generate admin-user and login token
+echo "Generating admin-user and login token" | log
+cat << EOF > $rootDir/user.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: "admin-user"
+type: kubernetes.io/service-account-token
+EOF
+kubectl apply -f $rootDir/user.yaml
+waitOrStop 0 "Unable to apply admin-user yaml"
+
+# Set up domain and IP
+export CWM_SERVERIP=$(hostname -I | awk '{print $1}')
+export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
+
+# Clone dashboard repository
+echo "Cloning dashboard repository" | log
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git
+waitOrStop 0 "Failed to clone dashboard repository"
+
+# Download Helm dependencies
+echo "Downloading Helm dependencies" | log
+cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo add jetstack https://charts.jetstack.io
+helm repo add kubernetes-sigs https://kubernetes-sigs.github.io/metrics-server/
+helm repo add kong https://charts.konghq.com
+helm dependency build
+waitOrStop 0 "Helm dependency build failed"
+
+# Install dashboard Helm chart
+echo "Installing dashboard Helm chart" | log
+sed -i "s/0.0.0.0/$CWM_DOMAIN/" values.yaml
+sed -i "s/1.1.1.1/$CWM_SERVERIP/" values.yaml
+helm install dashboard . --namespace kube-system
+waitOrStop 0 "Dashboard install failed"
+
+# Get admin token
+export ADMINTOKEN=$(kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d)
+waitOrStop 0 "Failed to retrieve admin token"
+
+# Add descriptions
+echo "Adding descriptions" | log
+descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
+descriptionAppend " "
+descriptionAppend "Kubernetes admin-user token: ${ADMINTOKEN}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
