@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# Include startup.sh if it exists
-if [ -f "include/startup.sh" ]; thenexport apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`exi
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
-else
-    echo "Warning: startup.sh not found."
 fi
 
-# Check for prior OS update
-type checkTagExist &> /dev/null && checkTagExist ubuntu-updateos.success
+checkTagExist ubuntu-updateos.success
 
 rootDir=$(rootDir)
 
