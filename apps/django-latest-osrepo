@@ -30,7 +30,7 @@ installPackage python3-pip python3.12-venv python3-django
 waitOrStop 0 "Failed to install python3 dependencies (ubuntu22)"
 else
 echo "Installing Django and dependencies from apt" | log
-installPackage python3-pip python3.8-venv python3-django
+installPackage python3-pip python3.10-venv python3-django
 waitOrStop 0 "Failed to install python3 dependencies"
 fi
 
@@ -41,14 +41,10 @@ cd $appPath
 
 echo "Creating Python3 enviroment and installing Django from pip" | log
 python3 -m venv django_env
-if [ ! -f "django_env/bin/activate" ]; then
-    waitOrStop 0 "venv not created properly"
-fi
 source django_env/bin/activate
-ping -c 3 8.8.8.8 || waitOrStop 0 "No internet access"
-pip install django > /root/django_install.log
-deactivate
+pip install django
 waitOrStop 0 "Failed to install django from pip"
+deactivate
 
 echo "Creating Django project" | log
 cd $appPath
