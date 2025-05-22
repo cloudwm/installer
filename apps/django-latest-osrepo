@@ -30,7 +30,7 @@ installPackage python3-pip python3.12-venv python3-django
 waitOrStop 0 "Failed to install python3 dependencies (ubuntu22)"
 else
 echo "Installing Django and dependencies from apt" | log
-installPackage python3-pip python3.8-venv python3-django
+installPackage python3-pip python3.10-venv python3-django
 waitOrStop 0 "Failed to install python3 dependencies"
 fi
 
@@ -43,8 +43,8 @@ echo "Creating Python3 enviroment and installing Django from pip" | log
 python3 -m venv django_env
 source django_env/bin/activate
 pip install django
-deactivate
 waitOrStop 0 "Failed to install django from pip"
+deactivate
 
 echo "Creating Django project" | log
 cd $appPath
