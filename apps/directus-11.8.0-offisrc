@@ -100,7 +100,7 @@ systemctl restart apache2.service
 waitOrStop 0 "Failed to restart Apache service"
 
 echo "Adding descriptions" | log
-descriptionAppend "To finish Directus configuration go to: http://${CWM_DISPLAYED_ADDRESS}/admin"
+descriptionAppend "To finish Directus configuration go to: http://${CWM_DISPLAYED_ADDRESS}:8055/admin"
 descriptionAppend "Directus Database: directus"
 descriptionAppend "Directus Database Username: directususer"
 descriptionAppend "Directus Database Password: ${ADMINPASSWORD}"
