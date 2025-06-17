@@ -47,6 +47,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: always
   directus:
     image: directus/directus:latest
     ports:
@@ -67,6 +68,7 @@ services:
       DB_PASSWORD: "${ADMINPASSWORD}"
       ADMIN_EMAIL: "${ADMINEMAIL}"
       ADMIN_PASSWORD: "${ADMINPASSWORD}"
+    restart: always
 EOF
 
 echo "Starting Directus Docker containers" | log
