@@ -44,7 +44,7 @@ ufw allow 8404
 
 echo "Placing annotated config file" | log
 backupFile /etc/haproxy/haproxy.cfg
-cp -f $rootDir/tweaks/extras/haproxy/haproxy-api.cfg /etc/haproxy/haproxy.cfg
+cp -f $rootDir/tweaks/extras/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg
 pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
 sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
 sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
