@@ -17,7 +17,7 @@ class JConfig
 	public $dbtype = 'mysqli';
 	public $host = 'localhost';
 	public $user = 'joomla';
-	public $password = '${ADMINPASSWORD}';
+	public $password = 'password';
 	public $db = 'joomla';
 	public $dbprefix = 'joomla_';
 	public $dbencryption = 0;
@@ -28,7 +28,7 @@ class JConfig
 	public $dbsslcipher = '';
 
 	/* Server Settings */
-	public $secret = '${SECRET}';
+	public $secret = 'AelHJ6GTxZUzV7HI';
 	public $gzip = false;
 	public $error_reporting = 'default';
 	public $helpurl = 'https://help.joomla.org/proxy?keyref=Help{major}{minor}:{keyref}&lang={langcode}';
@@ -57,7 +57,7 @@ class JConfig
 	/* Mail Settings */
 	public $mailonline = true;
 	public $mailer = 'mail';
-	public $mailfrom = '${ADMINEMAIL}';
+	public $mailfrom = 'some@mail.com';
 	public $fromname = 'Joomla!';
 	public $massmailoff = false;
 	public $replyto = '';
