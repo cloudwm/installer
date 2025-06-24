@@ -76,7 +76,7 @@ echo "Installing ElasticSearch" | log
 curlDownload https://artifacts.elastic.co/GPG-KEY-elasticsearch
 waitOrStop 0 "Key not downloaded from official source"
 apt-key add GPG-KEY-elasticsearch
-echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-7.x.list
+echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-8.x.list
 apt update | log
 installPackage elasticsearch
 systemctl enable elasticsearch.service
