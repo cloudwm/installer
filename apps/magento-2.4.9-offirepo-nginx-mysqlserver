@@ -101,6 +101,7 @@ chmod u+x bin/magento
 echo "Disabling sign static files and forcing cache refresh" | log
 cd $appPath
 php bin/magento cache:disable config | log
+bin/magento maintenance:disable | log
 bin/magento config:set dev/static/sign 0
 curl https://${CWM_DISPLAYED_ADDRESS} --insecure -o /dev/null
 waitOrStop 0 "Website failed to respond"
