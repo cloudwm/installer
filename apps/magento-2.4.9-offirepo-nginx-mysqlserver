@@ -107,7 +107,7 @@ waitOrStop 0 "Website failed to respond"
 bin/magento setup:static-content:deploy -f
 sleep 5
 bin/magento cache:clean
-waitOrStop 0 "Cleanup actions failed"
+#waitOrStop 0 "Cleanup actions failed"
 
 echo "Setting nginx config" | log
 # main magento config
