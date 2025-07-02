@@ -1,0 +1,116 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist httpd.success
+
+appPath=/var/www/html/directus
+rootDir=$(rootDir)
+
+echo "Installing Docker and dependencies" | log
+apt update
+packages=(docker.io docker-compose)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed to install Docker dependencies"
+systemctl start docker
+systemctl enable docker
+
+echo "Creating Directus Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE directus CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'directususer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
+GRANT ALL PRIVILEGES ON directus.* TO 'directususer'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+echo "Setting up Directus Docker environment" | log
+mkdir -p $appPath
+cd $appPath
+cat <<EOF > docker-compose.yml
+version: "3"
+services:
+  database:
+    image: mysql:8
+    volumes:
+      - ./data/database:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "${ADMINPASSWORD}"
+      MYSQL_DATABASE: "directus"
+      MYSQL_USER: "directususer"
+      MYSQL_PASSWORD: "${ADMINPASSWORD}"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "directususer", "-p${ADMINPASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+  directus:
+    image: directus/directus:latest
+    ports:
+      - 8055:8055
+    volumes:
+      - ./uploads:/directus/uploads
+      - ./extensions:/directus/extensions
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      SECRET: "$(openssl rand -base64 32)"
+      DB_CLIENT: "mysql"
+      DB_HOST: "database"
+      DB_PORT: "3306"
+      DB_DATABASE: "directus"
+      DB_USER: "directususer"
+      DB_PASSWORD: "${ADMINPASSWORD}"
+      ADMIN_EMAIL: "${ADMINEMAIL}"
+      ADMIN_PASSWORD: "${ADMINPASSWORD}"
+    restart: always
+EOF
+
+echo "Starting Directus Docker containers" | log
+docker-compose up -d
+waitOrStop 0 "Failed to start Docker containers"
+
+echo "Setting permissions for Directus volumes" | log
+chown -R www-data:www-data $appPath/uploads $appPath/extensions
+chmod -R 755 $appPath/uploads $appPath/extensions
+
+echo "Setting Apache VirtualHost as reverse proxy" | log
+cat <<EOF > /etc/apache2/sites-available/directus.conf
+<VirtualHost *:443>
+    ServerName ${CWM_DISPLAYED_ADDRESS}
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:8055/
+    ProxyPassReverse / http://localhost:8055/
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+EOF
+
+sed -i "s/ServerName .*/ServerName ${CWM_DISPLAYED_ADDRESS}/g" /etc/apache2/sites-available/directus.conf
+ln -s /etc/apache2/sites-available/directus.conf /etc/apache2/sites-enabled/
+unlink /etc/apache2/sites-enabled/000-default.conf 2>/dev/null || true
+unlink /etc/apache2/sites-enabled/default-ssl.conf 2>/dev/null || true
+
+echo "Enabling Apache proxy modules" | log
+a2enmod proxy proxy_http rewrite
+systemctl restart apache2.service
+waitOrStop 0 "Failed to restart Apache service"
+
+echo "Adding descriptions" | log
+descriptionAppend "To finish Directus configuration go to: http://${CWM_DISPLAYED_ADDRESS}:8055/admin"
+descriptionAppend "Directus Database: directus"
+descriptionAppend "Directus Database Username: directususer"
+descriptionAppend "Directus Database Password: ${ADMINPASSWORD}"
+descriptionAppend "Docker Compose file: ${appPath}/docker-compose.yml"
+descriptionAppend "Directus UI Username: ${ADMINEMAIL}"
+descriptionAppend "Directus UI Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
