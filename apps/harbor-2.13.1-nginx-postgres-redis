@@ -14,8 +14,8 @@ EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
 CERT_DIR="/opt/certs"
 ADMIN_PASSWORD="${ADMINPASSWORD}"
 
-OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-offline-installer-v2.13.1.tgz"
-ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.11.1/harbor-online-installer-v2.13.1.tgz"
+OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.13.1/harbor-offline-installer-v2.13.1.tgz"
+ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v2.13.1/harbor-online-installer-v2.13.1.tgz"
 INSTALL_TYPE="online"
 
 declare -a REMOVE_PACKAGES=("docker.io" "docker-doc" "docker-compose" "docker-compose-v2" "podman-docker" "containerd" "runc")
