@@ -10,6 +10,6 @@ echo "Downloading and installing Coolify" | log
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 waitOrStop 0 "Failed to install Coolify"
 
-descriptionAppend "Coolify Web UI: http://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Coolify Web UI: http://${CWM_DISPLAYED_ADDRESS}:8000"
 
 exit 0 
