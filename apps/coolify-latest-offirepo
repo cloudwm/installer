@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading and installing Coolify" | log
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+waitOrStop 0 "Failed to install Coolify"
+
+descriptionAppend "Coolify Web UI: http://${CWM_DISPLAYED_ADDRESS}"
+
+exit 0 
