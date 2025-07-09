@@ -21,7 +21,7 @@ echo "Docker repository added successfully" | log
 apt update
 
 echo "Installing Docker CE" | log
-installPackage docker-ce docker-ce-cli containerd.io docker-compose-plugin | log
+installPackage docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose | log
 waitOrStop 0 "Docker didn't install successfully"
 
 echo "Installing Docker Compose CLI plugin" | log
