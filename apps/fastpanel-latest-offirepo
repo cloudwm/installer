@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading and installing FastPanel" | log
+installPackage ca-certificates wget
+wget https://repo.fastpanel.direct/install_fastpanel.sh -O - | bash -
+waitOrStop 0 "Failed to install FastPanel"
+
+descriptionAppend "FastPanel Web UI: https://${CWM_DISPLAYED_ADDRESS}:8888"
+descriptionAppend "FastPanel Web User: fastuser"
+descriptionAppend "FastPanel Web Password: ${ADMINPASSWORD}"
+
+exit 0 
