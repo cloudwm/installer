@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+mv /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem
+sed -i "s|SSLCACertificateFile|#SSLCACertificateFile|" /etc/openproject/addons/apache2/includes/vhost/ssl_ca.conf
+
+echo "Downloading OpenProject key and adding to source list" | log
+curlDownload https://dl.packager.io/srv/opf/openproject/key -o key
+waitOrStop "Failed to download PGP key"
+apt-key add key
+echo "deb https://dl.packager.io/srv/opf/openproject/stable/16/installer/ubuntu/22.04.repo" | tee /etc/apt/sources.list.d/openproject.list
+
+echo "Updating and downloading OpenProject from apt" | log
+apt-get update
+installPackage openproject
+waitOrStop "Failed to install OpenProject"
+
+echo "Setting installation variables and installing OpenProject" | log
+cp $rootDir/tweaks/extras/openproject/installer.dat /etc/openproject/
+sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/openproject/installer.dat
+export DEBIAN_FRONTEND=noninteractive
+openproject configure
+
+echo "Adding descriptions" | log
+descriptionAppend "OpenProject Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "OpenProject default user: admin"
+descriptionAppend "OpenProject default password: admin"
+
+tagScript success
+
+exit 0
