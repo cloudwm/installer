@@ -30,7 +30,7 @@ waitOrStop 0 "Failed to update package index"
 
 # Install Redis server
 echo "Installing latest Redis server" | log
-installPackage redis-server
+installPackage redis-server redis
 waitOrStop 0 "Failed to install Redis server"
 
 # Configure Redis to bind to localhost for security
