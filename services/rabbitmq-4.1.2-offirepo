@@ -8,6 +8,8 @@ fi
 
 checkTagExist nginx.success
 
+rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+
 sudo apt-get install curl gnupg apt-transport-https -y
 
 ## Team RabbitMQ's main signing key
