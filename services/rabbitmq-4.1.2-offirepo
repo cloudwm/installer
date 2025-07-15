@@ -8,20 +8,22 @@ fi
 
 checkTagExist nginx.success
 
-rootDir=$(rootDir)
-erlangVersion=25.x
-rabbitmqVersion=4.1.\*
+sudo apt-get install curl gnupg apt-transport-https -y
 
-
-rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
-
-installPackage curl gnupg apt-transport-https
+## Team RabbitMQ's main signing key
 curl -1sLf "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/com.rabbitmq.team.gpg > /dev/null
+## Community mirror of Cloudsmith: modern Erlang repository
+curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg > /dev/null
+## Community mirror of Cloudsmith: RabbitMQ repository
 curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.9F4587F226208342.gpg > /dev/null
 
-echo "Adding RabbitMQ repository" | log
-echo "deb https://dl.bintray.com/rabbitmq-erlang/debian bionic erlang-${erlangVersion}" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list
-tee /etc/apt/sources.list.d/rabbitmq.list <<EOF
+## Add apt repositories maintained by Team RabbitMQ
+sudo tee /etc/apt/sources.list.d/rabbitmq.list <<EOF
+## Provides modern Erlang/OTP releases
+##
+deb [arch=amd64 signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu noble main
+deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu noble main
+
 # another mirror for redundancy
 deb [arch=amd64 signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu noble main
 deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu noble main
@@ -35,17 +37,19 @@ deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://pp
 deb [arch=amd64 signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-server/deb/ubuntu noble main
 deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-server/deb/ubuntu noble main
 EOF
-apt-get update -y
 
-echo "Installing Erlang & Rabbitmq" | log
-packages=(erlang-base erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key erlang-runtime-tools erlang-snmp erlang-ssl erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl)
-installPackage "${packages[@]}"
-waitOrStop 0 "Failed apt install: ${packages[@]}"
-# install main package
-installPackage rabbitmq-server --fix-missing
-waitOrStop 0 "Failed apt install: rabbitmq-server"
-# enable web ui plugin
-rabbitmq-plugins enable rabbitmq_management
+## Update package indices
+sudo apt-get update -y
+
+## Install Erlang packages
+sudo apt-get install -y erlang-base \
+                        erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
+                        erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key \
+                        erlang-runtime-tools erlang-snmp erlang-ssl \
+                        erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl
+
+## Install rabbitmq-server and its dependencies
+sudo apt-get install rabbitmq-server -y --fix-missing
 
 echo "Adding admin user" | log
 rabbitmqctl add_user admin ${ADMINPASSWORD}
@@ -90,7 +94,7 @@ cp $rootDir/tweaks/extras/rabbitmq-nginx/rabbitmq.conf /etc/nginx/sites-availabl
 sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem|" /etc/nginx/sites-available/rabbitmq.conf
 sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem|" /etc/nginx/sites-available/rabbitmq.conf
 
-if [[ -f /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem ]]; then 
+if [[ -f /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem ]]; then
       	sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${rabbitmqDomain}/chain.pem|" /etc/nginx/sites-available/rab
 	at << EOF > /etc/rabbitmq/rabbitmq.conf
 
@@ -153,4 +157,3 @@ descriptionAppend " "
 tagScript success
 
 exit 0
-
