@@ -145,6 +145,7 @@ waitOrStop 0 "Restarting nginx service failed"
 echo "Starting Rabbitmq service" | log
 systemctl enable rabbitmq-server
 systemctl start rabbitmq-server
+rabbitmq-plugins enable rabbitmq_management
 systemctl restart rabbitmq-server
 waitOrStop 0 "Starting rabbitmq service failed"
 
