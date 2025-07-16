@@ -89,10 +89,10 @@ RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
 
 # Install ImageMagic for Redmine
 echo "Installing ImageMagic & ghostscript..." | log
-apt update
-apt install -y imagemagick libmagickwand-dev
+apt-get update
+apt-get install -y imagemagick libmagickwand-dev
 convert -version
-apt install -y ghostscript
+apt-get install -y ghostscript
 
 echo "Writing apache configuration file..."
 cat <<_EOF_ > $WEBAPP_CONF/redmine.conf
