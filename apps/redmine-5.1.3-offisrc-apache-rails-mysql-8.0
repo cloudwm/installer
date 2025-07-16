@@ -47,6 +47,19 @@ echo "Downloading from ${REPO_URL} to ${REPO_DIR}..." | log
 curl -s ${REPO_URL} | sudo tar xz -C ${REPO_DIR} --strip-components=1
 echo "Download Complete." | log
 
+echo "Patching config/boot.rb to load stdlib Logger..." | log
+BOOT_FILE="${REPO_DIR}/config/boot.rb"
+
+if [ -f "$BOOT_FILE" ]; then
+  # Prepend require 'logger' if it's not already there
+  grep -q "^require 'logger'" "$BOOT_FILE" || \
+    sed -i "1i require 'logger'" "$BOOT_FILE"
+  echo "  → require 'logger' added to $BOOT_FILE" | log
+else
+  echo "  → ERROR: $BOOT_FILE not found, cannot patch Logger load" | log
+  exit 1
+fi
+
 # Configuring permissions
 echo "Configuring permissions..." | log
 chown -R www-data:www-data /opt/redmine/
