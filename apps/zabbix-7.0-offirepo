@@ -21,7 +21,7 @@ curlDownload https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbi
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Zabbix" | log
-dpkg -i zabbix-release_7.0-2+ubuntu24.04_all.deb
+dpkg -i zabbix-release_latest_7.4+ubuntu24.04_all.deb
 waitOrStop 0 "Failed to extract application archive"
 apt update | log
 
