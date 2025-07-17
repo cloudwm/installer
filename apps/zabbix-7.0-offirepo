@@ -40,7 +40,7 @@ set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
 EOF
 
-zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p "${ADMINPASSWORD}" zabbix
+zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbixuser -p "${ADMINPASSWORD}" zabbix
 
 echo "Tweaking Zabbix & PHP configuration" | log
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
@@ -83,14 +83,6 @@ while true; do
         fi
         sleep 1
 done
-
-gunzip /usr/share/zabbix-sql-scripts/mysql/server.sql.gz 
-
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-set global log_bin_trust_function_creators = 0;
-use zabbix;
-source /usr/share/zabbix-sql-scripts/mysql/server.sql;
-EOF
 
 echo "Enabling and starting SQL and Zabbix" | log
 systemctl enable mysql.service
