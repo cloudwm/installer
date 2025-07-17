@@ -17,7 +17,7 @@ installPackage php8.3-ldap
 waitOrStop 0 "Failed to install ldap"
 
 echo "Downloading Zabbix from official repo" | log
-curlDownload https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-2+ubuntu24.04_all.deb 
+curlDownload https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.4%2Bubuntu24.04_all.deb
 waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Zabbix" | log
