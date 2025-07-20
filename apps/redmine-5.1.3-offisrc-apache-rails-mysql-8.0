@@ -47,6 +47,19 @@ echo "Downloading from ${REPO_URL} to ${REPO_DIR}..." | log
 curl -s ${REPO_URL} | sudo tar xz -C ${REPO_DIR} --strip-components=1
 echo "Download Complete." | log
 
+echo "Patching config/boot.rb to load stdlib Logger..." | log
+BOOT_FILE="${REPO_DIR}/config/boot.rb"
+
+if [ -f "$BOOT_FILE" ]; then
+  # Prepend require 'logger' if it's not already there
+  grep -q "^require 'logger'" "$BOOT_FILE" || \
+    sed -i "1i require 'logger'" "$BOOT_FILE"
+  echo "  → require 'logger' added to $BOOT_FILE" | log
+else
+  echo "  → ERROR: $BOOT_FILE not found, cannot patch Logger load" | log
+  exit 1
+fi
+
 # Configuring permissions
 echo "Configuring permissions..." | log
 chown -R www-data:www-data /opt/redmine/
@@ -76,10 +89,10 @@ RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
 
 # Install ImageMagic for Redmine
 echo "Installing ImageMagic & ghostscript..." | log
-apt update
-apt install -y imagemagick libmagickwand-dev
+apt-get update
+apt-get install -y imagemagick libmagickwand-dev
 convert -version
-apt install -y ghostscript
+apt-get install -y ghostscript
 
 echo "Writing apache configuration file..."
 cat <<_EOF_ > $WEBAPP_CONF/redmine.conf
