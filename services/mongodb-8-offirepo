@@ -1,0 +1,61 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+source /etc/os-release
+
+if [[ $VERSION_CODENAME == "" ]]; then
+    echo "Unsupported OS version" | log
+    exit 1
+fi
+
+echo "Adding repo to OS" | log
+
+curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+   sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg \
+   --dearmor
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+apt-get update
+
+echo "Install mongodb from apt" | log
+
+apt-get install -y glibc-source mongodb-org-server=8.0.11 | log
+checkPackageInstalled glibc-source mongodb-org-server
+
+echo "Enabling authorization" | log
+
+sed -i "s/#security/security/g" /etc/mongod.conf
+sed -i "/security:/ a \  authorization: enabled" /etc/mongod.conf
+
+echo "Activating service" | log
+
+systemctl enable mongod.service
+systemctl start mongod.service
+sleep 5
+
+echo "Adding admin user" | log
+
+command="db.adminCommand({ createUser: \"admin\", pwd: \"$ADMINPASSWORD\", roles: [\"userAdminAnyDatabase\", \"dbAdminAnyDatabase\", \"readWriteAnyDatabase\"]});"
+mongosh --eval "${command}" | log
+
+echo "Adding descriptions" | log
+
+descriptionAppend "MongoDB Address: ${CWM_SERVERIP}"
+descriptionAppend "MongoDB Username: admin"
+descriptionAppend "MongoDB Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "MongoDB config file: /etc/mongod.conf"
+descriptionAppend " "
+
+echo "Adding dependency tags" | log
+
+tag mongodb.success
+tagScript success
+
+exit 0
