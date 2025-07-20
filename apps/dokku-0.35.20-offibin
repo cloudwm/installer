@@ -14,9 +14,9 @@ echo "127.0.0.1 ${CWM_DOMAIN} localhost" >> /etc/hosts
 
 echo "Installing application" | log
 cd $rootDir/temp
-curlDownload https://raw.githubusercontent.com/dokku/dokku/v0.32.3/bootstrap.sh
+curlDownload https://raw.githubusercontent.com/dokku/dokku/v0.35.20/bootstrap.sh
 waitOrStop 0 "File not downloaded from github"
-DOKKU_TAG=v0.32.3 bash bootstrap.sh
+DOKKU_TAG=v0.35.20 bash bootstrap.sh
 waitOrStop 0 "Failed to install application"
 
 echo "Setting dokku domain"
