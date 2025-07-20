@@ -1,0 +1,77 @@
+#!/bin/bash
+set -e
+
+# Load common startup (if present)
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ubuntu-updateos.success
+
+echo "Create temp swap for composer processes" | log
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+sleep 5
+
+echo "Installing MySQL from apt" | log
+export DEBIAN_FRONTEND="noninteractive"
+installPackage mysql-server
+waitOrStop 0 "Failed apt install: mysql-server"
+
+# 1) Configure root to use mysql_native_password so PASSWORD login works
+echo "Configuring MySQL root user for password authentication…" | log
+sudo mysql <<_EOF_
+ALTER USER 'root'@'localhost'
+  IDENTIFIED WITH mysql_native_password
+  BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+_EOF_
+
+# 2) Write root .my.cnf for password‑based CLI
+echo "Writing /root/.my.cnf for quick CLI access…" | log
+cat > /root/.my.cnf <<EOF
+[client]
+user=root
+password="${ADMINPASSWORD}"
+EOF
+chmod 600 /root/.my.cnf
+
+# 3) (Optional) Skip mysql_secure_installation since we've done the same changes
+echo "Skipping mysql_secure_installation (handled via direct ALTER USER)" | log
+
+# 4) Write custom mysqld options if not already present
+echo "Setting some defaults in mysqld‑installer.cnf…" | log
+if [ ! -f /etc/mysql/mysql.conf.d/mysqld‑installer.cnf ]; then
+  cat > /etc/mysql/mysql.conf.d/mysqld‑installer.cnf <<EOF
+[mysqld]
+skip-name-resolve=1
+max_allowed_packet=256M
+EOF
+fi
+
+# 5) Restart MySQL to apply changes
+echo "Restarting mysql.service" | log
+systemctl restart mysql.service
+waitOrStop 0 "Restart mysql service failed"
+
+# 6) Verify we can login as root via .my.cnf
+echo "Verifying root login via /root/.my.cnf…" | log
+mysql --defaults-file=/root/.my.cnf -e "SELECT VERSION();" &>/dev/null
+
+# 7) Add descriptions & tags
+echo "Adding descriptions" | log
+descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
+descriptionAppend "mySQL Server Username: root"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend "mySQL Server config global files location: /etc/mysql/"
+descriptionAppend "mySQL Server config user‑specific file: /root/.my.cnf"
+
+tag mysql-server-8.0.success
+tag mysqld.success
+tagScript success
+
+exit 0
