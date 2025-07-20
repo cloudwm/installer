@@ -14,7 +14,7 @@ cd $appDir
 docker-compose up -d
 waitOrStop 0 "Failed to start docker-compose file"
 
-descriptionAppend "N8N UI: http://${CWM_DISPLAYED_ADDRESS}:5678
+descriptionAppend "N8N UI: http://${CWM_DISPLAYED_ADDRESS}:5678"
 
 tagScript success
 
