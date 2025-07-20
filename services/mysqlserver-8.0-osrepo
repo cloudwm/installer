@@ -17,10 +17,23 @@ sudo mkswap /swapfile
 sudo swapon /swapfile
 sleep 5
 
+if [ -r /root/guest.conf ]; then
+    # Expect a line like password=YOUR_PASSWORD
+    ADMINPASSWORD="$(grep -E '^password=' /root/guest.conf | cut -d'=' -f2-)"
+    if [ -z "$ADMINPASSWORD" ]; then
+        echo "ERROR: password key not found or empty in /root/guest.conf" >&2
+        exit 1
+    fi
+else
+    echo "ERROR: /root/guest.conf not found or not readable" >&2
+    exit 1
+fi
+
 echo "Installing mysql from apt" | log
 export DEBIAN_FRONTEND="noninteractive"
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password password ${ADMINPASSWORD}"
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password_again password ${ADMINPASSWORD}"
+echo "ADMINPASS: ${ADMINPASSWORD}" | log
 
 installPackage mysql-server
 waitOrStop 0 "Failed apt install: mysql-server-8.0"
