@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Load startup script
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -9,15 +10,20 @@ fi
 aptSourceList=/etc/apt/sources.list.d/zentyal.list
 rootDir=$(rootDir)
 
-
 echo "Modifying hostname to fit max 64 chars requirement" | log
 savedHostname=$(hostname)
 hostnamectl set-hostname ${savedHostname::32}
 
-echo "Installing Zentyal 8.0" | log
-echo "zentyal-core zentyal-core/install-gui boolean true" | sudo debconf-set-selections
+echo "Installing Zentyal 8.0 with graphical environment" | log
+
+# Download and patch the installer to auto-confirm graphical environment
 wget https://raw.githubusercontent.com/zentyal/zentyal/master/extra/ubuntu_installers/zentyal_installer_8.0.sh
 chmod u+x zentyal_installer_8.0.sh
+
+# Patch the script: replace the prompt with default 'y'
+sed -i 's/read -p "Do you want to install the Zentyal Graphical environment? (n|y)" response/response="y"/' zentyal_installer_8.0.sh
+
+# Run the modified installer
 ./zentyal_installer_8.0.sh
 
 echo "ReInstalling Netplan" | log
@@ -26,7 +32,7 @@ installPackage netplan.io
 echo "Creating admin user and disabling root" | log
 useradd admin -s /bin/bash -m -g users -G sudo
 chpasswd <<< "admin:${ADMINPASSWORD}"
--passwd -l root
+passwd -l root
 
 echo "Fixing DNS Resolver" | log
 sed '/gateway/a dns-nameservers 8.8.8.8 8.8.4.4' -i /etc/network/interfaces
@@ -44,7 +50,7 @@ descriptionAppend "Zentyal Admin User: admin"
 descriptionAppend "Zentyal Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
-
 tagScript success
 
 exit 0
+
