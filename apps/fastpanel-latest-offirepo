@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+else
+    echo "Error: startup.sh not found in include/ or ../include/" >&2
+    exit 1
+fi
+
+echo "Downloading and installing FastPanel" | log
+installPackage ca-certificates wget
+LOG_FILE="/tmp/fastpanel_install.log"
+wget https://repo.fastpanel.direct/install_fastpanel.sh -O - | bash - 2>&1 | tee "$LOG_FILE"
+waitOrStop 0 "Failed to install FastPanel"
+
+FASTPASSWORD=$(grep -oP "Password:\s*\K.*" "$LOG_FILE")
+rm -f $LOG_FILE
+
+descriptionAppend "FastPanel Web UI: http://${CWM_DISPLAYED_ADDRESS}:8888"
+descriptionAppend "FastPanel Web User: fastuser"
+descriptionAppend "FastPanel Web Password: ${FASTPASSWORD}"
+
+exit 0
