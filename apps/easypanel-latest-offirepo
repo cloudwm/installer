@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Downloading and installing EasyPanel" | log
+curl -sSL https://get.easypanel.io | sh
+waitOrStop 0 "Failed to install EasyPanel"
+
+descriptionAppend "EasyPanel Web UI: http://${CWM_DISPLAYED_ADDRESS}:3000"
+
+exit 0 
+
