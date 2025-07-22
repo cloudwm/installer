@@ -21,7 +21,8 @@ wget https://raw.githubusercontent.com/zentyal/zentyal/master/extra/ubuntu_insta
 chmod u+x zentyal_installer_8.0.sh
 
 # Patch the script: replace the prompt with default 'y'
-sed -i 's/read -p "Do you want to install the Zentyal Graphical environment? (n|y)" response/response="y"/' zentyal_installer_8.0.sh
+sed -i '/read ZEN_GUI/i\ZEN_GUI="y"' zentyal_installer_8.0.sh
+sed -i '/read ZEN_GUI/d' zentyal_installer_8.0.sh
 
 # Run the modified installer
 ./zentyal_installer_8.0.sh
