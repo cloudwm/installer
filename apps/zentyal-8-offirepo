@@ -14,6 +14,8 @@ echo "Modifying hostname to fit max 64 chars requirement" | log
 savedHostname=$(hostname)
 hostnamectl set-hostname ${savedHostname::32}
 
+echo "Installing Zentyal 8.0" | log
+echo "zentyal-core zentyal-core/install-gui boolean true" | sudo debconf-set-selections
 wget https://raw.githubusercontent.com/zentyal/zentyal/master/extra/ubuntu_installers/zentyal_installer_8.0.sh
 chmod u+x zentyal_installer_8.0.sh
 ./zentyal_installer_8.0.sh
