@@ -40,8 +40,6 @@ set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
 EOF
 
-mysql --defaults-file=/root/.my.cnf -h localhost userzabbix < $rootDir/tweaks/extras/zabbix/images.sql
-
 echo "Tweaking Zabbix & PHP configuration" | log
 sed -i "s/DBName=zabbix_db/DBName=zabbix/g" /etc/zabbix/zabbix_server.conf
 sed -i "s/DBUser=zabbix/DBUser=zabbixuser/g" /etc/zabbix/zabbix_server.conf
