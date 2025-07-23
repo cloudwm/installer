@@ -73,8 +73,8 @@ waitOrStop 0 "Restart nginx service failed"
 
 echo "adding descriptions" | log
 descriptionAppend "Joomla Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/administrator"
-descriptionAppend "Joomla Username: admin"
-descriptionAppend "Joomla Password: ${ADMINPASSWORD}"
+descriptionAppend "Joomla Username: joomla"
+descriptionAppend "Joomla Password: joomlajoomla"
 descriptionAppend " "
 
 tagScript success
