@@ -40,7 +40,7 @@ echo "Configuring Joomla for first use" | log
 cp $rootDir/tweaks/extras/joomla-nginx/configuration-new.php $appPath/configuration.php
 sed -i "s/Password/${ADMINPASSWORD}/g" $appPath/configuration.php
 sed -i "s/some@mail.com/${ADMINEMAIL}/g" $appPath/configuration.php
-mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla.sql
+mysql --defaults-file=/root/.my.cnf -h localhost joomla < $rootDir/tweaks/extras/joomla-nginx/joomla_5.sql
 waitOrStop 0 "Failed to create database"
 
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
