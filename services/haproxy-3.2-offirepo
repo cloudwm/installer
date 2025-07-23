@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ssl-ready.success
+
+rootDir=$(rootDir)
+certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
+certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
+certsUpdateService=/opt/update-certs.sh
+certGeneratedName="haproxy-fullcert.pem"
+
+echo "Installing dependencies" | log
+installPackage software-properties-common
+waitOrStop 0 "Failed apt install: software-properties-common"
+
+ubuntu_version=$(lsb_release -rs)
+
+echo "Adding repository to OS package manager" | log
+if [[ $ubuntu_version == 24.04 ]]; then
+	add-apt-repository ppa:vbernat/haproxy-3.2 -y
+	apt update
+else
+	add-apt-repository ppa:vbernat/haproxy-2.4 -y
+	apt update
+fi
+
+echo "Installing main application" | log
+if [[ $ubuntu_version == 24.04 ]]; then
+	installPackage haproxy=3.2.\* | log
+	waitOrStop 0 "Failed apt install: haproxy 3.2.*"
+else
+	installPackage haproxy=2.4.\* | log
+	waitOrStop 0 "Failed apt install: haproxy 2.4.*"
+fi
+
+echo "Open port for stats web ui" | log
+ufw allow 8404
+
+echo "Placing annotated config file" | log
+backupFile /etc/haproxy/haproxy.cfg
+cp -f $rootDir/tweaks/extras/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg
+pass=$(echo ${ADMINPASSWORD//\&/\\&} | sed 's|[$#]|\\\\&|g')
+sed -i '/stats auth/s/USERPASS_PLACEHOLDER/admin:"'$pass'"/g' /etc/haproxy/haproxy.cfg
+sed -i 's|CERTS_PATH_PLACEHOLDER|'"${certsPath}"'|g' /etc/haproxy/haproxy.cfg
+sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.cfg
+
+echo "Generating proper haproxy certificate" | log
+
+if [[ ! -d ${certsArchivePath} ]]; then
+        cd ${certsPath}
+        cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+else
+        cd ${certsArchivePath}
+        cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+        cd ${certsPath}
+        ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+fi
+
+service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
+
+cat << EOF > ${certsUpdateService}
+
+certbot -q renew
+cd ${certsArchivePath}
+rm ${certGeneratedName}
+cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
+cd ${certsPath}
+ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+service haproxy reload
+
+EOF
+chmod +x ${certsUpdateService}
+
+backupFile /lib/systemd/system/certbot.service
+# sed -i '\|ExecStart|s|=.*|=/bin/bash '"${certsUpdateService}"'|' /lib/systemd/system/certbot.service
+sed -i '\|ExecStart|s|-q renew|-q renew --post-hook "/bin/bash '${certsUpdateService}'"|' /lib/systemd/system/certbot.service
+systemctl daemon-reload
+service haproxy reload
+waitOrStop 0 "Reload haproxy service failed"
+
+echo "Downloading DataPlane API from Git" | log
+cd $rootDir/temp
+curlDownload https://github.com/haproxytech/dataplaneapi/releases/download/v2.3.3/dataplaneapi_2.3.3_Linux_x86_64.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Extracting DataPlane & Setting Permissions" | log
+cd $rootDir/temp
+tar -xzvf dataplaneapi_2.3.3_Linux_x86_64.tar.gz
+chmod +x build/dataplaneapi
+cp build/dataplaneapi /usr/local/bin/
+
+echo "Creating DataPlane Config File" | log
+cp -f $rootDir/tweaks/extras/haproxy/dataplaneapi.hcl /etc/haproxy/
+
+cat /root/guest.conf | grep api >> /etc/default/haproxy
+sed -i "s/apiClientId/clientID/g" /etc/default/haproxy
+sed -i "s/apiSecret/secret/g" /etc/default/haproxy
+
+systemctl reload haproxy
+waitOrStop 0 "Failed to reload HAProxy" | log
+
+echo "Adding descriptions" | log
+descriptionAppend "HAProxy Address: ${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend " "
+descriptionAppend "HAProxy Stats Web UI: https://${CWM_DISPLAYED_ADDRESS}:8404/stats"
+descriptionAppend "HAProxy Stats Web UI Username: admin"
+descriptionAppend "HAProxy Stats Web UI Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "HAProxy config file: /etc/haproxy/haproxy.cfg"
+descriptionAppend " "
+descriptionAppend "HAProxy examples: /usr/share/doc/haproxy/examples"
+descriptionAppend "HAProxy documentation (on-server): /usr/share/doc/haproxy/"
+descriptionAppend "HAProxy documentation (online): http://cbonte.github.io/haproxy-dconv/2.4/intro.html"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
