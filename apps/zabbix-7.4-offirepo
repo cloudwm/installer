@@ -77,7 +77,7 @@ gunzip /usr/share/zabbix/sql-scripts/mysql/server.sql.gz
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 set global log_bin_trust_function_creators = 0;
 use zabbix;
-source /usr/share/zabbix-sql-scripts/mysql/server.sql;
+source /usr/share/zabbix/sql-scripts/mysql/server.sql;
 EOF
 
 echo "Enabling and starting SQL and Zabbix" | log
@@ -93,8 +93,8 @@ sleep 3
 systemctl restart apache2
 waitOrStop 0 "Failed to restart Apache"
 sleep 3
-systemctl restart php8.3-fpm
-waitOrStop 0 "Failed to restart php8.3-fpm"
+systemctl restart php8.4-fpm
+waitOrStop 0 "Failed to restart php8.4-fpm"
 sleep 3
 
 echo "Adding descriptions" | log
