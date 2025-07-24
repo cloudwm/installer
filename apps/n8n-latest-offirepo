@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appDir="/opt/n8n"
+mkdir $appDir
+cp /opt/installer/tweaks/extras/n8n/docker-compose.yml $appDir
+
+cd $appDir
+docker-compose up -d
+waitOrStop 0 "Failed to start docker-compose file"
+
+descriptionAppend "N8N UI: http://${CWM_DISPLAYED_ADDRESS}:5678"
+
+tagScript success
+
+exit 0
