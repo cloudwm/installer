@@ -1,0 +1,60 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+appPath=/etc/tomcat11
+assignedPort=9090
+
+echo "Installing main application" | log
+rootDir=$(rootDir)
+appPath=/etc/tomcat11
+assignedPort=9090
+
+apt install openjdk-17-jdk
+useradd -r -m -U -d /opt/tomcat -s /bin/false tomcat
+wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.7/bin/apache-tomcat-11.0.7.tar.gz
+tar -xzvf apache-tomcat-11.0.7.tar.gz
+mkdir $appPath
+mv apache-tomcat-11.0.7/* $appDir
+rm -f apache-tomcat-11.0.7.tar.gz apache-tomcat-11.0.7
+./$appPath/bin/startup.sh 
+
+echo "Removing default configs" | log 
+rm -f $appPath/conf/tomcat-users.xml
+rm -f $appPath/webapps/host-manager/WEB-INF/manager.xml
+
+echo "Setting prebuilt configs" | log
+cp $rootDir/tweaks/extras/tomcat11-nginx/tomcat-users.xml $appPath/conf/tomcat-users.xml
+cp $rootDir/tweaks/extras/tomcat11-nginx/manager.xml $appPath/webapps/host-manager/WEB-INF/manager.xml
+sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/conf/tomcat-users.xml 
+sed -i 's/Connector port="8080"/Connector port="'${assignedPort}'"/g' $appPath/conf/server.xml 
+
+echo "Setting nginx configuration" | log
+nginxConfigPath=/etc/nginx/sites-available
+# copy readymade config to nginx sites
+cp -f $rootDir/tweaks/extras/tomcat11-nginx/tomcat.conf $nginxConfigPath/
+# place chosen port in config
+sed -i '/server/s/PORT_PLACEHOLDER/'"${assignedPort}"'/g' $nginxConfigPath/tomcat.conf
+ln -s $nginxConfigPath/tomcat.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+service nginx reload
+waitOrStop 0 "Reload nginx service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Apache Tomcat11 Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Apache Tomcat11 Username: admin"
+descriptionAppend "Apache Tomcat11 Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Apache Tomcat11 config files location: ${appPath}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
