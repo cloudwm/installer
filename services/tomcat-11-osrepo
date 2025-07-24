@@ -6,10 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
-appPath=/etc/tomcat11
-assignedPort=9090
-
 echo "Installing main application" | log
 rootDir=$(rootDir)
 appPath=/etc/tomcat11
@@ -33,6 +29,70 @@ cp $rootDir/tweaks/extras/tomcat11-nginx/tomcat-users.xml $appPath/conf/tomcat-u
 cp $rootDir/tweaks/extras/tomcat11-nginx/manager.xml $appPath/webapps/host-manager/WEB-INF/manager.xml
 sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/conf/tomcat-users.xml 
 sed -i 's/Connector port="8080"/Connector port="'${assignedPort}'"/g' $appPath/conf/server.xml 
+
+echo "Setting up Tomcat as a systemd service" | log
+cat << EOF > /etc/systemd/system/tomcat.service
+[Unit]
+Description=Apache Tomcat 11 Web Application Server
+After=network.target
+
+[Service]
+Type=forking
+User=tomcat
+Group=tomcat
+Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
+Environment="CATALINA_HOME=$appPath"
+Environment="CATALINA_BASE=$appPath"
+ExecStart=$appPath/bin/startup.sh
+ExecStop=$appPath/bin/shutdown.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Set permissions
+echo "Setting Tomcat permissions" | log
+chown -R tomcat:tomcat $appPath
+chmod -R 755 $appPath
+
+# Verify Tomcat is running
+echo "Verifying Tomcat process" | log
+if pgrep -f "org.apache.catalina.startup.Bootstrap" > /dev/null; then
+    echo "Tomcat is running" | log
+else
+    echo "Tomcat failed to start. Check $appPath/logs/catalina.out" | log
+    exit 1
+fi
+
+# Set up systemd service
+echo "Setting up Tomcat as a systemd service" | log
+cat << EOF > /etc/systemd/system/tomcat.service
+[Unit]
+Description=Apache Tomcat 11 Web Application Server
+After=network.target
+
+[Service]
+Type=forking
+User=tomcat
+Group=tomcat
+Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
+Environment="CATALINA_HOME=$appPath"
+Environment="CATALINA_BASE=$appPath"
+ExecStart=$appPath/bin/startup.sh
+ExecStop=$appPath/bin/shutdown.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+waitOrStop 0 "Reload systemd failed"
+systemctl enable tomcat
+waitOrStop 0 "Enable tomcat service failed"
+systemctl start tomcat
+waitOrStop 0 "Start tomcat service failed"
 
 echo "Setting nginx configuration" | log
 nginxConfigPath=/etc/nginx/sites-available
