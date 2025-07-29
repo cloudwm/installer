@@ -11,6 +11,8 @@ rootDir=$(rootDir)
 echo "Downloading Node.js repository" | log
 curlDownload https://deb.nodesource.com/setup_22.x
 waitOrStop 0 "Setup script not downloaded from official source"
+rm /etc/apt/sources.list.d/nginx*
+sed -i '/security\.ubuntu\.com/s/^/#/' /etc/apt/sources.list
 bash setup_22.x | log
 waitOrStop 0 "Failed to install application"
 
