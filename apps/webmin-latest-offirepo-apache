@@ -9,20 +9,12 @@ fi
 checkTagExist httpd.success
 
 echo "Installing Packages"
-installPackage software-properties-common
-waitOrStop 0 "Failed apt install software-properties"
-installPackage apt-transport-https
-waitOrStop 0 "Failed apt install apt-transport-https"
-
-echo "Adding repo to apt" | log
-curlDownload http://www.webmin.com/jcameron-key.asc
-waitOrStop 0 "File not downloaded from official source"
-apt-key add jcameron-key.asc
-echo "deb [arch=amd64] http://download.webmin.com/download/repository sarge contrib"  | tee -a /etc/apt/sources.list
-apt update
+curl -o webmin-setup-repo.sh https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repo.sh
+sh webmin-setup-repo.sh -f
+waitOrStop 0 "Failed to setup Webmin repository"
 
 echo "Installing Webmin App"
-installPackage webmin
+apt-get install webmin --install-recommends
 waitOrStop 0 "Failed apt install Webmin"
 
 echo "Adding descriptions" | log
