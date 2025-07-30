@@ -12,7 +12,7 @@ sh webmin-setup-repo.sh -f
 waitOrStop 0 "Failed to setup Webmin repository"
 
 echo "Installing Webmin App"
-apt-get install webmin --install-recommends
+apt-get install -y webmin --install-recommends
 waitOrStop 0 "Failed apt install Webmin"
 
 echo "Adding descriptions" | log
