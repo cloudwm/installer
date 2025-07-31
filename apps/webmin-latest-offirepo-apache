@@ -6,15 +6,13 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist httpd.success
-
 echo "Installing Packages"
 curl -o webmin-setup-repo.sh https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repo.sh
 sh webmin-setup-repo.sh -f
 waitOrStop 0 "Failed to setup Webmin repository"
 
 echo "Installing Webmin App"
-apt-get install webmin --install-recommends
+apt-get install -y webmin --install-recommends
 waitOrStop 0 "Failed apt install Webmin"
 
 echo "Adding descriptions" | log
