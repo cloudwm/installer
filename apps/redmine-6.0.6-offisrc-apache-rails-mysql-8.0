@@ -36,6 +36,8 @@ GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';
 FLUSH PRIVILEGES;
 _EOF_
 
+mysql -e "SHOW DATABASES;" | log
+
 # Continue with Redmine setup or other steps
 echo "Database setup completed successfully." | log
 
