@@ -3,15 +3,18 @@
 # Add this at the beginning of all scripts.
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-
 # Update system and install required packages
 apt-get update
-apt-get install -y libmariadb-dev-compat apt-transport-https
+apt-get install -y mariadb-server libmariadb-dev-compat apt-transport-https
+
+# Ensure MariaDB service is running
+echo "Starting MariaDB service..." | log
+systemctl enable mariadb
+systemctl start mariadb
 
 # Variables
 DB_REDMINE_PASS="redmine"
@@ -21,13 +24,17 @@ WEBAPP_CONF="/etc/apache2/sites-available"
 
 # Secure MySQL and set up Redmine database
 echo "Creating redmine database..." | log
-mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-create database redmine character set utf8mb4 collate utf8mb4_bin;
-create user redmine@localhost identified by '${ADMINPASSWORD}';
-grant all privileges on redmine.* to redmine@localhost;
-set global log_bin_trust_function_creators = 1;
+MYSQL_CMD="mysql -u root"
+
+# Create or update database and user
+$MYSQL_CMD <<_EOF_ > /var/log/mysql_setup.log 2>&1
+CREATE DATABASE IF NOT EXISTS redmine CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE USER IF NOT EXISTS 'redmine'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_REDMINE_PASS}';
+ALTER USER 'redmine'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_REDMINE_PASS}';
+GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';
+SET GLOBAL log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
-EOF
+_EOF_
 
 # Continue with Redmine setup or other steps
 echo "Database setup completed successfully." | log
@@ -69,6 +76,8 @@ production:
   password: "${DB_REDMINE_PASS}"
   encoding: utf8mb4
 _EOF_
+chown www-data:www-data ${REPO_DIR}/config/database.yml
+chmod 640 ${REPO_DIR}/config/database.yml
 
 # Install gems
 gem install bundler
@@ -80,8 +89,8 @@ bundle exec rake generate_secret_token
 RAILS_ENV=production bundle exec rake db:migrate
 RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
 
-# Install ImageMagic for Redmine
-echo "Installing ImageMagic & ghostscript..." | log
+# Install ImageMagick for Redmine
+echo "Installing ImageMagick & ghostscript..." | log
 apt-get update
 apt-get install -y imagemagick libmagickwand-dev
 convert -version
@@ -94,7 +103,7 @@ cat <<_EOF_ > $WEBAPP_CONF/redmine.conf
     DocumentRoot ${REPO_DIR}/public
     <Directory ${REPO_DIR}/public>
         Allow from all
-        Options -MultiViews
+        Options - your-script.sh MultiViews
         Require all granted
     </Directory>
 </VirtualHost>
@@ -128,4 +137,3 @@ descriptionAppend "Redmine default admin user: Admin"
 descriptionAppend "Redmine default admin password: admin"
 
 echo "Redmine installation is complete."
-
