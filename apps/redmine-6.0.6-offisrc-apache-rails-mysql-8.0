@@ -21,20 +21,13 @@ WEBAPP_CONF="/etc/apache2/sites-available"
 
 # Secure MySQL and set up Redmine database
 echo "Creating redmine database..." | log
-mysql -u root <<_EOF_
--- Set the root password to empty and use mysql_native_password for authentication
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+create database redmine character set utf8mb4 collate utf8mb4_bin;
+create user redmine@localhost identified by '${ADMINPASSWORD}';
+grant all privileges on redmine.* to redmine@localhost;
+set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
-
--- Delete anonymous users for security reasons
-DELETE FROM mysql.user WHERE User='';
-
--- Create the Redmine database and user
-CREATE DATABASE redmine CHARACTER SET utf8mb4;
-CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${DB_REDMINE_PASS}';
-GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';
-FLUSH PRIVILEGES;
-_EOF_
+EOF
 
 # Continue with Redmine setup or other steps
 echo "Database setup completed successfully." | log
