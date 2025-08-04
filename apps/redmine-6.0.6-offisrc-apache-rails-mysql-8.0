@@ -14,7 +14,6 @@ apt-get update
 apt-get install -y libmariadb-dev-compat apt-transport-https
 
 # Variables
-DB_REDMINE_PASS="redmine"
 REPO_URL="https://www.redmine.org/releases/redmine-6.0.6.tar.gz"
 REPO_DIR="/opt/redmine"
 WEBAPP_CONF="/etc/apache2/sites-available"
@@ -66,7 +65,7 @@ production:
   database: redmine
   host: localhost
   username: redmine
-  password: "${DB_REDMINE_PASS}"
+  password: "${ADMINPASSWORD}"
   encoding: utf8mb4
 _EOF_
 
