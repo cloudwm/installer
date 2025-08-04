@@ -24,7 +24,7 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
 	systemctl daemon-reload 
 	systemctl restart docker.service
 	systemctl restart docker.socket
-	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/4.0.0.tar.gz
+	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/4.1.1.tar.gz
 	waitOrStop 0 "Failed to download PassBolt"
 else
 	curlDownload https://github.com/passbolt/passbolt_docker/archive/refs/tags/v3.0.1.tar.gz
@@ -33,10 +33,10 @@ fi
 
 echo "Extracting PassBolt" | log
 if [[ "$ubuntu_version" == "24.04" ]]; then
-	tar -xzvf 4.0.0.tar.gz
-	mv passbolt_docker-4.0.0/ passbolt/
+	tar -xzvf 4.1.1.tar.gz
+	mv passbolt_docker-4.1.1/ passbolt/
 	mv passbolt/ /opt/
-	rm -rf 4.0.0.tar.gz
+	rm -rf 4.1.1.tar.gz
 	cd /opt/passbolt/
 	sed -i "s/passbolt.local/${CWM_DOMAIN}/g" /opt/passbolt/dev/env/passbolt.env
 	sed -i "s/P4ssb0lt/${ADMINPASSWORD}/g" /opt/passbolt/dev/env/passbolt.env
