@@ -1,0 +1,104 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing dependencies" | log
+packages=(python3-pip build-essential wget python3-dev python3-venv \
+          python3-wheel libfreetype6-dev libxml2-dev libzip-dev libldap2-dev libsasl2-dev \
+          python3-setuptools node-less libjpeg-dev zlib1g-dev libpq-dev \
+          libxslt1-dev libldap2-dev libtiff5-dev libjpeg8-dev libopenjp2-7-dev \
+          liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev libxcb1-dev)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed to install dependencies"
+
+echo "Create app user" | log
+useradd -m -d /opt/odoo18 -U -r -s /bin/bash odoo18
+
+echo "Installing postgresql" | log
+installPackage postgresql | log
+waitOrStop 0 "Failed to install postgresql"
+
+echo "Downloading and installing wkhtmltox"
+curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
+waitOrStop 0 "File not downloaded from official source"
+
+su odoo18 << EOF
+git clone https://www.github.com/odoo/odoo --depth 1 --branch 18.0 /opt/odoo18/odoo
+cd /opt/odoo18
+python3 -m venv odoo-venv
+source odoo-venv/bin/activate
+pip3 install wheel
+pip3 install -r odoo/requirements.txt
+deactivate
+mkdir -p /opt/odoo18/odoo-custom-addons
+EOF
+
+echo "Creating Odoo service"
+cat << EOF > /etc/odoo18.conf
+[options]
+; This is the password that allows database operations:
+admin_passwd = $ADMINPASSWORD
+db_host = False
+db_port = False
+db_user = odoo18
+db_password = False
+addons_path = /opt/odoo18/odoo/addons,/opt/odoo18/odoo-custom-addons
+
+EOF
+
+cat << EOF > /etc/systemd/system/odoo18.service
+[Unit]
+Description=Odoo18
+Requires=postgresql.service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+SyslogIdentifier=odoo18
+PermissionsStartOnly=true
+User=odoo18
+Group=odoo18
+ExecStart=/opt/odoo18/odoo-venv/bin/python3 /opt/odoo18/odoo/odoo-bin -c /etc/odoo18.conf
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+ufw allow 8069
+
+echo "Enabling postgresql" | log
+systemctl enable postgresql
+systemctl stop postgresql
+sleep 2
+systemctl start postgresql
+sleep 5
+waitOrStop 0 "Failed to start postgresql"
+
+echo "Creating Odoo18 user in postgres" | log
+su - postgres <<EOF
+createuser -s odoo18
+EOF
+
+systemctl daemon-reload
+waitOrStop 0 "Reloading daemon failed"
+systemctl enable odoo18
+sleep 1
+systemctl start odoo18
+sleep 2
+waitOrStop 0 "Start Odoo18 service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Odoo configuration file: /etc/odoo18.conf"
+descriptionAppend "Odoo web UI: http://${CWM_DISPLAYED_ADDRESS}:8069"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
