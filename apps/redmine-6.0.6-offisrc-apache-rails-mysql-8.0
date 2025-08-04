@@ -14,7 +14,7 @@ apt-get update
 apt-get install -y libmariadb-dev-compat apt-transport-https
 
 # Variables
-REPO_URL="https://www.redmine.org/releases/redmine-5.1.3.tar.gz"
+REPO_URL="https://www.redmine.org/releases/redmine-6.0.6.tar.gz"
 REPO_DIR="/opt/redmine"
 WEBAPP_CONF="/etc/apache2/sites-available"
 
@@ -68,6 +68,9 @@ production:
   password: "${ADMINPASSWORD}"
   encoding: utf8mb4
 _EOF_
+
+chown www-data:www-data ${REPO_DIR}/config/database.yml
+chmod 640 ${REPO_DIR}/config/database.yml
 
 # Install gems
 gem install bundler
