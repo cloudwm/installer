@@ -27,7 +27,6 @@ waitOrStop 0 "File not downloaded from official source"
 chmod +x cyberpanel.sh
 export DEBIAN_FRONTEND=noninteractive
 bash cyberpanel.sh -v ols -a -p ${ADMINPASSWORD} > /root/cyberpanel.txt
-waitOrStop 0 "Failed to install CyberPanel"
 
 olspass=$(cat /etc/cyberpanel/webadmin_passwd)
 
