@@ -8,8 +8,8 @@ fi
 
 echo "Downloading and installing CloudPanel" | log
 curlDownload https://installer.cloudpanel.io/ce/v2/install.sh install.sh
-echo "a3ba69a8102345127b4ae0e28cfe89daca675cbc63cd39225133cdd2fa02ad36 install.sh" | \
-sha256sum -c && sudo bash install.sh
+echo "985bed747446eabad433c2e8115e21d6898628fa982c9e55ff6cd0d7c35b501d install.sh" | \
+sha256sum -c && sudo DB_ENGINE=MYSQL_8.4 bash install.sh
 waitOrStop 0 "Failed to install CloudPanel"
 
 echo "Restarting and enabling  services" | log
