@@ -1,0 +1,61 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+
+echo "Updating package lists" | log
+apt-get update
+waitOrStop 0 "Failed to update package lists"
+
+echo "Installing xRDP service" | log
+installPackage xrdp
+waitOrStop 0 "Failed apt install: xrdp"
+installPackage xserver-xorg-core
+waitOrStop 0 "Failed apt install: xserver-xorg-core"
+installPackage xserver-xorg-input-all
+waitOrStop 0 "Failed apt install: xserver-xorg-input-all"
+
+echo "Installing XFCE4" | log
+installPackage xfce4 xfce4-goodies xorg dbus-x11 x11-xserver-utils
+waitOrStop 0 "Failed apt install: XFCE4"
+
+echo "Adding user xrdp to ssl-cert group" | log
+adduser xrdp ssl-cert
+
+echo "Configuring xRDP startup file" | log
+rm -rf /etc/xrdp/startwm.sh
+cat > /etc/xrdp/startwm.sh << 'EOF'
+#!/bin/sh
+# xrdp session startup script
+if [ -r /etc/default/locale ]; then
+    . /etc/default/locale
+    export LANG LANGUAGE
+fi
+exec startxfce4
+EOF
+chmod +x /etc/xrdp/startwm.sh
+
+echo "Configuring PAM for xRDP" | log
+rm -rf /etc/pam.d/xrdp-sesman
+cat > /etc/pam.d/xrdp-sesman << 'EOF'
+auth include common-auth
+account include common-account
+password include common-password
+session include common-session
+EOF
+
+echo "Configuring XFCE4 for xRDP" | log
+echo "xfce4-session" > /etc/xrdp/.xsession
+chmod 644 /etc/xrdp/.xsession
+
+echo "Enabling and restarting xRDP service" | log
+systemctl enable xrdp
+systemctl restart xrdp
+waitOrStop 0 "Restart xrdp service failed"
+
+exit 0
