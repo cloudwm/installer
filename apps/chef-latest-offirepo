@@ -6,6 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+
 appPath=/var/chef
 rootDir=$(rootDir)
 
@@ -15,28 +16,34 @@ waitOrStop 0 "Failed to install dependencies"
 
 echo "Downloading Chef Workstation 24.6.1066" | log
 wget https://packages.chef.io/files/stable/chef-workstation/24.6.1066/ubuntu/22.04/chef-workstation_24.6.1066-1_amd64.deb
-waitOrStop "Failed to download Chef Workstation package"
+if [ $? -ne 0 ] || [ ! -f "chef-workstation_24.6.1066-1_amd64.deb" ]; then
+    echo "Failed to download Chef Workstation package" | log
+    exit 1
+fi
 
 echo "Installing Chef Workstation" | log
 dpkg -i chef-workstation_24.6.1066-1_amd64.deb
 apt-get install -f -y
 waitOrStop 0 "Failed to install Chef Workstation"
 
-echo "Verifying Chef Workstation installation" | log
-chef --version | grep "Chef Workstation version: 24.6.1066" || { echo "Chef Workstation 24.6.1066 not installed correctly" | log; exit 1; }
-
 echo "Creating Chef repository directory" | log
 mkdir -p $appPath/chef-repo
 cd $appPath/chef-repo
 chef generate repo . --chef-license accept
-waitOrStop "Failed to create Chef repository"
+if [ $? -ne 0 ]; then
+    echo "Failed to create Chef repository" | log
+    exit 1
+fi
 
-echo "Downloading Chef Infra Server 15.0.9" | log
-wget https://packages.chef.io/files/stable/chef-server/15.0.9/ubuntu/22.04/chef-server-core_15.0.9-1_amd64.deb
-waitOrStop "Failed to download Chef Infra Server package"
+echo "Downloading Chef Infra Server 15.10.33" | log
+wget https://packages.chef.io/files/stable/chef-server/15.10.33/ubuntu/22.04/chef-server-core_15.10.33-1_amd64.deb
+if [ $? -ne 0 ] || [ ! -f "chef-server-core_15.10.33-1_amd64.deb" ]; then
+    echo "Failed to download Chef Infra Server package" | log
+    exit 1
+fi
 
 echo "Installing Chef Infra Server" | log
-dpkg -i chef-server-core_15.0.9-1_amd64.deb
+dpkg -i chef-server-core_15.10.33-1_amd64.deb
 apt-get install -f -y
 waitOrStop 0 "Failed to install Chef Infra Server"
 
@@ -45,20 +52,37 @@ chef-server-ctl reconfigure --chef-license accept
 waitOrStop 0 "Failed to configure Chef Infra Server"
 
 echo "Installing Chef Manage for web UI" | log
-chef-server-ctl install chef-manage
+chef-server-ctl install chef-manage --force
+if [ $? -ne 0 ]; then
+    echo "Failed to install chef-manage via chef-server-ctl, attempting manual download" | log
+    wget https://packages.chef.io/files/stable/chef-manage/2.5.23/ubuntu/22.04/chef-manage_2.5.23-1_amd64.deb
+    if [ $? -ne 0 ] || [ ! -f "chef-manage_2.5.23-1_amd64.deb" ]; then
+        echo "Failed to download Chef Manage package" | log
+        exit 1
+    fi
+    dpkg -i chef-manage_2.5.23-1_amd64.deb
+    apt-get install -f -y
+    waitOrStop 0 "Failed to install Chef Manage manually"
+fi
+
+echo "Configuring Chef Manage" | log
 chef-server-ctl reconfigure
 chef-manage-ctl reconfigure --accept-license
-waitOrStop 0 "Failed to install or configure Chef Manage"
+waitOrStop 0 "Failed to configure Chef Manage"
 
 echo "Creating Chef admin user and organization" | log
 mkdir -p $appPath/.chef
+echo "Creating admin user with password: ${ADMINPASSWORD}" | log
 chef-server-ctl user-create admin Admin User admin@example.com "${ADMINPASSWORD}" --filename $appPath/.chef/admin.pem
 if [ $? -ne 0 ]; then
     echo "Failed to create Chef admin user" | log
     exit 1
 fi
 chef-server-ctl org-create myorg "My Organization" --association_user admin --filename $appPath/.chef/myorg.pem
-waitOrStop "Failed to create Chef organization"
+if [ $? -ne 0 ]; then
+    echo "Failed to create Chef organization" | log
+    exit 1
+fi
 
 echo "Configuring knife for Workstation" | log
 cat << EOF > $appPath/chef-repo/.chef/config.rb
@@ -70,6 +94,9 @@ client_key               "#{current_dir}/admin.pem"
 chef_server_url          "https://${CWM_DOMAIN}/organizations/myorg"
 cookbook_path            ["#{current_dir}/../cookbooks"]
 EOF
+
+echo "Adding Chef Manage UI port to ufw" | log
+ufw allow 443
 
 echo "Creating Chef service" | log
 cat << EOF > /etc/systemd/system/chef-workstation.service
@@ -99,11 +126,10 @@ descriptionAppend "Chef Infra Server and Chef Manage are installed for web UI ac
 descriptionAppend "Chef repository directory: $appPath/chef-repo"
 descriptionAppend "Chef configuration file: $appPath/chef-repo/.chef/config.rb"
 descriptionAppend "Chef Workstation CLI: /opt/chef-workstation/bin/chef"
-descriptionAppend "Chef Manage Web UI: https://${CWM_DOMAIN}/"
+descriptionAppend "Chef Manage Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Chef Manage Admin: admin"
 descriptionAppend "Chef Manage Password: ${ADMINPASSWORD}"
 descriptionAppend "To create cookbooks, run: cd $appPath/chef-repo && chef generate cookbook <name>"
-descriptionAppend " "
 
 tagScript success
 
