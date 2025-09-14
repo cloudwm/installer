@@ -13,3 +13,5 @@ repositories/git-install install
 repositories/svn-path /var/db/openproject/svn
 repositories/git-path /var/db/openproject/git
 repositories/git-http-backend /usr/lib/git-core/git-http-backend/
+openproject/admin_email USEREMAIL
+
