@@ -42,7 +42,7 @@ cp $rootDir/tweaks/extras/openproject/installer.dat /etc/openproject/
 sed -i "s/ServerDomain/${CWM_DOMAIN}/g" /etc/openproject/installer.dat
 sed -i "s/USEREMAIL/${ADMINEMAIL}/g" /etc/openproject/installer.dat
 export DEBIAN_FRONTEND=noninteractive
-openproject configure
+openproject configure --non-interactive
 waitOrStop 0 "Failed to configure OpenProject"
 
 # Add descriptions
