@@ -35,28 +35,6 @@ echo "Starting Flowise with Docker Compose" | log
 docker compose up -d
 waitOrStop 0 "Failed to start Flowise with Docker Compose"
 
-echo "Adding Flowise port to ufw" | echo "Installing Docker" | log
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-waitOrStop 0 "Failed to install Docker"
-
-echo "Installing Docker Compose" | log
-apt-get install docker-compose -y
-waitOrStop 0 "Failed to install Docker Compose"
-
-echo "Cloning Flowise repository" | log
-git clone https://github.com/FlowiseAI/Flowise.git $appPath
-waitOrStop 0 "Failed to clone Flowise repository"
-
-cd $appPath/docker
-cp .env.example .env
-chown -R root:root $appPath
-chmod -R 755 $appPath
-
-echo "Starting Flowise with Docker Compose" | log
-docker compose up -d
-waitOrStop 0 "Failed to start Flowise with Docker Compose"
-
 echo "Adding Flowise port to ufw" | log
 ufw allow 3000
 
@@ -96,3 +74,5 @@ descriptionAppend "Flowise logs: cd $appPath/docker && docker compose logs -f"
 descriptionAppend " "
 
 tagScript success
+
+exit 0
