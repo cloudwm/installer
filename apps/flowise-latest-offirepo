@@ -67,7 +67,7 @@ ufw allow 80
 echo "Adding descriptions" | log
 descriptionAppend "Flowise is installed and running with Docker."
 descriptionAppend "Flowise repository directory: $appPath"
-descriptionAppend "Flowise Web UI: http://${CWM_DOMAIN}/ or http://<server-ip>:3000/"
+descriptionAppend "Flowise Web UI: http://${CWM_DOMAIN}/"
 descriptionAppend "To stop Flowise: cd $appPath/docker && docker compose down"
 descriptionAppend "To start Flowise: cd $appPath/docker && docker compose up -d"
 descriptionAppend "Flowise logs: cd $appPath/docker && docker compose logs -f"
