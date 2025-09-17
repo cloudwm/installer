@@ -28,6 +28,8 @@ waitOrStop 0 "Failed to clone Flowise repository"
 
 cd $appPath/docker
 cp .env.example .env
+sed -i "s|^FLOWISE_USERNAME=.*|FLOWISE_USERNAME=${ADMINEMAIL}|" .env
+sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
 chown -R root:root $appPath
 chmod -R 755 $appPath
 
