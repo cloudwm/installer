@@ -31,8 +31,15 @@ fi
 echo "Adding MySQL 8.4 APT repository" | log
 wget https://dev.mysql.com/get/mysql-apt-config_0.8.32-1_all.deb -O /tmp/mysql-apt-config.deb
 export DEBIAN_FRONTEND="noninteractive"
+# Preseed all debconf keys for mysql-apt-config to avoid prompts
 echo "mysql-apt-config mysql-apt-config/select-server select mysql-8.4-lts" | sudo debconf-set-selections
 echo "mysql-apt-config mysql-apt-config/select-product select Ok" | sudo debconf-set-selections
+echo "mysql-apt-config mysql-apt-config/repo-codename string noble" | sudo debconf-set-selections
+echo "mysql-apt-config mysql-apt-config/repo-distro select ubuntu" | sudo debconf-set-selections
+echo "mysql-apt-config mysql-apt-config/repo-url string http://repo.mysql.com/apt/" | sudo debconf-set-selections
+echo "mysql-apt-config mysql-apt-config/select-tools select Enabled" | sudo debconf-set-selections
+echo "mysql-apt-config mysql-apt-config/select-preview select Disabled" | sudo debconf-set-selections
+echo "mysql-apt-config mysql-apt-config/unsupported-platform select abort" | sudo debconf-set-selections
 sudo dpkg -i /tmp/mysql-apt-config.deb
 sudo apt update
 sudo apt install -y wget libaio1t64
