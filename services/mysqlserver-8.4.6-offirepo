@@ -28,22 +28,14 @@ else
     exit 1
 fi
 
-echo "Adding MySQL 8.4 APT repository" | log
-wget https://dev.mysql.com/get/mysql-apt-config_0.8.32-1_all.deb -O /tmp/mysql-apt-config.deb
-export DEBIAN_FRONTEND="noninteractive"
-# Preseed all debconf keys for mysql-apt-config to avoid prompts
-echo "mysql-apt-config mysql-apt-config/select-server select mysql-8.4-lts" | sudo debconf-set-selections
-echo "mysql-apt-config mysql-apt-config/select-product select Ok" | sudo debconf-set-selections
-echo "mysql-apt-config mysql-apt-config/repo-codename string noble" | sudo debconf-set-selections
-echo "mysql-apt-config mysql-apt-config/repo-distro select ubuntu" | sudo debconf-set-selections
-echo "mysql-apt-config mysql-apt-config/repo-url string http://repo.mysql.com/apt/" | sudo debconf-set-selections
-echo "mysql-apt-config mysql-apt-config/select-tools select Enabled" | sudo debconf-set-selections
-echo "mysql-apt-config mysql-apt-config/select-preview select Disabled" | sudo debconf-set-selections
-echo "mysql-apt-config mysql-apt-config/unsupported-platform select abort" | sudo debconf-set-selections
-sudo dpkg -i /tmp/mysql-apt-config.deb
+echo "Adding MySQL 8.4 APT repository manually" | log
+# Download and import the MySQL GPG key
+wget -O /tmp/mysql-keyring.gpg https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+sudo apt-key add /tmp/mysql-keyring.gpg
+rm -f /tmp/mysql-keyring.gpg
+# Add the repository
+echo "deb http://repo.mysql.com/apt/ubuntu/ noble mysql-8.4-lts" | sudo tee /etc/apt/sources.list.d/mysql.list
 sudo apt update
-sudo apt install -y wget libaio1t64
-rm -f /tmp/mysql-apt-config.deb
 
 echo "Installing mysql from apt" | log
 export DEBIAN_FRONTEND="noninteractive"
@@ -51,8 +43,14 @@ debconf-set-selections <<< "mysql-community-server mysql-community-server/root-p
 debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
 echo "ADMINPASS: ${ADMINPASSWORD}" | log
 
+sudo apt install -y wget libaio1t64
 installPackage mysql-server
 waitOrStop 0 "Failed apt install: mysql-server-8.4"
+
+echo "Ensuring MySQL data directory permissions" | log
+sudo mkdir -p /var/lib/mysql
+sudo chown mysql:mysql /var/lib/mysql
+sudo chmod 750 /var/lib/mysql
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 if [ ! -f /root/.my.cnf ]; then
@@ -81,13 +79,16 @@ if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ]; then
 [mysqld]
 skip-name-resolve=1
 max_allowed_packet=256M
-default_authentication_plugin=caching_sha2_password
 EOF
 fi
 
 echo "Restarting mysql.service" | log
 systemctl restart mysql.service
-waitOrStop 0 "Restart mysql service failed"
+if [ $? -ne 0 ]; then
+    echo "MySQL service failed to start. Check error log:" | log
+    cat /var/log/mysql/error.log | log
+    waitOrStop 0 "Restart mysql service failed"
+fi
 
 echo "Adding descriptions" | log
 descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
