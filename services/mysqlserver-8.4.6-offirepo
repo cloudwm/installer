@@ -1,0 +1,96 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ubuntu-updateos.success
+
+echo "Create temp swap for composer processes" | log
+# Increase vm swappiness to allow swap to dominate process
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+sleep 5
+
+if [ -r /root/guest.conf ]; then
+    # Expect a line like password=YOUR_PASSWORD
+    ADMINPASSWORD="$(grep -E '^password=' /root/guest.conf | cut -d'=' -f2-)"
+    if [ -z "$ADMINPASSWORD" ]; then
+        echo "ERROR: password key not found or empty in /root/guest.conf" >&2
+        exit 1
+    fi
+else
+    echo "ERROR: /root/guest.conf not found or not readable" >&2
+    exit 1
+fi
+
+echo "Adding MySQL 8.4 APT repository" | log
+wget https://dev.mysql.com/get/mysql-apt-config_0.8.32-1_all.deb -O /tmp/mysql-apt-config.deb
+export DEBIAN_FRONTEND="noninteractive"
+echo "mysql-apt-config mysql-apt-config/select-server select mysql-8.4-lts" | sudo debconf-set-selections
+echo "mysql-apt-config mysql-apt-config/select-product select Ok" | sudo debconf-set-selections
+sudo dpkg -i /tmp/mysql-apt-config.deb
+sudo apt update
+sudo apt install -y wget libaio1t64
+rm -f /tmp/mysql-apt-config.deb
+
+echo "Installing mysql from apt" | log
+export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
+echo "ADMINPASS: ${ADMINPASSWORD}" | log
+
+installPackage mysql-server
+waitOrStop 0 "Failed apt install: mysql-server-8.4"
+
+echo "Set ~/.my.cnf root password for quick cli work" | log
+if [ ! -f /root/.my.cnf ]; then
+    cat << EOF > /root/.my.cnf
+[client]
+user=root
+password="${ADMINPASSWORD}"
+EOF
+fi
+chmod 600 /root/.my.cnf
+
+echo "Running first setup process" | log
+# Replace mysql_secure_installation with direct SQL to avoid prompts
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+EOF
+
+echo "Setting some defaults to mysqld-installer.cnf" | log
+if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ]; then
+    cat << EOF > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+[mysqld]
+skip-name-resolve=1
+max_allowed_packet=256M
+default_authentication_plugin=caching_sha2_password
+EOF
+fi
+
+echo "Restarting mysql.service" | log
+systemctl restart mysql.service
+waitOrStop 0 "Restart mysql service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
+descriptionAppend "mySQL Server Username: root"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "mySQL Server config global files location: /etc/mysql/"
+descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
