@@ -1,0 +1,52 @@
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Docker and Docker Compose" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+sleep 5
+
+echo "Cloning Ghost Docker repository" | log
+sudo mkdir -p /opt/ghost
+sudo git clone https://github.com/TryGhost/ghost-docker.git /opt/ghost
+cd /opt/ghost
+
+# Write .env file
+cat << EOF > .env
+DOMAIN=${CWM_DOMAIN}
+DATABASE_ROOT_PASSWORD="${ADMINPASSWORD}"
+DATABASE_PASSWORD="${ADMINPASSWORD}"
+EOF
+
+# Copy and configure Caddyfile
+cp caddy/Caddyfile.example caddy/Caddyfile
+sed -i "s/CHANGE_ME/$DOMAIN/g" caddy/Caddyfile
+
+echo "Pulling and starting Ghost services" | log
+docker compose pull
+docker compose up -d
+waitOrStop 0 "Failed to start Ghost services"
+
+echo "Waiting for Ghost to initialize" | log
+sleep 120  # Wait 2 minutes for initialization (adjust if needed)
+
+echo "Adding descriptions" | log
+descriptionAppend "Ghost Server Address: https://${CWM_DOMAIN}"
+descriptionAppend "Ghost Admin Address: https://${CWM_DOMAIN}/ghost"
+descriptionAppend "Ghost Database Root Password: $DATABASE_ROOT_PASSWORD"
+descriptionAppend " "
+descriptionAppend "Ghost config location: /opt/ghost/.env"
+descriptionAppend "Ghost Caddy config: /opt/ghost/caddy/Caddyfile"
+
+tagScript success
+
+exit 0
