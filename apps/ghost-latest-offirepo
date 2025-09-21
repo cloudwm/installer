@@ -40,8 +40,8 @@ echo "Waiting for Ghost to initialize" | log
 sleep 120  # Wait 2 minutes for initialization (adjust if needed)
 
 echo "Adding descriptions" | log
-descriptionAppend "Ghost Server Address: https://$DOMAIN"
-descriptionAppend "Ghost Admin Address: https://$ADMIN_DOMAIN/ghost"
+descriptionAppend "Ghost Server Address: https://${CWM_DOMAIN}"
+descriptionAppend "Ghost Admin Address: https://${CWM_DOMAIN}/ghost"
 descriptionAppend "Ghost Database Root Password: $DATABASE_ROOT_PASSWORD"
 descriptionAppend " "
 descriptionAppend "Ghost config location: /opt/ghost/.env"
