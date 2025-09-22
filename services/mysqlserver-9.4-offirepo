@@ -1,0 +1,134 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist ubuntu-updateos.success
+
+echo "Create temp swap for composer processes" | log
+# Increase vm swappiness to allow swap to dominate process
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+sleep 5
+
+if [ -r /root/guest.conf ]; then
+    # Expect a line like password=YOUR_PASSWORD
+    ADMINPASSWORD="$(grep -E '^password=' /root/guest.conf | cut -d'=' -f2-)"
+    if [ -z "$ADMINPASSWORD" ]; then
+        echo "ERROR: password key not found or empty in /root/guest.conf" >&2
+        exit 1
+    fi
+else
+    echo "ERROR: /root/guest.conf not found or not readable" >&2
+    exit 1
+fi
+
+echo "Checking for existing MySQL/MariaDB installations" | log
+if pgrep -x "mysqld" > /dev/null; then
+    echo "ERROR: MySQL/MariaDB process is already running" >&2
+    exit 1
+fi
+if netstat -tuln | grep ':3306 ' > /dev/null; then
+    echo "ERROR: Port 3306 is in use" >&2
+    exit 1
+fi
+
+echo "Updating package lists and installing MySQL 9.4.0 dependencies" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y wget libaio1t64 libssl-dev libc6 libmecab2
+
+echo "Downloading and installing MySQL 9.4.0 from deb bundle" | log
+wget https://dev.mysql.com/get/Downloads/MySQL-9.4/mysql-server_9.4.0-1ubuntu24.04_amd64.deb-bundle.tar -O /tmp/mysql-server_9.4.0.tar
+sudo mkdir -p /tmp/mysql-deb
+sudo tar -xf /tmp/mysql-server_9.4.0.tar -C /tmp/mysql-deb
+rm -f /tmp/mysql-server_9.4.0.tar
+
+echo "Installing mysql from deb bundle" | log
+export DEBIAN_FRONTEND="noninteractive"
+debconf-set-selections <<< "mysql-community-server mysql-community-server/root-pass password ${ADMINPASSWORD}"
+debconf-set-selections <<< "mysql-community-server mysql-community-server/re-root-pass password ${ADMINPASSWORD}"
+echo "ADMINPASS: ${ADMINPASSWORD}" | log
+
+# Install .deb packages in strict order to satisfy dependencies
+sudo dpkg -i /tmp/mysql-deb/mysql-common_*.deb
+sudo apt install -f -y
+sudo dpkg -i /tmp/mysql-deb/mysql-community-client-plugins_*.deb
+sudo apt install -f -y
+sudo dpkg -i /tmp/mysql-deb/mysql-community-client-core_*.deb
+sudo apt install -f -y
+sudo dpkg -i /tmp/mysql-deb/mysql-community-client_*.deb
+sudo apt install -f -y
+sudo dpkg -i /tmp/mysql-deb/mysql-client_*.deb
+sudo apt install -f -y
+sudo dpkg -i /tmp/mysql-deb/mysql-community-server-core_*.deb
+sudo apt install -f -y
+sudo dpkg -i /tmp/mysql-deb/mysql-community-server_*.deb
+sudo apt install -f -y
+sudo dpkg -i /tmp/mysql-deb/mysql-server_*.deb
+sudo apt install -f -y
+sudo rm -rf /tmp/mysql-deb
+
+waitOrStop 0 "Failed apt install: mysql-server-9.4"
+
+echo "Ensuring MySQL data directory permissions" | log
+sudo mkdir -p /var/lib/mysql
+sudo chown mysql:mysql /var/lib/mysql
+sudo chmod 750 /var/lib/mysql
+
+echo "Set ~/.my.cnf root password for quick cli work" | log
+if [ ! -f /root/.my.cnf ]; then
+    cat << EOF > /root/.my.cnf
+[client]
+user=root
+password="${ADMINPASSWORD}"
+EOF
+fi
+chmod 600 /root/.my.cnf
+
+echo "Running first setup process" | log
+# Replace mysql_secure_installation with direct SQL to avoid prompts
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+EOF
+
+echo "Setting some defaults to mysqld-installer.cnf" | log
+if [ ! -f /etc/mysql/mysql.conf.d/mysqld-installer.cnf ]; then
+    cat << EOF > /etc/mysql/mysql.conf.d/mysqld-installer.cnf
+[mysqld]
+skip-name-resolve=1
+max_allowed_packet=256M
+bind-address=127.0.0.1
+EOF
+fi
+
+echo "Restarting mysql.service" | log
+systemctl restart mysql.service
+if [ $? -ne 0 ]; then
+    echo "MySQL service failed to start. Check error log:" | log
+    cat /var/log/mysql/error.log | log
+    waitOrStop 0 "Restart mysql service failed"
+fi
+
+echo "Adding descriptions" | log
+descriptionAppend "mySQL Server Address: ${CWM_SERVERIP}"
+descriptionAppend "mySQL Server Username: root"
+descriptionAppend "mySQL Server Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "mySQL Server config global files location: /etc/mysql/"
+descriptionAppend "mySQL Server config user-specific file: ~/.my.cnf"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
