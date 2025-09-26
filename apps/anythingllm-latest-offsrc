@@ -86,6 +86,7 @@ install_anythingLLM() {
       --name anythingllm \
       -p 3001:3001 \
       --cap-add SYS_ADMIN \
+	  --restart=unless-stopped \
       -v "${STORAGE_LOCATION}:/app/server/storage" \
       -v "${STORAGE_LOCATION}/.env:/app/server/.env" \
       -e STORAGE_DIR="/app/server/storage" \
