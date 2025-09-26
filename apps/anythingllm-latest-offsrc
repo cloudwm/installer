@@ -77,20 +77,23 @@ install_anythingLLM() {
     touch "$STORAGE_LOCATION/.env"
     chmod 664 "$STORAGE_LOCATION/.env"
     chown 1000:1000 "$STORAGE_LOCATION/.env"
-
-    echo "Pulling AnythingLLM Docker image..." | log
+	
+	chown -R 1000:1000 "$HOME/anythingllm"
+	chmod 755 "$HOME/anythingllm"
+    
+	echo "Pulling AnythingLLM Docker image..." | log
     docker pull mintplexlabs/anythingllm:latest
 
     echo "Starting AnythingLLM container..." | log
     docker run -d \
-      --name anythingllm \
-      -p 3001:3001 \
-      --cap-add SYS_ADMIN \
-	  --restart=unless-stopped \
-      -v "${STORAGE_LOCATION}:/app/server/storage" \
-      -v "${STORAGE_LOCATION}/.env:/app/server/.env" \
-      -e STORAGE_DIR="/app/server/storage" \
-      mintplexlabs/anythingllm:latest
+		--name anythingllm \
+		-p 3001:3001 \
+		--cap-add SYS_ADMIN \
+		--restart=unless-stopped \
+		-v "${STORAGE_LOCATION}:/app/storage" \
+		-v "${STORAGE_LOCATION}/.env:/app/server/.env" \
+		-e STORAGE_DIR="/app/storage" \
+		mintplexlabs/anythingllm:latest
 
     echo "AnythingLLM is running on http://localhost:3001" | log
 }
