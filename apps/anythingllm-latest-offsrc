@@ -1,0 +1,104 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# ==============================
+# Install prerequisites
+# ==============================
+echo "Installing prerequisites..." | log
+apt update
+apt install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    net-tools \
+    debconf-utils \
+    libnss3-tools \
+    wget
+
+install_docker() {
+	# ==============================
+    # Check if Docker is already installed
+    # ==============================
+    if command -v docker >/dev/null 2>&1; then
+        echo "Docker is already installed. Skipping Docker installation." | log
+        return
+    fi
+	
+	# ==============================
+	# Add Docker GPG key & Ubuntu repo
+	# ==============================
+	echo "Adding docker GPG key..." | log
+	install -m 0755 -d /etc/apt/keyrings
+	curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+	  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+	chmod a+r /etc/apt/keyrings/docker.gpg
+
+	# Add the Docker repository for Ubuntu
+	echo \
+	  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+	  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+	  > /etc/apt/sources.list.d/docker.list
+
+	# ==============================
+	# Install Docker Engine & Plugins
+	# ==============================
+	echo "Installing Docker engine & plugins..." | log
+	apt update
+	apt install -y \
+		docker-ce \
+		docker-ce-cli \
+		containerd.io \
+		docker-buildx-plugin \
+		docker-compose-plugin
+
+	# ==============================
+	# Enable and start Docker
+	# ==============================
+	echo "Enabling & Starting docker service..."
+	systemctl enable --now docker
+
+	echo "Docker installation completed successfully." | log
+	echo "Verify with:  sudo docker run hello-world" | log
+}
+
+install_anythingLLM() {
+    echo "Creating base directory for AnythingLLM data..." | log
+    STORAGE_LOCATION="$HOME/anythingllm"
+    mkdir -p "$STORAGE_LOCATION"
+
+    # Create .env with correct permissions
+    touch "$STORAGE_LOCATION/.env"
+    chmod 664 "$STORAGE_LOCATION/.env"
+    chown 1000:1000 "$STORAGE_LOCATION/.env"
+
+    echo "Pulling AnythingLLM Docker image..." | log
+    docker pull mintplexlabs/anythingllm:latest
+
+    echo "Starting AnythingLLM container..." | log
+    docker run -d \
+      --name anythingllm \
+      -p 3001:3001 \
+      --cap-add SYS_ADMIN \
+      -v "${STORAGE_LOCATION}:/app/server/storage" \
+      -v "${STORAGE_LOCATION}/.env:/app/server/.env" \
+      -e STORAGE_DIR="/app/server/storage" \
+      mintplexlabs/anythingllm:latest
+
+    echo "AnythingLLM is running on http://localhost:3001" | log
+}
+
+
+main() {
+	install_docker
+	install_anythingLLM
+}
+
+
+main
