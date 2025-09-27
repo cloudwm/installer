@@ -152,22 +152,16 @@ trigger_redirect() {
     url="$CONTENT"
     [ -z "$url" ] && return
 
-    # message in the redirect box
-    sed -i "/<div id=\"redirection\">/,/<\/div>/ { /<p class=\"redirect\">.*<\/p>/d; }" "$HTML_FILE"
-    sed -i "/<div id=\"redirection\">/a \        <p class=\"redirect\">Redirecting to $url in 3 seconds...</p>" "$HTML_FILE"
+    # remove any existing reload/redirect scripts completely
+    sed -i '/window.location.reload/d' "$HTML_FILE"
+    sed -i '/window.location.replace/d' "$HTML_FILE"
+    sed -i '/window.location.href/d' "$HTML_FILE"
 
-    # neutralize the auto-reload so it doesn't race the redirect
-    sed -i "s/window.location.reload(true);/\/\/ reload disabled by redirect/;" "$HTML_FILE"
-
-    # insert or update the redirect script (3s delay)
-    if grep -q "window.location.href" "$HTML_FILE"; then
-        sed -i "s|window.location.href *= *['\"][^'\"]*['\"]|window.location.href='$url'|" "$HTML_FILE"
-    else
-        sed -i "/<\/body>/i \
+    # add the new redirect script just before </body>
+    sed -i "/<\/body>/i \
 <script>\n\
   setTimeout(function(){ window.location.replace('$url'); }, 3000);\n\
 </script>" "$HTML_FILE"
-    fi
 }
 
 
