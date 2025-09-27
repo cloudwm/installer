@@ -145,25 +145,31 @@ update_redirect() {
     done <<< "$(echo -e "$CONTENT")"
 }
 
-# Function to add a timed redirect to localhost:8080
 trigger_redirect() {
     # show the redirect container if hidden
     sed -i 's|<div class="container redirect-container hidden">|<div class="container redirect-container">|' "$HTML_FILE"
 
-    # insert a redirect message
-    if [ -n "$CONTENT" ]; then
-        sed -i "/<div id=\"redirection\">/,/<\/div>/ { /<p class=\"redirect\">.*<\/p>/d; }" "$HTML_FILE"
-        sed -i "/<div id=\"redirection\">/a \        <p class=\"redirect\">$CONTENT</p>" "$HTML_FILE"
-    fi
+    url="$CONTENT"
+    [ -z "$url" ] && return
 
-    # add a one-time JavaScript redirect to port 8080 if not already present
-    if ! grep -q "window.location.href='http://$CONTENT:8080'" "$HTML_FILE"; then
+    # message in the redirect box
+    sed -i "/<div id=\"redirection\">/,/<\/div>/ { /<p class=\"redirect\">.*<\/p>/d; }" "$HTML_FILE"
+    sed -i "/<div id=\"redirection\">/a \        <p class=\"redirect\">Redirecting to $url in 3 seconds...</p>" "$HTML_FILE"
+
+    # neutralize the auto-reload so it doesn't race the redirect
+    sed -i "s/window.location.reload(true);/\/\/ reload disabled by redirect/;" "$HTML_FILE"
+
+    # insert or update the redirect script (3s delay)
+    if grep -q "window.location.href" "$HTML_FILE"; then
+        sed -i "s|window.location.href *= *['\"][^'\"]*['\"]|window.location.href='$url'|" "$HTML_FILE"
+    else
         sed -i "/<\/body>/i \
 <script>\n\
-  setTimeout(function(){ window.location.href='http://$CONTENT:8080'; }, 10000);\n\
+  setTimeout(function(){ window.location.replace('$url'); }, 3000);\n\
 </script>" "$HTML_FILE"
     fi
 }
+
 
 # Decide which action to perform based on the second argument
 case "$ACTION" in
