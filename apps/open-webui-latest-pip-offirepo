@@ -1,0 +1,85 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/openwebui-setup.log"
+WEB_PATH="/var/www/html"
+HTML_PATH="/var/www/html/index.html"
+
+if [ ! -f "$LOG_PATH" ]; then
+	touch "$LOG_PATH"
+fi
+
+echo "Installing python3-venv and pip..." | log
+"$updateStatus" "$HTML_PATH" -ap "Installing python3-venv and pip..."
+apt update
+apt install -y python3-venv python3-pip
+
+
+# ----- Virtual environment -----
+"$updateStatus" "$HTML_PATH" -ap "Creating virtual environment..."
+VENV_DIR="$HOME/open-webui-venv"
+if [ ! -d "$VENV_DIR" ]; then
+    python3 -m venv "$VENV_DIR"
+fi
+source "$VENV_DIR/bin/activate"
+
+echo "Installing Open-WebUI..." | log
+"$updateStatus" "$HTML_PATH" -ap "Installing Open-WebUI..."
+pip install --upgrade pip
+pip install --upgrade open-webui
+
+# ----- systemd Service -----
+"$updateStatus" "$HTML_PATH" -ap "Creating service..."
+SERVICE_FILE="/etc/systemd/system/open-webui.service"
+if [ ! -f "$SERVICE_FILE" ]; then
+    echo "Creating systemd service at $SERVICE_FILE ..." | log
+     tee "$SERVICE_FILE" > /dev/null <<EOF
+[Unit]
+Description=Open WebUI
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$USER
+WorkingDirectory=$HOME
+ExecStart=$VENV_DIR/bin/open-webui serve --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=5
+Environment=PATH=$VENV_DIR/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable open-webui.service
+fi
+
+echo "Starting Open WebUI service..."
+"$updateStatus" "$HTML_PATH" -ap "Starting Open WebUI service..."
+systemctl restart open-webui.service
+
+# ----- Optional immediate health check -----
+echo "Checking if Open WebUI responds on port 8080..."
+"$updateStatus" "$HTML_PATH" -ap "Checking if Open WebUI responds on port 8080..."
+MAX_WAIT=60
+START=$(date +%s)
+while true; do
+    if curl -s http://localhost:8080/ >/dev/null 2>&1; then
+        echo "✅ Open WebUI is up at http://localhost:8080"
+        break
+    fi
+    if (( $(date +%s) - START > MAX_WAIT )); then
+        echo "❌ Timed out after ${MAX_WAIT}s. Check: journalctl -u open-webui"
+        exit 1
+    fi
+    sleep 2
+done
