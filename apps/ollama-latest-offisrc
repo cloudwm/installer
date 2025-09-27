@@ -6,11 +6,66 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/ollama-setup.log"
+WEB_PATH="/var/www/html"
+HTML_PATH="/var/www/html/index.html"
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+if [ -z "$MACHINE_IP" ]; then
+  MACHINE_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
+fi
+echo "Machine IP: $MACHINE_IP" | log
+
+if [ ! -f "$LOG_PATH" ]; then
+	touch "$LOG_PATH"
+fi
+
+echo "Opening Ollama's default port: 11434..." | log
+ufw allow 11434/tcp
+
 echo "Installing Ollama..." | log
-curl -fsSL https://ollama.com/install.sh | sh
+"$updateStatus" "$HTML_PATH" -ap "Installing Ollama (Might take some time)..."
+curl -fsSL https://ollama.com/install.sh | sh | tee "$LOG_PATH" & 
+
+
+declare -a pre_display_list=()
+declare -A seen # associative array to track seen lines
+
+# Start tailing the log file and process lines as they come
+while read line; do
+	# Locate the line to display
+    if [[ "$line" == *"==> "* ]]; then
+        if [[ "$line" == *"Pulling docker images"* ]]; then
+            line="Pulling docker images (Takes some time)..."
+			
+        else
+            line="${line#*==> }"
+        fi
+        
+        # Check if the line has been seen already
+        if [[ -z "${seen[$line]}" ]]; then
+            seen[$line]=1
+            pre_display_list+=("$line")
+
+			"$updateStatus" "$HTML_PATH" -cp
+			for stage in "${pre_display_list[@]}"; do
+				 # Remove all trailing dots first
+				cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
+				
+				# Append exactly three dots
+				final_stage="${cleaned_stage}..."
+				
+				# Update the installation landing page
+				"$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+			done
+        fi
+    fi
+done < <(tail -f "$LOG_PATH")
 
 # Add the OLLAMA_HOST environment variable to the systemd unit
 echo "Tweaking Ollama server to accept outside connections..." | log
+"$updateStatus" "$HTML_PATH" -ap "Tweaking Ollama server to accept outside connections..."
 SERVICE_FILE="/etc/systemd/system/ollama.service"
 if [ -f "$SERVICE_FILE" ]; then
     # insert the line only if it isn’t already present
@@ -22,4 +77,22 @@ if [ -f "$SERVICE_FILE" ]; then
     fi
 fi
 
+"$updateStatus" "$HTML_PATH" -sr
+"$updateStatus" "$HTML_PATH" -ur "Ollama API is ready at http://${MACHINE_IP}:11434"
+"$updateStatus" "$HTML_PATH" -tr "http://${MACHINE_IP}:11434"
+
+sleep 10
+echo "Installation complete. Stopping and removing Apache2..." | log
+
+# Stop the service and disable it from starting on boot
+systemctl stop apache2
+systemctl disable apache2
+
+# Optionally remove the apache2 package and related modules
+apt purge -y apache2 apache2-utils apache2-bin apache2.2-common
+apt autoremove -y
+apt clean
+
+echo "Apache2 service stopped and removed." | log
+		
 tag Script.success
