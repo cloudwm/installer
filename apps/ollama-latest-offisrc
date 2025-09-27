@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# --- setup and vars ---
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -9,72 +10,48 @@ fi
 rootDir="$(rootDir)"
 updateStatus="$rootDir/include/updateInstallStatus.sh"
 LOG_PATH="/var/log/ollama-setup.log"
-WEB_PATH="/var/www/html"
 HTML_PATH="/var/www/html/index.html"
 MACHINE_IP=$(hostname -I | awk '{print $1}')
-if [ -z "$MACHINE_IP" ]; then
-  MACHINE_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
-fi
+[ -z "$MACHINE_IP" ] && MACHINE_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
 echo "Machine IP: $MACHINE_IP" | log
+[ -f "$LOG_PATH" ] || touch "$LOG_PATH"
 
-if [ ! -f "$LOG_PATH" ]; then
-	touch "$LOG_PATH"
-fi
+declare -a pre_display_list
+declare -A seen
 
 echo "Opening Ollama's default port: 11434..." | log
 ufw allow 11434/tcp
 
+# --- kick off installer in background ---
 echo "Installing Ollama..." | log
 "$updateStatus" "$HTML_PATH" -ap "Installing Ollama (Might take some time)..."
-curl -fsSL https://ollama.com/install.sh | sh | tee "$LOG_PATH" & 
+curl -fsSL https://ollama.com/install.sh | sh | tee "$LOG_PATH" &   # background
+INSTALL_PID=$!
 
-
-declare -a pre_display_list=()
-declare -A seen # associative array to track seen lines
-
-# Start tailing the log file and process lines as they come
-while read line; do
-	# Locate the line to display
-    if [[ "$line" == *"==> "* ]]; then
-        if [[ "$line" == *"Pulling docker images"* ]]; then
-            line="Pulling docker images (Takes some time)..."
-			
-        else
-            line="${line#*==> }"
-        fi
-        
-        # Check if the line has been seen already
-        if [[ -z "${seen[$line]}" ]]; then
-            seen[$line]=1
-            pre_display_list+=("$line")
-
-			"$updateStatus" "$HTML_PATH" -cp
-			for stage in "${pre_display_list[@]}"; do
-				 # Remove all trailing dots first
-				cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
-				
-				# Append exactly three dots
-				final_stage="${cleaned_stage}..."
-				
-				# Update the installation landing page
-				"$updateStatus" "$HTML_PATH" -ap "${final_stage}"
-			done
-        fi
+# --- stream log to Web UI as it grows ---
+tail -f "$LOG_PATH" | while read -r line; do
+    [[ "$line" == *"==> "* ]] || continue
+    [[ "$line" == *"Pulling docker images"* ]] && line="Pulling docker images (Takes some time)..." || line="${line#*==> }"
+    if [[ -z "${seen[$line]}" ]]; then
+        seen[$line]=1
+        pre_display_list+=("$line")
+        "$updateStatus" "$HTML_PATH" -cp
+        for stage in "${pre_display_list[@]}"; do
+            cleaned=$(echo "$stage" | sed 's/\.*$//')
+            "$updateStatus" "$HTML_PATH" -ap "${cleaned}..."
+        done
     fi
-done < <(tail -f "$LOG_PATH")
+done &
 
-# Add the OLLAMA_HOST environment variable to the systemd unit
-echo "Tweaking Ollama server to accept outside connections..." | log
-"$updateStatus" "$HTML_PATH" -ap "Tweaking Ollama server to accept outside connections..."
+wait $INSTALL_PID   # wait for installer to finish
+
+# --- systemd tweak for external access ---
 SERVICE_FILE="/etc/systemd/system/ollama.service"
-if [ -f "$SERVICE_FILE" ]; then
-    # insert the line only if it isn’t already present
-    if ! grep -q '^Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"; then
-        sed -i '/^\[Service\]/a Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"
-        systemctl daemon-reload
-        systemctl restart ollama
-        echo "Added Environment=OLLAMA_HOST=0.0.0.0:11434 to $SERVICE_FILE and restarted service." | log
-    fi
+if [ -f "$SERVICE_FILE" ] && ! grep -q '^Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"; then
+    sed -i '/^\[Service\]/a Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"
+    systemctl daemon-reload
+    systemctl restart ollama
+    echo "Added Environment=OLLAMA_HOST=0.0.0.0:11434 to $SERVICE_FILE and restarted service." | log
 fi
 
 "$updateStatus" "$HTML_PATH" -sr
@@ -83,16 +60,11 @@ fi
 
 sleep 10
 echo "Installation complete. Stopping and removing Apache2..." | log
-
-# Stop the service and disable it from starting on boot
 systemctl stop apache2
 systemctl disable apache2
-
-# Optionally remove the apache2 package and related modules
 apt purge -y apache2 apache2-utils apache2-bin apache2.2-common
 apt autoremove -y
 apt clean
-
 echo "Apache2 service stopped and removed." | log
-		
+
 tag Script.success
