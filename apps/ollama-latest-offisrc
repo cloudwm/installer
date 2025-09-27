@@ -67,4 +67,9 @@ apt autoremove -y
 apt clean
 echo "Apache2 service stopped and removed." | log
 
+systemctl stop ollama.service
+systemctl daemon-reload
+systemctl enable ollama.service
+systemctl start ollama.service
+
 tag Script.success
