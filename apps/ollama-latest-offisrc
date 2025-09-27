@@ -1,6 +1,25 @@
 #!/bin/bash
 
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Ollama..." | log
 curl -fsSL https://ollama.com/install.sh | sh
 
+# Add the OLLAMA_HOST environment variable to the systemd unit
+echo "Tweaking Ollama server to accept outside connections..." | log
+SERVICE_FILE="/etc/systemd/system/ollama.service"
+if [ -f "$SERVICE_FILE" ]; then
+    # insert the line only if it isn’t already present
+    if ! grep -q '^Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"; then
+        sed -i '/^\[Service\]/a Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"
+        systemctl daemon-reload
+        systemctl restart ollama
+        echo "Added Environment=OLLAMA_HOST=0.0.0.0:11434 to $SERVICE_FILE and restarted service." | log
+    fi
+fi
 
 tag Script.success
