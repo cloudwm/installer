@@ -12,7 +12,7 @@ updateStatus="$rootDir/include/updateInstallStatus.sh"
 LOG_PATH="/var/log/openwebui-setup.log"
 WEB_PATH="/var/www/html"
 HTML_PATH="/var/www/html/index.html"
-MACHINE_IP="$(grep -Eo '^ip0=[0-9.]+' "$HOME/guest.conf" | cut -d'=' -f2)"
+MACHINE_IP=$(hostname -I | awk '{print $1}')
 
 if [ ! -f "$LOG_PATH" ]; then
 	touch "$LOG_PATH"
@@ -68,12 +68,14 @@ EOF
     systemctl enable open-webui.service
 fi
 
-echo "Starting Open WebUI service..."
+echo "Starting Open WebUI service..." | log
 "$updateStatus" "$HTML_PATH" -ap "Starting Open WebUI service..."
 systemctl restart open-webui.service
 
 # ----- Optional immediate health check -----
-echo "Checking if Open WebUI responds on port 8080..."
+echo "Checking if Open WebUI responds on port 8080..." | log
+echo "Machine IP: $MACHINE_IP"
+
 "$updateStatus" "$HTML_PATH" -ap "Checking if Open WebUI responds on port 8080..."
 MAX_WAIT=60
 START=$(date +%s)
