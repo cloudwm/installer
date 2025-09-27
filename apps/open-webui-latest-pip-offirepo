@@ -80,8 +80,9 @@ START=$(date +%s)
 while true; do
     if curl -s http://localhost:8080/ >/dev/null 2>&1; then
         echo "✅ Open WebUI is ready at http://$MACHINE_IP:8080"
-		"$updateStatus" "$HTML_PATH" -cp
-		"$updateStatus" "$HTML_PATH" -ap "✅ Open WebUI is ready at http://$MACHINE_IP:8080"
+		"$updateStatus" "$HTML_PATH" -sr
+		"$updateStatus" "$HTML_PATH" -ur "✅ Open WebUI is ready at http://$MACHINE_IP:8080"
+		"$updateStatus" "$HTML_PATH" -tr "http://$MACHINE_IP:8080"
 		
 		echo "Installation complete. Stopping and removing Apache2..." | log
 
