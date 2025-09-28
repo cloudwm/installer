@@ -100,6 +100,10 @@ server {
     }
 }
 EOF
+	
+	systemctl stop apache2
+	systemctl disable apache2
+	
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/open-webui.conf
     nginx -t && systemctl reload nginx
 
