@@ -57,6 +57,12 @@ if [ -f ".env" ]; then
     # Enable HTTPS if domain is provided
     if [ ! -z "$CWM_DOMAIN" ]; then
         sed -i "s|_APP_OPTIONS_FORCE_HTTPS=.*|_APP_OPTIONS_FORCE_HTTPS=enabled|g" .env
+        # Configure Let's Encrypt settings
+        echo "" >> .env
+        echo "# SSL Certificate Configuration" >> .env
+        echo "_APP_DOMAIN_FUNCTIONS=https://${CWM_DOMAIN}" >> .env
+        echo "_APP_OPTIONS_ABUSE=disabled" >> .env
+        echo "_APP_SYSTEM_EMAIL_ADDRESS=${ADMINEMAIL}" >> .env
     fi
 else
     echo "Error: .env file not found" | log
@@ -68,12 +74,7 @@ docker compose up -d --remove-orphans
 waitOrStop 0 "Failed to start Appwrite services"
 
 echo "Waiting for Appwrite to initialize" | log
-sleep 180  # Wait 3 minutes for initialization (Appwrite takes longer than Ghost)
-
-# Check if Appwrite is running
-if ! curl -f -s "http://localhost" > /dev/null; then
-    echo "Warning: Appwrite may still be starting up. This is normal on first installation." | log
-fi
+sleep 180
 
 echo "Adding descriptions" | log
 descriptionAppend "Appwrite Console: https://${CWM_DOMAIN}"
@@ -93,8 +94,6 @@ descriptionAppend "First-time setup:"
 descriptionAppend "1. Visit https://${CWM_DOMAIN} to access the Appwrite Console"
 descriptionAppend "2. Create your admin account"
 descriptionAppend "3. Create your first project"
-
-# No temporary files to clean up in this version
 
 tagScript success
 exit 0
