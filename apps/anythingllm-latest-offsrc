@@ -136,7 +136,7 @@ install_anythingLLM() {
 		-e STORAGE_DIR="/app/storage" \
 		mintplexlabs/anythingllm:latest
 
-    echo "AnythingLLM is running on http://${MACHINE_IP}:3001" | log
+    echo "AnythingLLM is running on http://${DOMAIN_NAME}:3001" | log
 }
 
 
