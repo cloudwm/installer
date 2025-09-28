@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Appwrite Installation Script
+# Based on existing installer format
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -44,25 +47,35 @@ echo "Configuring Appwrite environment" | log
 # Update .env file with custom configurations
 if [ -f ".env" ]; then
     echo "Updating Appwrite configuration with domain settings" | log
-
+    
     # Update the environment file with our settings
-    sed -i "s|_APP_DOMAIN=.*|_APP_DOMAIN=${CWM_DOMAIN}|g" .env
+    sed -i "s|_APP_DOMAIN=.*|_APP_DOMAIN=https://${CWM_DOMAIN}|g" .env
     sed -i "s|_APP_DOMAIN_TARGET=.*|_APP_DOMAIN_TARGET=${CWM_DOMAIN}|g" .env
     sed -i "s|_APP_SYSTEM_SECURITY_MASTER_KEY=.*|_APP_SYSTEM_SECURITY_MASTER_KEY=${APPWRITE_SECRET}|g" .env
-
+    
     # Set HTTP and HTTPS ports
     sed -i "s|_APP_PORT_HTTP=.*|_APP_PORT_HTTP=80|g" .env
     sed -i "s|_APP_PORT_HTTPS=.*|_APP_PORT_HTTPS=443|g" .env
-
-    # Enable HTTPS if domain is provided
+    
+    # Critical settings for Let's Encrypt to work
     if [ ! -z "$CWM_DOMAIN" ]; then
+        # Force HTTPS
         sed -i "s|_APP_OPTIONS_FORCE_HTTPS=.*|_APP_OPTIONS_FORCE_HTTPS=enabled|g" .env
-        # Configure Let's Encrypt settings
-        echo "" >> .env
-        echo "# SSL Certificate Configuration" >> .env
-        echo "_APP_DOMAIN_FUNCTIONS=https://${CWM_DOMAIN}" >> .env
-        echo "_APP_OPTIONS_ABUSE=disabled" >> .env
-        echo "_APP_SYSTEM_EMAIL_ADDRESS=${ADMINEMAIL}" >> .env
+        
+        # Set environment to production (REQUIRED for Let's Encrypt)
+        sed -i "s|_APP_ENV=.*|_APP_ENV=production|g" .env
+        
+        # Set email for Let's Encrypt (REQUIRED)
+        if [ ! -z "$ADMINEMAIL" ]; then
+            sed -i "s|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=.*|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${ADMINEMAIL}|g" .env
+        else
+            sed -i "s|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=.*|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=admin@${CWM_DOMAIN}|g" .env
+        fi
+        
+        # Ensure domain functions are set correctly
+        sed -i "s|_APP_DOMAIN_FUNCTIONS=.*|_APP_DOMAIN_FUNCTIONS=https://${CWM_DOMAIN}|g" .env
+        
+        echo "Configured Let's Encrypt settings for domain: ${CWM_DOMAIN}" | log
     fi
 else
     echo "Error: .env file not found" | log
@@ -73,8 +86,23 @@ echo "Starting Appwrite services" | log
 docker compose up -d --remove-orphans
 waitOrStop 0 "Failed to start Appwrite services"
 
-echo "Waiting for Appwrite to initialize" | log
-sleep 180
+echo "Waiting for Appwrite to initialize..." | log
+sleep 60
+
+# Trigger certificate generation by visiting the domain
+echo "Triggering Let's Encrypt certificate generation..." | log
+curl -k -s "https://${CWM_DOMAIN}" > /dev/null 2>&1 || true
+curl -s "http://${CWM_DOMAIN}" > /dev/null 2>&1 || true
+
+# Manually trigger certificate generation
+echo "Manually generating SSL certificate..." | log
+docker compose exec -T appwrite ssl domain="${CWM_DOMAIN}" || true
+
+echo "Waiting for SSL certificate generation..." | log
+sleep 120  # Wait 2 minutes for certificate generation
+
+echo "Waiting for Appwrite to initialize and SSL certificates" | log
+sleep 180  # Wait 3 minutes for initialization (Appwrite takes longer than Ghost)
 
 echo "Adding descriptions" | log
 descriptionAppend "Appwrite Console: https://${CWM_DOMAIN}"
@@ -84,16 +112,24 @@ descriptionAppend " "
 descriptionAppend "Appwrite config location: /opt/appwrite/.env"
 descriptionAppend "Appwrite compose file: /opt/appwrite/docker-compose.yml"
 descriptionAppend " "
-descriptionAppend "To manage Appwrite:"
-descriptionAppend "  Start: cd /opt/appwrite && docker compose start"
-descriptionAppend "  Stop: cd /opt/appwrite && docker compose stop"
-descriptionAppend "  Restart: cd /opt/appwrite && docker compose restart"
-descriptionAppend "  View logs: cd /opt/appwrite && docker compose logs -f"
+descriptionAppend "IMPORTANT - SSL Certificate Requirements:"
+descriptionAppend "- Your domain (${CWM_DOMAIN}) MUST point to this server's public IP"
+descriptionAppend "- Ports 80 and 443 must be open and accessible from the internet"
+descriptionAppend "- Let's Encrypt validates your domain ownership via HTTP challenge"
+descriptionAppend "- Certificate generation may take 5-10 minutes after first visit"
 descriptionAppend " "
-descriptionAppend "First-time setup:"
+descriptionAppend "IMPORTANT - First-time setup:"
 descriptionAppend "1. Visit https://${CWM_DOMAIN} to access the Appwrite Console"
-descriptionAppend "2. Create your admin account"
-descriptionAppend "3. Create your first project"
+descriptionAppend "2. Sign up for a new account - THIS BECOMES YOUR ADMIN/ROOT USER"
+descriptionAppend "3. The first user created automatically becomes the administrator"
+descriptionAppend "4. After signing up, you'll be taken to the admin dashboard"
+descriptionAppend "5. Create your first project to start using Appwrite"
+descriptionAppend " "
+descriptionAppend "Security Note:"
+descriptionAppend "- Anyone can create the first user, so set it up immediately"
+descriptionAppend "- After setup, consider disabling public registration in .env:"
+descriptionAppend "  _APP_CONSOLE_WHITELIST_ROOT=disabled"
+descriptionAppend " "
 
 tagScript success
 exit 0
