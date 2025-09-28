@@ -65,7 +65,7 @@ if [ -f ".env" ]; then
         # Set environment to production (REQUIRED for Let's Encrypt)
         sed -i "s|_APP_ENV=.*|_APP_ENV=production|g" .env
         
-       if [ ! -z "$ADMIN_EMAIL" ]; then
+       if [ ! -z "$ADMINEMAIL" ]; then
             sed -i "s|_APP_EMAIL_CERTIFICATES=.*|_APP_EMAIL_CERTIFICATES=${ADMINEMAIL}|g" .env
             echo "_APP_EMAIL_CERTIFICATES=${ADMINEMAIL}" >> .env
        fi
