@@ -65,17 +65,14 @@ if [ -f ".env" ]; then
         # Set environment to production (REQUIRED for Let's Encrypt)
         sed -i "s|_APP_ENV=.*|_APP_ENV=production|g" .env
         
-        # Set email for Let's Encrypt (REQUIRED)
-        if [ ! -z "$ADMINEMAIL" ]; then
-            sed -i "s|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=.*|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${ADMINEMAIL}|g" .env
-        else
-            sed -i "s|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=.*|_APP_SYSTEM_SECURITY_EMAIL_ADDRESS=admin@${CWM_DOMAIN}|g" .env
-        fi
-        
+       if [ ! -z "$ADMIN_EMAIL" ]; then
+            sed -i "s|_APP_EMAIL_CERTIFICATES=.*|_APP_EMAIL_CERTIFICATES=${ADMINEMAIL}|g" .env
+            echo "_APP_EMAIL_CERTIFICATES=${ADMINEMAIL}" >> .env
+       fi
         # Ensure domain functions are set correctly
-        sed -i "s|_APP_DOMAIN_FUNCTIONS=.*|_APP_DOMAIN_FUNCTIONS=https://${CWM_DOMAIN}|g" .env
-        
-        echo "Configured Let's Encrypt settings for domain: ${CWM_DOMAIN}" | log
+       sed -i "s|_APP_DOMAIN_FUNCTIONS=.*|_APP_DOMAIN_FUNCTIONS=https://${CWM_DOMAIN}|g" .env
+
+       echo "Configured Let's Encrypt settings for domain: ${CWM_DOMAIN}" | log
     fi
 else
     echo "Error: .env file not found" | log
