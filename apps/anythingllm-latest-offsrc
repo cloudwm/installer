@@ -29,7 +29,7 @@ apt install -y \
 
 install_nginx() {
     echo "Installing nginx & certbot..." | log
-    apt install -y nginx python3-certbot-nginx
+    apt install -y nginx certbot python3-certbot-nginx
 
     echo "Enabling nginx..." | log
     systemctl enable --now nginx
