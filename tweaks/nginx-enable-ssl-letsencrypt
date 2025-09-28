@@ -29,8 +29,6 @@ echo "Preparing nginx for certbot certification" | log
 cp $rootDir/tweaks/letsencrypt-nginx-route.conf /etc/nginx/snippets/
 cp $rootDir/tweaks/letsencrypt-nginx-register.conf /etc/nginx/sites-available/
 ln -s /etc/nginx/sites-available/letsencrypt-nginx-register.conf /etc/nginx/sites-enabled/
-systemctl restart nginx.service
-waitOrStop 0 "Failed restart nginx after certification"
 
 echo "Generating letsencrypt certificates with certbot" | log
 execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
