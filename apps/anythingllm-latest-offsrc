@@ -8,10 +8,9 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 MACHINE_IP=$(hostname -I | awk '{print $1}')
-if [ -z "$MACHINE_IP" ]; then
-  MACHINE_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
-fi
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
+echo "Domain: $DOMAIN_NAME" | log
 
 # ==============================
 # Install prerequisites
@@ -27,6 +26,42 @@ apt install -y \
     debconf-utils \
     libnss3-tools \
     wget
+
+install_nginx() {
+    echo "Installing nginx & certbot..." | log
+    apt install -y nginx python3-certbot-nginx
+
+    echo "Enabling nginx..." | log
+    systemctl enable --now nginx
+
+    # ---- Create nginx site config dynamically ----
+    NGINX_CONF="/etc/nginx/sites-available/anythingllm.conf"
+    echo "Creating nginx config for $DOMAIN_NAME ..." | log
+    cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    location / {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/anythingllm.conf
+    nginx -t && systemctl reload nginx
+
+    # ---- Obtain and enable SSL with certbot ----
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
+
+    echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
+}
 
 install_docker() {
 	# ==============================
@@ -107,6 +142,7 @@ install_anythingLLM() {
 
 main() {
 	install_docker
+	install_nginx
 	install_anythingLLM
 }
 
