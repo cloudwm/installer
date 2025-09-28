@@ -7,6 +7,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+if [ -z "$MACHINE_IP" ]; then
+  MACHINE_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
+fi
+echo "Machine IP: $MACHINE_IP" | log
+
 # ==============================
 # Install prerequisites
 # ==============================
@@ -95,7 +101,7 @@ install_anythingLLM() {
 		-e STORAGE_DIR="/app/storage" \
 		mintplexlabs/anythingllm:latest
 
-    echo "AnythingLLM is running on http://localhost:3001" | log
+    echo "AnythingLLM is running on http://${MACHINE_IP}:3001" | log
 }
 
 
