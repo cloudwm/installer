@@ -1,0 +1,80 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appPath=/var/flowise
+rootDir=$(rootDir)
+
+echo "Installing Docker dependencies" | log
+installPackage curl git
+waitOrStop 0 "Failed to install dependencies"
+
+echo "Installing Docker" | log
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+waitOrStop 0 "Failed to install Docker"
+
+echo "Installing Docker Compose" | log
+apt-get install docker-compose -y
+waitOrStop 0 "Failed to install Docker Compose"
+
+echo "Cloning Flowise repository" | log
+git clone https://github.com/FlowiseAI/Flowise.git $appPath
+waitOrStop 0 "Failed to clone Flowise repository"
+
+cd $appPath/docker
+cp .env.example .env
+sed -i "s|^FLOWISE_USERNAME=.*|FLOWISE_USERNAME=${ADMINEMAIL}|" .env
+sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
+chown -R root:root $appPath
+chmod -R 755 $appPath
+
+echo "Starting Flowise with Docker Compose" | log
+docker compose up -d
+waitOrStop 0 "Failed to start Flowise with Docker Compose"
+
+echo "Adding Flowise port to ufw" | log
+ufw allow 3000
+
+echo "Installing Nginx for reverse proxy" | log
+installPackage nginx
+waitOrStop 0 "Failed to install Nginx"
+
+echo "Configuring Nginx for Flowise" | log
+cat << EOF > /etc/nginx/sites-available/flowise
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/flowise /etc/nginx/sites-enabled/
+nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+echo "Adding Nginx port to ufw" | log
+ufw allow 80
+
+echo "Adding descriptions" | log
+descriptionAppend "Flowise is installed and running with Docker."
+descriptionAppend "Flowise repository directory: $appPath"
+descriptionAppend "Flowise Web UI: http://${CWM_DOMAIN}/"
+descriptionAppend "To stop Flowise: cd $appPath/docker && docker compose down"
+descriptionAppend "To start Flowise: cd $appPath/docker && docker compose up -d"
+descriptionAppend "Flowise logs: cd $appPath/docker && docker compose logs -f"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

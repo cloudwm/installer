@@ -7,10 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Downloading and installing CloudPanel" | log
-curl -sS https://installer.cloudpanel.io/ce/v2/install.sh -o install.sh; \
-echo "985bed747446eabad433c2e8115e21d6898628fa982c9e55ff6cd0d7c35b501d install.sh" | \
-sha256sum -c && sudo DB_ENGINE=MYSQL_8.4 bash install.sh
-
+curl -sSL https://installer.cloudpanel.io/ce/v2/install.sh -o install.sh; \
+sudo DB_ENGINE=MYSQL_8.4 bash install.sh
 waitOrStop 0 "Failed to install CloudPanel"
 
 echo "Restarting and enabling  services" | log
