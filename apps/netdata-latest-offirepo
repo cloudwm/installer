@@ -1,0 +1,140 @@
+#!/bin/bash
+
+# Source startup script if available
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Starting Netdata installation with SSL" | log
+export DEBIAN_FRONTEND="noninteractive"
+
+# Update system packages
+echo "Updating system packages" | log
+sudo apt update
+sudo apt install -y curl wget apt-transport-https ca-certificates gnupg lsb-release
+
+# Install Docker and Docker Compose
+echo "Installing Docker and Docker Compose" | log
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+
+sleep 5
+
+# Download and verify Netdata kickstart script
+echo "Downloading Netdata kickstart script" | log
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
+
+# Install Netdata
+echo "Installing Netdata" | log
+# Using --non-interactive for automated installation
+# Using --stable-channel for production stability
+# Disable auto-updates to control updates manually
+sh /tmp/netdata-kickstart.sh --non-interactive --stable-channel --no-updates
+waitOrStop 0 "Failed to install Netdata"
+
+echo "Starting Netdata service" | log
+sudo systemctl start netdata
+sudo systemctl enable netdata
+
+
+# Configure Netdata to listen only on localhost (Caddy will be the public interface)
+echo "Configuring Netdata to listen on localhost only" | log
+sudo mkdir -p /etc/netdata
+cat << EOF | sudo tee /etc/netdata/netdata.conf > /dev/null
+[web]
+    bind to = 127.0.0.1:19999
+EOF
+
+# Restart Netdata to apply configuration
+sudo systemctl restart netdata
+
+# Create directory for Caddy setup
+echo "Setting up Caddy reverse proxy" | log
+sudo mkdir -p /opt/netdata/caddy
+
+# Create Caddyfile for Netdata with automatic SSL
+cat << EOF | sudo tee /opt/netdata/caddy/Caddyfile > /dev/null
+${CWM_DOMAIN} {
+    reverse_proxy localhost:19999
+    
+    # Enable compression
+    encode gzip
+    
+    # Security headers
+    header {
+        # Enable HSTS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Prevent clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        # Prevent MIME type sniffing
+        X-Content-Type-Options "nosniff"
+        # Enable XSS protection
+        X-XSS-Protection "1; mode=block"
+    }
+    
+    # Logging
+    log {
+        output file /var/log/caddy/netdata-access.log
+        format json
+    }
+}
+EOF
+
+# Create docker-compose.yml for Caddy
+cat << EOF | sudo tee /opt/netdata/docker-compose.yml > /dev/null
+version: '3.8'
+
+services:
+  caddy:
+    image: caddy:latest
+    container_name: netdata-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    network_mode: host
+    environment:
+      - DOMAIN=${CWM_DOMAIN}
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
+EOF
+
+# Start Caddy with Docker Compose
+echo "Starting Caddy reverse proxy" | log
+cd /opt/netdata
+docker compose pull
+docker compose up -d
+
+waitOrStop 0 "Failed to start Caddy reverse proxy"
+
+echo "Adding descriptions" | log
+descriptionAppend "Netdata Dashboard: https://${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "Netdata Configuration: /etc/netdata/netdata.conf"
+descriptionAppend "Netdata Data Directory: /var/cache/netdata"
+descriptionAppend "Netdata Log Directory: /var/log/netdata"
+descriptionAppend "Caddy Configuration: /opt/netdata/caddy/Caddyfile"
+descriptionAppend "Caddy Logs: /opt/netdata/caddy_logs"
+descriptionAppend " "
+descriptionAppend "To edit Netdata config: sudo /etc/netdata/edit-config netdata.conf"
+descriptionAppend "To restart Netdata: sudo systemctl restart netdata"
+descriptionAppend "To restart Caddy: cd /opt/netdata && docker compose restart"
+descriptionAppend "To view Netdata logs: sudo journalctl -u netdata -f"
+descriptionAppend "To view Caddy logs: docker logs netdata-caddy -f"
+
+tagScript success
+
+exit 0
