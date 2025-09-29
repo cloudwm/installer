@@ -122,7 +122,6 @@ health_check_and_cleanup() {
             echo "✅ Open WebUI is ready at https://${DOMAIN_NAME}" | log
             "$updateStatus" "$HTML_PATH" -sr
             "$updateStatus" "$HTML_PATH" -ur "✅ Open WebUI is ready at https://${DOMAIN_NAME}"
-            "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 
             sleep 10
             echo "Installation complete. Stopping and removing Apache2..." | log
@@ -132,6 +131,8 @@ health_check_and_cleanup() {
             apt autoremove -y
             apt clean
             echo "Apache2 service stopped and removed." | log
+			
+            "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
             break
         fi
         if (( $(date +%s) - START > MAX_WAIT )); then
