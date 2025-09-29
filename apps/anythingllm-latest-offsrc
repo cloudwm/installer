@@ -7,6 +7,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/anythingllm-setup.log"
+HTML_PATH="/var/www/html/index.html"
+
 MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
@@ -16,6 +21,7 @@ echo "Domain: $DOMAIN_NAME" | log
 # Install prerequisites
 # ==============================
 echo "Installing prerequisites..." | log
+"$updateStatus" "$HTML_PATH" -ap "Installing prerequisites..."
 apt update
 apt install -y \
     ca-certificates \
@@ -69,6 +75,7 @@ install_docker() {
     # ==============================
     if command -v docker >/dev/null 2>&1; then
         echo "Docker is already installed. Skipping Docker installation." | log
+		"$updateStatus" "$HTML_PATH" -ap "Docker is already installed. Skipping Docker installation."
         return
     fi
 	
@@ -91,6 +98,7 @@ install_docker() {
 	# Install Docker Engine & Plugins
 	# ==============================
 	echo "Installing Docker engine & plugins..." | log
+	"$updateStatus" "$HTML_PATH" -ap "Installing Docker engine & plugins..."
 	apt update
 	apt install -y \
 		docker-ce \
@@ -106,11 +114,12 @@ install_docker() {
 	systemctl enable --now docker
 
 	echo "Docker installation completed successfully." | log
+	"$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
 	echo "Verify with:  sudo docker run hello-world" | log
 }
 
 install_anythingLLM() {
-    echo "Creating base directory for AnythingLLM data..." | log
+	echo "Creating base directory for AnythingLLM data..." | log
     STORAGE_LOCATION="$HOME/anythingllm"
     mkdir -p "$STORAGE_LOCATION"
 
@@ -123,9 +132,11 @@ install_anythingLLM() {
 	chmod 755 "$HOME/anythingllm"
     
 	echo "Pulling AnythingLLM Docker image..." | log
+	"$updateStatus" "$HTML_PATH" -ap "Pulling AnythingLLM Docker image..."
     docker pull mintplexlabs/anythingllm:latest
 
     echo "Starting AnythingLLM container..." | log
+	"$updateStatus" "$HTML_PATH" -ap "Starting AnythingLLM container..."
     docker run -d \
 		--name anythingllm \
 		-p 3001:3001 \
@@ -136,7 +147,10 @@ install_anythingLLM() {
 		-e STORAGE_DIR="/app/storage" \
 		mintplexlabs/anythingllm:latest
 
-    echo "AnythingLLM is running on http://${DOMAIN_NAME}:3001" | log
+    echo "AnythingLLM is running on https://${DOMAIN_NAME}" | log
+	"$updateStatus" "$HTML_PATH" -sr
+	"$updateStatus" "$HTML_PATH" -ur "AnythingLLM is running on https://${DOMAIN_NAME}"
+	"$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
 
 
