@@ -16,6 +16,7 @@ show_help() {
     echo "  -hr, hide_redirect      - Hides the redirect container."
     echo "  -sr, show_redirect      - Shows the redirect container."
     echo "  -ur, update_redirect    - Updates the content of the #redirection div."
+	echo "	-tr, redirect			- Trigger Redirect the page to a new URL."
     echo ""
     echo "Arguments:"
     echo "  html_file          - Path to the HTML file to be modified."
@@ -36,13 +37,17 @@ show_help() {
     echo "  $0 /path/to/file.html -hr"
     echo "  $0 /path/to/file.html -sr"
     echo "  $0 /path/to/file.html -ur \"You will be redirected in 10 seconds.\""
+	echo "  $0 /path/to/file.html -tr  \"http://example.com:3000\""
     echo ""
     echo "Options:"
     echo "  -h, --help         - Display this help message and exit."
 }
 
 # Check for necessary arguments
-if [ "$1" == "-h" ] || [ "$1" == "--help" ] || [ "$#" -lt 3 ] && [ "$2" != "-cp" ] && [ "$2" != "-ui" ] && [ "$2" != "-uf" ] && [ "$2" != "-hc" ] && [ "$2" != "-sc" ] && [ "$2" != "-hr" ] && [ "$2" != "-sr" ]; then
+if [ "$1" == "-h" ] || [ "$1" == "--help" ] || \
+   ( [ "$#" -lt 3 ] && [ "$2" != "-cp" ] && [ "$2" != "-ui" ] && [ "$2" != "-uf" ] \
+     && [ "$2" != "-hc" ] && [ "$2" != "-sc" ] && [ "$2" != "-hr" ] \
+     && [ "$2" != "-sr" ] && [ "$2" != "-tr" ] ); then
     show_help
     exit 1
 fi
@@ -50,6 +55,7 @@ fi
 HTML_FILE="$1"
 ACTION="$2"
 CONTENT="${3-}"
+
 
 # Function to update the title
 update_title() {
@@ -139,6 +145,25 @@ update_redirect() {
     done <<< "$(echo -e "$CONTENT")"
 }
 
+trigger_redirect() {
+    # show the redirect container if hidden
+    sed -i 's|<div class="container redirect-container hidden">|<div class="container redirect-container">|' "$HTML_FILE"
+
+    url="$CONTENT"
+    [ -z "$url" ] && return
+
+    # remove any existing reload/redirect scripts completely
+    sed -i '/window.location.reload/d' "$HTML_FILE"
+    sed -i '/window.location.replace/d' "$HTML_FILE"
+    sed -i '/window.location.href/d' "$HTML_FILE"
+
+    # add the new redirect script just before </body>
+    sed -i "/<\/body>/i \
+<script>\n\
+  setTimeout(function(){ window.location.replace('$url'); }, 3000);\n\
+</script>" "$HTML_FILE"
+}
+
 
 # Decide which action to perform based on the second argument
 case "$ACTION" in
@@ -181,9 +206,12 @@ case "$ACTION" in
     -ur | update_redirect)
         update_redirect "$HTML_FILE" "$CONTENT"
         ;;
+	-tr | redirect)
+        trigger_redirect
+        ;;
     *)
         echo "Invalid action: $ACTION"
-        echo "Valid actions: -uh (update_heading), -ap (add_paragraph), -rp (replace_paragraphs), -cp (clear_paragraphs), -ui (update_image), -ut (update_title), -uf (update_favicon), -uc (update_credentials), -hc (hide_credentials), -sc (show_credentials), -hr (hide_redirect), -sr (show_redirect), -ur (update_redirect)"
+		show_help
         exit 1
         ;;
 esac
