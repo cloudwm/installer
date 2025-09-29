@@ -1,0 +1,105 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Docker and Docker Compose" | log
+export DEBIAN_FRONTEND="noninteractive"
+
+# Update system packages
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Add Docker's official GPG key and repository
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker and Docker Compose
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Add current user to docker group
+sudo usermod -aG docker $USER
+
+sleep 5
+
+echo "Setting up Appwrite installation directory" | log
+sudo mkdir -p /opt/appwrite
+cd /opt/appwrite
+
+echo "Downloading Appwrite configuration files" | log
+
+# Download docker-compose.yml and .env template
+curl -o docker-compose.yml https://appwrite.io/install/compose
+curl -o .env https://appwrite.io/install/env
+
+# Generate a random secret key
+APPWRITE_SECRET=$(openssl rand -hex 32)
+
+echo "Configuring Appwrite environment" | log
+
+# Update .env file with custom configurations
+if [ -f ".env" ]; then
+    echo "Updating Appwrite configuration with domain settings" | log
+
+    # Update the environment file with our settings
+    sed -i "s|_APP_DOMAIN=.*|_APP_DOMAIN=${CWM_DOMAIN}|g" .env
+    sed -i "s|_APP_DOMAIN_TARGET=.*|_APP_DOMAIN_TARGET=${CWM_DOMAIN}|g" .env
+    sed -i "s|_APP_SYSTEM_SECURITY_MASTER_KEY=.*|_APP_SYSTEM_SECURITY_MASTER_KEY=${APPWRITE_SECRET}|g" .env
+
+    # Set HTTP and HTTPS ports
+    sed -i "s|_APP_PORT_HTTP=.*|_APP_PORT_HTTP=80|g" .env
+    sed -i "s|_APP_PORT_HTTPS=.*|_APP_PORT_HTTPS=443|g" .env
+
+    # Enable HTTPS if domain is provided
+    if [ ! -z "$CWM_DOMAIN" ]; then
+        sed -i "s|_APP_OPTIONS_FORCE_HTTPS=.*|_APP_OPTIONS_FORCE_HTTPS=enabled|g" .env
+    fi
+else
+    echo "Error: .env file not found" | log
+    exit 1
+fi
+
+echo "Starting Appwrite services" | log
+docker compose up -d --remove-orphans
+waitOrStop 0 "Failed to start Appwrite services"
+
+echo "Waiting for Appwrite to initialize" | log
+sleep 180
+
+# Check if Appwrite is running
+if ! curl -f -s "http://localhost" > /dev/null; then
+    echo "Warning: Appwrite may still be starting up. This is normal on first installation." | log
+fi
+
+echo "Adding descriptions" | log
+descriptionAppend "Appwrite Console: https://${CWM_DOMAIN}"
+descriptionAppend "Appwrite API Endpoint: https://${CWM_DOMAIN}/v1"
+descriptionAppend "Appwrite Secret Key: ${APPWRITE_SECRET}"
+descriptionAppend " "
+descriptionAppend "Appwrite config location: /opt/appwrite/.env"
+descriptionAppend "Appwrite compose file: /opt/appwrite/docker-compose.yml"
+descriptionAppend " "
+descriptionAppend "IMPORTANT - First-time setup:"
+descriptionAppend "1. Visit https://${CWM_DOMAIN} to access the Appwrite Console"
+descriptionAppend "2. Sign up for a new account - THIS BECOMES YOUR ADMIN/ROOT USER"
+descriptionAppend "3. The first user created automatically becomes the administrator"
+descriptionAppend "4. After signing up, you'll be taken to the admin dashboard"
+descriptionAppend "5. Create your first project to start using Appwrite"
+descriptionAppend " "
+descriptionAppend "Security Note:"
+descriptionAppend "- Anyone can create the first user, so set it up immediately"
+descriptionAppend "- After setup, consider disabling public registration in .env:"
+descriptionAppend "  _APP_CONSOLE_WHITELIST_ROOT=disabled"
+descriptionAppend " "
+descriptionAppend "To manage Appwrite:"
+descriptionAppend "  Start: cd /opt/appwrite && docker compose start"
+descriptionAppend "  Stop: cd /opt/appwrite && docker compose stop"
+descriptionAppend "  Restart: cd /opt/appwrite && docker compose restart"
+descriptionAppend "  View logs: cd /opt/appwrite && docker compose logs -f"
+
+tagScript success
+exit 0
