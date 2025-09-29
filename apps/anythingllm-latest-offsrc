@@ -36,9 +36,6 @@ apt install -y \
 install_nginx() {
     echo "Installing nginx & certbot..." | log
     apt install -y nginx certbot python3-certbot-nginx
-	
-    echo "Enabling nginx..." | log
-    systemctl enable --now nginx
 
     # ---- Create nginx site config dynamically ----
     NGINX_CONF="/etc/nginx/sites-available/anythingllm.conf"
@@ -60,7 +57,7 @@ server {
 EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/anythingllm.conf
-    nginx -t && systemctl reload nginx
+	nginx -t
 
     # ---- Obtain and enable SSL with certbot ----
     echo "Requesting Let's Encrypt certificate..." | log
@@ -154,6 +151,9 @@ install_anythingLLM() {
 	
 	systemctl stop apache2
 	systemctl disable apache2
+	
+	echo "Enabling nginx..." | log
+    systemctl enable --now nginx
 	systemctl start nginx
 }
 
