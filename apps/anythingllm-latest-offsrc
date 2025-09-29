@@ -146,11 +146,15 @@ install_anythingLLM() {
 		-v "${STORAGE_LOCATION}/.env:/app/server/.env" \
 		-e STORAGE_DIR="/app/storage" \
 		mintplexlabs/anythingllm:latest
-
+	
     echo "AnythingLLM is running on https://${DOMAIN_NAME}" | log
 	"$updateStatus" "$HTML_PATH" -sr
 	"$updateStatus" "$HTML_PATH" -ur "AnythingLLM is running on https://${DOMAIN_NAME}"
 	"$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+	
+	systemctl stop apache2
+	systemctl disable apache2
+	systemctl start nginx
 }
 
 
