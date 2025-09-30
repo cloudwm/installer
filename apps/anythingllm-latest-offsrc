@@ -2,7 +2,6 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
@@ -34,12 +33,9 @@ apt install -y \
     wget
 
 install_nginx() {
-    echo "Installing nginx & certbot..." | log
-    apt install -y nginx certbot python3-certbot-nginx
-
-    # ---- Create nginx site config dynamically ----
+    echo "Configuring nginx reverse proxy for AnythingLLM..." | log
+    
     NGINX_CONF="/etc/nginx/sites-available/anythingllm.conf"
-    echo "Creating nginx config for $DOMAIN_NAME ..." | log
     cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
@@ -57,100 +53,97 @@ server {
 EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/anythingllm.conf
-	nginx -t
+    nginx -t
+    systemctl reload nginx
+
+    echo "nginx configuration updated for AnythingLLM." | log
 }
 
 install_docker() {
-    # Check if Docker is already installed
     if command -v docker >/dev/null 2>&1; then
         echo "Docker is already installed. Skipping Docker installation." | log
-		"$updateStatus" "$HTML_PATH" -ap "Docker is already installed. Skipping Docker installation."
+        "$updateStatus" "$HTML_PATH" -ap "Docker is already installed. Skipping Docker installation."
         return
     fi
-	
-	# Add Docker GPG key & Ubuntu repo
-	echo "Adding docker GPG key..." | log
-	install -m 0755 -d /etc/apt/keyrings
-	curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-	  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-	chmod a+r /etc/apt/keyrings/docker.gpg
 
-	# Add the Docker repository for Ubuntu
-	echo \
-	  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-	  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-	  > /etc/apt/sources.list.d/docker.list
+    echo "Adding docker GPG key..." | log
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
 
-	# Install Docker Engine & Plugins
-	echo "Installing Docker engine & plugins..." | log
-	"$updateStatus" "$HTML_PATH" -ap "Installing Docker engine & plugins..."
-	apt update
-	apt install -y \
-		docker-ce \
-		docker-ce-cli \
-		containerd.io \
-		docker-buildx-plugin \
-		docker-compose-plugin
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
 
-	echo "Enabling & Starting docker service..."
-	systemctl enable --now docker
+    echo "Installing Docker engine & plugins..." | log
+    "$updateStatus" "$HTML_PATH" -ap "Installing Docker engine & plugins..."
+    apt update
+    apt install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin
 
-	echo "Docker installation completed successfully." | log
-	"$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
-	echo "Verify with:  sudo docker run hello-world" | log
+    echo "Enabling & Starting docker service..."
+    systemctl enable --now docker
+
+    echo "Docker installation completed successfully." | log
+    "$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
+    echo "Verify with:  sudo docker run hello-world" | log
 }
 
 install_anythingLLM() {
-	echo "Creating base directory for AnythingLLM data..." | log
+    echo "Creating base directory for AnythingLLM data..." | log
     STORAGE_LOCATION="$HOME/anythingllm"
     mkdir -p "$STORAGE_LOCATION"
 
-    # Create .env with correct permissions
     touch "$STORAGE_LOCATION/.env"
     chmod 664 "$STORAGE_LOCATION/.env"
     chown 1000:1000 "$STORAGE_LOCATION/.env"
-	
-	chown -R 1000:1000 "$HOME/anythingllm"
-	chmod 755 "$HOME/anythingllm"
-    
-	echo "Pulling AnythingLLM Docker image..." | log
-	"$updateStatus" "$HTML_PATH" -ap "Pulling AnythingLLM Docker image..."
+
+    chown -R 1000:1000 "$HOME/anythingllm"
+    chmod 755 "$HOME/anythingllm"
+
+    echo "Pulling AnythingLLM Docker image..." | log
+    "$updateStatus" "$HTML_PATH" -ap "Pulling AnythingLLM Docker image..."
     docker pull mintplexlabs/anythingllm:latest
 
     echo "Starting AnythingLLM container..." | log
-	"$updateStatus" "$HTML_PATH" -ap "Starting AnythingLLM container..."
+    "$updateStatus" "$HTML_PATH" -ap "Starting AnythingLLM container..."
     docker run -d \
-		--name anythingllm \
-		-p 3001:3001 \
-		--cap-add SYS_ADMIN \
-		--restart=unless-stopped \
-		-v "${STORAGE_LOCATION}:/app/storage" \
-		-v "${STORAGE_LOCATION}/.env:/app/server/.env" \
-		-e STORAGE_DIR="/app/storage" \
-		mintplexlabs/anythingllm:latest
-	
-    echo "AnythingLLM is running on https://${DOMAIN_NAME}" | log
+        --name anythingllm \
+        -p 3001:3001 \
+        --cap-add SYS_ADMIN \
+        --restart=unless-stopped \
+        -v "${STORAGE_LOCATION}:/app/storage" \
+        -v "${STORAGE_LOCATION}/.env:/app/server/.env" \
+        -e STORAGE_DIR="/app/storage" \
+        mintplexlabs/anythingllm:latest
+
+    echo "AnythingLLM container launched." | log
 }
 
-main() {
-	install_docker
-	install_nginx
-	install_anythingLLM
-	
-	systemctl stop apache2
-	systemctl disable apache2
-	sleep 3
-    systemctl enable nginx
-	systemctl start nginx
-	
-	# ---- Obtain and enable SSL with certbot ----
+obtain_ssl() {
+    echo "Reloading nginx before requesting certificate..." | log
+    systemctl reload nginx
+
     echo "Requesting Let's Encrypt certificate..." | log
     certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
 
     echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
-	"$updateStatus" "$HTML_PATH" -sr
-	"$updateStatus" "$HTML_PATH" -ur "AnythingLLM is running on https://${DOMAIN_NAME}"
-	"$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "AnythingLLM is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+
+main() {
+    install_docker
+    install_nginx
+    install_anythingLLM
+    obtain_ssl
 }
 
 main
