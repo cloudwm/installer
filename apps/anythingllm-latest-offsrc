@@ -58,9 +58,6 @@ EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/anythingllm.conf
 	nginx -t
-	
-	echo "Enabling nginx..." | log
-    systemctl enable nginx
 }
 
 install_docker() {
@@ -142,7 +139,8 @@ main() {
 	
 	systemctl stop apache2
 	systemctl disable apache2
-	sleep 10
+	sleep 3
+    systemctl enable nginx
 	systemctl start nginx
 	
 	# ---- Obtain and enable SSL with certbot ----
