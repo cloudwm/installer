@@ -152,7 +152,8 @@ main() {
     start_service
     setup_nginx_ssl
     health_check_and_cleanup
-    tag Script.success
 }
 
 main
+
+tag Script.success
