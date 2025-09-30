@@ -12,8 +12,9 @@ updateStatus="$rootDir/include/updateInstallStatus.sh"
 LOG_PATH="/var/log/ollama-setup.log"
 HTML_PATH="/var/www/html/index.html"
 MACHINE_IP=$(hostname -I | awk '{print $1}')
-[ -z "$MACHINE_IP" ] && MACHINE_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
+echo "Domain: $DOMAIN_NAME" | log
 [ -f "$LOG_PATH" ] || touch "$LOG_PATH"
 
 declare -a pre_display_list
@@ -25,7 +26,7 @@ ufw allow 11434/tcp
 # --- kick off installer in background ---
 echo "Installing Ollama..." | log
 "$updateStatus" "$HTML_PATH" -ap "Installing Ollama (Might take some time)..."
-curl -fsSL https://ollama.com/install.sh | sh | tee "$LOG_PATH" &   # background
+curl -fsSL --http1.1 https://ollama.com/install.sh | sh | tee "$LOG_PATH" &
 INSTALL_PID=$!
 
 # --- stream log to Web UI as it grows ---
@@ -54,22 +55,54 @@ if [ -f "$SERVICE_FILE" ] && ! grep -q '^Environment=OLLAMA_HOST=0.0.0.0:11434' 
     echo "Added Environment=OLLAMA_HOST=0.0.0.0:11434 to $SERVICE_FILE and restarted service." | log
 fi
 
-"$updateStatus" "$HTML_PATH" -sr
-"$updateStatus" "$HTML_PATH" -ur "Ollama API is ready at http://${MACHINE_IP}:11434"
-"$updateStatus" "$HTML_PATH" -tr "http://${MACHINE_IP}:11434"
-
-sleep 10
-echo "Installation complete. Stopping and removing Apache2..." | log
-systemctl stop apache2
-systemctl disable apache2
-apt purge -y apache2 apache2-utils apache2-bin apache2.2-common
-apt autoremove -y
-apt clean
-echo "Apache2 service stopped and removed." | log
-
-systemctl stop ollama.service
 systemctl daemon-reload
 systemctl enable ollama.service
 systemctl start ollama.service
+
+# --- configure nginx reverse proxy for Ollama ---
+echo "Writing nginx reverse proxy config for Ollama..." | log
+cat <<EOF > /etc/nginx/sites-available/ollama.conf
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    location / {
+        proxy_pass         http://127.0.0.1:11434;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/ollama.conf /etc/nginx/sites-enabled/ollama.conf
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+
+# --- obtain SSL cert ---
+obtain_ssl() {
+    echo "Reloading nginx before requesting certificate..." | log
+    systemctl reload nginx
+
+    echo "Requesting Let's Encrypt certificate..." | log
+    apt install -y certbot python3-certbot-nginx
+    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
+
+    echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
+    "$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Ollama API is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+obtain_ssl
+
+# --- cleanup progress config if it existed ---
+echo "Cleaning nginx progress site (if any)..." | log
+rm -f /etc/nginx/sites-enabled/installProgress.conf
+rm -f /etc/nginx/sites-available/installProgress.conf
+systemctl enable nginx
+systemctl restart nginx
+echo "Nginx ready with Ollama reverse proxy." | log
 
 tag Script.success
