@@ -2,34 +2,29 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+RUNTIME_DIR="/etc/supabase"
+RUNTIME_ENV="$RUNTIME_DIR/runtime.env"
+mkdir -p "$RUNTIME_DIR"
+
 rootDir="$(rootDir)"
 updateStatus="$rootDir/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
-
-# ────────────────────────────────────────────────
-# GLOBAL CONFIG
-# ────────────────────────────────────────────────
 LOG_PATH="/var/log/supabase-install.log"
 INSTALL_DIR="$HOME/supabase-local"
 PROJECT_NAME="local-supabase-app"
 SUPABASE_VERSION="2.48.3"
 DOMAIN_NAME="$(hostname -I | awk '{print $1}' | tr '.' '-')".cloud-xip.com
 
-# ────────────────────────────────────────────────
-# LOGGING
-# ────────────────────────────────────────────────
 log() {
     local msg="$1"
     echo "$(date '+%Y-%m-%d %H:%M:%S') $msg" | tee -a "$LOG_PATH"
 }
 
-# ────────────────────────────────────────────────
-# SYSTEM SETUP
-# ────────────────────────────────────────────────
 system_setup() {
     log "🔧 Updating system and installing dependencies..."
     apt-get update -y
@@ -38,9 +33,6 @@ system_setup() {
     systemctl start docker nginx
 }
 
-# ────────────────────────────────────────────────
-# FIREWALL CONFIGURATION
-# ────────────────────────────────────────────────
 configure_firewall() {
     log "🧱 Configuring firewall for Supabase..."
     ufw --force enable
@@ -61,9 +53,6 @@ configure_firewall() {
     log "✅ Firewall rules applied successfully."
 }
 
-# ────────────────────────────────────────────────
-# SUPABASE CLI INSTALLATION
-# ────────────────────────────────────────────────
 install_supabase_cli() {
     local ARCH
     ARCH=$(uname -m)
@@ -76,17 +65,38 @@ install_supabase_cli() {
     wget -q -O "/tmp/${DEB_FILE}" "$URL"
 
     log "📦 Installing Supabase CLI..."
-    dpkg -i "/tmp/${DEB_FILE}" || apt-get install -f -y
-    if ! command -v supabase &>/dev/null; then
-        log "❌ Supabase CLI installation failed."
-        exit 1
+    
+    # Wait for dpkg/apt locks (max 5 minutes)
+    local waited=0
+    while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+          fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+          fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+        if (( waited >= 300 )); then
+            log "❌ Timed out waiting for package manager lock. Another process (e.g., unattended-upgrades) is blocking installation."
+            return 1
+        fi
+        log "⏳ Waiting for package manager to finish (lock held)..."
+        sleep 5
+        (( waited += 5 ))
+    done
+
+    # Once lock is released, proceed with installation
+    if dpkg -i "/tmp/${DEB_FILE}" >/dev/null 2>&1; then
+        log "✅ Supabase CLI installed successfully."
+    else
+        log "⚙️ dpkg dependency fix in progress..."
+        apt-get install -f -y >/dev/null 2>&1
     fi
-    log "✅ Supabase CLI installed successfully."
+
+    # Validate installation
+    if ! command -v supabase &>/dev/null; then
+        log "❌ Supabase CLI installation failed after resolving dependencies."
+        return 1
+    fi
+
+    log "✅ Supabase CLI installed and verified."
 }
 
-# ────────────────────────────────────────────────
-# PROJECT SETUP
-# ────────────────────────────────────────────────
 setup_project() {
     log "📁 Setting up Supabase project at ${INSTALL_DIR}/${PROJECT_NAME}..."
     mkdir -p "${INSTALL_DIR}/${PROJECT_NAME}"
@@ -100,42 +110,90 @@ setup_project() {
     fi
 }
 
-# ────────────────────────────────────────────────
-# START SUPABASE (Live terminal + GUI progress)
-# ────────────────────────────────────────────────
+_kv_upsert() {
+	local k="$1" v="$2"
+	local f="$RUNTIME_ENV"
+	touch "$f"
+	v_escaped=$(printf '%s' "$v" | sed 's/"/\\"/g')
+	
+	if grep -q "^${k}=" "$f"; then
+		sed -i -E "s|^${k}=.*|${k}=\"${v_escaped}\"|" "$f"
+	else
+		echo "${k}=\"${v_escaped}\"" >> "$f"
+	fi
+}
+
 start_supabase() {
     log "▶️  Starting Supabase stack..."
     "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase and pulling Docker images..."
 
-    # Start Supabase and stream output to both terminal and GUI
-    supabase start 2>&1 | tee -a "$LOG_PATH" | while IFS= read -r line; do
-        # Always print raw line to terminal for full visibility
-        echo "$line"
+    : > "$RUNTIME_ENV"   # clear previous values
 
-        # Match lines like: "17.6.1.011: Pulling from supabase/postgres"
+    declare -A active_images
+
+    # stream start + parse both image pulls and the final banner
+    while IFS= read -r line; do
+        echo "$line" | tee -a "$LOG_PATH"
+
+        # ----- image pull progress (kept from your version) -----
         if echo "$line" | grep -q "Pulling from"; then
             version=$(echo "$line" | sed -E 's/^([^:]+):.*/\1/')
             imageName=$(echo "$line" | sed -E 's/.*Pulling from[[:space:]]*([^[:space:]]+).*/\1/')
-            # Clean up stray symbols
             version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
             imageName=$(echo "$imageName" | sed 's/[^a-zA-Z0-9._/-]//g')
+            active_images["$imageName:$version"]=1
             "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image: $imageName:$version..."
-        
-        # Match lines like: "🐋 Pulling image: v2.51.11:"
-        elif echo "$line" | grep -q "Pulling image:"; then
+            continue
+        fi
+
+        if echo "$line" | grep -Eq '^Digest:[[:space:]]*sha256:[a-f0-9]{64}'; then
+            for key in "${!active_images[@]}"; do
+                "$updateStatus" "$HTML_PATH" -ap "✅ Finished pulling: $key"
+                unset 'active_images[$key]'
+            done
+            continue
+        fi
+
+        if echo "$line" | grep -q "Pulling image:"; then
             version=$(echo "$line" | sed -E 's/.*Pulling image:[[:space:]]*([^[:space:]:]+).*/\1/')
             version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
+            active_images["$version"]=1
             "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image version: $version"
+            continue
         fi
-    done
+
+        # ----- parse the final startup banner to capture real creds -----
+        if echo "$line" | grep -qE '^\s*API URL:'; then
+            _kv_upsert API_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*GraphQL URL:'; then
+            _kv_upsert GRAPHQL_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Storage URL:'; then
+            _kv_upsert S3_STORAGE_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*MCP URL:'; then
+            _kv_upsert MCP_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Database URL:'; then
+            _kv_upsert DB_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Studio URL:'; then
+            _kv_upsert STUDIO_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Mailpit URL:'; then
+            _kv_upsert MAILPIT_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Publishable key:'; then
+            _kv_upsert PUBLISHABLE_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Secret key:'; then
+            _kv_upsert SECRET_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Access Key:'; then
+            _kv_upsert S3_ACCESS_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Secret Key:'; then
+            _kv_upsert S3_SECRET_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Region:'; then
+            _kv_upsert S3_REGION "${line#*: }"
+        fi
+    done < <(supabase start 2>&1)
 
     log "✅ Supabase started successfully."
     "$updateStatus" "$HTML_PATH" -ap "✅ Supabase stack started successfully."
 }
 
-# ────────────────────────────────────────────────
-# NGINX REVERSE PROXY (HTTP ONLY; CERTBOT ADDS HTTPS)
-# ────────────────────────────────────────────────
 configure_nginx() {
     log "🌀 Configuring Nginx reverse proxy..."
     local CONF="/etc/nginx/sites-available/supabase.conf"
@@ -182,9 +240,6 @@ EOF
     log "✅ Nginx reverse proxy configured."
 }
 
-# ────────────────────────────────────────────────
-# SSL CERTIFICATE (Let's Encrypt)
-# ────────────────────────────────────────────────
 obtain_ssl() {
     log "🔒 Attempting to obtain Let's Encrypt SSL certificate..."
     if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect -v; then
@@ -229,9 +284,6 @@ EOF
     fi
 }
 
-# ────────────────────────────────────────────────
-# POST-INSTALLATION CONFIGURATION
-# ────────────────────────────────────────────────
 post_install_configuration() {
     log "🧩 Running post-installation configuration..."
     local CONFIG_FILE="${INSTALL_DIR}/${PROJECT_NAME}/supabase/config.toml"
@@ -264,9 +316,6 @@ post_install_configuration() {
     log "✅ Post-installation configuration applied and services reloaded."
 }
 
-# ────────────────────────────────────────────────
-# VERIFY CONNECTION
-# ────────────────────────────────────────────────
 verify_connection() {
     log "🧠 Verifying Supabase Studio availability (HTTPS)..."
     for i in {1..10}; do
@@ -281,15 +330,87 @@ verify_connection() {
     exit 1
 }
 
-# ────────────────────────────────────────────────
-# MAIN FLOW
-# ────────────────────────────────────────────────
+configure_motd() {
+  log "🧾 Configuring system MOTD with Supabase info..."
+  chmod -x /etc/update-motd.d/* 2>/dev/null || true
+  rm -f /etc/motd 2>/dev/null
+
+  # read persisted values (fallbacks if missing)
+  [ -f "$RUNTIME_ENV" ] && set -a && . "$RUNTIME_ENV" && set +a
+
+  : "${API_URL:=http://127.0.0.1:54321}"
+  : "${GRAPHQL_URL:=${API_URL%/}/graphql/v1}"
+  : "${DB_URL:=postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
+  : "${STUDIO_URL:=http://127.0.0.1:54323}"
+  : "${MAILPIT_URL:=http://127.0.0.1:54324}"
+  : "${PUBLISHABLE_KEY:=<unknown>}"
+  : "${SECRET_KEY:=<unknown>}"
+  : "${S3_ACCESS_KEY:=<unknown>}"
+  : "${S3_SECRET_KEY:=<unknown>}"
+  : "${S3_REGION:=local}"
+
+  cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🚀 Started Supabase Local Development Setup
+──────────────────────────────────────────────
+
+         API URL: ${API_URL}
+     GraphQL URL: ${GRAPHQL_URL}
+  S3 Storage URL: ${API_URL%/}/storage/v1/s3
+         MCP URL: ${API_URL%/}/mcp
+    Database URL: ${DB_URL}
+      Studio URL: ${STUDIO_URL}
+     Mailpit URL: ${MAILPIT_URL}
+ Publishable key: ${PUBLISHABLE_KEY}
+      Secret key: ${SECRET_KEY}
+   S3 Access Key: ${S3_ACCESS_KEY}
+   S3 Secret Key: ${S3_SECRET_KEY}
+       S3 Region: ${S3_REGION}
+
+──────────────────────────────────────────────
+💡 To manage Supabase:
+   cd ${INSTALL_DIR}/${PROJECT_NAME}
+   supabase stop     # Stop all services
+   supabase start    # Start again
+   
+🧹 To remove this message:
+   sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+  chmod 644 /etc/motd
+  log "✅ Custom MOTD installed at /etc/motd with live values."
+}
+
+wait_for_package_lock() {
+    log "⏳ Checking for existing apt/dpkg operations..."
+    local waited=0
+    local max_wait=600  # 10 minutes
+
+    while pgrep -x apt >/dev/null || pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null || \
+          fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+          fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+          fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+
+        if (( waited == 0 )); then
+            log "🔒 Another package process is running (likely unattended-upgrades). Waiting for lock to release..."
+        fi
+
+        if (( waited >= max_wait )); then
+            log "❌ Timed out after 10 minutes waiting for package lock. Aborting."
+            exit 1
+        fi
+
+        sleep 5
+        (( waited += 5 ))
+    done
+
+    log "✅ Package manager is free. Proceeding with installation."
+}
+
 main() {
-    if [[ $EUID -ne 0 ]]; then
-        echo "⚠️  Please run as root: sudo $0"
-        exit 1
-    fi
-	
+	"$updateStatus" "$HTML_PATH" -ap "🧩 Checking for active package managers..."
+	wait_for_package_lock
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing prerequisites..."
     system_setup
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing Supabase CLI..."
@@ -305,7 +426,8 @@ main() {
 	post_install_configuration
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Verifying connection..."
     verify_connection
-
+	configure_motd
+	
     log "🎉 Supabase is ready and secured!"
     log "🌐 URL: https://${DOMAIN_NAME}"
     log "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop"
