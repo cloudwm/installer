@@ -1,10 +1,21 @@
 #!/bin/bash
 
-if [ -f "include/startup.sh" ]; then
-    . include/startup.sh
-	
-elif [ -f "../include/startup.sh" ]; then
-    . ../include/startup.sh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Ensure PATH includes where the Supabase CLI will land on Debian/Ubuntu
+export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+export HOME="${HOME:-/root}"
+
+# Source shared helpers
+if [ -f "$ROOT_DIR/include/startup.sh" ]; then
+  . "$ROOT_DIR/include/startup.sh"
+  
+else
+  echo "❌ Missing $ROOT_DIR/include/startup.sh — aborting."
+  exit 1
 fi
 
 RUNTIME_DIR="/etc/supabase"
