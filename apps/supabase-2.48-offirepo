@@ -201,10 +201,6 @@ start_supabase() {
         fi
     done < <(supabase start 2>&1)
 	
-	# Enable automatic restart for all containers
-	docker ps -q | xargs -r docker update --restart unless-stopped
-	log "🔁 Enabled Docker auto-restart for Supabase containers."
-	
     log "✅ Supabase started successfully."
     "$updateStatus" "$HTML_PATH" -ap "✅ Supabase stack started successfully."
 }
@@ -423,30 +419,75 @@ wait_for_package_lock() {
     log "✅ Package manager is free. Proceeding with installation."
 }
 
+enable_autostart_service() {
+    log "🧩 Creating systemd service for Supabase auto-start..."
+    local SERVICE_FILE="/etc/systemd/system/supabase-autostart.service"
+
+    cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=Auto-start Supabase Local Stack
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${INSTALL_DIR}/${PROJECT_NAME}
+ExecStart=/usr/local/bin/supabase start
+ExecStop=/usr/local/bin/supabase stop
+User=root
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable supabase-autostart
+    log "✅ Supabase auto-start service installed and enabled."
+}
+
+
 main() {
+	echo "Checking for active package managers..." | log
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Checking for active package managers..."
 	wait_for_package_lock
+	
+	echo "Installing prerequisites..." | log
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing prerequisites..."
     system_setup
-	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing Supabase CLI..."
+	
+	echo "Installing Supabase..." | log
+	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing Supabase..."
     install_supabase_cli
+	
+	echo "Setting up project..." | log
     "$updateStatus" "$HTML_PATH" -ap "🧩 Setting up project..."
 	setup_project
+	
+	echo "Starting Supabase..." | log
     "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase..."
 	start_supabase
+	
+	echo "Configuring web access..." | log
     "$updateStatus" "$HTML_PATH" -ap "🧩 Configuring web access..."
 	configure_nginx
     obtain_ssl
+	
+	echo "Performing post installation configurations..." | log
     "$updateStatus" "$HTML_PATH" -ap "🧩 Performing post installation configurations..."
 	post_install_configuration
-	"$updateStatus" "$HTML_PATH" -ap "🧩 Verifying connection..."
+	
+	echo "Finalizing installation..." | log
+	"$updateStatus" "$HTML_PATH" -ap "🧩 Finalizing installation..."
     verify_connection
 	configure_motd
+	enable_autostart_service
 	
-    log "🎉 Supabase is ready and secured!"
-    log "🌐 URL: https://${DOMAIN_NAME}"
-    log "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop"
-    log "🔄 Restart: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase start"
+    echo "🎉 Supabase is ready and secured!" | log
+    echo "🌐 URL: https://${DOMAIN_NAME}" | log
+    echo "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop" | log
+    echo "🔄 Restart: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase start" | log
 	
 	"$updateStatus" "$HTML_PATH" -sr
     "$updateStatus" "$HTML_PATH" -ur "Supabase is running on https://${DOMAIN_NAME}"
