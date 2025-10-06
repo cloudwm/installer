@@ -1,0 +1,319 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="/var/www/html/index.html"
+
+# ────────────────────────────────────────────────
+# GLOBAL CONFIG
+# ────────────────────────────────────────────────
+LOG_PATH="/var/log/supabase-install.log"
+INSTALL_DIR="$HOME/supabase-local"
+PROJECT_NAME="local-supabase-app"
+SUPABASE_VERSION="2.48.3"
+DOMAIN_NAME="$(hostname -I | awk '{print $1}' | tr '.' '-')".cloud-xip.com
+
+# ────────────────────────────────────────────────
+# LOGGING
+# ────────────────────────────────────────────────
+log() {
+    local msg="$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $msg" | tee -a "$LOG_PATH"
+}
+
+# ────────────────────────────────────────────────
+# SYSTEM SETUP
+# ────────────────────────────────────────────────
+system_setup() {
+    log "🔧 Updating system and installing dependencies..."
+    apt-get update -y
+    apt-get install -y curl wget git docker.io docker-compose jq nginx certbot python3-certbot-nginx
+    systemctl enable docker nginx
+    systemctl start docker nginx
+}
+
+# ────────────────────────────────────────────────
+# FIREWALL CONFIGURATION
+# ────────────────────────────────────────────────
+configure_firewall() {
+    log "🧱 Configuring firewall for Supabase..."
+    ufw --force enable
+
+    # Supabase stack ports
+    ufw allow 80/tcp     # HTTP
+    ufw allow 443/tcp    # HTTPS
+    ufw allow 5432/tcp   # PostgreSQL
+    ufw allow 5433/tcp   # PostgREST
+    ufw allow 5434/tcp   # Realtime
+    ufw allow 5435/tcp   # Storage
+    ufw allow 5436/tcp   # Edge Functions
+    ufw allow 54321/tcp  # API (Kong)
+    ufw allow 54322/tcp  # Database
+    ufw allow 54323/tcp  # Studio
+
+    ufw reload
+    log "✅ Firewall rules applied successfully."
+}
+
+# ────────────────────────────────────────────────
+# SUPABASE CLI INSTALLATION
+# ────────────────────────────────────────────────
+install_supabase_cli() {
+    local ARCH
+    ARCH=$(uname -m)
+    [[ "$ARCH" == "aarch64" ]] && ARCH="arm64" || ARCH="amd64"
+
+    local DEB_FILE="supabase_${SUPABASE_VERSION}_linux_${ARCH}.deb"
+    local URL="https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/${DEB_FILE}"
+
+    log "⬇️  Downloading Supabase CLI v${SUPABASE_VERSION}..."
+    wget -q -O "/tmp/${DEB_FILE}" "$URL"
+
+    log "📦 Installing Supabase CLI..."
+    dpkg -i "/tmp/${DEB_FILE}" || apt-get install -f -y
+    if ! command -v supabase &>/dev/null; then
+        log "❌ Supabase CLI installation failed."
+        exit 1
+    fi
+    log "✅ Supabase CLI installed successfully."
+}
+
+# ────────────────────────────────────────────────
+# PROJECT SETUP
+# ────────────────────────────────────────────────
+setup_project() {
+    log "📁 Setting up Supabase project at ${INSTALL_DIR}/${PROJECT_NAME}..."
+    mkdir -p "${INSTALL_DIR}/${PROJECT_NAME}"
+    cd "${INSTALL_DIR}/${PROJECT_NAME}"
+
+    if [ ! -f "supabase/config.toml" ]; then
+        log "🚀 Initializing Supabase project..."
+        yes "N" | supabase init >/dev/null 2>&1 || true
+    else
+        log "ℹ️  Supabase project already initialized."
+    fi
+}
+
+# ────────────────────────────────────────────────
+# START SUPABASE (Live terminal + GUI progress)
+# ────────────────────────────────────────────────
+start_supabase() {
+    log "▶️  Starting Supabase stack..."
+    "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase and pulling Docker images..."
+
+    # Start Supabase and stream output to both terminal and GUI
+    supabase start 2>&1 | tee -a "$LOG_PATH" | while IFS= read -r line; do
+        # Always print raw line to terminal for full visibility
+        echo "$line"
+
+        # Match lines like: "17.6.1.011: Pulling from supabase/postgres"
+        if echo "$line" | grep -q "Pulling from"; then
+            version=$(echo "$line" | sed -E 's/^([^:]+):.*/\1/')
+            imageName=$(echo "$line" | sed -E 's/.*Pulling from[[:space:]]*([^[:space:]]+).*/\1/')
+            # Clean up stray symbols
+            version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
+            imageName=$(echo "$imageName" | sed 's/[^a-zA-Z0-9._/-]//g')
+            "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image: $imageName:$version..."
+        
+        # Match lines like: "🐋 Pulling image: v2.51.11:"
+        elif echo "$line" | grep -q "Pulling image:"; then
+            version=$(echo "$line" | sed -E 's/.*Pulling image:[[:space:]]*([^[:space:]:]+).*/\1/')
+            version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
+            "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image version: $version"
+        fi
+    done
+
+    log "✅ Supabase started successfully."
+    "$updateStatus" "$HTML_PATH" -ap "✅ Supabase stack started successfully."
+}
+
+# ────────────────────────────────────────────────
+# NGINX REVERSE PROXY (HTTP ONLY; CERTBOT ADDS HTTPS)
+# ────────────────────────────────────────────────
+configure_nginx() {
+    log "🌀 Configuring Nginx reverse proxy..."
+    local CONF="/etc/nginx/sites-available/supabase.conf"
+    cat > "$CONF" <<'EOF'
+server {
+    listen 80;
+    server_name __DOMAIN_NAME__;
+
+    # Studio UI
+    location / {
+        proxy_pass http://127.0.0.1:54323;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    # Kong gateway
+    location ~ ^/(auth|rest|storage|graphql|functions|realtime)/ {
+        proxy_pass http://127.0.0.1:54321;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    client_max_body_size 100M;
+}
+EOF
+    sed -i "s|__DOMAIN_NAME__|${DOMAIN_NAME}|g" "$CONF"
+    ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
+    nginx -t
+    systemctl reload nginx
+    log "✅ Nginx reverse proxy configured."
+}
+
+# ────────────────────────────────────────────────
+# SSL CERTIFICATE (Let's Encrypt)
+# ────────────────────────────────────────────────
+obtain_ssl() {
+    log "🔒 Attempting to obtain Let's Encrypt SSL certificate..."
+    if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect -v; then
+        log "✅ Let's Encrypt SSL certificate active at https://${DOMAIN_NAME}"
+    else
+        log "⚠️ Let's Encrypt failed, falling back to self-signed certificate..."
+        mkdir -p /etc/ssl/supabase
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout /etc/ssl/supabase/key.pem -out /etc/ssl/supabase/cert.pem -days 365 \
+            -subj "/CN=${DOMAIN_NAME}" >/dev/null 2>&1
+
+        local CONF="/etc/nginx/sites-available/supabase.conf"
+        cat > "$CONF" <<EOF
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN_NAME};
+
+    ssl_certificate /etc/ssl/supabase/cert.pem;
+    ssl_certificate_key /etc/ssl/supabase/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:54323;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location ~ ^/(auth|rest|storage|graphql|functions|realtime)/ {
+        proxy_pass http://127.0.0.1:54321;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    client_max_body_size 100M;
+}
+EOF
+        ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
+        nginx -t && systemctl reload nginx
+        log "✅ Self-signed certificate configured for https://${DOMAIN_NAME}"
+    fi
+}
+
+# ────────────────────────────────────────────────
+# POST-INSTALLATION CONFIGURATION
+# ────────────────────────────────────────────────
+post_install_configuration() {
+    log "🧩 Running post-installation configuration..."
+    local CONFIG_FILE="${INSTALL_DIR}/${PROJECT_NAME}/supabase/config.toml"
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        log "❌ config.toml not found. Skipping post-install configuration."
+        return
+    fi
+
+    # Patch Studio API URL
+    sed -i -E 's|^[[:space:]]*api_url[[:space:]]*=.*|api_url = "https://'"${DOMAIN_NAME}"'"|g' "$CONFIG_FILE"
+
+    # Patch Auth site_url + redirect URLs
+    sed -i -E 's|^[[:space:]]*site_url[[:space:]]*=.*|site_url = "https://'"${DOMAIN_NAME}"'"|g' "$CONFIG_FILE"
+    sed -i -E 's|^\s*additional_redirect_urls\s*=.*|additional_redirect_urls = ["https://'"${DOMAIN_NAME}"'"]|g' "$CONFIG_FILE"
+
+    # Set Supabase Studio theme to 'system'
+    if grep -q "^\[studio\]" "$CONFIG_FILE"; then
+        sed -i '/^\[studio\]/a theme = "system"' "$CONFIG_FILE"
+    fi
+
+    log "✅ Updated studio.api_url, auth.site_url, and set theme=system"
+
+    # Restart stack to apply config
+    cd "${INSTALL_DIR}/${PROJECT_NAME}"
+    supabase stop >/dev/null 2>&1 || true
+    supabase start >/dev/null 2>&1 || true
+
+    systemctl reload nginx
+    log "✅ Post-installation configuration applied and services reloaded."
+}
+
+# ────────────────────────────────────────────────
+# VERIFY CONNECTION
+# ────────────────────────────────────────────────
+verify_connection() {
+    log "🧠 Verifying Supabase Studio availability (HTTPS)..."
+    for i in {1..10}; do
+        if curl -kfsS "https://${DOMAIN_NAME}/" >/dev/null 2>&1; then
+            log "✅ Supabase Studio reachable at https://${DOMAIN_NAME}"
+            return
+        fi
+        log "⏳ Waiting for Supabase Studio... (attempt $i/10)"
+        sleep 5
+    done
+    log "❌ Supabase Studio not reachable after setup."
+    exit 1
+}
+
+# ────────────────────────────────────────────────
+# MAIN FLOW
+# ────────────────────────────────────────────────
+main() {
+    if [[ $EUID -ne 0 ]]; then
+        echo "⚠️  Please run as root: sudo $0"
+        exit 1
+    fi
+	
+	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing prerequisites..."
+    system_setup
+	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing Supabase CLI..."
+    install_supabase_cli
+    "$updateStatus" "$HTML_PATH" -ap "🧩 Setting up project..."
+	setup_project
+    "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase..."
+	start_supabase
+    "$updateStatus" "$HTML_PATH" -ap "🧩 Configuring web access..."
+	configure_nginx
+    obtain_ssl
+    "$updateStatus" "$HTML_PATH" -ap "🧩 Performing post installation configurations..."
+	post_install_configuration
+	"$updateStatus" "$HTML_PATH" -ap "🧩 Verifying connection..."
+    verify_connection
+
+    log "🎉 Supabase is ready and secured!"
+    log "🌐 URL: https://${DOMAIN_NAME}"
+    log "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop"
+    log "🔄 Restart: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase start"
+	
+	"$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Supabase is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+
+main "$@"
