@@ -437,14 +437,30 @@ ExecStart=/usr/local/bin/supabase start
 ExecStop=/usr/local/bin/supabase stop
 User=root
 TimeoutStartSec=600
+StandardOutput=append:/var/log/supabase-autostart.log
+StandardError=append:/var/log/supabase-autostart.log
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+    chmod 644 "$SERVICE_FILE"
     systemctl daemon-reload
-    systemctl enable supabase-autostart
-    log "✅ Supabase auto-start service installed and enabled."
+
+    if systemctl enable supabase-autostart >/dev/null 2>&1; then
+        log "✅ Supabase auto-start service enabled at boot."
+    else
+        log "⚠️ Failed to enable Supabase auto-start service."
+    fi
+
+    # Start immediately (to verify and populate systemd state)
+    if systemctl start supabase-autostart >/dev/null 2>&1; then
+        log "✅ Supabase auto-start service started successfully."
+    else
+        log "⚠️ Failed to start Supabase auto-start service right now."
+    fi
+
+    systemctl status supabase-autostart --no-pager | head -n 10 >> "$LOG_PATH" 2>&1
 }
 
 
