@@ -200,7 +200,11 @@ start_supabase() {
             _kv_upsert S3_REGION "${line#*: }"
         fi
     done < <(supabase start 2>&1)
-
+	
+	# Enable automatic restart for all containers
+	docker ps -q | xargs -r docker update --restart unless-stopped
+	log "🔁 Enabled Docker auto-restart for Supabase containers."
+	
     log "✅ Supabase started successfully."
     "$updateStatus" "$HTML_PATH" -ap "✅ Supabase stack started successfully."
 }
