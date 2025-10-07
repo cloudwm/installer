@@ -31,13 +31,9 @@ PROJECT_NAME="local-supabase-app"
 SUPABASE_VERSION="2.48.3"
 DOMAIN_NAME="$(hostname -I | awk '{print $1}' | tr '.' '-')".cloud-xip.com
 
-log() {
-    local msg="$1"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $msg" | tee -a "$LOG_PATH"
-}
 
 system_setup() {
-    log "🔧 Updating system and installing dependencies..."
+    echo "🔧 Updating system and installing dependencies..." | log
     apt-get update -y
     apt-get install -y curl wget git docker.io docker-compose jq nginx certbot python3-certbot-nginx
     systemctl enable docker nginx
@@ -45,7 +41,7 @@ system_setup() {
 }
 
 configure_firewall() {
-    log "🧱 Configuring firewall for Supabase..."
+    echo "🧱 Configuring firewall for Supabase..." | log
     ufw --force enable
 
     # Supabase stack ports
@@ -61,7 +57,7 @@ configure_firewall() {
     ufw allow 54323/tcp  # Studio
 
     ufw reload
-    log "✅ Firewall rules applied successfully."
+    echo "✅ Firewall rules applied successfully." | log
 }
 
 install_supabase_cli() {
@@ -72,10 +68,10 @@ install_supabase_cli() {
     local DEB_FILE="supabase_${SUPABASE_VERSION}_linux_${ARCH}.deb"
     local URL="https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/${DEB_FILE}"
 
-    log "⬇️  Downloading Supabase CLI v${SUPABASE_VERSION}..."
+    echo "⬇️  Downloading Supabase CLI v${SUPABASE_VERSION}..." | log
     wget -q -O "/tmp/${DEB_FILE}" "$URL"
 
-    log "📦 Installing Supabase CLI..."
+    echo "📦 Installing Supabase CLI..." | log
     
     # Wait for dpkg/apt locks (max 5 minutes)
     local waited=0
@@ -83,41 +79,41 @@ install_supabase_cli() {
           fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
           fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
         if (( waited >= 300 )); then
-            log "❌ Timed out waiting for package manager lock. Another process (e.g., unattended-upgrades) is blocking installation."
+            echo "❌ Timed out waiting for package manager lock. Another process (e.g., unattended-upgrades) is blocking installation." | log
             return 1
         fi
-        log "⏳ Waiting for package manager to finish (lock held)..."
+        echo "⏳ Waiting for package manager to finish (lock held)..." | log
         sleep 5
         (( waited += 5 ))
     done
 
     # Once lock is released, proceed with installation
     if dpkg -i "/tmp/${DEB_FILE}" >/dev/null 2>&1; then
-        log "✅ Supabase CLI installed successfully."
+        echo "✅ Supabase CLI installed successfully." | log
     else
-        log "⚙️ dpkg dependency fix in progress..."
+        echo "⚙️ dpkg dependency fix in progress..." | log
         apt-get install -f -y >/dev/null 2>&1
     fi
 
     # Validate installation
     if ! command -v supabase &>/dev/null; then
-        log "❌ Supabase CLI installation failed after resolving dependencies."
+        echo "❌ Supabase CLI installation failed after resolving dependencies." | log
         return 1
     fi
 
-    log "✅ Supabase CLI installed and verified."
+    echo "✅ Supabase CLI installed and verified." | log
 }
 
 setup_project() {
-    log "📁 Setting up Supabase project at ${INSTALL_DIR}/${PROJECT_NAME}..."
+    echo "📁 Setting up Supabase project at ${INSTALL_DIR}/${PROJECT_NAME}..." | log
     mkdir -p "${INSTALL_DIR}/${PROJECT_NAME}"
     cd "${INSTALL_DIR}/${PROJECT_NAME}"
 
     if [ ! -f "supabase/config.toml" ]; then
-        log "🚀 Initializing Supabase project..."
+        echo "🚀 Initializing Supabase project..." | log
         yes "N" | supabase init >/dev/null 2>&1 || true
     else
-        log "ℹ️  Supabase project already initialized."
+        echo "ℹ️  Supabase project already initialized." | log
     fi
 }
 
@@ -135,7 +131,7 @@ _kv_upsert() {
 }
 
 start_supabase() {
-    log "▶️  Starting Supabase stack..."
+    echo "▶️  Starting Supabase stack..." | log
     "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase and pulling Docker images..."
 
     : > "$RUNTIME_ENV"   # clear previous values
@@ -201,12 +197,12 @@ start_supabase() {
         fi
     done < <(supabase start 2>&1)
 	
-    log "✅ Supabase started successfully."
+    echo "✅ Supabase started successfully." | log
     "$updateStatus" "$HTML_PATH" -ap "✅ Supabase stack started successfully."
 }
 
 configure_nginx() {
-    log "🌀 Configuring Nginx reverse proxy..."
+    echo "🌀 Configuring Nginx reverse proxy..." | log
     local CONF="/etc/nginx/sites-available/supabase.conf"
     cat > "$CONF" <<'EOF'
 server {
@@ -248,15 +244,16 @@ EOF
     ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
     nginx -t
     systemctl reload nginx
-    log "✅ Nginx reverse proxy configured."
+    echo "✅ Nginx reverse proxy configured." | log
 }
 
 obtain_ssl() {
-    log "🔒 Attempting to obtain Let's Encrypt SSL certificate..."
+    echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
     if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect -v; then
-        log "✅ Let's Encrypt SSL certificate active at https://${DOMAIN_NAME}"
+        echo "✅ Let's Encrypt SSL certificate active at https://${DOMAIN_NAME}" | log
+		
     else
-        log "⚠️ Let's Encrypt failed, falling back to self-signed certificate..."
+        echo "⚠️ Let's Encrypt failed, falling back to self-signed certificate..." | log
         mkdir -p /etc/ssl/supabase
         openssl req -x509 -newkey rsa:2048 -nodes -keyout /etc/ssl/supabase/key.pem -out /etc/ssl/supabase/cert.pem -days 365 \
             -subj "/CN=${DOMAIN_NAME}" >/dev/null 2>&1
@@ -291,16 +288,16 @@ server {
 EOF
         ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
         nginx -t && systemctl reload nginx
-        log "✅ Self-signed certificate configured for https://${DOMAIN_NAME}"
+        echo "✅ Self-signed certificate configured for https://${DOMAIN_NAME}" | log
     fi
 }
 
 post_install_configuration() {
-    log "🧩 Running post-installation configuration..."
+    echo "🧩 Running post-installation configuration..." | log
     local CONFIG_FILE="${INSTALL_DIR}/${PROJECT_NAME}/supabase/config.toml"
 
     if [ ! -f "$CONFIG_FILE" ]; then
-        log "❌ config.toml not found. Skipping post-install configuration."
+        echo "❌ config.toml not found. Skipping post-install configuration." | log
         return
     fi
 
@@ -316,7 +313,7 @@ post_install_configuration() {
         sed -i '/^\[studio\]/a theme = "system"' "$CONFIG_FILE"
     fi
 
-    log "✅ Updated studio.api_url, auth.site_url, and set theme=system"
+    echo "✅ Updated studio.api_url, auth.site_url, and set theme=system" | log
 
     # Restart stack to apply config
     cd "${INSTALL_DIR}/${PROJECT_NAME}"
@@ -324,25 +321,27 @@ post_install_configuration() {
     supabase start >/dev/null 2>&1 || true
 
     systemctl reload nginx
-    log "✅ Post-installation configuration applied and services reloaded."
+    echo "✅ Post-installation configuration applied and services reloaded." | log
 }
 
 verify_connection() {
-    log "🧠 Verifying Supabase Studio availability (HTTPS)..."
+    echo "🧠 Verifying Supabase Studio availability (HTTPS)..." | log
     for i in {1..10}; do
         if curl -kfsS "https://${DOMAIN_NAME}/" >/dev/null 2>&1; then
-            log "✅ Supabase Studio reachable at https://${DOMAIN_NAME}"
+            echo "✅ Supabase Studio reachable at https://${DOMAIN_NAME}" | log
             return
         fi
-        log "⏳ Waiting for Supabase Studio... (attempt $i/10)"
+		
+        echo "⏳ Waiting for Supabase Studio... (attempt $i/10)" | log
         sleep 5
+		
     done
-    log "❌ Supabase Studio not reachable after setup."
+    echo "❌ Supabase Studio not reachable after setup." | log
     exit 1
 }
 
 configure_motd() {
-  log "🧾 Configuring system MOTD with Supabase info..."
+  echo "🧾 Configuring system MOTD with Supabase info..." | log
   chmod -x /etc/update-motd.d/* 2>/dev/null || true
   rm -f /etc/motd 2>/dev/null
 
@@ -390,11 +389,11 @@ configure_motd() {
 EOM
 
   chmod 644 /etc/motd
-  log "✅ Custom MOTD installed at /etc/motd with live values."
+  echo "✅ Custom MOTD installed at /etc/motd with live values." | log
 }
 
 wait_for_package_lock() {
-    log "⏳ Checking for existing apt/dpkg operations..."
+    echo "⏳ Checking for existing apt/dpkg operations..." | log
     local waited=0
     local max_wait=600  # 10 minutes
 
@@ -404,11 +403,11 @@ wait_for_package_lock() {
           fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
 
         if (( waited == 0 )); then
-            log "🔒 Another package process is running (likely unattended-upgrades). Waiting for lock to release..."
+            echo "🔒 Another package process is running (likely unattended-upgrades). Waiting for lock to release..." | log
         fi
 
         if (( waited >= max_wait )); then
-            log "❌ Timed out after 10 minutes waiting for package lock. Aborting."
+            echo "❌ Timed out after 10 minutes waiting for package lock. Aborting." | log
             exit 1
         fi
 
@@ -416,11 +415,11 @@ wait_for_package_lock() {
         (( waited += 5 ))
     done
 
-    log "✅ Package manager is free. Proceeding with installation."
+    echo "✅ Package manager is free. Proceeding with installation." | log
 }
 
 enable_autostart_service() {
-    log "🧩 Creating systemd service for Supabase auto-start..."
+    echo "🧩 Creating systemd service for Supabase auto-start..." | log
     local SERVICE_FILE="/etc/systemd/system/supabase-autostart.service"
 
     cat > "$SERVICE_FILE" <<EOF
@@ -433,8 +432,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${INSTALL_DIR}/${PROJECT_NAME}
-ExecStart=/usr/local/bin/supabase start
-ExecStop=/usr/local/bin/supabase stop
+ExecStart=/usr/bin/supabase start
+ExecStop=/usr/bin/supabase stop
 User=root
 TimeoutStartSec=600
 StandardOutput=append:/var/log/supabase-autostart.log
@@ -448,16 +447,18 @@ EOF
     systemctl daemon-reload
 
     if systemctl enable supabase-autostart >/dev/null 2>&1; then
-        log "✅ Supabase auto-start service enabled at boot."
+        echo "✅ Supabase auto-start service enabled at boot." | log
+		
     else
-        log "⚠️ Failed to enable Supabase auto-start service."
+        echo "⚠️ Failed to enable Supabase auto-start service." | log
     fi
 
     # Start immediately (to verify and populate systemd state)
     if systemctl start supabase-autostart >/dev/null 2>&1; then
-        log "✅ Supabase auto-start service started successfully."
+        echo "✅ Supabase auto-start service started successfully." | log
+		
     else
-        log "⚠️ Failed to start Supabase auto-start service right now."
+        echo "⚠️ Failed to start Supabase auto-start service right now." | log
     fi
 
     systemctl status supabase-autostart --no-pager | head -n 10 >> "$LOG_PATH" 2>&1
@@ -500,10 +501,10 @@ main() {
 	configure_motd
 	enable_autostart_service
 	
-    echo "🎉 Supabase is ready and secured!" | log
-    echo "🌐 URL: https://${DOMAIN_NAME}" | log
-    echo "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop" | log
-    echo "🔄 Restart: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase start" | log
+    log "🎉 Supabase is ready and secured!"
+    log "🌐 URL: https://${DOMAIN_NAME}"
+    log "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop"
+    log "🔄 Restart: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase start" | log
 	
 	"$updateStatus" "$HTML_PATH" -sr
     "$updateStatus" "$HTML_PATH" -ur "Supabase is running on https://${DOMAIN_NAME}"
