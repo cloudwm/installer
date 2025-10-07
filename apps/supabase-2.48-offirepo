@@ -406,12 +406,10 @@ RemainAfterExit=yes
 WorkingDirectory=${INSTALL_DIR}/${PROJECT_NAME}
 Environment=HOME=/root
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/bin/bash -lc "${SUPABASE_BIN} start"
-ExecStop=/bin/bash -lc "${SUPABASE_BIN} stop"
+ExecStart=/bin/bash -c '${SUPABASE_BIN} start >> /var/log/supabase-autostart.log 2>&1'
+ExecStop=/bin/bash -c '${SUPABASE_BIN} stop >> /var/log/supabase-autostart.log 2>&1'
 User=root
 TimeoutStartSec=600
-StandardOutput=append:/var/log/supabase-autostart.log
-StandardError=append:/var/log/supabase-autostart.log
 
 [Install]
 WantedBy=multi-user.target
@@ -426,15 +424,22 @@ EOF
         echo "⚠️ Failed to enable Supabase auto-start service." | log
     fi
 
-    if systemctl start supabase-autostart >/dev/null 2>&1; then
+    echo "▶️ Testing Supabase autostart now..." | log
+    if systemctl start supabase-autostart; then
         echo "✅ Supabase auto-start service started successfully." | log
     else
         echo "⚠️ Failed to start Supabase auto-start service right now." | log
     fi
 
-    systemctl status supabase-autostart --no-pager | head -n 10 >> "$LOG_PATH" 2>&1
-}
+    sleep 2
+    if [ -f /var/log/supabase-autostart.log ]; then
+        echo "📜 Log file created: /var/log/supabase-autostart.log" | log
+    else
+        echo "⚠️ Log file not found. The ExecStart may not have executed properly." | log
+    fi
 
+    systemctl status supabase-autostart --no-pager | head -n 15 >> "$LOG_PATH" 2>&1
+}
 
 main() {
 	echo "Checking for active package managers..." | log
