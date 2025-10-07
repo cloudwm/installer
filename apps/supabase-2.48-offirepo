@@ -253,43 +253,13 @@ obtain_ssl() {
         echo "✅ Let's Encrypt SSL certificate active at https://${DOMAIN_NAME}" | log
 		
     else
-        echo "⚠️ Let's Encrypt failed, falling back to self-signed certificate..." | log
-        mkdir -p /etc/ssl/supabase
-        openssl req -x509 -newkey rsa:2048 -nodes -keyout /etc/ssl/supabase/key.pem -out /etc/ssl/supabase/cert.pem -days 365 \
-            -subj "/CN=${DOMAIN_NAME}" >/dev/null 2>&1
-
-        local CONF="/etc/nginx/sites-available/supabase.conf"
-        cat > "$CONF" <<EOF
-server {
-    listen 443 ssl;
-    server_name ${DOMAIN_NAME};
-
-    ssl_certificate /etc/ssl/supabase/cert.pem;
-    ssl_certificate_key /etc/ssl/supabase/key.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:54323;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location ~ ^/(auth|rest|storage|graphql|functions|realtime)/ {
-        proxy_pass http://127.0.0.1:54321;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    client_max_body_size 100M;
-}
-EOF
-        ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
-        nginx -t && systemctl reload nginx
-        echo "✅ Self-signed certificate configured for https://${DOMAIN_NAME}" | log
+        echo "⚠️ Let's Encrypt failed." | log
+		exit 1
     fi
+	
+	ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
+	nginx -t && systemctl reload nginx
+	echo "✅ Self-signed certificate configured for https://${DOMAIN_NAME}" | log
 }
 
 post_install_configuration() {
@@ -421,6 +391,8 @@ wait_for_package_lock() {
 enable_autostart_service() {
     echo "🧩 Creating systemd service for Supabase auto-start..." | log
     local SERVICE_FILE="/etc/systemd/system/supabase-autostart.service"
+    local SUPABASE_BIN
+    SUPABASE_BIN="$(command -v supabase || echo /usr/bin/supabase)"
 
     cat > "$SERVICE_FILE" <<EOF
 [Unit]
@@ -432,8 +404,10 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${INSTALL_DIR}/${PROJECT_NAME}
-ExecStart=/usr/bin/supabase start
-ExecStop=/usr/bin/supabase stop
+Environment=HOME=/root
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash -lc "${SUPABASE_BIN} start"
+ExecStop=/bin/bash -lc "${SUPABASE_BIN} stop"
 User=root
 TimeoutStartSec=600
 StandardOutput=append:/var/log/supabase-autostart.log
@@ -448,15 +422,12 @@ EOF
 
     if systemctl enable supabase-autostart >/dev/null 2>&1; then
         echo "✅ Supabase auto-start service enabled at boot." | log
-		
     else
         echo "⚠️ Failed to enable Supabase auto-start service." | log
     fi
 
-    # Start immediately (to verify and populate systemd state)
     if systemctl start supabase-autostart >/dev/null 2>&1; then
         echo "✅ Supabase auto-start service started successfully." | log
-		
     else
         echo "⚠️ Failed to start Supabase auto-start service right now." | log
     fi
