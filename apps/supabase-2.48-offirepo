@@ -7,6 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+RUNTIME_DIR="/etc/supabase"
+RUNTIME_ENV="$RUNTIME_DIR/runtime.env"
+mkdir -p "$RUNTIME_DIR"
+
 rootDir="$(rootDir)"
 updateStatus="$rootDir/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
@@ -82,28 +86,69 @@ start_supabase() {
     echo "▶️  Starting Supabase stack..." | log
     "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase and pulling Docker images..."
 
-    # Start Supabase and stream output to both terminal and GUI
-    supabase start 2>&1 | tee -a "$LOG_PATH" | while IFS= read -r line; do
-        # Always print raw line to terminal for full visibility
-        echo "$line"
+    : > "$RUNTIME_ENV"   # clear previous values
 
-        # Match lines like: "17.6.1.011: Pulling from supabase/postgres"
+    declare -A active_images
+
+    # stream start + parse both image pulls and the final banner
+    while IFS= read -r line; do
+        echo "$line" | tee -a "$LOG_PATH"
+
+        # ----- image pull progress (kept from your version) -----
         if echo "$line" | grep -q "Pulling from"; then
             version=$(echo "$line" | sed -E 's/^([^:]+):.*/\1/')
             imageName=$(echo "$line" | sed -E 's/.*Pulling from[[:space:]]*([^[:space:]]+).*/\1/')
-            # Clean up stray symbols
             version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
             imageName=$(echo "$imageName" | sed 's/[^a-zA-Z0-9._/-]//g')
+            active_images["$imageName:$version"]=1
             "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image: $imageName:$version..."
-        
-        # Match lines like: "🐋 Pulling image: v2.51.11:"
-        elif echo "$line" | grep -q "Pulling image:"; then
+            continue
+        fi
+
+        if echo "$line" | grep -Eq '^Digest:[[:space:]]*sha256:[a-f0-9]{64}'; then
+            for key in "${!active_images[@]}"; do
+                "$updateStatus" "$HTML_PATH" -ap "✅ Finished pulling: $key"
+                unset 'active_images[$key]'
+            done
+            continue
+        fi
+
+        if echo "$line" | grep -q "Pulling image:"; then
             version=$(echo "$line" | sed -E 's/.*Pulling image:[[:space:]]*([^[:space:]:]+).*/\1/')
             version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
+            active_images["$version"]=1
             "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image version: $version"
+            continue
         fi
-    done
 
+        # ----- parse the final startup banner to capture real creds -----
+        if echo "$line" | grep -qE '^\s*API URL:'; then
+            _kv_upsert API_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*GraphQL URL:'; then
+            _kv_upsert GRAPHQL_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Storage URL:'; then
+            _kv_upsert S3_STORAGE_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*MCP URL:'; then
+            _kv_upsert MCP_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Database URL:'; then
+            _kv_upsert DB_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Studio URL:'; then
+            _kv_upsert STUDIO_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Mailpit URL:'; then
+            _kv_upsert MAILPIT_URL "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Publishable key:'; then
+            _kv_upsert PUBLISHABLE_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*Secret key:'; then
+            _kv_upsert SECRET_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Access Key:'; then
+            _kv_upsert S3_ACCESS_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Secret Key:'; then
+            _kv_upsert S3_SECRET_KEY "${line#*: }"
+        elif echo "$line" | grep -qE '^\s*S3 Region:'; then
+            _kv_upsert S3_REGION "${line#*: }"
+        fi
+    done < <(supabase start 2>&1)
+	
     echo "✅ Supabase started successfully." | log
     "$updateStatus" "$HTML_PATH" -ap "✅ Supabase stack started successfully."
 }
@@ -247,8 +292,110 @@ verify_connection() {
     exit 1
 }
 
-main() {
+_kv_upsert() {
+	local k="$1" v="$2"
+	local f="$RUNTIME_ENV"
+	touch "$f"
+	v_escaped=$(printf '%s' "$v" | sed 's/"/\\"/g')
 	
+	if grep -q "^${k}=" "$f"; then
+		sed -i -E "s|^${k}=.*|${k}=\"${v_escaped}\"|" "$f"
+	else
+		echo "${k}=\"${v_escaped}\"" >> "$f"
+	fi
+}
+
+configure_motd() {
+  echo "🧾 Configuring system MOTD with Supabase info..." | log
+  chmod -x /etc/update-motd.d/* 2>/dev/null || true
+  rm -f /etc/motd 2>/dev/null
+
+  # read persisted values (fallbacks if missing)
+  [ -f "$RUNTIME_ENV" ] && set -a && . "$RUNTIME_ENV" && set +a
+
+  : "${API_URL:=http://127.0.0.1:54321}"
+  : "${GRAPHQL_URL:=${API_URL%/}/graphql/v1}"
+  : "${DB_URL:=postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
+  : "${STUDIO_URL:=http://127.0.0.1:54323}"
+  : "${MAILPIT_URL:=http://127.0.0.1:54324}"
+  : "${PUBLISHABLE_KEY:=<unknown>}"
+  : "${SECRET_KEY:=<unknown>}"
+  : "${S3_ACCESS_KEY:=<unknown>}"
+  : "${S3_SECRET_KEY:=<unknown>}"
+  : "${S3_REGION:=local}"
+
+  cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🚀 Started Supabase Local Development Setup
+──────────────────────────────────────────────
+
+         API URL: ${API_URL}
+     GraphQL URL: ${GRAPHQL_URL}
+  S3 Storage URL: ${API_URL%/}/storage/v1/s3
+         MCP URL: ${API_URL%/}/mcp
+    Database URL: ${DB_URL}
+      Studio URL: ${STUDIO_URL}
+     Mailpit URL: ${MAILPIT_URL}
+ Publishable key: ${PUBLISHABLE_KEY}
+      Secret key: ${SECRET_KEY}
+   S3 Access Key: ${S3_ACCESS_KEY}
+   S3 Secret Key: ${S3_SECRET_KEY}
+       S3 Region: ${S3_REGION}
+
+──────────────────────────────────────────────
+💡 To manage Supabase:
+   cd ${INSTALL_DIR}/${PROJECT_NAME}
+   supabase stop     # Stop all services
+   supabase start    # Start again
+   
+🧹 To remove this message:
+   sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+  chmod 644 /etc/motd
+  echo "✅ Custom MOTD installed at /etc/motd with live values." | log
+}
+
+enable_autostart_service() {
+    echo "🧩 Creating systemd service for Supabase auto-start..." | log
+    local SERVICE_FILE="/etc/systemd/system/supabase-autostart.service"
+
+    cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=Auto-start Supabase Local Stack
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${INSTALL_DIR}/${PROJECT_NAME}
+ExecStart=/usr/bin/supabase start
+ExecStop=/usr/bin/supabase stop
+User=root
+TimeoutStartSec=600
+StandardOutput=append:/var/log/supabase-autostart.log
+StandardError=append:/var/log/supabase-autostart.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    chmod 644 "$SERVICE_FILE"
+    systemctl daemon-reload
+
+    if systemctl enable supabase-autostart >/dev/null 2>&1; then
+        echo "✅ Supabase auto-start service enabled at boot." | log
+		
+    else
+        echo "⚠️ Failed to enable Supabase auto-start service." | log
+    fi
+
+    systemctl status supabase-autostart --no-pager | head -n 10 >> "$LOG_PATH" 2>&1
+}
+
+main() {
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing prerequisites..."
     system_setup
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing Supabase CLI..."
@@ -257,14 +404,18 @@ main() {
 	setup_project
     "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase..."
 	start_supabase
-    "$updateStatus" "$HTML_PATH" -ap "🧩 Configuring web access..."
-	configure_nginx
-    obtain_ssl
     "$updateStatus" "$HTML_PATH" -ap "🧩 Performing post installation configurations..."
 	post_install_configuration
+	
+	enable_autostart_service
+	configure_motd
+	
+	"$updateStatus" "$HTML_PATH" -ap "🧩 Configuring web access..."
+	configure_nginx
+    obtain_ssl
 	"$updateStatus" "$HTML_PATH" -ap "🧩 Verifying connection..."
     verify_connection
-
+	
     echo "🎉 Supabase is ready and secured!" | log
     echo "🌐 URL: https://${DOMAIN_NAME}" | log
     echo "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop" | log
