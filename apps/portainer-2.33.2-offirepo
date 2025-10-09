@@ -23,43 +23,32 @@ sudo mkdir -p /opt/portainer/{certs,data}
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
-echo "Obtaining Let's Encrypt SSL certificate" | log
-sudo docker stop $(docker ps -q 2>/dev/null | xargs) 2>/dev/null || true
-sudo systemctl stop apache2 2>/dev/null || true
-sudo systemctl stop nginx 2>/dev/null || true
-sleep 5
-sudo certbot certonly --standalone -d $CWM_DOMAIN --non-interactive --agree-tos --email $ADMINEMAIL --http-01-port 80
-if [ $? -ne 0 ]; then
-    echo "ERROR: Let's Encrypt certificate acquisition failed. Falling back to self-signed certificate." | log
-    echo "Check /var/log/letsencrypt/letsencrypt.log for details." | log
-    sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -keyout /opt/portainer/certs/portainer.key \
-        -out /opt/portainer/certs/portainer.crt \
-        -subj "/CN=$CWM_DOMAIN" \
-        -addext "subjectAltName=DNS:$CWM_DOMAIN"
-else
-    echo "Copying Let's Encrypt certificates" | log
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+# Stop Nginx temporarily for Certbot validation
+sudo systemctl stop nginx
+if certbot --nginx -d "$CWM_DOMAIN" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" --redirect -v; then
+    echo "✅ Let's Encrypt SSL certificate active at https://${CWM_DOMAIN}" | log
+    sudo nginx -t && sudo systemctl reload nginx
+    # Copy certificates for Portainer
     sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
     sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
         waitOrStop 0 "Certificate copy failed"
     fi
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
 fi
 
 # Attempt to generate admin password with helper-reset-password
 echo "Generating admin password with helper-reset-password" | log
 docker pull portainer/helper-reset-password
-HELPER_OUTPUT=$(docker run --rm -v /opt/portainer/data:/data portainer/helper-reset-password 2>&1)
-NEW_ADMIN_PASSWORD=$(echo "$HELPER_OUTPUT" | grep "Use the following password to login" | awk '{print $NF}')
-if [ -z "$NEW_ADMIN_PASSWORD" ]; then
-    echo "WARNING: Failed to generate password with helper-reset-password. Output: $HELPER_OUTPUT" | log
-    echo "Falling back to original password: $ADMINPASSWORD" | log
-    ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$ADMINPASSWORD" | cut -d: -f2)
-else
-    echo "Generated admin password: $NEW_ADMIN_PASSWORD" | log
-    ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$NEW_ADMIN_PASSWORD" | cut -d: -f2)
-fi
+echo "Generated admin password: $NEW_ADMIN_PASSWORD" | log
+ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$NEW_ADMIN_PASSWORD" | cut -d: -f2)
 
 echo "Creating Docker Compose file for Portainer" | log
 cat << EOF > /opt/portainer/docker-compose.yml
