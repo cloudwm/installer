@@ -47,8 +47,16 @@ fi
 # Attempt to generate admin password with helper-reset-password
 echo "Generating admin password with helper-reset-password" | log
 docker pull portainer/helper-reset-password
-echo "Generated admin password: $NEW_ADMIN_PASSWORD" | log
-ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$NEW_ADMIN_PASSWORD" | cut -d: -f2)
+HELPER_OUTPUT=$(docker run --rm -v /opt/portainer/data:/data portainer/helper-reset-password 2>&1)
+NEW_ADMIN_PASSWORD=$(echo "$HELPER_OUTPUT" | grep "Use the following password to login" | awk '{print $NF}')
+if [ -z "$NEW_ADMIN_PASSWORD" ]; then
+    echo "WARNING: Failed to generate password with helper-reset-password. Output: $HELPER_OUTPUT" | log
+    echo "Falling back to original password: $ADMINPASSWORD" | log
+    ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$ADMINPASSWORD" | cut -d: -f2)
+else
+    echo "Generated admin password: $NEW_ADMIN_PASSWORD" | log
+    ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$NEW_ADMIN_PASSWORD" | cut -d: -f2)
+fi
 
 echo "Creating Docker Compose file for Portainer" | log
 cat << EOF > /opt/portainer/docker-compose.yml
