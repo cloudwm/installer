@@ -58,7 +58,7 @@ services:
     environment:
       - ADMIN_USERNAME=$ADMINEMAIL
       - ADMIN_PASSWORD=$ADMINPASSWORD
-    command: -H unix:///var/run/docker.sock --tlsverify --tlscert /certs/portainer.crt --tlskey /certs/portainer.key
+    command: -H unix:///var/run/docker.sock --tlsverify --tlscert /certs/portainer.crt --tlskey /certs/portainer.key --admin-password '$ADMINPASSWORD' 
 EOF
 
 echo "Generated docker-compose.yml:" | log
