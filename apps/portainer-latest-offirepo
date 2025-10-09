@@ -1,0 +1,87 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Docker and dependencies" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+sleep 5
+
+echo "Creating Portainer directories" | log
+sudo mkdir -p /opt/portainer/{certs,data}
+
+echo "Obtaining Let's Encrypt SSL certificate" | log
+sudo certbot certonly --standalone -d $CWM_DOMAIN --non-interactive --agree-tos --email $ADMINEMAIL --http-01-port 80
+if [ $? -ne 0 ]; then
+    echo "ERROR: Let's Encrypt certificate acquisition failed. Falling back to self-signed certificate." | log
+    echo "Check /var/log/letsencrypt/letsencrypt.log for details." | log
+    # Generate self-signed certificate as fallback
+    sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout /opt/portainer/certs/portainer.key \
+        -out /opt/portainer/certs/portainer.crt \
+        -subj "/CN=$CWM_DOMAIN" \
+        -addext "subjectAltName=DNS:$CWM_DOMAIN"
+else
+    echo "Copying Let's Encrypt certificates" | log
+    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
+    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
+        waitOrStop 0 "Certificate copy failed"
+    fi
+fi
+
+echo "Creating Docker Compose file for Portainer" | log
+cat << EOF > /opt/portainer/docker-compose.yml
+services:
+  portainer:
+    image: portainer/portainer-ce:2.33.2
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "8080:9000"  # Default to 8080 to avoid port 80 conflict
+      - "9443:9443"  # HTTPS port
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/portainer/data:/data
+      - /opt/portainer/certs:/certs
+    environment:
+      - ADMIN_USERNAME=$ADMINEMAIL
+      - ADMIN_PASSWORD=$ADMINPASSWORD
+    command: -H unix:///var/run/docker.sock --tlsverify --tlscert /certs/portainer.crt --tlskey /certs/portainer.key
+EOF
+
+echo "Generated docker-compose.yml:" | log
+cat /opt/portainer/docker-compose.yml | log
+
+echo "Starting Portainer services" | log
+cd /opt/portainer
+docker compose up -d
+waitOrStop 0 "Failed to start Portainer services"
+
+echo "Waiting for Portainer to initialize" | log
+sleep 30  # Wait 30 seconds for initialization
+
+echo "Adding descriptions" | log
+descriptionAppend "Portainer Secure Address: https://$CWM_DOMAIN:9443"
+descriptionAppend "Portainer Admin Email: $ADMINEMAIL"
+descriptionAppend "Portainer Admin Password: $ADMINPASSWORD"
+descriptionAppend " "
+descriptionAppend "Portainer config location: /opt/portainer/docker-compose.yml"
+descriptionAppend "Portainer data location: /opt/portainer/data"
+descriptionAppend "Portainer certificates location: /opt/portainer/certs"
+descriptionAppend "Note: If using self-signed certificate, accept the security warning."
+
+tagScript success
+
+exit 0
