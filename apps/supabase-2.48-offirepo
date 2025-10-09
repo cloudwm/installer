@@ -202,47 +202,18 @@ EOF
 
 obtain_ssl() {
     echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-    if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect -v; then
+
+    if certbot --nginx -d "$DOMAIN_NAME" \
+        --non-interactive --agree-tos \
+        -m "admin@${DOMAIN_NAME}" --redirect -v; then
+
         echo "✅ Let's Encrypt SSL certificate active at https://${DOMAIN_NAME}" | log
+        nginx -t && systemctl reload nginx
+
     else
-        echo "⚠️ Let's Encrypt failed, falling back to self-signed certificate..." | log
-        mkdir -p /etc/ssl/supabase
-        openssl req -x509 -newkey rsa:2048 -nodes -keyout /etc/ssl/supabase/key.pem -out /etc/ssl/supabase/cert.pem -days 365 \
-            -subj "/CN=${DOMAIN_NAME}" >/dev/null 2>&1
-
-        local CONF="/etc/nginx/sites-available/supabase.conf"
-        cat > "$CONF" <<EOF
-server {
-    listen 443 ssl;
-    server_name ${DOMAIN_NAME};
-
-    ssl_certificate /etc/ssl/supabase/cert.pem;
-    ssl_certificate_key /etc/ssl/supabase/key.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:54323;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location ~ ^/(auth|rest|storage|graphql|functions|realtime)/ {
-        proxy_pass http://127.0.0.1:54321;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    client_max_body_size 100M;
-}
-EOF
-        ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
-        nginx -t
-		systemctl reload nginx
-		systemctl restart nginx
-        echo "✅ Self-signed certificate configured for https://${DOMAIN_NAME}" | log
+        echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${DOMAIN_NAME}" | log
+        echo "🛑 Aborting installation — SSL is required." | log
+        exit 1
     fi
 }
 
