@@ -9,12 +9,11 @@ fi
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx python3-pip
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin 
-pip3 install bcrypt
 sudo usermod -aG docker $USER
 sleep 5
 
@@ -42,14 +41,14 @@ else
     fi
 fi
 
-ADMINPASSWORD_HASH=$(python3 -c "import bcrypt; print(bcrypt.hashpw('$ADMINPASSWORD'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'))")
+ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$ADMINPASSWORD" | cut -d: -f2)
 echo "Creating Docker Compose file for Portainer" | log
 cat << EOF > /opt/portainer/docker-compose.yml
 services:
   portainer:
     image: portainer/portainer-ce:2.33.2
     container_name: portainer
-    restart: unless-stopped
+    restart: always
     ports:
       - "8080:9000"  # Default to 8080 to avoid port 80 conflict
       - "9443:9443"  # HTTPS port
