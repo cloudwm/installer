@@ -6,20 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-CWM_DOMAIN="63-250-63-7.cloud-xip.com"
-
-if [ -r /root/guest.conf ]; then
-    ADMINPASSWORD="$(grep -E '^password=' /root/guest.conf | cut -d'=' -f2-)"
-    ADMINEMAIL="$(grep -E '^email=' /root/guest.conf | cut -d'=' -f2-)"
-    if [ -z "$ADMINPASSWORD" ] || [ -z "$ADMINEMAIL" ]; then
-        echo "ERROR: password or email key not found or empty in /root/guest.conf" >&2
-        exit 1
-    fi
-else
-    echo "ERROR: /root/guest.conf not found or not readable" >&2
-    exit 1
-fi
-
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
@@ -31,11 +17,19 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 sudo usermod -aG docker $USER
 sleep 5
 
-echo "Creating Portainer directories" | log
+echo "Creating and cleaning Portainer directories" | log
+sudo rm -rf /opt/portainer/data
 sudo mkdir -p /opt/portainer/{certs,data}
 
+echo "Checking and freeing ports 8080 and 9443" | log
+for port in 8080 9443; do
+    if sudo netstat -tuln | grep -q :$port; then
+        echo "WARNING: Port $port is in use. Stopping conflicting services." | log
+        sudo lsof -i :$port | awk 'NR>1 {print $2}' | xargs sudo kill -9 2>/dev/null || true
+    fi
+done
+
 echo "Obtaining Let's Encrypt SSL certificate" | log
-# Stop any running services on port 80
 sudo docker stop $(docker ps -q 2>/dev/null | xargs) 2>/dev/null || true
 sudo systemctl stop apache2 2>/dev/null || true
 sudo systemctl stop nginx 2>/dev/null || true
@@ -44,7 +38,6 @@ sudo certbot certonly --standalone -d $CWM_DOMAIN --non-interactive --agree-tos 
 if [ $? -ne 0 ]; then
     echo "ERROR: Let's Encrypt certificate acquisition failed. Falling back to self-signed certificate." | log
     echo "Check /var/log/letsencrypt/letsencrypt.log for details." | log
-    # Generate self-signed certificate as fallback
     sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout /opt/portainer/certs/portainer.key \
         -out /opt/portainer/certs/portainer.crt \
@@ -60,8 +53,14 @@ else
     fi
 fi
 
-ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$ADMINPASSWORD" | cut -d: -f2)
-echo "Generated $ADMINPASSWORD_HASH" | log
+# Generate admin password using helper-reset-password
+echo "Generating admin password with helper-reset-password" | log
+NEW_ADMIN_PASSWORD=$(docker run --rm -v /opt/portainer/data:/data portainer/helper-reset-password | grep "Use the following password to login" | awk '{print $NF}')
+if [ -z "$NEW_ADMIN_PASSWORD" ]; then
+    echo "ERROR: Failed to generate admin password" | log
+    waitOrStop 0 "Admin password generation failed"
+fi
+echo "Generated admin password: $NEW_ADMIN_PASSWORD" | log
 
 echo "Creating Docker Compose file for Portainer" | log
 cat << EOF > /opt/portainer/docker-compose.yml
@@ -71,66 +70,24 @@ services:
     container_name: portainer
     restart: always
     ports:
-      - "8080:9000"  # Default to 8080 to avoid port 80 conflict
-      - "9443:9443"  # HTTPS port
+      - "8080:9000"
+      - "9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
       - /opt/portainer/certs:/certs
-    command: -H unix:///var/run/docker.sock --tlsverify --tlscert /certs/portainer.crt --tlskey /certs/portainer.key --admin-password '$ADMINPASSWORD_HASH'
+    command: -H unix:///var/run/docker.sock --tlsverify --tlscert /certs/portainer.crt --tlskey /certs/portainer.key --admin-password '$(htpasswd -bnB "" "$NEW_ADMIN_PASSWORD" | cut -d: -f2)'
 EOF
-
-echo "Generated docker-compose.yml:" | log
-cat /opt/portainer/docker-compose.yml | log
 
 echo "Starting Portainer services" | log
 cd /opt/portainer
 docker compose up -d
 waitOrStop 0 "Failed to start Portainer services"
 
-echo "Waiting for Portainer to initialize" | log
-sleep 30  # Wait 30 seconds for initialization
-if ! docker compose ps | grep -q "portainer.*Up"; then
-    echo "Portainer container failed to start. Status:" | log
-    docker compose ps | log
-    echo "Check logs:" | log
-    docker compose logs portainer | log
-    waitOrStop 0 "Portainer initialization failed"
-fi
-
-# Check if admin password was applied
-echo "Checking admin password setup" | log
-if docker compose logs portainer | grep -q "skipping admin password related flags"; then
-    echo "WARNING: Existing admin user detected. Resetting admin password." | log
-    docker compose down
-    docker pull portainer/helper-reset-password
-    NEW_ADMIN_PASSWORD=$(docker run --rm -v /opt/portainer/data:/data portainer/helper-reset-password | grep "Use the following password to login" | awk '{print $NF}')
-    if [ -z "$NEW_ADMIN_PASSWORD" ]; then
-        echo "ERROR: Failed to reset admin password" | log
-        waitOrStop 0 "Admin password reset failed"
-    else
-        echo "Admin password reset successfully. New password: $NEW_ADMIN_PASSWORD" | log
-    fi
-    docker compose up -d
-    sleep 30
-fi
-
-echo "Checking port mappings:" | log
-sudo netstat -tuln | grep -E ':8080|:9443' | log
-
-echo "Testing local connectivity" | log
-curl -v http://localhost:8080 2>&1 | log
-curl -k -v https://localhost:9443 2>&1 | log
-
 echo "Adding descriptions" | log
-descriptionAppend "Portainer Address: https://$CWM_DOMAIN:9443"
-if [ -n "$NEW_ADMIN_PASSWORD" ]; then
-    descriptionAppend "Portainer Admin Username: admin"
-    descriptionAppend "Portainer Admin Password: $NEW_ADMIN_PASSWORD"
-else
-    descriptionAppend "Portainer Admin Username: admin"
-    descriptionAppend "Portainer Admin Password: $ADMINPASSWORD"
-fi
+descriptionAppend "Portainer Secure Address: https://$CWM_DOMAIN:9443"
+descriptionAppend "Portainer Admin Username: admin"
+descriptionAppend "Portainer Admin Password: $NEW_ADMIN_PASSWORD"
 descriptionAppend " "
 descriptionAppend "Portainer config location: /opt/portainer/docker-compose.yml"
 descriptionAppend "Portainer data location: /opt/portainer/data"
