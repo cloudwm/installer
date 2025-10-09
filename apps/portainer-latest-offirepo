@@ -20,14 +20,8 @@ sleep 5
 echo "Creating and cleaning Portainer directories" | log
 sudo rm -rf /opt/portainer/data
 sudo mkdir -p /opt/portainer/{certs,data}
-
-echo "Checking and freeing ports 8080 and 9443" | log
-for port in 8080 9443; do
-    if sudo netstat -tuln | grep -q :$port; then
-        echo "WARNING: Port $port is in use. Stopping conflicting services." | log
-        sudo lsof -i :$port | awk 'NR>1 {print $2}' | xargs sudo kill -9 2>/dev/null || true
-    fi
-done
+sudo chown -R root:root /opt/portainer/data
+sudo chmod -R 755 /opt/portainer/data
 
 echo "Obtaining Let's Encrypt SSL certificate" | log
 sudo docker stop $(docker ps -q 2>/dev/null | xargs) 2>/dev/null || true
@@ -53,14 +47,19 @@ else
     fi
 fi
 
-# Generate admin password using helper-reset-password
+# Attempt to generate admin password with helper-reset-password
 echo "Generating admin password with helper-reset-password" | log
-NEW_ADMIN_PASSWORD=$(docker run --rm -v /opt/portainer/data:/data portainer/helper-reset-password | grep "Use the following password to login" | awk '{print $NF}')
+docker pull portainer/helper-reset-password
+HELPER_OUTPUT=$(docker run --rm -v /opt/portainer/data:/data portainer/helper-reset-password 2>&1)
+NEW_ADMIN_PASSWORD=$(echo "$HELPER_OUTPUT" | grep "Use the following password to login" | awk '{print $NF}')
 if [ -z "$NEW_ADMIN_PASSWORD" ]; then
-    echo "ERROR: Failed to generate admin password" | log
-    waitOrStop 0 "Admin password generation failed"
+    echo "WARNING: Failed to generate password with helper-reset-password. Output: $HELPER_OUTPUT" | log
+    echo "Falling back to original password: $ADMINPASSWORD" | log
+    ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$ADMINPASSWORD" | cut -d: -f2)
+else
+    echo "Generated admin password: $NEW_ADMIN_PASSWORD" | log
+    ADMINPASSWORD_HASH=$(htpasswd -bnB "" "$NEW_ADMIN_PASSWORD" | cut -d: -f2)
 fi
-echo "Generated admin password: $NEW_ADMIN_PASSWORD" | log
 
 echo "Creating Docker Compose file for Portainer" | log
 cat << EOF > /opt/portainer/docker-compose.yml
@@ -76,7 +75,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
       - /opt/portainer/certs:/certs
-    command: -H unix:///var/run/docker.sock --tlsverify --tlscert /certs/portainer.crt --tlskey /certs/portainer.key --admin-password '$(htpasswd -bnB "" "$NEW_ADMIN_PASSWORD" | cut -d: -f2)'
+    command: -H unix:///var/run/docker.sock --tlsverify --tlscert /certs/portainer.crt --tlskey /certs/portainer.key --admin-password '$ADMINPASSWORD_HASH'
 EOF
 
 echo "Starting Portainer services" | log
@@ -84,10 +83,18 @@ cd /opt/portainer
 docker compose up -d
 waitOrStop 0 "Failed to start Portainer services"
 
+echo "Waiting for Portainer to initialize" | log
+sleep 30
+
 echo "Adding descriptions" | log
 descriptionAppend "Portainer Secure Address: https://$CWM_DOMAIN:9443"
-descriptionAppend "Portainer Admin Username: admin"
-descriptionAppend "Portainer Admin Password: $NEW_ADMIN_PASSWORD"
+if [ -n "$NEW_ADMIN_PASSWORD" ]; then
+    descriptionAppend "Portainer Admin Username: admin"
+    descriptionAppend "Portainer Admin Password: $NEW_ADMIN_PASSWORD"
+else
+    descriptionAppend "Portainer Admin Username: admin"
+    descriptionAppend "Portainer Admin Password: $ADMINPASSWORD"
+fi
 descriptionAppend " "
 descriptionAppend "Portainer config location: /opt/portainer/docker-compose.yml"
 descriptionAppend "Portainer data location: /opt/portainer/data"
