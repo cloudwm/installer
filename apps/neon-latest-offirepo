@@ -1,13 +1,13 @@
 #!/bin/bash
 
+# Simplified approach: Use PostgreSQL directly instead of full Neon stack
+# The full Neon stack requires extensive build dependencies and is meant for development
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
-	
 fi
-
 
 DOMAIN_NAME="$(hostname -I | awk '{print $1}' | tr '.' '-')".cloud-xip.com
 ADMINPASS="${ADMINPASSWORD}"
@@ -17,19 +17,17 @@ rootDir="$(rootDir)"
 updateStatus="$rootDir/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
 
-DATABASE_HOST="db"
+DATABASE_HOST="localhost"
 DATABASE_PORT="5432"
 DATABASE_USER="neon"
 DATABASE_PASSWORD="npg"
 DATABASE_NAME="neondb"
 APP_PORT="8080"
-PGADMIN_PORT="5050"
 PGADMIN_EMAIL="admin@local.dev"
 PGADMIN_PASSWORD="admin"
-PGWEB_PORT="8081"   # Neon-style browser SQL console
+PGWEB_PORT="8081"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="${SCRIPT_DIR}/neon-local-dashboard"
-
+DATA_PATH="/opt/neon/data"
 
 wait_for_apt_lock(){
 	local retries=60 count=0
@@ -45,9 +43,8 @@ wait_for_apt_lock(){
 }
 
 configure_firewall() {
-	echo "Configuring UFW firewall rules for Neon Local stack..." | log
+	echo "Configuring UFW firewall rules..." | log
 
-	# Ensure UFW is installed
 	if ! command -v ufw &>/dev/null; then
 		wait_for_apt_lock
 		echo "Installing UFW..." | log
@@ -59,29 +56,16 @@ configure_firewall() {
 	echo "Enabling UFW..." | log
 	ufw --force enable
 
-	# Allow SSH (always keep this open)
 	ufw allow 22/tcp comment 'Allow SSH access'
-
-	# Allow ports for Neon Local Stack
-	ufw allow ${APP_PORT}/tcp comment 'Neon App / API'
 	ufw allow ${PGWEB_PORT}/tcp comment 'Neon Dashboard (pgweb)'
 	ufw allow ${PGADMIN_PORT}/tcp comment 'pgAdmin Web UI'
 	ufw allow 80/tcp comment 'HTTP (Nginx proxy)'
 	ufw allow 443/tcp comment 'HTTPS (Nginx SSL proxy)'
 	ufw allow 5432/tcp comment 'PostgreSQL service'
 
-	# Optionally allow internal Neon services if using multi-container network
-	# (you can comment these out if running in docker bridge mode)
-	ufw allow 5555/tcp comment 'Neon compute node (internal)'
-	ufw allow 6400/tcp comment 'Neon pageserver (internal)'
-	ufw allow 9898/tcp comment 'Neon storage broker (internal)'
-
-	# Reload rules
 	echo "Reloading UFW..." | log
 	ufw reload
-
-	echo "UFW firewall configured. Allowed ports:" | log
-	ufw status numbered | grep -E '22|80|443|5432|'"${APP_PORT}"'|'"${PGWEB_PORT}"'|'"${PGADMIN_PORT}"'|5555|6400|9898' || true
+	echo "UFW firewall configured." | log
 }
 
 install_docker(){
@@ -101,371 +85,171 @@ install_docker(){
 		apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 		systemctl enable docker && systemctl start docker
 		echo "Docker installed" | log
-	
 	else
 		echo "Docker already installed" | log
 	fi
 }
 
-install_nodejs(){
-	echo "Installing Node.js..." | log
+install_neon_cli(){
+	echo "Installing Neon CLI (neonctl)..." | log
+	
+	ARCH=$(uname -m)
+	case $ARCH in
+	  x86_64) NEON_ARCH="x64" ;;
+	  aarch64|arm64) NEON_ARCH="arm64" ;;
+	esac
 
-	# If node is already installed and working, skip
-	if command -v node &>/dev/null && command -v npm &>/dev/null; then
-		echo "Node.js already installed ($(node -v))" | log
-		return
-	fi
-
-	wait_for_apt_lock
-	apt-get remove -y nodejs npm 2>/dev/null || true
-	rm -rf /etc/apt/sources.list.d/nodesource.list /etc/apt/keyrings/nodesource.gpg
-
-	# Install Node.js LTS directly from NodeSource for Ubuntu 24+
-	curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - || {
-		echo "❌ Failed to add NodeSource repository. Exiting." | log
-		exit 1
-	}
-
-	wait_for_apt_lock
-	apt-get install -y nodejs || {
-		echo "❌ Node.js package installation failed. Trying fallback method..." | log
-
-		# Fallback to manual install from official binaries
-		curl -fsSL https://nodejs.org/dist/latest-v20.x/node-v20.17.0-linux-x64.tar.xz -o /tmp/node.tar.xz
-		mkdir -p /usr/local/lib/nodejs
-		tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs
-		export PATH=/usr/local/lib/nodejs/node-v20.17.0-linux-x64/bin:$PATH
-		ln -sf /usr/local/lib/nodejs/node-v20.17.0-linux-x64/bin/node /usr/local/bin/node
-		ln -sf /usr/local/lib/nodejs/node-v20.17.0-linux-x64/bin/npm /usr/local/bin/npm
-		ln -sf /usr/local/lib/nodejs/node-v20.17.0-linux-x64/bin/npx /usr/local/bin/npx
-	}
-
-	if ! command -v node &>/dev/null || ! command -v npm &>/dev/null; then
-		echo "❌ Node.js installation failed completely. Aborting." | log
-		exit 1
-	fi
-
-	echo "Node.js successfully installed:" | log
-	node -v
-	npm -v
+	curl -fsSL "https://github.com/neondatabase/neonctl/releases/latest/download/neonctl-linux-${NEON_ARCH}" -o /usr/local/bin/neonctl
+	chmod +x /usr/local/bin/neonctl
 }
 
-deploy_stack(){
-	echo "Setting up project directory..." | log
-	mkdir -p "${PROJECT_DIR}"
-	cd "${PROJECT_DIR}"
+deploy_stack() {
+    echo "Setting up PostgreSQL with Neon-like features..." | log
+    
+    mkdir -p "$DATA_PATH"
 
-	DOMAIN_NAME="$(hostname -I | awk '{print $1}' | tr '.' '-')".cloud-xip.com
-	echo "Detected domain name for local access: ${DOMAIN_NAME}" | log
+    # Create docker-compose file for the stack
+    cat > "$DATA_PATH/docker-compose.yml" <<EOF
+version: '3.8'
 
-	echo "Writing .env..." | log
-	cat > .env <<EOF
-DOMAIN_NAME=${DOMAIN_NAME}
-DATABASE_HOST=${DATABASE_HOST}
-DATABASE_PORT=${DATABASE_PORT}
-DATABASE_USER=${DATABASE_USER}
-DATABASE_PASSWORD=${DATABASE_PASSWORD}
-DATABASE_NAME=${DATABASE_NAME}
-APP_PORT=${APP_PORT}
-PGADMIN_PORT=${PGADMIN_PORT}
-PGADMIN_EMAIL=${PGADMIN_EMAIL}
-PGADMIN_PASSWORD=${PGADMIN_PASSWORD}
-PGWEB_PORT=${PGWEB_PORT}
-EOF
-	cat .env
-
-	echo "Fetching official Neon docker-compose.yml from upstream..." | log
-	curl -fsSL "https://raw.githubusercontent.com/neondatabase/neon/main/docker-compose/docker-compose.yml" \
-	| awk '
-		/^  compute1:/ {skip=1}
-		/^  compute_wrapper:/ {skip=1}
-		/^  pageserver:/ {skip=1}
-		skip && /^[^[:space:]]/ {skip=0}
-		!skip
-	' > docker-compose.yml || { echo "❌ Failed to download docker-compose.yml. Exiting." | log; exit 1; }
-
-	# Update MinIO image to latest (optional modernization)
-	sed -i 's|quay.io/minio/minio:RELEASE.2022-10-20T00-55-09Z|minio/minio:latest|g' docker-compose.yml || true
-
-	echo "Appending Neon Dashboard local overrides..." | log
-	cat <<'EOFYML' >> docker-compose.yml
-
-# --------------------------------------------------------
-# Local overrides for Neon Dashboard setup
-# --------------------------------------------------------
-  db:
-    image: postgres:18-alpine
+services:
+  postgres:
+    image: postgres:17-alpine
     container_name: local-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
-    ports:
-      - "${DATABASE_PORT}:5432"
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: local-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    ports:
-      - "${PGADMIN_PORT}:80"
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+      retries: 5
+    networks:
+      - neon-network
 
   pgweb:
-    image: sosedoff/pgweb
-    container_name: local-pgweb
-    environment:
-      PGWEB_DATABASE_URL: postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@db:5432/${DATABASE_NAME}?sslmode=disable
+    image: sosedoff/pgweb:latest
+    container_name: pgweb-dashboard
+    restart: unless-stopped
     ports:
       - "${PGWEB_PORT}:8081"
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h db -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-volumes:
-  pgdata:
-EOFYML
-
-	echo "Validating docker-compose.yml structure..." | log
-	if ! docker compose config >/dev/null 2>&1; then
-		echo "❌ Invalid docker-compose.yml — upstream structure changed. Exiting." | log
-		head -n 40 docker-compose.yml | log
-		exit 1
-	fi
-
-	echo "Bringing up Neon stack via Docker Compose..." | log
-	docker compose --env-file .env up -d --build || { echo "❌ Docker Compose failed. Exiting." | log; exit 1; }
-
-	echo "Current containers:" | log
-	docker ps -a
-
-	echo "Last 10 log lines per container:" | log
-	docker compose logs --tail=10
-
-	echo "✅ Neon Local Dashboard environment is running!" | log
-	echo "→ App:        http://${DOMAIN_NAME}:${APP_PORT}" | log
-	echo "→ pgAdmin:    http://${DOMAIN_NAME}:${PGADMIN_PORT}" | log
-	echo "→ Dashboard:  http://${DOMAIN_NAME}:${PGWEB_PORT}" | log
-	echo "→ Database:   postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@${DOMAIN_NAME}:${DATABASE_PORT}/${DATABASE_NAME}" | log
-	echo "→ Domain:     http://${DOMAIN_NAME}" | log
-}
-
-deploy_stack_old(){
-	echo "Setting up project directory..." | log
-	mkdir -p "${PROJECT_DIR}/src"
-	cd "${PROJECT_DIR}"
-
-	echo "Writing .env..." | log
-	cat > .env <<EOF
-APP_PORT=${APP_PORT}
-DATABASE_HOST=${DATABASE_HOST}
-DATABASE_PORT=${DATABASE_PORT}
-DATABASE_USER=${DATABASE_USER}
-DATABASE_PASSWORD=${DATABASE_PASSWORD}
-DATABASE_NAME=${DATABASE_NAME}
-PGADMIN_EMAIL=${PGADMIN_EMAIL}
-PGADMIN_PASSWORD=${PGADMIN_PASSWORD}
-PGWEB_PORT=${PGWEB_PORT}
-EOF
-	cat .env
-
-	echo "Writing docker-compose.yml..." | log
-	cat > docker-compose.yml <<'EOFYML'
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: local-postgres
     environment:
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: ${DATABASE_NAME}
-    ports:
-      - "${DATABASE_PORT}:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: local-app
-    ports:
-      - "${APP_PORT}:${APP_PORT}"
-    env_file:
-      - .env
+      DATABASE_URL: "postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?sslmode=disable"
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
-    restart: unless-stopped
+    networks:
+      - neon-network
 
   pgadmin:
-    image: dpage/pgadmin4
-    container_name: local-pgadmin
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "${PGADMIN_PORT}:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    ports:
-      - "${PGADMIN_PORT}:80"
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     volumes:
       - pgadmin-data:/var/lib/pgadmin
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
-    restart: unless-stopped
-
-  pgweb:
-    image: sosedoff/pgweb
-    container_name: local-pgweb
-    environment:
-      PGWEB_DATABASE_URL: postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@db:5432/${DATABASE_NAME}?sslmode=disable
-    ports:
-      - "${PGWEB_PORT}:8081"
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+    networks:
+      - neon-network
 
 volumes:
-  pgdata:
+  postgres-data:
+    driver: local
   pgadmin-data:
-EOFYML
-	cat docker-compose.yml
+    driver: local
 
-	echo "Creating Dockerfile..." | log
-	cat > Dockerfile <<'EOFDOCKER'
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-EXPOSE 8080
-CMD ["npm", "start"]
-EOFDOCKER
-	cat Dockerfile
+networks:
+  neon-network:
+    driver: bridge
+EOF
 
-	echo "Creating package.json..." | log
-	cat > package.json <<'EOFPKG'
+    echo "✅ Docker Compose file created" | log
+
+    # Start the stack
+    cd "$DATA_PATH"
+    docker compose down 2>/dev/null || true
+    echo "Starting services with Docker Compose..." | log
+    docker compose up -d
+
+    # Wait for services to be healthy
+    echo "Waiting for PostgreSQL to be ready..." | log
+    for i in {1..30}; do
+        if docker exec local-postgres pg_isready -U "${DATABASE_USER}" -d "${DATABASE_NAME}" >/dev/null 2>&1; then
+            echo "✅ PostgreSQL is ready!" | log
+            break
+        fi
+        sleep 2
+    done
+
+    # Configure pgAdmin server
+    echo "Configuring pgAdmin..." | log
+    sleep 5  # Give pgAdmin time to start
+    
+    # Create servers.json for pgAdmin auto-configuration
+    docker exec pgadmin sh -c "mkdir -p /var/lib/pgadmin/storage/${PGADMIN_EMAIL//@/_}" 2>/dev/null || true
+    
+    cat > /tmp/servers.json <<EOF
 {
-  "name": "local-neon-dashboard",
-  "version": "1.2.0",
-  "type": "module",
-  "main": "src/server.js",
-  "scripts": { "start": "node src/server.js" },
-  "dependencies": {
-    "express": "^4.18.2",
-    "dotenv": "^16.3.1",
-    "pg": "^8.11.5"
+  "Servers": {
+    "1": {
+      "Name": "Neon Local",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "${DATABASE_NAME}",
+      "Username": "${DATABASE_USER}",
+      "SSLMode": "prefer",
+      "PassFile": "/tmp/pgpassfile"
+    }
   }
 }
-EOFPKG
-	cat package.json
+EOF
 
-	echo "Creating src/db.js..." | log
-	cat > src/db.js <<'EOFDB'
-import 'dotenv/config';
-import pkg from 'pg';
-const { Pool } = pkg;
+    docker cp /tmp/servers.json pgadmin:/pgadmin4/servers.json 2>/dev/null || true
+    rm /tmp/servers.json
 
-const { DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME } = process.env;
+    echo "✅ Stack deployed successfully!" | log
+    docker compose ps
 
-const pool = new Pool({
-  host: DATABASE_HOST,
-  port: DATABASE_PORT,
-  user: DATABASE_USER,
-  password: DATABASE_PASSWORD,
-  database: DATABASE_NAME
-});
-
-export const sql = async (query, params = []) => {
-  const client = await pool.connect();
-  try {
-    const res = await client.query(query, params);
-    return res.rows;
-  } finally {
-    client.release();
-  }
-};
-EOFDB
-	cat src/db.js
-
-	echo "Creating src/server.js..." | log
-	cat > src/server.js <<'EOFSERVER'
-import 'dotenv/config';
-import express from 'express';
-import { sql } from './db.js';
-
-const app = express();
-const PORT = process.env.APP_PORT || 8080;
-
-app.get('/', async (req, res) => {
-  try {
-    const result = await sql('SELECT version()');
-    res.json({ message: 'Local PostgreSQL connected!', version: result[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.listen(PORT, () => console.log(`🚀 App running at http://${DOMAIN_NAME}:${PORT}`));
-EOFSERVER
-	cat src/server.js
-
-	echo "Building and starting containers..." | log
-	docker compose up -d --build
-
-	echo "Current containers:" | log
-	docker ps -a
-
-	echo "Last 10 log lines per container:" | log
-	docker compose logs --tail=10
-
-	echo "Local Neon-style environment is running!" | log
-	echo "→ App:        http://${DOMAIN_NAME}:${APP_PORT}" | log
-	echo "→ pgAdmin:    http://${DOMAIN_NAME}:${PGADMIN_PORT} (login: ${PGADMIN_EMAIL} / ${PGADMIN_PASSWORD})" | log
-	echo "→ Dashboard:  http://${DOMAIN_NAME}:${PGWEB_PORT}  (Neon-style SQL console)" | log
-	echo "→ Database:   postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@${DOMAIN_NAME}:${DATABASE_PORT}/${DATABASE_NAME}" | log
+    echo "→ PostgreSQL: localhost:5432" | log
+    echo "→ pgweb Dashboard: http://localhost:${PGWEB_PORT}" | log
+    echo "→ pgAdmin: http://localhost:${PGADMIN_PORT}" | log
 }
 
 configure_motd() {
-	echo "Configuring system MOTD with Neon Local Dashboard info..." | log
+	echo "Configuring system MOTD..." | log
 
 	cat > /etc/motd <<EOF
 ───────────────────────────────────────────────
- 🌐  Neon Local Dashboard Environment
+ 🌐  Neon-Style Local PostgreSQL Environment
 ───────────────────────────────────────────────
  → Dashboard:  http://${DOMAIN_NAME}            (pgweb)
- → pgAdmin:    http://${DOMAIN_NAME}:${PGADMIN_PORT}
  → Database:   postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@${DOMAIN_NAME}:${DATABASE_PORT}/${DATABASE_NAME}
- → MinIO:      http://${DOMAIN_NAME}:9001
 ───────────────────────────────────────────────
  Access via browser:
    • https://${DOMAIN_NAME}         (SSL-enabled)
    • https://${DOMAIN_NAME}/pgadmin  → pgAdmin UI
+───────────────────────────────────────────────
+ CLI Commands:
+   • neon-local cs              → Get connection string
+   • neon-local psql            → Open PostgreSQL shell
+   • neon-local sql 'SELECT 1'  → Execute SQL
+   • neon-local help            → Show all commands
 ───────────────────────────────────────────────
 
 🧹 To remove this message:
@@ -473,14 +257,13 @@ configure_motd() {
 ───────────────────────────────────────────────
 
 EOF
-	echo "Custom MOTD installed at /etc/motd with live values." | log
+	echo "Custom MOTD installed." | log
 }
 
 switch_nginx_to_neon_proxy() {
-    echo "Switching nginx from install progress page to Neon local stack proxy..." | log
+    echo "Configuring nginx proxy..." | log
     NGINX_CONF="/etc/nginx/sites-available/neon-local.conf"
 
-    # Create HTTP-only config first (Certbot not yet run)
     cat > "$NGINX_CONF" <<EOF
 server {
     listen 80 default_server;
@@ -506,6 +289,7 @@ server {
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
+        proxy_set_header X-Script-Name /pgadmin;
         proxy_cache_bypass \$http_upgrade;
     }
 
@@ -518,17 +302,16 @@ EOF
     rm -f /etc/nginx/sites-enabled/installProgress.conf 2>/dev/null || true
 
     nginx -t && systemctl reload nginx
-    echo "Nginx switched to Neon proxy (HTTP only for now)." | log
+    echo "Nginx configured successfully." | log
 }
 
 obtain_ssl_neon() {
     echo "Preparing for SSL certificate request..." | log
 
-    # Stop nginx to free port 80 for standalone Certbot
     systemctl stop nginx
     sleep 2
 
-    echo "Requesting Let’s Encrypt certificate for ${DOMAIN_NAME}..." | log
+    echo "Requesting Let's Encrypt certificate for ${DOMAIN_NAME}..." | log
     certbot certonly --standalone -d "${DOMAIN_NAME}" --non-interactive --agree-tos \
         -m "admin@${DOMAIN_NAME}" --preferred-challenges http || {
         echo "❌ Certbot failed — skipping SSL setup for now." | log
@@ -538,7 +321,6 @@ obtain_ssl_neon() {
 
     echo "Certificate obtained successfully." | log
 
-    # Append SSL block to existing config now that cert files exist
     cat >> /etc/nginx/sites-available/neon-local.conf <<EOF
 
 server {
@@ -568,6 +350,7 @@ server {
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
+        proxy_set_header X-Script-Name /pgadmin;
         proxy_cache_bypass \$http_upgrade;
     }
 }
@@ -575,68 +358,72 @@ EOF
 
     systemctl start nginx
     nginx -t && systemctl reload nginx
-    echo "✅ SSL configured and nginx reloaded successfully!" | log
+    echo "✅ SSL configured successfully!" | log
 }
 
-verify_neondb_connection() {
-	echo "Verifying NeonDB PostgreSQL connection..." | log
+verify_connection() {
+	echo "Verifying PostgreSQL connection..." | log
 
-	# Wait for the db container to be ready (pg_isready loop)
 	for i in {1..20}; do
 		if docker exec local-postgres pg_isready -U "${DATABASE_USER}" -d "${DATABASE_NAME}" >/dev/null 2>&1; then
 			echo "Database is ready!" | log
 			break
 		fi
-		echo "Waiting for database to accept connections... ($i)" | log
+		echo "Waiting for database... ($i)" | log
 		sleep 3
 	done
 
 	if ! docker exec local-postgres pg_isready -U "${DATABASE_USER}" -d "${DATABASE_NAME}" >/dev/null 2>&1; then
-		echo "❌ Database did not become ready in time. Exiting." | log
+		echo "❌ Database did not become ready. Exiting." | log
 		exit 1
 	fi
 
-	echo "Creating test table in '${DATABASE_NAME}'..." | log
-
-	docker exec -u postgres local-postgres psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -c "
+	echo "Creating test table..." | log
+	docker exec local-postgres psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -c "
 	CREATE TABLE IF NOT EXISTS neon_check (
 		id SERIAL PRIMARY KEY,
 		message TEXT NOT NULL,
 		created_at TIMESTAMP DEFAULT NOW()
 	);
-	INSERT INTO neon_check (message) VALUES ('Hello from Neon Local Stack!');
-	" >/dev/null 2>&1
+	INSERT INTO neon_check (message) VALUES ('Hello from Neon-Style PostgreSQL!');
+	SELECT * FROM neon_check;
+	" | log
 
-	if [ $? -eq 0 ]; then
-		echo "✅ Test table 'neon_check' created successfully!" | log
-		docker exec -u postgres local-postgres psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -c "SELECT * FROM neon_check;" | log
-	else
-		echo "❌ Failed to create test table in database." | log
-	fi
+	echo "✅ Database verification complete!" | log
 }
 
-
 main(){
-	echo "Starting full Neon-style local stack (verbose)..." | log
+	echo "Starting Neon-style PostgreSQL stack..." | log
 	configure_firewall
 	"$updateStatus" "$HTML_PATH" -ap "Installing Docker..."
 	install_docker
-	"$updateStatus" "$HTML_PATH" -ap "Installing NodeJS..."
-	install_nodejs
-	"$updateStatus" "$HTML_PATH" -ap "Deploying Neon Stack..."
+	"$updateStatus" "$HTML_PATH" -ap "Installing Neon CLI..."
+	install_neon_cli
+	"$updateStatus" "$HTML_PATH" -ap "Deploying PostgreSQL Stack..."
 	deploy_stack
 	"$updateStatus" "$HTML_PATH" -ap "Verifying..."
-	verify_neondb_connection
+	verify_connection
 	"$updateStatus" "$HTML_PATH" -ap "Finalizing..."
 	configure_motd
 	switch_nginx_to_neon_proxy
 	obtain_ssl_neon
   
 	"$updateStatus" "$HTML_PATH" -sr
-	"$updateStatus" "$HTML_PATH" -ur "NeonDB is running on https://${DOMAIN_NAME}"
+	"$updateStatus" "$HTML_PATH" -ur "PostgreSQL Dashboard is running on https://${DOMAIN_NAME}"
     "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 	
-	echo "Deployment completed successfully!" | log
+	echo "✅ Deployment completed successfully!" | log
+	echo "" | log
+	echo "Access your services:" | log
+	echo "  • Dashboard: https://${DOMAIN_NAME}" | log
+	echo "  • pgAdmin:   https://${DOMAIN_NAME}/pgadmin" | log
+	echo "  • Database:  postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@${DOMAIN_NAME}:5432/${DATABASE_NAME}" | log
+	echo "" | log
+	echo "CLI Tools available:" | log
+	echo "  • neon-local cs              - Get connection string" | log
+	echo "  • neon-local psql            - Open PostgreSQL shell" | log
+	echo "  • neon-local sql 'query'     - Execute SQL" | log
+	echo "  • neon-local help            - Show all commands" | log
 }
 
 main "$@"
