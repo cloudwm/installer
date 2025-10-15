@@ -1,0 +1,110 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+kafkaVersion="4.0.1"
+scalaVersion="2.13"
+kafkaPackage="kafka_${scalaVersion}-${kafkaVersion}.tgz"
+kafkaDownloadUrl="https://downloads.apache.org/kafka/${kafkaVersion}/${kafkaPackage}"
+kafkaInstallDir="/opt/kafka"
+kafkaUser="kafka"
+kafkaGroup="kafka"
+rootDir=$(rootDir)
+
+ensureDir() {
+    local dir="$1"
+    mkdir -p "$dir"
+    chown -R "${kafkaUser}:${kafkaGroup}" "$dir"
+    chmod 750 "$dir"
+}
+
+echo "Downloading Kafka ${kafkaVersion} binary" | log
+cd "${rootDir}/temp"
+installPackage curl tar openjdk-17-jre-headless
+waitOrStop 0 "Failed apt install: curl tar openjdk-17-jre-headless"
+curlDownload "${kafkaDownloadUrl}"
+waitOrStop 0 "Kafka tarball not downloaded"
+
+echo "Installing Kafka to ${kafkaInstallDir}" | log
+if ! id -u "${kafkaUser}" >/dev/null 2>&1; then
+    groupadd -r "${kafkaGroup}"
+    useradd -r -g "${kafkaGroup}" -d "${kafkaInstallDir}" -s /usr/sbin/nologin "${kafkaUser}"
+fi
+tar -xzf "${kafkaPackage}" -C /opt
+mv "/opt/kafka_${scalaVersion}-${kafkaVersion}" "${kafkaInstallDir}"
+chown -R "${kafkaUser}:${kafkaGroup}" "${kafkaInstallDir}"
+ensureDir "/var/lib/kafka/data"
+ensureDir "/var/log/kafka"
+
+echo "Writing minimal Kafka server.properties for KRaft" | log
+mkdir -p "${kafkaInstallDir}/config/kraft"
+cat > "${kafkaInstallDir}/config/kraft/server.properties" <<EOF
+process.roles=broker,controller
+node.id=1
+controller.quorum.voters=1@localhost:9093
+listeners=PLAINTEXT://:9092,CONTROLLER://:9093
+advertised.listeners=PLAINTEXT://${CWM_DISPLAYED_ADDRESS}:9092,CONTROLLER://${CWM_DISPLAYED_ADDRESS}:9093
+inter.broker.listener.name=PLAINTEXT
+listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+controller.listener.names=CONTROLLER
+log.dirs=/var/lib/kafka/data
+num.partitions=3
+default.replication.factor=1
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
+EOF
+chown "${kafkaUser}:${kafkaGroup}" "${kafkaInstallDir}/config/kraft/server.properties"
+
+echo "Formatting Kafka storage for KRaft mode" | log
+# Generate a cluster ID and format the storage directory
+clusterId=$(/opt/kafka/bin/kafka-storage.sh random-uuid)
+waitOrStop 0 "Failed to generate cluster ID"
+sudo -u "${kafkaUser}" /opt/kafka/bin/kafka-storage.sh format -t "${clusterId}" -c "${kafkaInstallDir}/config/kraft/server.properties"
+waitOrStop 0 "Failed to format Kafka storage"
+
+echo "Creating systemd service for Kafka" | log
+cat > /etc/systemd/system/kafka.service <<EOF
+[Unit]
+Description=Apache Kafka Broker (KRaft mode)
+After=network.target
+[Service]
+Type=simple
+User=${kafkaUser}
+Group=${kafkaGroup}
+Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
+ExecStart=${kafkaInstallDir}/bin/kafka-server-start.sh ${kafkaInstallDir}/config/kraft/server.properties
+ExecStop=${kafkaInstallDir}/bin/kafka-server-stop.sh
+Restart=on-failure
+StandardOutput=journal
+StandardError=journal
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable kafka.service
+
+echo "Starting Kafka" | log
+service kafka start
+waitOrStop 0 "Failed to start Kafka broker"
+
+echo "Adding installation description" | log
+descriptionAppend "Kafka Broker (KRaft mode, binary distribution) installed"
+descriptionAppend "Version: ${kafkaVersion} (Scala ${scalaVersion})"
+descriptionAppend "Install location: ${kafkaInstallDir}"
+descriptionAppend "Data directory: /var/lib/kafka/data"
+descriptionAppend "Log directory: /var/log/kafka"
+descriptionAppend " "
+descriptionAppend "Kafka CLI tools: ${kafkaInstallDir}/bin/"
+descriptionAppend "Example: ${kafkaInstallDir}/bin/kafka-topics.sh --list --bootstrap-server ${CWM_DISPLAYED_ADDRESS}:9092"
+descriptionAppend " "
+descriptionAppend "Systemd service: kafka.service – Kafka broker (KRaft mode)"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
