@@ -1,0 +1,112 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Docker and dependencies" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx apache2-utils jq
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+sleep 5
+
+echo "Creating Syncthing user and directories" | log
+appInstallDir="/opt/syncthing"
+syncthingUser="syncthing"
+syncthingGroup="syncthing"
+adminPassword="${ADMINPASSWORD:-$(openssl rand -base64 12)}"
+
+if ! id -u "${syncthingUser}" >/dev/null 2>&1; then
+    groupadd -r "${syncthingGroup}"
+    useradd -r -g "${syncthingGroup}" -d "${appInstallDir}" -s /usr/sbin/nologin "${syncthingUser}"
+fi
+
+sudo rm -rf ${appInstallDir}/data ${appInstallDir}/config ${appInstallDir}/certs
+sudo mkdir -p ${appInstallDir}/{certs,config,data}
+sudo chown -R ${syncthingUser}:${syncthingGroup} ${appInstallDir}/{config,data,certs}
+sudo chmod -R 750 ${appInstallDir}/{config,data,certs}
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+    sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem ${appInstallDir}/config/https-cert.pem
+    sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem ${appInstallDir}/config/https-key.pem
+    sudo chown ${syncthingUser}:${syncthingGroup} ${appInstallDir}/config/https-{cert,key}.pem
+    sudo chmod 640 ${appInstallDir}/config/https-{cert,key}.pem
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
+        waitOrStop 0 "Certificate copy failed"
+    fi
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+echo "Creating Docker Compose file for Syncthing" | log
+cat << EOF > ${appInstallDir}/docker-compose.yml
+services:
+  syncthing:
+    image: syncthing/syncthing:2.0.10
+    container_name: syncthing
+    restart: always
+    ports:
+      - "8384:8384"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+    volumes:
+      - ${appInstallDir}/config:/var/syncthing
+      - ${appInstallDir}/data:/var/syncthing/Sync
+    environment:
+      - PUID=$(id -u ${syncthingUser})
+      - PGID=$(id -g ${syncthingGroup})
+    command: --home=/var/syncthing --gui-address=0.0.0.0:8384
+EOF
+sudo chown ${syncthingUser}:${syncthingGroup} ${appInstallDir}/docker-compose.yml
+echo "Generated docker-compose.yml:" | log
+cat ${appInstallDir}/docker-compose.yml | log
+
+echo "Starting Syncthing services" | log
+cd ${appInstallDir}
+docker compose up -d
+waitOrStop 0 "Failed to start Syncthing services"
+
+echo "Waiting for Syncthing to initialize (30 seconds)..." | log
+sleep 30
+
+echo "Configuring Syncthing for HTTPS and admin user..." | log
+ADMINPASSWORD_HASH=$(htpasswd -nbB admin "${adminPassword}" | cut -d: -f2)
+echo "Generated password hash (length: ${#ADMINPASSWORD_HASH})" | log
+docker exec syncthing sed -i 's|<tls>false</tls>|<tls>true</tls>|' /var/syncthing/config.xml
+docker exec syncthing sed -i "/<gui enabled=\"true\"/a <user>admin</user>\n<password>${ADMINPASSWORD_HASH}</password>" /var/syncthing/config.xml
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to configure HTTPS or admin in config.xml" | log
+    waitOrStop 0 "Configuration failed"
+fi
+
+echo "Adding descriptions" | log
+descriptionAppend "Syncthing Web Interface: https://${CWM_DOMAIN}:8384/"
+descriptionAppend " "
+descriptionAppend "Syncthing Admin Username: admin"
+descriptionAppend "Syncthing Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "⚠️  IMPORTANT: On first access, your browser may show a certificate warning."
+descriptionAppend "This is normal for Let's Encrypt certificates. Click 'Advanced' and 'Proceed'."
+descriptionAppend " "
+descriptionAppend "Syncthing config location: ${appInstallDir}/docker-compose.yml"
+descriptionAppend "Syncthing data location: ${appInstallDir}/data"
+descriptionAppend "Syncthing certificates location: ${appInstallDir}/config (https-cert.pem, https-key.pem)"
+descriptionAppend "Syncthing sync port: 22000 (TCP/UDP) - open in firewall if needed"
+descriptionAppend " "
+
+tagScript success
+exit 0
