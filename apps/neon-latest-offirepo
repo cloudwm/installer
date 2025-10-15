@@ -23,6 +23,7 @@ DATABASE_USER="neon"
 DATABASE_PASSWORD="npg"
 DATABASE_NAME="neondb"
 APP_PORT="8080"
+PGADMIN_PORT="5050"
 PGADMIN_EMAIL="admin@local.dev"
 PGADMIN_PASSWORD="admin"
 PGWEB_PORT="8081"
@@ -239,6 +240,7 @@ configure_motd() {
  🌐  Neon-Style Local PostgreSQL Environment
 ───────────────────────────────────────────────
  → Dashboard:  http://${DOMAIN_NAME}            (pgweb)
+ → pgAdmin:    http://${DOMAIN_NAME}:${PGADMIN_PORT}
  → Database:   postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@${DOMAIN_NAME}:${DATABASE_PORT}/${DATABASE_NAME}
 ───────────────────────────────────────────────
  Access via browser:
