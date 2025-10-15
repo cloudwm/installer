@@ -33,6 +33,8 @@ sudo mkdir -p ${appInstallDir}/{certs,config,data}
 sudo chown -R ${syncthingUser}:${syncthingGroup} ${appInstallDir}/{config,data,certs}
 sudo chmod -R 750 ${appInstallDir}/{config,data,certs}
 
+systemctl stop nginx.service
+
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
 if certbot certonly --standalone -d "${CWM_DOMAIN}" \
     --non-interactive --agree-tos \
@@ -51,6 +53,8 @@ else
     echo "🛑 Aborting installation — SSL is required." | log
     exit 1
 fi
+
+systemctl enbale nginx && systemctl start nginx
 
 echo "Creating Docker Compose file for Syncthing" | log
 cat << EOF > ${appInstallDir}/docker-compose.yml
