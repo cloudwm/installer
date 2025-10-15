@@ -1,0 +1,148 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Docker and dependencies" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx apache2-utils nginx jq
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+sleep 5
+
+echo "Creating and cleaning Portainer directories" | log
+sudo rm -rf /opt/portainer/data
+sudo mkdir -p /opt/portainer/{certs,data}
+sudo chown -R root:root /opt/portainer/data
+sudo chmod -R 755 /opt/portainer/data
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+# Stop Nginx temporarily for Certbot validation
+sudo systemctl stop nginx
+if certbot --nginx -d "$CWM_DOMAIN" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" --redirect -v; then
+    echo "✅ Let's Encrypt SSL certificate active at https://${CWM_DOMAIN}" | log
+    sudo nginx -t && sudo systemctl reload nginx
+    # Copy certificates for Portainer
+    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
+    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
+        waitOrStop 0 "Certificate copy failed"
+    fi
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+echo "Creating Docker Compose file for Portainer (without initial password)" | log
+cat << 'EOF' > /opt/portainer/docker-compose.yml
+services:
+  portainer:
+    image: portainer/portainer-ce:2.33.2
+    container_name: portainer
+    restart: always
+    ports:
+      - "8080:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/portainer/data:/data
+      - /opt/portainer/certs:/certs
+    environment:
+      - PORTAINER_SSLCERT=/certs/portainer.crt
+      - PORTAINER_SSLKEY=/certs/portainer.key
+EOF
+
+echo "Generated docker-compose.yml:" | log
+cat /opt/portainer/docker-compose.yml | log
+
+echo "Starting Portainer services" | log
+cd /opt/portainer
+docker compose up -d
+waitOrStop 0 "Failed to start Portainer services"
+
+echo "Waiting for Portainer to initialize (60 seconds)..." | log
+sleep 60
+
+echo "Setting up admin user via API..." | log
+# Initialize admin user through the API
+INIT_RESPONSE=$(curl -k -s -X POST https://localhost:9443/api/users/admin/init \
+  -H "Content-Type: application/json" \
+  -d "{\"Username\":\"admin\",\"Password\":\"${ADMINPASSWORD}\"}")
+
+if echo "$INIT_RESPONSE" | grep -q "admin"; then
+    echo "✅ Admin user initialized successfully via API" | log
+    ADMIN_CREATED=true
+else
+    echo "⚠️  API initialization response: $INIT_RESPONSE" | log
+    echo "Attempting alternative initialization method..." | log
+
+    # Alternative: Stop container, use helper, restart
+    docker compose down
+    sleep 5
+
+    # Generate bcrypt hash
+    ADMINPASSWORD_HASH=$(htpasswd -nbB admin "$ADMINPASSWORD" | cut -d: -f2)
+    echo "Generated password hash (length: ${#ADMINPASSWORD_HASH})" | log
+
+    # Create admin user file manually
+    cat > /tmp/init_admin.json << JSONEOF
+{
+  "Username": "admin",
+  "Password": "${ADMINPASSWORD_HASH}"
+}
+JSONEOF
+
+    # Use docker run with the hash as command argument
+    cat << 'EOFCOMPOSE' > /opt/portainer/docker-compose.yml
+services:
+  portainer:
+    image: portainer/portainer-ce:2.33.2
+    container_name: portainer
+    restart: always
+    ports:
+      - "8080:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/portainer/data:/data
+      - /opt/portainer/certs:/certs
+    environment:
+      - PORTAINER_SSLCERT=/certs/portainer.crt
+      - PORTAINER_SSLKEY=/certs/portainer.key
+EOFCOMPOSE
+
+    # Add the hashed password to the command
+    echo "    command: --admin-password '$ADMINPASSWORD_HASH'" >> /opt/portainer/docker-compose.yml
+
+    docker compose up -d
+    sleep 30
+    ADMIN_CREATED=true
+fi
+
+echo "Adding descriptions" | log
+descriptionAppend "Portainer Web Interface: https://$CWM_DOMAIN:9443"
+descriptionAppend " "
+descriptionAppend "Portainer Admin Username: admin"
+descriptionAppend "Portainer Admin Password: $ADMINPASSWORD"
+descriptionAppend " "
+descriptionAppend "⚠️  IMPORTANT: On first access, your browser may show a certificate warning."
+descriptionAppend "This is normal for Let's Encrypt certificates. Click 'Advanced' and 'Proceed'."
+descriptionAppend " "
+descriptionAppend "Portainer config location: /opt/portainer/docker-compose.yml"
+descriptionAppend "Portainer data location: /opt/portainer/data"
+descriptionAppend "Portainer certificates location: /opt/portainer/certs"
+
+tagScript success
+
+exit 0
