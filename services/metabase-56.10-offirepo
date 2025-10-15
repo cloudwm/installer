@@ -1,0 +1,139 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Docker and dependencies" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx apache2-utils jq nginx
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+sleep 5
+
+echo "Creating Metabase user and directories" | log
+appInstallDir="/opt/metabase"
+metabaseUser="metabase"
+metabaseGroup="metabase"
+adminPassword="${ADMINPASSWORD:-$(openssl rand -base64 12)}"
+
+if ! id -u "${metabaseUser}" >/dev/null 2>&1; then
+    groupadd -r "${metabaseGroup}"
+    useradd -r -g "${metabaseGroup}" -d "${appInstallDir}" -s /usr/sbin/nologin "${metabaseUser}"
+fi
+
+sudo rm -rf ${appInstallDir}/data ${appInstallDir}/config
+sudo mkdir -p ${appInstallDir}/{config,data}
+sudo chown -R ${metabaseUser}:${metabaseGroup} ${appInstallDir}/{config,data}
+sudo chmod -R 750 ${appInstallDir}/{config,data}
+
+echo "🔒 Clearing port conflicts and obtaining Let's Encrypt SSL certificate..." | log
+# Kill any processes using ports 80/443
+sudo fuser -k 80/tcp 443/tcp 2>/dev/null || true
+sleep 2
+
+# Stop any existing nginx
+sudo systemctl stop nginx 2>/dev/null || true
+
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+echo "Starting Nginx service" | log
+sudo systemctl start nginx
+sudo systemctl enable nginx
+sleep 3
+
+echo "Creating Docker Compose file for Metabase" | log
+cat << EOF > ${appInstallDir}/docker-compose.yml
+services:
+  metabase:
+    image: metabase/metabase:v0.56.10.x
+    container_name: metabase
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ${appInstallDir}/config:/metabase-config
+      - ${appInstallDir}/data:/metabase-data
+    environment:
+      - MB_DB_TYPE=h2
+      - MB_DB_DBNAME=metabase
+      - MB_DB_FILENAME=/metabase-data/metabase.db
+      - MB_JETTY_PORT=3000
+      - MB_JETTY_HOST=0.0.0.0
+      - MB_ADMIN_EMAIL=admin@${CWM_DOMAIN}
+      - MB_ADMIN_PASSWORD=${adminPassword}
+      - MB_SITE_URL=https://${CWM_DOMAIN}
+      - PUID=$(id -u ${metabaseUser})
+      - PGID=$(id -g ${metabaseGroup})
+EOF
+sudo chown ${metabaseUser}:${metabaseGroup} ${appInstallDir}/docker-compose.yml
+echo "Generated docker-compose.yml:" | log
+cat ${appInstallDir}/docker-compose.yml | log
+
+echo "Creating Nginx proxy configuration" | log
+sudo rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/*
+cat > /etc/nginx/sites-available/metabase <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/metabase /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+waitOrStop 0 "Failed to configure Nginx proxy"
+
+echo "Starting Metabase services" | log
+cd ${appInstallDir}
+docker compose up -d
+waitOrStop 0 "Failed to start Metabase services"
+
+echo "Adding descriptions" | log
+descriptionAppend "Metabase Web Interface: https://${CWM_DOMAIN}/"
+descriptionAppend " "
+descriptionAppend "Metabase Admin Email: admin@${CWM_DOMAIN}"
+descriptionAppend "Metabase Admin Password: ${adminPassword}"
+descriptionAppend " "
+descriptionAppend "⚠️  IMPORTANT: On first access, your browser may show a certificate warning."
+descriptionAppend "This is normal for Let's Encrypt certificates. Click 'Advanced' and 'Proceed'."
+descriptionAppend " "
+descriptionAppend "Metabase config location: ${appInstallDir}/docker-compose.yml"
+descriptionAppend "Metabase data location: ${appInstallDir}/data"
+descriptionAppend " "
+
+tagScript success
+exit 0
