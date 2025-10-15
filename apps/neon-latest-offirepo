@@ -235,21 +235,15 @@ configure_motd() {
 
 	cat > /etc/motd <<EOF
 ───────────────────────────────────────────────
- 🌐  Neon-Style Local PostgreSQL Environment
-───────────────────────────────────────────────
- → Dashboard:  http://${DOMAIN_NAME}            (pgweb)
- → pgAdmin:    http://${DOMAIN_NAME}:${PGADMIN_PORT}
- → Database:   postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@${DOMAIN_NAME}:${DATABASE_PORT}/${DATABASE_NAME}
-───────────────────────────────────────────────
  Access via browser:
    • https://${DOMAIN_NAME}         (SSL-enabled)
    • https://${DOMAIN_NAME}/pgadmin  → pgAdmin UI
+   
 ───────────────────────────────────────────────
- CLI Commands:
-   • neon-local cs              → Get connection string
-   • neon-local psql            → Open PostgreSQL shell
-   • neon-local sql 'SELECT 1'  → Execute SQL
-   • neon-local help            → Show all commands
+ CLI Tools:
+   • neonctl [options]          → Manage Neon Cloud projects
+   • docker exec -it local-postgres psql -U ${DATABASE_USER} -d ${DATABASE_NAME}
+   • docker compose -f ${DATA_PATH}/docker-compose.yml ps
 ───────────────────────────────────────────────
 
 🧹 To remove this message:
