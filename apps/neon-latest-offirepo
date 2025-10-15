@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Simplified approach: Use PostgreSQL directly instead of full Neon stack
-# The full Neon stack requires extensive build dependencies and is meant for development
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
