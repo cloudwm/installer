@@ -15,23 +15,22 @@ MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 
 COMPOSE_FILE="/opt/rancher/docker-compose.yaml"
-#PASSWORD="${ADMINPASSWORD}"
-PASSWORD="Pass12344321!!"
+PASSWORD="${ADMINPASSWORD}"
 
 detect_network() {
     PRIMARY_IF=$(ip route show default | awk '/default/ {print $5; exit}')
     PRIMARY_IP=$(ip -4 addr show dev "$PRIMARY_IF" | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
 
     if [ -z "$PRIMARY_IF" ] || [ -z "$PRIMARY_IP" ]; then
-        echo "[ERROR] Could not detect primary interface/IP."
+        echo "[ERROR] Could not detect primary interface/IP." | log
         exit 1
     fi
 
     RANCHER_FQDN="${PRIMARY_IP//./-}.cloud-xip.com"
 
-    echo "[INFO] Primary Interface: $PRIMARY_IF"
-    echo "[INFO] Primary IP: $PRIMARY_IP"
-    echo "[INFO] Rancher FQDN: $RANCHER_FQDN"
+    echo "[INFO] Primary Interface: $PRIMARY_IF" | log
+    echo "[INFO] Primary IP: $PRIMARY_IP" | log
+    echo "[INFO] Rancher FQDN: $RANCHER_FQDN" | log
 
     export PRIMARY_IF PRIMARY_IP RANCHER_FQDN
 }
@@ -43,7 +42,7 @@ install_prereqs() {
 }
 
 install_docker() {
-    echo "[INFO] Installing Docker..."
+    echo "[INFO] Installing Docker..." | log
     mkdir -p /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
@@ -67,7 +66,7 @@ install_docker() {
 }
 
 issue_certificates() {
-    echo "[INFO] Obtaining Let's Encrypt certificate for ${RANCHER_FQDN}..."
+    echo "[INFO] Obtaining Let's Encrypt certificate for ${RANCHER_FQDN}..." | log
 
     # Ensure nothing occupies port 80
     systemctl stop nginx 2>/dev/null || true
@@ -87,7 +86,7 @@ issue_certificates() {
         exit 1
     fi
 
-    echo "[INFO] Certificate successfully issued at /etc/letsencrypt/live/${RANCHER_FQDN}/"
+    echo "[INFO] Certificate successfully issued at /etc/letsencrypt/live/${RANCHER_FQDN}/" | log
 	
 	"$updateStatus" "$HTML_PATH" -sr
     "$updateStatus" "$HTML_PATH" -ur "Rancher will be available on https://${DOMAIN_NAME}"
@@ -98,7 +97,7 @@ issue_certificates() {
 }
 
 configure_rancher() {
-  echo "[INFO] Configuring Rancher with real SSL..."
+  echo "[INFO] Configuring Rancher with real SSL..." | log
   mkdir -p /opt/rancher
 
   cat > "$COMPOSE_FILE" <<EOF
@@ -135,32 +134,32 @@ EOF
 }
 
 launch_rancher() {
-    echo "[INFO] Launching Rancher..."
+    echo "[INFO] Launching Rancher..." | log
     docker compose -f "$COMPOSE_FILE" up -d
-    echo "[INFO] Waiting for Rancher to initialize..."
+    echo "[INFO] Waiting for Rancher to initialize..." | log
     for i in {1..60}; do
         if curl -sk "https://${RANCHER_FQDN}/ping" >/dev/null 2>&1; then
-            echo "[INFO] Rancher is online."
+            echo "[INFO] Rancher is online." | log
             return 0
         fi
         sleep 5
         echo -n "."
     done
-    echo "[ERROR] Rancher did not initialize in time."
+    echo "[ERROR] Rancher did not initialize in time." | log
     exit 1
 }
 
 show_summary() {
-    echo "=================================================================="
-    echo "✅ Rancher installation complete."
-    echo "🌐 URL: https://${RANCHER_FQDN}"
-    echo "👤 Username: admin"
-    echo "🔑 Password: ${PASSWORD}"
-    echo "=================================================================="
+    echo "==================================================================" | log
+    echo "✅ Rancher installation complete." | log
+    echo "🌐 URL: https://${RANCHER_FQDN}" | log
+    echo "👤 Username: admin" | log
+    echo "🔑 Password: ${PASSWORD}" | log
+    echo "==================================================================" | log
 }
 
 setup_motd() {
-    echo "[INFO] Setting custom Rancher MOTD..."
+    echo "[INFO] Setting custom Rancher MOTD..." | log
 
     # Remove all dynamic MOTD components (Ubuntu uses update-motd.d)
     if [ -d /etc/update-motd.d ]; then
