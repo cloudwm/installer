@@ -12,9 +12,6 @@ Config:    /etc/valkey/valkey.conf
 CLI usage: valkey-cli PING
 Data dir:  /var/lib/valkey
 
-For logs:
-  journalctl -u valkey
-
 ============================================================
 EOF
 }
