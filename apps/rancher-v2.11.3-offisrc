@@ -1,0 +1,151 @@
+#!/bin/bash
+
+COMPOSE_FILE="/opt/rancher/docker-compose.yaml"
+#PASSWORD="${ADMINPASSWORD}"
+PASSWORD="Pass12344321!!"
+
+detect_network() {
+    PRIMARY_IF=$(ip route show default | awk '/default/ {print $5; exit}')
+    PRIMARY_IP=$(ip -4 addr show dev "$PRIMARY_IF" | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+
+    if [ -z "$PRIMARY_IF" ] || [ -z "$PRIMARY_IP" ]; then
+        echo "[ERROR] Could not detect primary interface/IP."
+        exit 1
+    fi
+
+    RANCHER_FQDN="${PRIMARY_IP//./-}.cloud-xip.com"
+
+    echo "[INFO] Primary Interface: $PRIMARY_IF"
+    echo "[INFO] Primary IP: $PRIMARY_IP"
+    echo "[INFO] Rancher FQDN: $RANCHER_FQDN"
+
+    export PRIMARY_IF PRIMARY_IP RANCHER_FQDN
+}
+
+install_prereqs() {
+    export DEBIAN_FRONTEND=noninteractive
+    apt update
+    apt install -y ca-certificates curl gnupg lsb-release jq certbot nginx
+}
+
+install_docker() {
+    echo "[INFO] Installing Docker..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+    OS_ID=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+    DISTRO_CODENAME=$(lsb_release -cs)
+
+    # Normalize Ubuntu 24.04 (noble) to jammy until Docker repo exists
+    if [ "$OS_ID" = "ubuntu" ] && [ "$DISTRO_CODENAME" = "noble" ]; then
+        DISTRO_CODENAME="jammy"
+    fi
+
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/${OS_ID} ${DISTRO_CODENAME} stable" \
+      > /etc/apt/sources.list.d/docker.list
+
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    systemctl enable docker
+    systemctl start docker
+}
+
+issue_certificates() {
+    echo "[INFO] Obtaining Let's Encrypt certificate for ${RANCHER_FQDN}..."
+
+    # Ensure nothing occupies port 80
+    systemctl stop nginx 2>/dev/null || true
+    systemctl disable nginx 2>/dev/null || true
+    docker stop rancher-server 2>/dev/null || true
+    docker rm rancher-server 2>/dev/null || true
+
+    # Run certbot in standalone mode
+    certbot certonly --standalone \
+      --agree-tos \
+      --non-interactive \
+      -m "admin@${RANCHER_FQDN}" \
+      -d "${RANCHER_FQDN}"
+
+    if [ ! -f "/etc/letsencrypt/live/${RANCHER_FQDN}/fullchain.pem" ]; then
+        echo "[ERROR] Certificate issuance failed."
+        exit 1
+    fi
+
+    echo "[INFO] Certificate successfully issued at /etc/letsencrypt/live/${RANCHER_FQDN}/"
+}
+
+configure_rancher() {
+  echo "[INFO] Configuring Rancher with real SSL..."
+  mkdir -p /opt/rancher
+
+  cat > "$COMPOSE_FILE" <<EOF
+services:
+  rancher:
+    image: rancher/rancher:v2.11.3
+    container_name: rancher-server
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CATTLE_SERVER_URL: "https://${RANCHER_FQDN}"
+      CATTLE_BOOTSTRAP_PASSWORD: "${PASSWORD}"
+    volumes:
+      # Leaf + intermediates presented by Rancher
+      - /etc/letsencrypt/live/${RANCHER_FQDN}/fullchain.pem:/etc/rancher/ssl/cert.pem:ro
+      - /etc/letsencrypt/live/${RANCHER_FQDN}/privkey.pem:/etc/rancher/ssl/key.pem:ro
+      # CA bundle used for agent checksum and strict verification
+      - /etc/letsencrypt/live/${RANCHER_FQDN}/chain.pem:/etc/rancher/ssl/cacerts.pem:ro
+      - rancher-data:/var/lib/rancher
+    networks:
+      - rancher-net
+
+networks:
+  rancher-net:
+    driver: bridge
+
+volumes:
+  rancher-data:
+    driver: local
+EOF
+}
+
+launch_rancher() {
+    echo "[INFO] Launching Rancher..."
+    docker compose -f "$COMPOSE_FILE" up -d
+    echo "[INFO] Waiting for Rancher to initialize..."
+    for i in {1..60}; do
+        if curl -sk "https://${RANCHER_FQDN}/ping" >/dev/null 2>&1; then
+            echo "[INFO] Rancher is online."
+            return 0
+        fi
+        sleep 5
+        echo -n "."
+    done
+    echo "[ERROR] Rancher did not initialize in time."
+    exit 1
+}
+
+show_summary() {
+    echo "=================================================================="
+    echo "✅ Rancher installation complete."
+    echo "🌐 URL: https://${RANCHER_FQDN}"
+    echo "👤 Username: admin"
+    echo "🔑 Password: ${PASSWORD}"
+    echo "=================================================================="
+}
+
+main() {
+    detect_network
+    install_prereqs
+    install_docker
+    issue_certificates
+    configure_rancher
+    launch_rancher
+    show_summary
+}
+
+main "$@"
