@@ -88,6 +88,9 @@ issue_certificates() {
     fi
 
     echo "[INFO] Certificate successfully issued at /etc/letsencrypt/live/${RANCHER_FQDN}/"
+	
+	systemctl restart nginx
+	systemctl disable nginx
 }
 
 configure_rancher() {
