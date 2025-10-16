@@ -1,5 +1,19 @@
 #!/bin/bash
 
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/anythingllm-setup.log"
+HTML_PATH="/var/www/html/index.html"
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+
 COMPOSE_FILE="/opt/rancher/docker-compose.yaml"
 #PASSWORD="${ADMINPASSWORD}"
 PASSWORD="Pass12344321!!"
@@ -138,14 +152,60 @@ show_summary() {
     echo "=================================================================="
 }
 
+setup_motd() {
+    echo "[INFO] Setting custom Rancher MOTD..."
+
+    # Remove all dynamic MOTD components (Ubuntu uses update-motd.d)
+    if [ -d /etc/update-motd.d ]; then
+        rm -f /etc/update-motd.d/*
+    fi
+
+    cat > /etc/motd <<EOF
+==================================================================
+ 🐄  Rancher Management Node
+==================================================================
+
+Access Rancher Web UI:
+  → URL: https://${RANCHER_FQDN}
+  → Username: admin
+  → Password: ${PASSWORD}
+
+To view logs:
+  sudo docker logs rancher-server -f
+
+To stop/start Rancher:
+  sudo docker compose -f ${COMPOSE_FILE} down
+  sudo docker compose -f ${COMPOSE_FILE} up -d
+
+Certificate files:
+  /etc/letsencrypt/live/${RANCHER_FQDN}/
+
+Data volume:
+  /var/lib/docker/volumes/rancher-data/_data
+
+==================================================================
+EOF
+}
+
+
 main() {
     detect_network
+	"$updateStatus" "$HTML_PATH" -ap "Installing Prerequisites..."
     install_prereqs
+	"$updateStatus" "$HTML_PATH" -ap "Installing Docker..."
     install_docker
+	"$updateStatus" "$HTML_PATH" -ap "Configuring certs..."
     issue_certificates
+	"$updateStatus" "$HTML_PATH" -ap "Configuring Rancher..."
     configure_rancher
+	"$updateStatus" "$HTML_PATH" -ap "Launching Rancher..."
     launch_rancher
     show_summary
+	setup_motd
+	
+	"$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Rancher is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
 
 main "$@"
