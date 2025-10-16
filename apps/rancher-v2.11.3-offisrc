@@ -89,8 +89,12 @@ issue_certificates() {
 
     echo "[INFO] Certificate successfully issued at /etc/letsencrypt/live/${RANCHER_FQDN}/"
 	
-	systemctl restart nginx
-	systemctl disable nginx
+	"$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Rancher will be available on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+	
+	systemctl stop nginx
+    systemctl disable nginx
 }
 
 configure_rancher() {
@@ -206,9 +210,6 @@ main() {
     show_summary
 	setup_motd
 	
-	"$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "Rancher is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
 
 main "$@"
