@@ -108,7 +108,6 @@ services:
     restart: unless-stopped
     privileged: true
     ports:
-      - "80:80"
       - "443:443"
     environment:
       CATTLE_SERVER_URL: "https://${RANCHER_FQDN}"
