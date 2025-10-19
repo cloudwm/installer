@@ -122,8 +122,6 @@ set_motd() {
   - You can stop or restart the service using:
         systemctl stop pyspark
         systemctl restart pyspark
-  - Access logs with:
-        journalctl -u pyspark -f
   - The Spark process runs in local[*] mode by default.
 
 =============================================
