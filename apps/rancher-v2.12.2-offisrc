@@ -15,8 +15,7 @@ MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 
 COMPOSE_FILE="/opt/rancher/docker-compose.yaml"
-#PASSWORD="${ADMINPASSWORD}"
-PASSWORD="Pass12344321!!"
+PASSWORD="${ADMINPASSWORD}"
 RANCHER_IMAGE="${RANCHER_IMAGE:-rancher/rancher:v2.12.2}"
 
 detect_network() {
