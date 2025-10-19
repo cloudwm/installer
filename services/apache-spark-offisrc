@@ -133,7 +133,7 @@ EOF
 main() {
 	"$updateStatus" "$HTML_PATH" -ap "installing dependencies..."
     install_dependencies
-	"$updateStatus" "$HTML_PATH" -ap "Creating venv..."
+	"$updateStatus" "$HTML_PATH" -ap "Creating venv & installing Spark..."
     create_venv
 	"$updateStatus" "$HTML_PATH" -ap "Setting up wrapper..."
     setup_spark_wrapper
