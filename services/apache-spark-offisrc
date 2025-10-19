@@ -92,7 +92,9 @@ server {
 }
 EOF
     ln -sf /etc/nginx/sites-available/spark.conf /etc/nginx/sites-enabled/spark.conf
+    rm -f /etc/nginx/sites-enabled/default
     nginx -t && systemctl reload nginx
+	systemctl restart nginx
 }
 
 enable_ssl() {
@@ -126,16 +128,26 @@ EOF
 }
 
 main() {
+	"$update_status" "$html_path" -rp "installing dependencies..."
     install_dependencies
+	"$update_status" "$html_path" -rp "Creating venv..."
     create_venv
+	"$update_status" "$html_path" -rp "Setting up wrapper..."
     setup_spark_wrapper
+	"$update_status" "$html_path" -rp "Creating service..."
     create_systemd_service
+	"$update_status" "$html_path" -rp "Configuring access..."
     configure_nginx
     enable_ssl
+	"$update_status" "$html_path" -rp "Finishing up..."
     set_motd
-
+	
     echo "Spark installation and service setup complete." | log
     echo "Access Spark Web UI at: https://$DOMAIN_NAME/" | log
+	
+	"$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Spark is available on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
 
 main "$@"
