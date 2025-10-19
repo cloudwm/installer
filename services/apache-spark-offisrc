@@ -81,20 +81,9 @@ configure_nginx() {
     echo "Configuring Nginx reverse proxy for Spark UI..." | log
     mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
     cat >/etc/nginx/sites-available/spark.conf <<EOF
-# Redirect all HTTP to HTTPS
 server {
     listen 80;
     server_name $DOMAIN_NAME;
-    return 301 https://$host$request_uri;
-}
-
-# HTTPS reverse proxy to Spark
-server {
-    listen 443 ssl;
-    server_name $DOMAIN_NAME;
-
-    ssl_certificate     /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:4040;
@@ -105,7 +94,6 @@ server {
     }
 }
 EOF
-
     ln -sf /etc/nginx/sites-available/spark.conf /etc/nginx/sites-enabled/spark.conf
     rm -f /etc/nginx/sites-enabled/default
     nginx -t && systemctl reload nginx
