@@ -19,6 +19,8 @@ configure_firewall() {
 	ufw --force enable
 	
 	ufw allow ssh
+	ufw allow 80/tcp
+	ufw allow 443/tcp
 	ufw allow 3000/tcp
 	ufw allow 7000/tcp
 	ufw allow 7001/tcp
@@ -98,8 +100,10 @@ install_cassandra() {
     docker exec cassandra cqlsh -e "SHOW VERSION;" >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         echo "Cassandra CQLSH is responding." | log
+        "$updateStatus" "$HTML_PATH" -ap "Cassandra CQLSH is responding."
     else
         echo "CQLSH failed. Verify container health." | log
+        "$updateStatus" "$HTML_PATH" -ap "CQLSH failed. Verify container health."
     fi
 }
 
@@ -128,9 +132,81 @@ install_cassandra_web() {
     sleep 5
     if docker ps | grep -q cassandra-web; then
         echo "Cassandra Web UI is running at http://${MACHINE_IP}:3000" | log
+        "$updateStatus" "$HTML_PATH" -ap "Cassandra Web UI available at http://${MACHINE_IP}:3000"
     else
         echo "Cassandra Web UI failed to start. Check logs with: docker logs cassandra-web" | log
+        "$updateStatus" "$HTML_PATH" -ap "Cassandra Web UI failed to start."
     fi
+}
+
+install_nginx() {
+    echo "Installing Nginx and Certbot..." | log
+    apt install -y nginx certbot python3-certbot-nginx
+    systemctl enable --now nginx
+}
+
+switch_nginx_to_proxy() {
+    echo "Switching nginx to reverse proxy for Cassandra Web UI..." | log
+    NGINX_CONF="/etc/nginx/sites-available/cassandra-web.conf"
+    cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    location / {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/cassandra-web.conf
+    nginx -t
+    systemctl reload nginx
+    echo "nginx configuration switched to Cassandra Web reverse proxy." | log
+}
+
+obtain_ssl() {
+    echo "Reloading nginx before requesting certificate..." | log
+    systemctl reload nginx
+
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
+
+    echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
+    
+}
+
+configure_motd() {
+    echo "Configuring MOTD..." | log
+
+    # Remove existing dynamic MOTD scripts
+    rm -f /etc/update-motd.d/*
+    : > /etc/motd
+
+    cat > /etc/motd <<EOF
+============================================================
+  Apache Cassandra + Cassandra Web UI
+============================================================
+
+Cassandra service:    docker container named 'cassandra'
+Web UI:               https://${DOMAIN_NAME}
+Default credentials:  cassandra / cassandra
+
+Useful commands:
+  docker ps                     # list running containers
+  docker logs cassandra          # view Cassandra logs
+  docker exec -it cassandra cqlsh  # connect to CQL shell
+  docker logs cassandra-web      # view Web UI logs
+
+============================================================
+EOF
+
+    echo "MOTD configured successfully." | log
 }
 
 main () {
@@ -144,6 +220,19 @@ main () {
 
 	"$updateStatus" "$HTML_PATH" -ap "Installing Cassandra Web UI..."
     install_cassandra_web
+
+	"$updateStatus" "$HTML_PATH" -ap "Installing Nginx reverse proxy..."
+    install_nginx
+    switch_nginx_to_proxy
+
+	"$updateStatus" "$HTML_PATH" -ap "Obtaining SSL certificate..."
+    obtain_ssl
+	
+	configure_motd
+	
+	"$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Cassandra Web UI is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
 
 main
