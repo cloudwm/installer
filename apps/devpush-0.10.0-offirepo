@@ -17,11 +17,9 @@ cd $AppDir
 cp $DockerFileDir Docker/Dockerfile.app
 
 # Configure .env
-echo "Configuring .env file" | log 
-sed -i "s|APP_HOSTNAME=*|APP_HOSTNAME='${CWM_DOMAIN}'|" $AppDir/.env
-sed -i "s|DEPLOY_DOMAIN=*|DEPLOY_DOMAIN='${CWM_DOMAIN}'|" $AppDir/.env
-sed -i "s|LE_EMAIL=*|LE_EMAIL='${ADMINEMAIL}'|" $AppDir/.env
-sed -i "s|\('[^']*'\)\"\"|\1|g" $AppDir/.env
+sed -i "s|APP_HOSTNAME=.*|APP_HOSTNAME=\"${CWM_DOMAIN}\"|" $AppDir/.env
+sed -i "s|DEPLOY_DOMAIN=.*|DEPLOY_DOMAIN=\"${CWM_DOMAIN}\"|" $AppDir/.env
+sed -i "s|LE_EMAIL=.*|LE_EMAIL=\"${ADMINEMAIL}\"|" $AppDir/.env
 
 echo "Building Containers"
 docker compose up -d --build
