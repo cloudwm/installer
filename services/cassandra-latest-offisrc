@@ -13,22 +13,29 @@ HTML_PATH="/var/www/html/index.html"
 MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 
+install_dependencies() {
+    echo "Installing Nginx and Certbot..." | log
+    apt-get update
+    apt install -y nginx certbot python3-certbot-nginx
+    systemctl enable --now nginx
+}
+
 configure_firewall() {
-	apt update
-	apt install -y ufw
-	ufw --force enable
-	
-	ufw allow ssh
-	ufw allow 80/tcp
-	ufw allow 443/tcp
-	ufw allow 3000/tcp
-	ufw allow 7000/tcp
-	ufw allow 7001/tcp
-	ufw allow 7199/tcp
-	ufw allow 9042/tcp
-	ufw allow 9160/tcp
-	
-	systemctl restart ufw
+    apt update
+    apt install -y ufw
+    ufw --force enable
+
+    ufw allow ssh
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    ufw allow 3000/tcp
+    ufw allow 7000/tcp
+    ufw allow 7001/tcp
+    ufw allow 7199/tcp
+    ufw allow 9042/tcp
+    ufw allow 9160/tcp
+
+    systemctl restart ufw
 }
 
 install_docker() {
@@ -37,18 +44,18 @@ install_docker() {
         return
     fi
 
-    echo "Adding docker GPG key..." | log
+    echo "Adding Docker GPG key..." | log
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
 
     echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-      > /etc/apt/sources.list.d/docker.list
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+        https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+        > /etc/apt/sources.list.d/docker.list
 
-    echo "Installing Docker engine & plugins..." | log
+    echo "Installing Docker engine and plugins..." | log
     apt update
     apt install -y \
         docker-ce \
@@ -57,14 +64,14 @@ install_docker() {
         docker-buildx-plugin \
         docker-compose-plugin
 
-    echo "Enabling & Starting docker service..."
     systemctl enable --now docker
-
     echo "Docker installation completed successfully." | log
-    echo "Verify with:  sudo docker run hello-world" | log
 }
 
 install_cassandra() {
+    echo "Creating Docker network for Cassandra..." | log
+    docker network inspect cassandra-net >/dev/null 2>&1 || docker network create cassandra-net
+
     echo "Checking for existing Cassandra container..." | log
     if docker ps -a --format '{{.Names}}' | grep -q '^cassandra$'; then
         echo "Cassandra container already exists. Skipping installation." | log
@@ -77,6 +84,7 @@ install_cassandra() {
     echo "Starting Cassandra container..." | log
     docker run -d \
         --name cassandra \
+        --network cassandra-net \
         --restart unless-stopped \
         -p 7000:7000 \
         -p 7001:7001 \
@@ -86,7 +94,7 @@ install_cassandra() {
         cassandra:latest
 
     echo "Waiting for Cassandra to initialize..." | log
-    sleep 40
+    sleep 60
 
     echo "Verifying Cassandra container status..." | log
     if docker ps | grep -q cassandra; then
@@ -94,16 +102,6 @@ install_cassandra() {
     else
         echo "Cassandra container failed to start. Check logs with: docker logs cassandra" | log
         exit 1
-    fi
-
-    echo "Testing CQLSH connectivity..." | log
-    docker exec cassandra cqlsh -e "SHOW VERSION;" >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        echo "Cassandra CQLSH is responding." | log
-        "$updateStatus" "$HTML_PATH" -ap "Cassandra CQLSH is responding."
-    else
-        echo "CQLSH failed. Verify container health." | log
-        "$updateStatus" "$HTML_PATH" -ap "CQLSH failed. Verify container health."
     fi
 }
 
@@ -115,38 +113,43 @@ install_cassandra_web() {
     fi
 
     echo "Pulling Cassandra Web Docker image..." | log
-    docker pull orzhaha/cassandra-web:latest
+    docker pull ipushc/cassandra-web:latest
 
     echo "Starting Cassandra Web container..." | log
     docker run -d \
         --name cassandra-web \
+        --network cassandra-net \
         --restart unless-stopped \
-        -p 3000:3000 \
-        -e CASSANDRA_HOST="${MACHINE_IP}" \
+        -p 3000:8083 \
+        -e CASSANDRA_HOST="cassandra" \
         -e CASSANDRA_PORT=9042 \
         -e CASSANDRA_USER=cassandra \
         -e CASSANDRA_PASS=cassandra \
         -e CASSANDRA_KEYSPACE=system \
-        orzhaha/cassandra-web:latest
+        ipushc/cassandra-web:latest
 
-    sleep 5
+    sleep 10
     if docker ps | grep -q cassandra-web; then
         echo "Cassandra Web UI is running at http://${MACHINE_IP}:3000" | log
-        "$updateStatus" "$HTML_PATH" -ap "Cassandra Web UI available at http://${MACHINE_IP}:3000"
     else
         echo "Cassandra Web UI failed to start. Check logs with: docker logs cassandra-web" | log
-        "$updateStatus" "$HTML_PATH" -ap "Cassandra Web UI failed to start."
     fi
 }
 
-install_nginx() {
-    echo "Installing Nginx and Certbot..." | log
-    apt install -y nginx certbot python3-certbot-nginx
-    systemctl enable --now nginx
+test_db_connection() {
+	echo "Testing CQLSH connectivity..." | log
+    docker exec cassandra cqlsh -e "SHOW VERSION;" >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo "Cassandra CQLSH is responding." | log
+        "$updateStatus" "$HTML_PATH" -ap "Cassandra CQLSH is responding."
+    else
+        echo "CQLSH failed. Verify container health." | log
+        "$updateStatus" "$HTML_PATH" -ap "CQLSH failed. Verify container health."
+    fi
 }
 
 switch_nginx_to_proxy() {
-    echo "Switching nginx to reverse proxy for Cassandra Web UI..." | log
+    echo "Switching Nginx to reverse proxy for Cassandra Web UI..." | log
     NGINX_CONF="/etc/nginx/sites-available/cassandra-web.conf"
     cat > "$NGINX_CONF" <<EOF
 server {
@@ -165,26 +168,21 @@ server {
 EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/cassandra-web.conf
-    nginx -t
-    systemctl reload nginx
-    echo "nginx configuration switched to Cassandra Web reverse proxy." | log
+    nginx -t && systemctl reload nginx
+    echo "Nginx configuration switched to Cassandra Web reverse proxy." | log
 }
 
 obtain_ssl() {
-    echo "Reloading nginx before requesting certificate..." | log
+    echo "Reloading Nginx before requesting certificate..." | log
     systemctl reload nginx
 
     echo "Requesting Let's Encrypt certificate..." | log
     certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
-
     echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
-    
 }
 
 configure_motd() {
     echo "Configuring MOTD..." | log
-
-    # Remove existing dynamic MOTD scripts
     rm -f /etc/update-motd.d/*
     : > /etc/motd
 
@@ -198,39 +196,41 @@ Web UI:               https://${DOMAIN_NAME}
 Default credentials:  cassandra / cassandra
 
 Useful commands:
-  docker ps                     # list running containers
-  docker logs cassandra          # view Cassandra logs
-  docker exec -it cassandra cqlsh  # connect to CQL shell
-  docker logs cassandra-web      # view Web UI logs
+  docker ps                        # list running containers
+  docker logs cassandra             # view Cassandra logs
+  docker exec -it cassandra cqlsh   # connect to CQL shell
+  docker logs cassandra-web         # view Web UI logs
 
 ============================================================
 EOF
-
     echo "MOTD configured successfully." | log
 }
 
-main () {
-	configure_firewall
-	
-	"$updateStatus" "$HTML_PATH" -ap "Installing Docker..."
+main() {
+    configure_firewall
+
+    "$updateStatus" "$HTML_PATH" -ap "Installing Nginx and dependencies..."
+    install_dependencies
+
+    "$updateStatus" "$HTML_PATH" -ap "Installing Docker..."
     install_docker
-	
-	"$updateStatus" "$HTML_PATH" -ap "Installing Cassandra..."
+
+    "$updateStatus" "$HTML_PATH" -ap "Installing Cassandra..."
     install_cassandra
 
-	"$updateStatus" "$HTML_PATH" -ap "Installing Cassandra Web UI..."
+    "$updateStatus" "$HTML_PATH" -ap "Installing Cassandra Web UI..."
     install_cassandra_web
 
-	"$updateStatus" "$HTML_PATH" -ap "Installing Nginx reverse proxy..."
-    install_nginx
+    "$updateStatus" "$HTML_PATH" -ap "Configuring Nginx reverse proxy..."
     switch_nginx_to_proxy
 
-	"$updateStatus" "$HTML_PATH" -ap "Obtaining SSL certificate..."
+    "$updateStatus" "$HTML_PATH" -ap "Obtaining SSL certificate..."
     obtain_ssl
 	
-	configure_motd
-	
-	"$updateStatus" "$HTML_PATH" -sr
+	test_db_connection
+    configure_motd
+
+    "$updateStatus" "$HTML_PATH" -sr
     "$updateStatus" "$HTML_PATH" -ur "Cassandra Web UI is running on https://${DOMAIN_NAME}"
     "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
