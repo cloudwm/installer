@@ -16,9 +16,6 @@ waitOrStop 0 "Failed to install DevPush"
 # Switching to devpush user
 sudo -iu devpush
 
-cd /opt
-sudo git clone https://github.com/cloudwm/installer
-
 cd $AppDir
 cp $InstallerDir/tweaks/extras/devpush/Dockerfile.app Docker/Dockerfile.app
 
