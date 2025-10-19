@@ -6,28 +6,26 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-AppDir="/home/devpush"
-InstallerDir="/opt/installer"
+AppDir="/home/devpush/devpush"
+DockerFileDir="/opt/installer/tweaks/extras/devpush/Dockerfile.app"
 
 # Installing Dev-Push from official URL
 curl -fsSL https://raw.githubusercontent.com/hunvreus/devpush/main/scripts/prod/install.sh | sudo bash
 waitOrStop 0 "Failed to install DevPush"
 
-# Switching to devpush user
-sudo -iu devpush
-
 cd $AppDir
-cp $InstallerDir/tweaks/extras/devpush/Dockerfile.app Docker/Dockerfile.app
+cp $DockerFileDir Docker/Dockerfile.app
 
 # Configure .env
 echo "Configuring .env file" | log 
-sed -i "s|APP_HOSTNAME=*|APP_HOSTNAME='${CWM_DOMAIN}'|" .env
-sed -i "s|DEPLOY_DOMAIN=*|DEPLOY_DOMAIN='${CWM_DOMAIN}'|" .env
-sed -i "s|LE_EMAIL=*|LE_EMAIL='${ADMINEMAIL}'|" .env
+sed -i "s|APP_HOSTNAME=*|APP_HOSTNAME='${CWM_DOMAIN}'|" $AppDir/.env
+sed -i "s|DEPLOY_DOMAIN=*|DEPLOY_DOMAIN='${CWM_DOMAIN}'|" $AppDir/.env
+sed -i "s|LE_EMAIL=*|LE_EMAIL='${ADMINEMAIL}'|" $AppDir/.env
+sed -i "s|\('[^']*'\)\"\"|\1|g" $AppDir/.env
 
 echo "Building Containers"
 docker compose up -d --build
-sleep 60
+sleep 30
 docker compose run --rm --no-deps --entrypoint "" app uv run alembic upgrade head
 docker compose restart app
 
