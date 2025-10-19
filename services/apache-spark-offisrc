@@ -131,18 +131,18 @@ EOF
 }
 
 main() {
-	"$updateStatus" "$HTML_PATH" -rp "installing dependencies..."
+	"$updateStatus" "$HTML_PATH" -ap "installing dependencies..."
     install_dependencies
-	"$updateStatus" "$HTML_PATH" -rp "Creating venv..."
+	"$updateStatus" "$HTML_PATH" -ap "Creating venv..."
     create_venv
-	"$updateStatus" "$HTML_PATH" -rp "Setting up wrapper..."
+	"$updateStatus" "$HTML_PATH" -ap "Setting up wrapper..."
     setup_spark_wrapper
-	"$updateStatus" "$HTML_PATH" -rp "Creating service..."
+	"$updateStatus" "$HTML_PATH" -ap "Creating service..."
     create_systemd_service
-	"$updateStatus" "$HTML_PATH" -rp "Configuring access..."
+	"$updateStatus" "$HTML_PATH" -ap "Configuring access..."
     configure_nginx
     enable_ssl
-	"$updateStatus" "$HTML_PATH" -rp "Finishing up..."
+	"$updateStatus" "$HTML_PATH" -ap "Finishing up..."
     set_motd
 	
     echo "Spark installation and service setup complete." | log
