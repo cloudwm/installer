@@ -1,2 +1,234 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+#---------------------------------------------------
+# Global variables
+#---------------------------------------------------
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+PASSWORD="Pass12344321!!"
+
+#rootDir="$(rootDir)"
+#updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/anythingllm-setup.log"
+HTML_PATH="/var/www/html/index.html"
+
+AIRFLOW_HOME="/opt/airflow"
+AIRFLOW_ENV="/opt/airflow/venv"
+AIRFLOW_USER="airflow"
+PYTHON_BIN="python3.12"
+AIRFLOW_VERSION="3.1.0"
+
+#---------------------------------------------------
+# Function: install_dependencies
+#---------------------------------------------------
+install_dependencies() {
+    echo "[INFO] Installing system dependencies..."
+    apt update -y
+	apt install -y nginx
+    apt install -y ${PYTHON_BIN} ${PYTHON_BIN}-venv ${PYTHON_BIN}-dev \
+                   python3-pip libmysqlclient-dev libpq-dev libssl-dev libffi-dev \
+                   build-essential curl git systemd certbot python3-certbot-nginx
+
+    echo "[INFO] Creating Airflow user and directories..."
+    id -u ${AIRFLOW_USER} &>/dev/null || useradd -r -m -d ${AIRFLOW_HOME} -s /bin/bash ${AIRFLOW_USER}
+    mkdir -p ${AIRFLOW_HOME}
+    chown -R ${AIRFLOW_USER}:${AIRFLOW_USER} ${AIRFLOW_HOME}
+	
+	idxHTMLPath="/var/www/html"
+	if [ ! -d "$idxHTMLPath" ]; then
+		mkdir -p "$idxHTMLPath"
+	fi
+
+	if [ -f "$idxHTMLPath/index.html" ]; then
+		rm -f "$idxHTMLPath/index.html"
+	fi
+
+	# Define variables
+	update_status="include/updateInstallStatus.sh"
+	web_path="/var/www/html"
+	logo_img_root="include/Logos"
+	logo_img_name="anythingllm-lim.png"
+	logo_img_root_path="$logo_img_root/$logo_img_name"
+	html_path="/var/www/html/index.html"
+	local_html_path="include/index.html"
+
+	echo "Writing nginx configuration file..."
+	cat <<_EOF_ > /etc/nginx/sites-available/installProgress.conf
+server {
+	listen 80;
+	server_name _;
+
+	root $idxHTMLPath;
+	index index.html;
+
+	access_log /var/log/nginx/installProgress_access.log;
+	error_log /var/log/nginx/installProgress_error.log;
+	}
+_EOF_
+	
+	if [ ! -d "$web_path" ]; then
+		mkdir -p "$web_path"
+	fi
+	
+	ln -sf /etc/nginx/sites-available/installProgress.conf /etc/nginx/sites-enabled/installProgress.conf
+	rm -f /etc/nginx/sites-enabled/default
+	
+	systemctl enable --now nginx
+	systemctl restart nginx
+}
+
+open_ports() {
+    echo "[INFO] Configuring firewall rules..."
+	ufw allow 22/tcp || true
+	ufw allow 80/tcp
+	ufw allow 443/tcp
+	ufw allow 8080/tcp
+	ufw --force enable
+	echo "[INFO] UFW firewall configured for ports 22, 80, 443, and 8080."
+}
+
+#---------------------------------------------------
+# Function: install_airflow
+#---------------------------------------------------
+install_airflow() {
+    echo "[INFO] Setting up Python virtual environment..."
+    ${PYTHON_BIN} -m venv ${AIRFLOW_ENV}
+    source ${AIRFLOW_ENV}/bin/activate
+
+    echo "[INFO] Installing Apache Airflow..."
+    pip install --upgrade pip setuptools wheel
+    export AIRFLOW_VERSION=${AIRFLOW_VERSION}
+    export CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-$(python -V | awk '{print $2}' | cut -d. -f1-2).txt"
+    pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+
+    echo "[INFO] Migrating Airflow database..."
+    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow db migrate"
+
+    echo "[INFO] Starting standalone mode once to create initial metadata..."
+    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow standalone & sleep 40 && pkill -f 'airflow standalone'"
+
+    echo "[INFO] Creating deterministic admin user..."
+    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow users create \
+        --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password '${PASSWORD}'"
+
+    echo "[INFO] Ensuring admin has Admin role..."
+    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow users add-role -u admin -r Admin"
+
+    deactivate
+}
+
+#---------------------------------------------------
+# Function: configure_systemd
+#---------------------------------------------------
+configure_systemd() {
+    echo "[INFO] Configuring Airflow systemd services..."
+
+    cat <<EOF >/etc/systemd/system/airflow-webserver.service
+[Unit]
+Description=Airflow webserver daemon
+After=network.target
+
+[Service]
+Environment=AIRFLOW_HOME=${AIRFLOW_HOME}
+User=${AIRFLOW_USER}
+Group=${AIRFLOW_USER}
+ExecStart=${AIRFLOW_ENV}/bin/airflow webserver
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat <<EOF >/etc/systemd/system/airflow-scheduler.service
+[Unit]
+Description=Airflow scheduler daemon
+After=network.target
+
+[Service]
+Environment=AIRFLOW_HOME=${AIRFLOW_HOME}
+User=${AIRFLOW_USER}
+Group=${AIRFLOW_USER}
+ExecStart=${AIRFLOW_ENV}/bin/airflow scheduler
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable airflow-webserver.service
+    systemctl enable airflow-scheduler.service
+    systemctl start airflow-webserver.service
+    systemctl start airflow-scheduler.service
+}
+
+#---------------------------------------------------
+# Function: switch_nginx_to_proxy
+#---------------------------------------------------
+switch_nginx_to_proxy() {
+    echo "[INFO] Switching nginx to Airflow reverse proxy..."
+    NGINX_CONF="/etc/nginx/sites-available/airflow.conf"
+    cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/airflow.conf
+    nginx -t && systemctl reload nginx
+    echo "[INFO] nginx configuration switched to Airflow reverse proxy."
+}
+
+#---------------------------------------------------
+# Function: obtain_ssl
+#---------------------------------------------------
+obtain_ssl() {
+    echo "[INFO] Reloading nginx before requesting certificate..."
+    systemctl reload nginx
+
+    echo "[INFO] Requesting Let's Encrypt certificate..."
+    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
+
+    echo "[INFO] SSL successfully configured for https://${DOMAIN_NAME}"
+}
+
+#---------------------------------------------------
+# Main
+#---------------------------------------------------
+main() {
+	open_ports
+	install_dependencies
+    install_airflow
+    configure_systemd
+    switch_nginx_to_proxy
+    obtain_ssl
+	
+    echo "[INFO] Apache Airflow installation complete."
+    echo "[INFO] Access Airflow UI at https://${DOMAIN_NAME}"
+	
+	"$updateStatus" "$HTML_PATH" -sr
+	"$updateStatus" "$HTML_PATH" -ur "Airflow is running on https://${DOMAIN_NAME}"
+	"$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+		
+}
+
+main "$@"
