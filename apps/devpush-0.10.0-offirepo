@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+AppDir="/home/devpush/devpush"
+DockerFileDir="/opt/installer/tweaks/extras/devpush/Dockerfile.app"
+
+# Installing Dev-Push from official URL
+curl -fsSL https://raw.githubusercontent.com/hunvreus/devpush/main/scripts/prod/install.sh | sudo bash
+waitOrStop 0 "Failed to install DevPush"
+
+cd $AppDir
+cp $DockerFileDir Docker/Dockerfile.app
+
+# Configure .env
+sed -i "s|APP_HOSTNAME=.*|APP_HOSTNAME=\"${CWM_DOMAIN}\"|" $AppDir/.env
+sed -i "s|DEPLOY_DOMAIN=.*|DEPLOY_DOMAIN=\"${CWM_DOMAIN}\"|" $AppDir/.env
+sed -i "s|LE_EMAIL=.*|LE_EMAIL=\"${ADMINEMAIL}\"|" $AppDir/.env
+
+echo "Building Containers"
+docker compose up -d --build
+sleep 30
+docker compose run --rm --no-deps --entrypoint "" app uv run alembic upgrade head
+docker compose restart app
+
+descriptionAppend "===================================="
+descriptionAppend "🎉 DEV PUSH FULLY INSTALLED!"
+descriptionAppend ""
+descriptionAppend "🌐 DASHBOARD: https://${CWM_DOMAIN}"
+descriptionAppend "🔧 MIGRATE: ~/devpush/scripts/prod/migrate.sh"
+descriptionAppend "🔄 RESTART: ~/devpush/scripts/prod/restart.sh"
+descriptionAppend "Edit .env with your Github App info to be able to migrate"
