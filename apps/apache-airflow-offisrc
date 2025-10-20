@@ -255,6 +255,7 @@ main() {
 	"$updateStatus" "$HTML_PATH" -ap "Finishing up..."
     switch_nginx_to_proxy
     obtain_ssl
+	configure_motd
 	
     echo "[INFO] Apache Airflow installation complete." | log
     echo "[INFO] Access Airflow UI at https://${DOMAIN_NAME}" | log
