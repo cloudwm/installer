@@ -1,0 +1,141 @@
+#!/bin/bash
+set -e
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+
+install_dependencies() {
+    echo "Installing dependencies..." | log
+    apt update -y
+    apt install -y python3-full python3-venv curl wget openjdk-17-jre-headless certbot python3-certbot-nginx
+}
+
+create_venv() {
+    echo "Creating Python virtual environment for Spark..." | log
+    python3 -m venv /opt/pyspark-env
+    source /opt/pyspark-env/bin/activate
+    pip install pyspark
+}
+
+setup_spark_wrapper() {
+    echo "Setting up Spark run wrapper..." | log
+    cat >/usr/local/bin/start-spark.sh <<'EOF'
+#!/bin/bash
+source /opt/pyspark-env/bin/activate
+export SPARK_HOME=/opt/pyspark-env/lib/python3.12/site-packages/pyspark
+export PYSPARK_PYTHON=/opt/pyspark-env/bin/python
+export PYSPARK_DRIVER_PYTHON=/opt/pyspark-env/bin/python
+LOG_DIR=/var/log/spark
+mkdir -p "$LOG_DIR"
+cd "$SPARK_HOME" || exit 1
+
+# Start persistent Spark session so Web UI stays up
+$PYSPARK_PYTHON - <<'PYCODE'
+from pyspark.sql import SparkSession
+import time
+spark = SparkSession.builder.master("local[*]").appName("PersistentSpark").getOrCreate()
+print("Spark started. Web UI available on port 4040.")
+while True:
+    time.sleep(3600)
+PYCODE
+EOF
+    chmod +x /usr/local/bin/start-spark.sh
+}
+
+create_systemd_service() {
+    echo "Creating systemd service for Spark..." | log
+    mkdir -p /var/log/spark
+    cat >/etc/systemd/system/pyspark.service <<'EOF'
+[Unit]
+Description=Apache Spark (PySpark) Local Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/start-spark.sh
+Restart=on-failure
+User=root
+WorkingDirectory=/opt/pyspark-env
+StandardOutput=file:/var/log/spark/pyspark.out
+StandardError=file:/var/log/spark/pyspark.err
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable pyspark.service
+    systemctl restart pyspark.service
+}
+
+configure_nginx() {
+    echo "Configuring Nginx reverse proxy for Spark UI..." | log
+    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+    cat >/etc/nginx/sites-available/spark.conf <<EOF
+server {
+    listen 80;
+    server_name $DOMAIN_NAME;
+
+    location / {
+        proxy_pass http://127.0.0.1:4040;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    ln -sf /etc/nginx/sites-available/spark.conf /etc/nginx/sites-enabled/spark.conf
+    nginx -t && systemctl reload nginx
+}
+
+enable_ssl() {
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
+}
+
+set_motd() {
+    echo "Configuring MOTD..." | log
+    rm -f /etc/update-motd.d/*
+    cat >/etc/motd <<EOF
+=============================================
+ Apache Spark Service (Persistent Mode)
+=============================================
+
+ Web UI:   https://$DOMAIN_NAME/
+ Service:  pyspark.service
+ Logs:     /var/log/spark/
+
+ Basic usage:
+  - The Spark Web UI is automatically available when Spark is running.
+  - You can stop or restart the service using:
+        systemctl stop pyspark
+        systemctl restart pyspark
+  - Access logs with:
+        journalctl -u pyspark -f
+  - The Spark process runs in local[*] mode by default.
+
+=============================================
+EOF
+}
+
+main() {
+    install_dependencies
+    create_venv
+    setup_spark_wrapper
+    create_systemd_service
+    configure_nginx
+    enable_ssl
+    set_motd
+
+    echo "Spark installation and service setup complete." | log
+    echo "Access Spark Web UI at: https://$DOMAIN_NAME/" | log
+}
+
+main "$@"
