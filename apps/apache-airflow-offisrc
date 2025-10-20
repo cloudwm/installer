@@ -260,6 +260,7 @@ main() {
     echo "[INFO] Apache Airflow installation complete." | log
     echo "[INFO] Access Airflow UI at https://${DOMAIN_NAME}" | log
 	
+	sleep 10
 	"$updateStatus" "$HTML_PATH" -tr " https://${DOMAIN_NAME}"
 }
 
