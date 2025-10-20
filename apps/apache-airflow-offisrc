@@ -21,7 +21,7 @@ HTML_PATH="/var/www/html/index.html"
 
 AIRFLOW_HOME="/opt/airflow"
 AIRFLOW_ENV="/opt/airflow/venv"
-AIRFLOW_USER="airflow"
+AIRFLOW_USER="admin"
 PYTHON_BIN="python3.12"
 AIRFLOW_VERSION="3.1.0"
 
@@ -29,13 +29,13 @@ AIRFLOW_VERSION="3.1.0"
 # Function: install_dependencies
 #---------------------------------------------------
 install_dependencies() {
-    echo "[INFO] Installing system dependencies..."
+    echo "[INFO] Installing system dependencies..." | log
     apt update -y
     apt install -y ${PYTHON_BIN} ${PYTHON_BIN}-venv ${PYTHON_BIN}-dev \
                    python3-pip libmysqlclient-dev libpq-dev libssl-dev libffi-dev \
                    build-essential curl git systemd certbot python3-certbot-nginx
 
-    echo "[INFO] Creating Airflow user and directories..."
+    echo "[INFO] Creating Airflow user and directories..." | log
     id -u ${AIRFLOW_USER} &>/dev/null || useradd -r -m -d ${AIRFLOW_HOME} -s /bin/bash ${AIRFLOW_USER}
     mkdir -p ${AIRFLOW_HOME}
     chown -R ${AIRFLOW_USER}:${AIRFLOW_USER} ${AIRFLOW_HOME}
@@ -43,42 +43,63 @@ install_dependencies() {
 }
 
 open_ports() {
-    echo "[INFO] Configuring firewall rules..."
+    echo "[INFO] Configuring firewall rules..." | log
 	ufw allow 22/tcp || true
 	ufw allow 80/tcp
 	ufw allow 443/tcp
 	ufw allow 8080/tcp
 	ufw --force enable
-	echo "[INFO] UFW firewall configured for ports 22, 80, 443, and 8080."
+	echo "[INFO] UFW firewall configured for ports 22, 80, 443, and 8080." | log
 }
 
-#---------------------------------------------------
-# Function: install_airflow
-#---------------------------------------------------
 install_airflow() {
-    echo "[INFO] Setting up Python virtual environment..."
+    echo "[INFO] Setting up Python virtual environment..." | log
     ${PYTHON_BIN} -m venv ${AIRFLOW_ENV}
     source ${AIRFLOW_ENV}/bin/activate
 
-    echo "[INFO] Installing Apache Airflow..."
+    echo "[INFO] Installing Apache Airflow and dependencies..." | log
     pip install --upgrade pip setuptools wheel
     export AIRFLOW_VERSION=${AIRFLOW_VERSION}
     export CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-$(python -V | awk '{print $2}' | cut -d. -f1-2).txt"
     pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+    pip install apache-airflow-providers-fab
 
-    echo "[INFO] Migrating Airflow database..."
-    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow db migrate"
+    echo "[INFO] Migrating Airflow database..." | log
+    sudo -u ${AIRFLOW_USER} bash -c "
+        export AIRFLOW_HOME=${AIRFLOW_HOME}
+        source ${AIRFLOW_ENV}/bin/activate
+        airflow db migrate
+    "
 
-    echo "[INFO] Starting standalone mode once to create initial metadata..."
-    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow standalone & sleep 40 && pkill -f 'airflow standalone'"
+    echo "[INFO] Enabling FAB authentication in airflow.cfg..." | log
+    sudo -u ${AIRFLOW_USER} bash -c "
+        export AIRFLOW_HOME=${AIRFLOW_HOME}
+        source ${AIRFLOW_ENV}/bin/activate
+        airflow config list --defaults > ${AIRFLOW_HOME}/airflow.cfg
+        sed -i '/^auth_manager/d' ${AIRFLOW_HOME}/airflow.cfg || true
+        echo 'auth_manager = airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager' >> ${AIRFLOW_HOME}/airflow.cfg
+        sed -i '/^auth_backends/d' ${AIRFLOW_HOME}/airflow.cfg || true
+        echo 'auth_backends = airflow.www.fab_security.manager.AUTH_DB' >> ${AIRFLOW_HOME}/airflow.cfg
+    "
 
-    echo "[INFO] Creating deterministic admin user..."
-    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow users create \
-        --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password '${PASSWORD}'"
+    echo "[INFO] Creating deterministic admin user..." | log
+    sudo -u ${AIRFLOW_USER} bash -c "
+        export AIRFLOW_HOME=${AIRFLOW_HOME}
+        export AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+        export AIRFLOW__WEBSERVER__AUTH_BACKENDS=airflow.www.fab_security.manager.AUTH_DB
+        source ${AIRFLOW_ENV}/bin/activate
+        airflow db migrate
+        airflow users create \
+            --username admin \
+            --firstname Admin \
+            --lastname User \
+            --role Admin \
+            --email admin@${DOMAIN_NAME} \
+            --password '${PASSWORD}'
+    "
 
-    echo "[INFO] Ensuring admin has Admin role..."
-    sudo -u ${AIRFLOW_USER} bash -c "source ${AIRFLOW_ENV}/bin/activate && airflow users add-role -u admin -r Admin"
-
+    echo "[INFO] Fixing permissions..." | log
+    chown -R ${AIRFLOW_USER}:${AIRFLOW_USER} ${AIRFLOW_HOME}
     deactivate
 }
 
@@ -86,18 +107,24 @@ install_airflow() {
 # Function: configure_systemd
 #---------------------------------------------------
 configure_systemd() {
-    echo "[INFO] Configuring Airflow systemd services..."
+    echo "[INFO] Configuring Airflow systemd services..." | log
+
+    # Ensure AIRFLOW_HOME is persistent for the airflow user
+    echo 'export AIRFLOW_HOME=/opt/airflow' >> /home/${AIRFLOW_USER}/.bashrc
+    chown ${AIRFLOW_USER}:${AIRFLOW_USER} /home/${AIRFLOW_USER}/.bashrc
 
     cat <<EOF >/etc/systemd/system/airflow-webserver.service
 [Unit]
-Description=Airflow webserver daemon
+Description=Airflow API server
 After=network.target
 
 [Service]
 Environment=AIRFLOW_HOME=${AIRFLOW_HOME}
+Environment=AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+Environment=AIRFLOW__WEBSERVER__AUTH_BACKENDS=airflow.www.fab_security.manager.AUTH_DB
 User=${AIRFLOW_USER}
 Group=${AIRFLOW_USER}
-ExecStart=${AIRFLOW_ENV}/bin/airflow webserver
+ExecStart=${AIRFLOW_ENV}/bin/airflow api-server
 Restart=always
 RestartSec=5s
 
@@ -107,11 +134,13 @@ EOF
 
     cat <<EOF >/etc/systemd/system/airflow-scheduler.service
 [Unit]
-Description=Airflow scheduler daemon
+Description=Airflow scheduler
 After=network.target
 
 [Service]
 Environment=AIRFLOW_HOME=${AIRFLOW_HOME}
+Environment=AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+Environment=AIRFLOW__WEBSERVER__AUTH_BACKENDS=airflow.www.fab_security.manager.AUTH_DB
 User=${AIRFLOW_USER}
 Group=${AIRFLOW_USER}
 ExecStart=${AIRFLOW_ENV}/bin/airflow scheduler
@@ -122,18 +151,52 @@ RestartSec=5s
 WantedBy=multi-user.target
 EOF
 
+    cat <<EOF >/etc/systemd/system/airflow-triggerer.service
+[Unit]
+Description=Airflow triggerer
+After=network.target
+
+[Service]
+Environment=AIRFLOW_HOME=${AIRFLOW_HOME}
+Environment=AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+Environment=AIRFLOW__WEBSERVER__AUTH_BACKENDS=airflow.www.fab_security.manager.AUTH_DB
+User=${AIRFLOW_USER}
+Group=${AIRFLOW_USER}
+ExecStart=${AIRFLOW_ENV}/bin/airflow triggerer
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    echo "[INFO] Cleaning up old Airflow processes..." | log
+    pkill -u ${AIRFLOW_USER} -f "airflow" || true
+    sleep 3
+
     systemctl daemon-reload
+
+    echo "[INFO] Finalizing Airflow DB migration under service user..." | log
+    sudo -u ${AIRFLOW_USER} bash -c "
+        export AIRFLOW_HOME='${AIRFLOW_HOME}'
+        source '${AIRFLOW_ENV}/bin/activate'
+        airflow db migrate
+    "
+
     systemctl enable airflow-webserver.service
     systemctl enable airflow-scheduler.service
+    systemctl enable airflow-triggerer.service
+
     systemctl start airflow-webserver.service
     systemctl start airflow-scheduler.service
+    systemctl start airflow-triggerer.service
 }
 
 #---------------------------------------------------
 # Function: switch_nginx_to_proxy
 #---------------------------------------------------
 switch_nginx_to_proxy() {
-    echo "[INFO] Switching nginx to Airflow reverse proxy..."
+    echo "[INFO] Switching nginx to Airflow reverse proxy..." | log
     NGINX_CONF="/etc/nginx/sites-available/airflow.conf"
     cat > "$NGINX_CONF" <<EOF
 server {
@@ -153,40 +216,47 @@ EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/airflow.conf
     nginx -t && systemctl reload nginx
-    echo "[INFO] nginx configuration switched to Airflow reverse proxy."
+    echo "[INFO] nginx configuration switched to Airflow reverse proxy." | log
 }
 
 #---------------------------------------------------
 # Function: obtain_ssl
 #---------------------------------------------------
 obtain_ssl() {
-    echo "[INFO] Reloading nginx before requesting certificate..."
+    echo "[INFO] Reloading nginx before requesting certificate..." | log
     systemctl reload nginx
 
-    echo "[INFO] Requesting Let's Encrypt certificate..."
+    echo "[INFO] Requesting Let's Encrypt certificate..." | log
     certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
 
-    echo "[INFO] SSL successfully configured for https://${DOMAIN_NAME}"
+    echo "[INFO] SSL successfully configured for https://${DOMAIN_NAME}" | log
+	
+	"$updateStatus" "$HTML_PATH" -sr
+	"$updateStatus" "$HTML_PATH" -ur "Airflow is available on https://${DOMAIN_NAME}"
 }
 
 #---------------------------------------------------
 # Main
 #---------------------------------------------------
 main() {
+	"$updateStatus" "$HTML_PATH" -ap "Opening ports..."
 	open_ports
+	"$updateStatus" "$HTML_PATH" -ap "Installing dependencies..."
 	install_dependencies
+	"$updateStatus" "$HTML_PATH" -ap "Installing Airflow (might take some time)..."
     install_airflow
+	"$updateStatus" "$HTML_PATH" -ap "Configuring service..."
     configure_systemd
+	
+	"$updateStatus" "$HTML_PATH" -ap "Finishing up..."
     switch_nginx_to_proxy
     obtain_ssl
 	
-    echo "[INFO] Apache Airflow installation complete."
-    echo "[INFO] Access Airflow UI at https://${DOMAIN_NAME}"
+    echo "[INFO] Apache Airflow installation complete." | log
+    echo "[INFO] Access Airflow UI at https://${DOMAIN_NAME}" | log
 	
-	"$updateStatus" "$HTML_PATH" -sr
-	"$updateStatus" "$HTML_PATH" -ur "Airflow is running on https://${DOMAIN_NAME}"
-	"$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
-		
+	"$updateStatus" "$HTML_PATH" -tr " https://${DOMAIN_NAME}"
 }
+
 
 main "$@"
