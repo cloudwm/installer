@@ -12,11 +12,11 @@ fi
 #---------------------------------------------------
 MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+#PASSWORD="${ADMINPASSWORD}"
 PASSWORD="Pass12344321!!"
 
-#rootDir="$(rootDir)"
-#updateStatus="$rootDir/include/updateInstallStatus.sh"
-LOG_PATH="/var/log/anythingllm-setup.log"
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
 
 AIRFLOW_HOME="/opt/airflow"
@@ -31,7 +31,6 @@ AIRFLOW_VERSION="3.1.0"
 install_dependencies() {
     echo "[INFO] Installing system dependencies..."
     apt update -y
-	apt install -y nginx
     apt install -y ${PYTHON_BIN} ${PYTHON_BIN}-venv ${PYTHON_BIN}-dev \
                    python3-pip libmysqlclient-dev libpq-dev libssl-dev libffi-dev \
                    build-essential curl git systemd certbot python3-certbot-nginx
@@ -41,47 +40,6 @@ install_dependencies() {
     mkdir -p ${AIRFLOW_HOME}
     chown -R ${AIRFLOW_USER}:${AIRFLOW_USER} ${AIRFLOW_HOME}
 	
-	idxHTMLPath="/var/www/html"
-	if [ ! -d "$idxHTMLPath" ]; then
-		mkdir -p "$idxHTMLPath"
-	fi
-
-	if [ -f "$idxHTMLPath/index.html" ]; then
-		rm -f "$idxHTMLPath/index.html"
-	fi
-
-	# Define variables
-	update_status="include/updateInstallStatus.sh"
-	web_path="/var/www/html"
-	logo_img_root="include/Logos"
-	logo_img_name="anythingllm-lim.png"
-	logo_img_root_path="$logo_img_root/$logo_img_name"
-	html_path="/var/www/html/index.html"
-	local_html_path="include/index.html"
-
-	echo "Writing nginx configuration file..."
-	cat <<_EOF_ > /etc/nginx/sites-available/installProgress.conf
-server {
-	listen 80;
-	server_name _;
-
-	root $idxHTMLPath;
-	index index.html;
-
-	access_log /var/log/nginx/installProgress_access.log;
-	error_log /var/log/nginx/installProgress_error.log;
-	}
-_EOF_
-	
-	if [ ! -d "$web_path" ]; then
-		mkdir -p "$web_path"
-	fi
-	
-	ln -sf /etc/nginx/sites-available/installProgress.conf /etc/nginx/sites-enabled/installProgress.conf
-	rm -f /etc/nginx/sites-enabled/default
-	
-	systemctl enable --now nginx
-	systemctl restart nginx
 }
 
 open_ports() {
