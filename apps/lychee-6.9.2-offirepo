@@ -6,10 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-CWM_DOMAIN="194-37-81-216.cloud-xip.com"
-ADMINPASSWORD="Lior1231231231"
-
-
 echo "Installing Lychee Photo Management with Docker + Nginx" | log
 
 export DEBIAN_FRONTEND="noninteractive"
