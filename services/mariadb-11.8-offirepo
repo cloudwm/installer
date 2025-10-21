@@ -1,0 +1,79 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing MariaDB 11.8" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+# Install prerequisites
+echo "Installing prerequisites" | log
+sudo apt update
+sudo apt install -y wget curl software-properties-common dirmngr ca-certificates lsb-release
+
+# Run mariadb_repo_setup for MariaDB 11.8
+echo "Setting up MariaDB 11.8 repository" | log
+curl -LsS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash -s -- --mariadb-server-version="mariadb-11.8"
+waitOrStop 0 "Failed to download MariaDB repo setup"
+sudo apt update
+
+# Install MariaDB 11.8 server and client explicitly
+echo "Installing MariaDB 11.8.3" | log
+apt install -y mariadb-server mariadb-client
+waitOrStop 0 "Failed to install MariaDB"
+echo "✅ MariaDB 11.8.x ($INSTALLED_VERSION) installed successfully" | log
+
+# Ensure directories and permissions
+sudo mkdir -p /var/lib/mysql /var/run/mysqld /var/log/mysql
+sudo chown -R mysql:mysql /var/lib/mysql /var/run/mysqld /var/log/mysql
+sudo chmod 755 /var/run/mysqld
+
+# Start MariaDB
+echo "Starting MariaDB services" | log
+sudo systemctl start mariadb
+sudo systemctl enable mariadb
+
+# Secure installation with ADMINPASSWORD
+echo "Running secure installation" | log
+sudo mysql_secure_installation << EOF
+
+n
+${ADMINPASSWORD}
+${ADMINPASSWORD}
+y
+y
+y
+y
+EOF
+
+# Create admin user using root and ADMINPASSWORD
+echo "Creating admin user with full privileges" | log
+sudo mysql -u root -p${ADMINPASSWORD} << EOF
+CREATE USER IF NOT EXISTS 'admin'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Adding descriptions" | log
+descriptionAppend "MariaDB Server Address: localhost:3306"
+descriptionAppend " "
+descriptionAppend "Root Login: root / ${ADMINPASSWORD}"
+descriptionAppend "Admin Login: admin / ${ADMINPASSWORD}"
+descriptionAppend "MariaDB config location: /etc/mysql/my.cnf (customize as needed)"
+descriptionAppend "Data directory: /var/lib/mysql"
+descriptionAppend "Logs: /var/log/mysql/error.log"
+descriptionAppend " "
+descriptionAppend "Commands:"
+descriptionAppend "  sudo systemctl status mariadb          # Check service"
+descriptionAppend "  sudo systemctl restart mariadb         # Restart"
+descriptionAppend "  mysql -u root -p${ADMINPASSWORD}       # Connect as root"
+descriptionAppend "  mysql -u admin -p${ADMINPASSWORD}      # Connect as admin"
+descriptionAppend "  sudo mysqldump -u admin -p${ADMINPASSWORD} --all-databases > backup.sql  # Backup"
+
+tagScript success
+
+exit 0
