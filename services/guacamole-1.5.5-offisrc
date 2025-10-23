@@ -185,8 +185,16 @@ start_guacamole() {
     echo "[INFO] Guacamole containers are running and healthy." | log
 }
 
+nginx_log() {
+    local timestamp
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    echo "[$timestamp] $*" >> "$NGINX_LOG"
+}
+
 switch_nginx_to_proxy() {
     echo "[INFO] Configuring nginx reverse proxy for Guacamole..." | log
+    nginx_log "[INFO] Configuring nginx reverse proxy for Guacamole..."
+
     NGINX_CONF="/etc/nginx/sites-available/guacamole.conf"
     cat > "$NGINX_CONF" <<EOF
 server {
@@ -205,17 +213,30 @@ server {
 EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/guacamole.conf
-    nginx -t && systemctl reload nginx
+    if nginx -t; then
+        nginx_log "[INFO] Nginx configuration test passed."
+        systemctl reload nginx
+        nginx_log "[INFO] Nginx reloaded successfully."
+    else
+        nginx_log "[ERROR] Nginx configuration test failed."
+        nginx -t 2>&1 | tee -a "$NGINX_LOG"
+        exit 1
+    fi
 }
 
 obtain_ssl() {
-    echo "[INFO] Reloading nginx before requesting certificate..." | log
+    nginx_log "[INFO] Reloading nginx before requesting certificate..."
     systemctl reload nginx
 
-    echo "[INFO] Requesting Let's Encrypt certificate..." | log
-    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
+    nginx_log "[INFO] Requesting Let's Encrypt certificate for ${DOMAIN_NAME}..."
+    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect >>"$NGINX_LOG" 2>&1
 
-    echo "[INFO] SSL successfully configured for https://${DOMAIN_NAME}" | log
+    if [ $? -eq 0 ]; then
+        nginx_log "[INFO] SSL successfully configured for https://${DOMAIN_NAME}"
+    else
+        nginx_log "[ERROR] SSL certificate request failed for ${DOMAIN_NAME}"
+    fi
+
     "$updateStatus" "$HTML_PATH" -sr
     "$updateStatus" "$HTML_PATH" -ur "Guacamole is available on https://${DOMAIN_NAME}"
 }
