@@ -1,5 +1,4 @@
 #!/bin/bash
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -19,11 +18,28 @@ waitOrStop 0 "Failed to install GitLab"
 
 echo "Installing GitLab from apt" | log
 apt update
-EXTERNAL_URL="https://gitlab.${CWM_DOMAIN}" installPackage gitlab-ce
-waitOrStop 0 "Failed to install gitlab-ee"
+EXTERNAL_URL="https://${CWM_DOMAIN}" installPackage gitlab-ce
+waitOrStop 0 "Failed to install gitlab-ce"
+
+echo "Configuring Let's Encrypt for SSL" | log
+cat >> /etc/gitlab/gitlab.rb << EOF
+
+# Enable Let's Encrypt
+letsencrypt['enable'] = true
+letsencrypt['contact_emails'] = ['admin@${CWM_DOMAIN}']
+letsencrypt['auto_renew'] = true
+
+# Redirect HTTP to HTTPS
+nginx['redirect_http_to_https'] = true
+EOF
+
+echo "Reconfiguring GitLab with SSL" | log
+gitlab-ctl reconfigure
+waitOrStop 0 "Failed to reconfigure GitLab"
+
+sleep 60  # Wait for Let's Encrypt to generate certificates
 
 gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
-
 descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
 descriptionAppend " "
 descriptionAppend "Default admin account has been configured with following details:"
@@ -33,5 +49,4 @@ descriptionAppend "This password will be cleaned up in first reconfigure run aft
 descriptionAppend " "
 
 tagScript success
-
 exit 0
