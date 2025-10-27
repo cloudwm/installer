@@ -45,7 +45,7 @@ EOF
 cat << 'EOF' > ${appInstallDir}/docker-compose.yml
 services:
   luanti:
-    image: lscr.io/linuxserver/luanti:5.14
+    image: lscr.io/linuxserver/luanti:5.14.0
     restart: unless-stopped
     ports:
       - "${LUANTI_PORT}:30000/udp"
