@@ -1,0 +1,173 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Lychee Photo Management with Docker + Nginx" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apache2-utils nginx certbot python3-certbot-nginx  apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Install Docker (if not already installed)
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+fi
+
+
+echo "Creating Lychee directory" | log
+appInstallDir="/opt/lychee"
+sudo mkdir -p ${appInstallDir}/config
+sudo chown www-data:www-data ${appInstallDir}/config
+sudo chmod 755 ${appInstallDir}/config
+
+# Write .env file
+cat << EOF > ${appInstallDir}/.env
+DOMAIN=${CWM_DOMAIN}
+MYSQL_ROOT_PASSWORD=${ADMINPASSWORD}
+MYSQL_DATABASE=lychee
+MYSQL_USER=lychee
+MYSQL_PASSWORD=${ADMINPASSWORD}
+EOF
+
+# Create docker-compose.yml
+cat << 'EOF' > ${appInstallDir}/docker-compose.yml
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - lychee-net
+
+  lychee:
+    image: lycheeserver/lychee:6.9.2
+    restart: always
+    depends_on:
+      - mysql
+    environment:
+      TRUSTED_PROXIES: "*"
+      SECURITY_HEADER_CSP_FORM_ACTION: "'self'"
+      APP_URL:${DOMAIN}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${MYSQL_DATABASE}
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - lychee_config:/config
+      - lychee_uploads:/app/public/uploads
+    networks:
+      - lychee-net
+    ports:
+      - "8080:80"
+
+volumes:
+  mysql_data:
+  lychee_config:
+  lychee_uploads:
+
+networks:
+  lychee-net:
+    driver: bridge
+EOF
+
+systemctl stop nginx
+
+# Generate Let's Encrypt certs (YOUR EXACT BLOCK)
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+    sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem ${appInstallDir}/config/https-cert.pem
+    sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem ${appInstallDir}/config/https-key.pem
+    sudo chown www-data:www-data ${appInstallDir}/config/https-{cert,key}.pem
+    sudo chmod 640 ${appInstallDir}/config/https-{cert,key}.pem
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
+        waitOrStop 0 "Certificate copy failed"
+    fi
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+# Configure Nginx
+cat << EOF > /etc/nginx/sites-available/lychee
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate ${appInstallDir}/config/https-cert.pem;
+    ssl_certificate_key ${appInstallDir}/config/https-key.pem;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+# Enable Nginx site
+sudo ln -sf /etc/nginx/sites-available/lychee /etc/nginx/sites-enabled/
+systemctl restart nginx
+
+# Pull and start Lychee services
+echo "Pulling and starting Lychee services" | log
+cd ${appInstallDir}
+docker compose pull
+docker compose up -d
+waitOrStop 0 "Failed to start Lychee services"
+
+echo "Waiting for Lychee to initialize (DB migration)" | log
+sleep 60  # Wait for MySQL and Laravel migration
+
+echo "Adding descriptions" | log
+descriptionAppend "Lychee Server Address: https://${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "Initial Setup: Visit the address, create admin account on first login"
+descriptionAppend "Lychee config location: ${appInstallDir}/config (customize via UI)"
+descriptionAppend "Nginx config: /etc/nginx/sites-available/lychee"
+descriptionAppend "SSL certs: ${appInstallDir}/config/https-{cert,key}.pem"
+descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
+descriptionAppend "Database: MySQL (root/${ADMINPASSWORD}, lychee/${ADMINPASSWORD})"
+descriptionAppend " "
+descriptionAppend "Commands:"
+descriptionAppend "  sudo docker compose -f ${appInstallDir}/docker-compose.yml logs -f  # View logs"
+descriptionAppend "  sudo docker compose -f ${appInstallDir}/docker-compose.yml down  # Stop"
+descriptionAppend "  sudo docker compose -f ${appInstallDir}/docker-compose.yml up -d  # Start"
+descriptionAppend "  sudo docker compose exec mysql mysql -u root -p${ADMINPASSWORD} -e 'SHOW DATABASES;'  # Check DB"
+descriptionAppend "  sudo certbot renew  # Renew SSL cert"
+
+tagScript success
+
+exit 0
