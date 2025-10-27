@@ -77,7 +77,7 @@ sleep 60
 
 # Final info
 descriptionAppend "Luanti Server Running!"
-descriptionAppend "Connect in-game: ${CWM_DOMAIN}:${LUANTI_PORT}"
+descriptionAppend "Connect in-game: ${CWM_DOMAIN}:30000"
 descriptionAppend "Server Password: ${SERVER_PASSWORD}"
 descriptionAppend "Data: ${appInstallDir}/data"
 descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
