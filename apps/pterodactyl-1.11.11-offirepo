@@ -4,9 +4,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-CWM_DOMAIN="185-159-74-86.cloud-xip.com"
-ADMINPASSWORD="Lior1231231231"
-
 echo "Installing Pterodactyl Panel 1.0-develop with Wings using Docker on Ubuntu" | log
 
 export DEBIAN_FRONTEND="noninteractive"
