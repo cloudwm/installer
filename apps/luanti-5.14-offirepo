@@ -1,0 +1,96 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Luanti Dedicated Server (Docker, No Web UI)" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Install Docker (if not already installed)
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+fi
+
+# Create Luanti directory
+appInstallDir="/opt/luanti"
+echo "Creating server directory: ${appInstallDir}" | log
+sudo mkdir -p ${appInstallDir}/data
+sudo chown -R $USER:$USER ${appInstallDir}
+
+# Generate secure server password
+SERVER_PASSWORD=$(openssl rand -base64 32 | tr -d /= | cut -c1-16)
+echo "Server Password: $SERVER_PASSWORD" | log
+
+# Write .env
+cat << EOF > ${appInstallDir}/.env
+LUANTI_PORT=30000
+LUANTI_RCON_PORT=30001
+LUANTI_SERVER_PASSWORD=${SERVER_PASSWORD}
+SERVER_NAME=${CWM_DOMAIN:-luanti-server}
+MAX_PLAYERS=16
+EOF
+
+# docker-compose.yml — pure game server using linuxserver/luanti
+cat << 'EOF' > ${appInstallDir}/docker-compose.yml
+services:
+  luanti:
+    image: lscr.io/linuxserver/luanti:5.14
+    restart: unless-stopped
+    ports:
+      - "${LUANTI_PORT}:30000/udp"
+      - "${LUANTI_RCON_PORT}:30000/tcp"
+    volumes:
+      - ./data:/config/.minetest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - CLI_ARGS=--server --worldname default --gameid minetest --max-users ${MAX_PLAYERS} --password ${LUANTI_SERVER_PASSWORD}
+    networks:
+      - luanti-net
+
+networks:
+  luanti-net:
+    driver: bridge
+EOF
+
+# Start server
+echo "Starting Luanti server..." | log
+cd ${appInstallDir}
+docker compose pull
+docker compose up -d
+waitOrStop 0 "Failed to start Luanti server"
+
+echo "Waiting for world generation..." | log
+sleep 60
+
+# Final info
+descriptionAppend "Luanti Server Running!"
+descriptionAppend "Connect in-game: ${CWM_DOMAIN}:${LUANTI_PORT}"
+descriptionAppend "Server Password: ${SERVER_PASSWORD}"
+descriptionAppend "Data: ${appInstallDir}/data"
+descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
+descriptionAppend " "
+descriptionAppend "Commands:"
+descriptionAppend "  docker compose -f ${appInstallDir}/docker-compose.yml logs -f"
+descriptionAppend "  docker compose -f ${appInstallDir}/docker-compose.yml down"
+descriptionAppend "  docker compose -f ${appInstallDir}/docker-compose.yml up -d"
+descriptionAppend "  docker exec -it \$(docker ps -qf 'name=luanti') luanti --help  # In-container help"
+descriptionAppend " "
+descriptionAppend "Tip: Edit CLI_ARGS in docker-compose.yml for mods/games (e.g., --gameid mineclone2)."
+descriptionAppend "   Place mods in ${appInstallDir}/data/mods/ and restart."
+descriptionAppend "   Download games/mods from ContentDB and add to ${appInstallDir}/data/games/."
+
+tagScript success
+exit 0
