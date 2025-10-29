@@ -97,8 +97,6 @@ EOF
 # Create docker-compose.yml
 echo "Creating Docker Compose configuration" | log
 cat > $appDir/docker-compose.yml << 'EOF'
-version: '3.8'
-
 services:
   hoppscotch-db:
     image: postgres:15-alpine
@@ -146,7 +144,7 @@ services:
       - hoppscotch-net
 
   hoppscotch-frontend:
-    image: hoppscotch/hoppscotch-forntend:2025.9.2
+    image: hoppscotch/hoppscotch-frontend:2025.9.2
     container_name: hoppscotch-frontend
     restart: unless-stopped
     env_file: .env
