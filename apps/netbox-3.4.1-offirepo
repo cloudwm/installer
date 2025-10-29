@@ -1,0 +1,270 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing NetBox (Network Management) with Docker + Nginx + SSL" | log
+
+export DEBIAN_FRONTEND=noninteractive
+apt update
+apt install -y nginx certbot python3-certbot-nginx \
+               apt-transport-https ca-certificates curl gnupg lsb-release
+
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker..." | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+        gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
+          https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+          tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    usermod -aG docker $USER || true
+    sleep 5
+fi
+
+appDir="/opt/netbox"
+rm -rf $appDir
+mkdir -p $appDir/config/netbox $appDir/config/postgres $appDir/config/redis \
+         $appDir/config/reports $appDir/config/scripts $appDir/config/startup_scripts \
+         $appDir/media $appDir/config/netbox/static
+chown -R $USER:$USER $appDir
+
+DB_PASSWORD=$(openssl rand -hex 16)
+SECRET_KEY=$(openssl rand -base64 48 | tr -d /=+ | cut -c1-50)
+ADMIN_PASS=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-20)
+
+cat > $appDir/.env << EOF
+ALLOWED_HOSTS=*
+DB_NAME=netbox
+DB_USER=netbox
+DB_PASSWORD=$DB_PASSWORD
+DB_HOST=netbox-postgres
+DB_PORT=5432
+REDIS_HOST=netbox-redis
+REDIS_PORT=6379
+REDIS_DB_CACHE=1
+REDIS_DB_TASKS=0
+SECRET_KEY=$SECRET_KEY
+SUPERUSER_NAME=admin
+SUPERUSER_EMAIL=admin@$CWM_DOMAIN
+SUPERUSER_PASSWORD=$ADMIN_PASS
+SKIP_SUPERUSER=false
+STATIC_ROOT=/opt/netbox/config/netbox/static
+EOF
+
+cat > $appDir/config/netbox/configuration.py << 'EOF'
+from os import environ
+
+ALLOWED_HOSTS = ['*']
+
+DATABASE = {
+    "ENGINE": "django.db.backends.postgresql",
+    "NAME": environ.get("DB_NAME", "netbox"),
+    "USER": environ.get("DB_USER", "netbox"),
+    "PASSWORD": environ.get("DB_PASSWORD", ""),
+    "HOST": environ.get("DB_HOST", "netbox-postgres"),
+    "PORT": environ.get("DB_PORT", "5432"),
+    "CONN_MAX_AGE": 300,
+}
+
+REDIS = {
+    "tasks": {
+        "HOST": environ.get("REDIS_HOST", "netbox-redis"),
+        "PORT": int(environ.get("REDIS_PORT", 6379)),
+        "DATABASE": int(environ.get("REDIS_DB_TASKS", 0)),
+        "SSL": False,
+    },
+    "caching": {
+        "HOST": environ.get("REDIS_HOST", "netbox-redis"),
+        "PORT": int(environ.get("REDIS_PORT", 6379)),
+        "DATABASE": int(environ.get("REDIS_DB_CACHE", 1)),
+        "SSL": False,
+    },
+}
+
+SECRET_KEY = environ.get("SECRET_KEY", "")
+DEBUG = False
+PLUGINS = []
+
+STATIC_URL = "/static/"
+STATIC_ROOT = environ.get("STATIC_ROOT", "/opt/netbox/config/netbox/static")
+STATICFILES_DIRS = []
+EOF
+
+cat > $appDir/docker-compose.yml << 'EOF'
+services:
+  netbox-postgres:
+    image: postgres:15-alpine
+    container_name: netbox-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./config/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  netbox-redis:
+    image: redis:7-alpine
+    container_name: netbox-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./config/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  netbox:
+    image: netboxcommunity/netbox:latest-3.4.1
+    container_name: netbox
+    restart: unless-stopped
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_healthy
+    env_file: .env
+    ports:
+      - "8000:8080"
+    volumes:
+      - ./config/netbox:/etc/netbox/config:z
+      - ./config/reports:/etc/netbox/reports:z
+      - ./config/scripts:/etc/netbox/scripts:z
+      - ./media:/opt/netbox/netbox/media:z
+      - ./config/netbox/static:/opt/netbox/netbox/static:z
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/login/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  netbox-worker:
+    image: netboxcommunity/netbox:latest-3.4.1
+    container_name: netbox-worker
+    restart: unless-stopped
+    depends_on:
+      netbox:
+        condition: service_healthy
+    env_file: .env
+    volumes:
+      - ./config/netbox:/etc/netbox/config:z
+      - ./config/reports:/etc/netbox/reports:z
+      - ./config/scripts:/etc/netbox/scripts:z
+      - ./media:/opt/netbox/netbox/media:z
+    command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "rqworker"]
+
+  # netbox-housekeeping:
+  #   image: netboxcommunity/netbox:latest
+  #   restart: unless-stopped
+  #   command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "housekeeping"]
+EOF
+
+echo "Obtaining SSL certificate..." | log
+systemctl stop nginx 2>/dev/null || true
+
+if certbot certonly --standalone -d "$CWM_DOMAIN" \
+     --non-interactive --agree-tos -m "admin@$CWM_DOMAIN" --http-01-port 80; then
+    echo "SSL obtained via Let's Encrypt" | log
+    cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem $appDir/config/https-cert.pem
+    cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem $appDir/config/https-key.pem
+else
+    echo "Failed to generate ssl"
+    exit 1
+fi
+
+chown $USER:$USER $appDir/config/https-*.pem
+chmod 644 $appDir/config/https-cert.pem
+chmod 600 $appDir/config/https-key.pem
+
+# === 10. NGINX CONFIG (NO /static/ BLOCK) ===
+cat > /etc/nginx/sites-available/netbox << EOF
+server {
+    listen 80;
+    server_name $CWM_DOMAIN;
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $CWM_DOMAIN;
+
+    ssl_certificate $appDir/config/https-cert.pem;
+    ssl_certificate_key $appDir/config/https-key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_read_timeout 900s;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/netbox /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl restart nginx
+
+# === 11. START & INITIALIZE ===
+cd $appDir
+
+echo "Starting database and cache..." | log
+docker compose up -d netbox-postgres netbox-redis
+
+echo "Waiting for DB and Redis..." | log
+for i in {1..30}; do
+    if docker compose ps | grep -q "healthy"; then
+        break
+    fi
+    sleep 3
+done
+
+echo "Starting NetBox..." | log
+docker compose up -d netbox
+sleep 60
+
+echo "Running migrations..." | log
+docker compose exec netbox ./manage.py migrate --noinput
+
+echo "Collecting static files..." | log
+docker compose exec netbox ./manage.py collectstatic --noinput --clear
+
+echo "Starting worker..." | log
+docker compose up -d netbox-worker
+
+
+systemctl restart nginx
+
+# === SUCCESS ===
+descriptionAppend "NetBox is LIVE!"
+descriptionAppend "URL: https://$CWM_DOMAIN"
+descriptionAppend "Username: admin"
+descriptionAppend "Password: $ADMIN_PASS"
+descriptionAppend "Save this password!"
+descriptionAppend " "
+descriptionAppend "Commands:"
+descriptionAppend "  cd $appDir && docker compose logs -f"
+descriptionAppend "  Backup: docker exec netbox-postgres pg_dump -U netbox netbox > backup.sql"
+
+tagScript success
+
+exit 0
