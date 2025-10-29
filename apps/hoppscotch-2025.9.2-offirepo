@@ -1,0 +1,294 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Hoppscotch API Testing Platform" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+# Install prerequisites
+echo "Installing prerequisites" | log
+sudo apt update
+apt update
+apt install -y nginx certbot python3-certbot-nginx \
+               apt-transport-https ca-certificates curl gnupg lsb-release
+
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker..." | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+        gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
+          https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+          tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    usermod -aG docker $USER || true
+    sleep 5
+fi
+
+# Create directories
+echo "Creating directories" | log
+appDir="/opt/hoppscotch"
+sudo rm -rf $appDir
+sudo mkdir -p $appDir/config/db
+sudo chown -R $USER:$USER $appDir
+
+# Generate secrets
+echo "Generating secrets" | log
+POSTGRES_PASSWORD=$(openssl rand -hex 16)
+JWT_SECRET=$(openssl rand -base64 48 | tr -d '/=+' | cut -c1-32)
+SESSION_SECRET=$(openssl rand -base64 32 | tr -d '/=+')
+DATA_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '/=+' | cut -c1-32)
+
+# Create .env file
+echo "Creating environment configuration" | log
+cat > $appDir/.env << EOF
+# Domain
+CWM_DOMAIN=${CWM_DOMAIN}
+
+# Database
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=hoppscotch
+DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@hoppscotch-db:5432/hoppscotch
+
+# Application
+NODE_ENV=production
+PORT=3170
+PRODUCTION=true
+
+# URLs
+APP_URL=https://${CWM_DOMAIN}
+VITE_BACKEND_API_URL=https://${CWM_DOMAIN}/api
+VITE_BACKEND_WS_URL=wss://${CWM_DOMAIN}/api
+VITE_APP_TOS_LINK=https://${CWM_DOMAIN}/terms
+VITE_APP_PRIVACY_POLICY_LINK=https://${CWM_DOMAIN}/privacy
+
+# Security
+JWT_SECRET=${JWT_SECRET}
+SESSION_SECRET=${SESSION_SECRET}
+DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
+TOKEN_SALT_COMPLEXITY=10
+MAGIC_LINK_TOKEN_VALIDITY=3
+REFRESH_TOKEN_VALIDITY=604800000
+ACCESS_TOKEN_VALIDITY=86400000
+
+# CORS
+WHITELISTED_ORIGINS=https://${CWM_DOMAIN}
+ALLOWED_ORIGINS=https://${CWM_DOMAIN}
+REDIRECT_URL=https://${CWM_DOMAIN}
+
+# Auth
+ALLOW_SECURE_COOKIES=true
+WHITELIST_ENABLED=false
+
+# Session
+SESSION_RESAVE=false
+SESSION_SAVE_UNINITIALIZED=false
+
+# Mailer (disabled for now)
+MAILER_SMTP_ENABLE=false
+EOF
+
+# Create docker-compose.yml
+echo "Creating Docker Compose configuration" | log
+cat > $appDir/docker-compose.yml << 'EOF'
+version: '3.8'
+
+services:
+  hoppscotch-db:
+    image: postgres:15-alpine
+    container_name: hoppscotch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./config/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - hoppscotch-net
+
+  hoppscotch-backend:
+    image: hoppscotch/hoppscotch-backend:2025.9.2
+    container_name: hoppscotch-backend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      hoppscotch-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3170:3170"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hoppscotch-db:5432/${POSTGRES_DB}
+      NODE_ENV: production
+      PORT: 3170
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 10 &&
+        echo 'Running migrations...' &&
+        pnpm exec prisma migrate deploy &&
+        echo 'Starting backend...' &&
+        pnpm run start:prod
+      "
+    networks:
+      - hoppscotch-net
+
+  hoppscotch-frontend:
+    image: hoppscotch/hoppscotch-forntend:2025.9.2
+    container_name: hoppscotch-frontend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - hoppscotch-backend
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - hoppscotch-net
+
+networks:
+  hoppscotch-net:
+    driver: bridge
+EOF
+
+# Get SSL certificate
+echo "Obtaining SSL certificate" | log
+sudo systemctl stop nginx 2>/dev/null || true
+
+if sudo certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    --email "admin@${CWM_DOMAIN}" \
+    --http-01-port 80; then
+    echo "✅ SSL certificate obtained" | log
+    USE_LETSENCRYPT=true
+else
+    echo "⚠️ Let's Encrypt failed" | log
+    exit 1
+fi
+
+# Copy SSL certificates
+sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem $appDir/config/https-cert.pem
+sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem $appDir/config/https-key.pem
+sudo chown $USER:$USER $appDir/config/https-*.pem
+sudo chmod 644 $appDir/config/https-cert.pem
+sudo chmod 600 $appDir/config/https-key.pem
+
+# Configure Nginx
+echo "Configuring Nginx" | log
+sudo tee /etc/nginx/sites-available/hoppscotch > /dev/null << EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate $appDir/config/https-cert.pem;
+    ssl_certificate_key $appDir/config/https-key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 10M;
+
+    # Frontend
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    # Backend API
+    location /api/ {
+        proxy_pass http://127.0.0.1:3170/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # WebSocket support
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+
+# Enable site
+sudo ln -sf /etc/nginx/sites-available/hoppscotch /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test and restart Nginx
+sudo nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+
+sudo systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+# Start Hoppscotch
+echo "Starting Hoppscotch services" | log
+cd $appDir
+sudo docker compose down 2>/dev/null || true
+sudo docker compose up -d
+waitOrStop 0 "Failed to start Docker services"
+
+# Wait for services
+echo "Waiting for services to start" | log
+sleep 30
+
+# Check database
+echo "Checking database connection" | log
+for i in {1..30}; do
+    if sudo docker exec hoppscotch-db pg_isready -U postgres >/dev/null 2>&1; then
+        echo "✅ Database is ready" | log
+        break
+    fi
+    echo "Waiting for database ($i/30)..." | log
+    sleep 5
+done
+
+echo "Adding descriptions" | log
+descriptionAppend "✅ Hoppscotch Installation Complete!"
+descriptionAppend " "
+descriptionAppend "🌐 Hoppscotch URL: https://${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "📁 Important Files:"
+descriptionAppend "  • App Directory: $appDir"
+descriptionAppend "  • Environment: $appDir/.env"
+descriptionAppend "  • Docker Compose: $appDir/docker-compose.yml"
+descriptionAppend "  • Database: $appDir/config/db/"
+descriptionAppend "  • Nginx Config: /etc/nginx/sites-available/hoppscotch"
+descriptionAppend " "
+descriptionAppend "💻 Useful Commands:"
+descriptionAppend "  cd $appDir && sudo docker compose ps"
+descriptionAppend "  cd $appDir && sudo docker compose logs -f hoppscotch-backend"
+descriptionAppend "  cd $appDir && sudo docker compose logs -f hoppscotch-frontend"
+descriptionAppend "  cd $appDir && sudo docker compose restart"
+descriptionAppend " "
+descriptionAppend "🔍 Troubleshooting:"
+descriptionAppend "  Check backend: curl http://localhost:3170/"
+descriptionAppend "  Check frontend: curl http://localhost:3000/"
+descriptionAppend "  Check database: docker exec hoppscotch-db pg_isready -U postgres"
+
+tagScript success
+exit 0
