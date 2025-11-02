@@ -65,7 +65,7 @@ services:
     environment:
       TRUSTED_PROXIES: "*"
       SECURITY_HEADER_CSP_FORM_ACTION: "'self'"
-      APP_URL:${DOMAIN}
+      APP_URL: ${DOMAIN}
       DB_CONNECTION: mysql
       DB_HOST: mysql
       DB_PORT: 3306
