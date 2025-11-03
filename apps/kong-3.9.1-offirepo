@@ -1,0 +1,207 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+CWM_DOMAIN="91-228-126-97.cloud-xip.com"
+
+echo "Installing Kong Gateway using official quickstart script" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+# Get server IP
+SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com)
+echo "Server IP: $SERVER_IP" | log
+
+# Install prerequisites
+echo "Installing prerequisites" | log
+sudo apt update
+sudo apt install -y curl ca-certificates dnsutils nginx certbot python3-certbot-nginx
+waitOrStop 0 "Failed to install prerequisites"
+
+# Install Docker
+echo "Installing Docker" | log
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+waitOrStop 0 "Docker installation failed"
+
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo apt install -y docker-compose-plugin
+waitOrStop 0 "Docker Compose installation failed"
+
+# Run Kong's official quickstart
+echo "Running Kong official quickstart installation" | log
+curl -Ls https://get.konghq.com/quickstart | bash -s -- -i kong -t 3.9.1-ubuntu
+waitOrStop 0 "Kong quickstart installation failed"
+
+# Wait for Kong to be ready
+echo "Waiting for Kong to start" | log
+sleep 30
+
+# Check if Kong is running
+for i in {1..60}; do
+    if curl -s http://localhost:8001/ >/dev/null 2>&1; then
+        echo "✅ Kong is running" | log
+        break
+    fi
+    echo "Waiting for Kong ($i/60)..." | log
+    sleep 5
+done
+
+if [ $i -eq 60 ]; then
+    echo "❌ Kong failed to start" | log
+    cd /tmp/kong-quickstart 2>/dev/null && docker compose logs || true
+    waitOrStop 0 "Kong startup failed"
+fi
+
+# Get SSL certificate
+echo "Obtaining SSL certificate" | log
+sudo systemctl stop nginx 2>/dev/null || true
+
+if sudo certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    --email "admin@${CWM_DOMAIN}" \
+    --http-01-port 80; then
+    echo "✅ SSL certificate obtained" | log
+else
+    echo "⚠️ Let's Encrypt failed" | log
+fi
+
+# Configure Nginx as reverse proxy
+echo "Configuring Nginx reverse proxy with SSL" | log
+sudo tee /etc/nginx/sites-available/kong > /dev/null << EOF
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+# Kong Proxy (Main API Gateway)
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+    }
+}
+
+# Kong Admin API
+server {
+    listen 8444 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# Kong Manager (Web UI)
+server {
+    listen 8445 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass http://127.0.0.1:8002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+# Enable site
+sudo ln -sf /etc/nginx/sites-available/kong /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test and restart Nginx
+sudo nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+
+sudo systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding descriptions" | log
+descriptionAppend " "
+descriptionAppend "🚀 Kong Proxy (API Gateway): https://${CWM_DOMAIN}"
+descriptionAppend "🔧 Kong Admin API: https://${CWM_DOMAIN}:8444"
+descriptionAppend "🌐 Kong Manager (Web UI): https://${CWM_DOMAIN}:8445"
+descriptionAppend " "
+descriptionAppend "🧪 Test the Sample API:"
+descriptionAppend "  curl https://${CWM_DOMAIN}/httpbin/get"
+descriptionAppend " "
+descriptionAppend "📡 Kong Admin API Examples:"
+descriptionAppend " "
+descriptionAppend "# List all services"
+descriptionAppend "curl http://localhost:8001/services"
+descriptionAppend " "
+descriptionAppend "# Create a new service"
+descriptionAppend "curl -X POST http://localhost:8001/services \\"
+descriptionAppend "  --data 'name=my-api' \\"
+descriptionAppend "  --data 'url=https://api.example.com'"
+descriptionAppend " "
+descriptionAppend "# Create a route for the service"
+descriptionAppend "curl -X POST http://localhost:8001/services/my-api/routes \\"
+descriptionAppend "  --data 'name=my-route' \\"
+descriptionAppend "  --data 'paths[]=/api'"
+descriptionAppend " "
+descriptionAppend "# Add rate limiting plugin"
+descriptionAppend "curl -X POST http://localhost:8001/services/my-api/plugins \\"
+descriptionAppend "  --data 'name=rate-limiting' \\"
+descriptionAppend "  --data 'config.minute=100' \\"
+descriptionAppend "  --data 'config.policy=local'"
+descriptionAppend " "
+descriptionAppend "# Add authentication (API Key)"
+descriptionAppend "curl -X POST http://localhost:8001/services/my-api/plugins \\"
+descriptionAppend "  --data 'name=key-auth'"
+descriptionAppend " "
+descriptionAppend "# Add CORS"
+descriptionAppend "curl -X POST http://localhost:8001/services/my-api/plugins \\"
+descriptionAppend "  --data 'name=cors' \\"
+descriptionAppend "  --data 'config.origins=*'"
+
+tagScript success
+exit 0
