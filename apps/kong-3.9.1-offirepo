@@ -6,8 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-CWM_DOMAIN="91-228-126-97.cloud-xip.com"
-
 echo "Installing Kong Gateway using official quickstart script" | log
 
 export DEBIAN_FRONTEND="noninteractive"
