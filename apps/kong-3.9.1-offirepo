@@ -107,6 +107,15 @@ for i in {1..60}; do
     sleep 5
 done
 
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    exit 1
+fi
+
 sudo tee /etc/nginx/sites-available/kong > /dev/null << EOF
 # HTTP to HTTPS redirect
 server {
