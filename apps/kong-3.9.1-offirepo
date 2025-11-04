@@ -12,10 +12,6 @@ echo "Installing Kong Gateway using official quickstart script" | log
 
 export DEBIAN_FRONTEND="noninteractive"
 
-# Get server IP
-SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com)
-echo "Server IP: $SERVER_IP" | log
-
 # Install prerequisites
 echo "Installing prerequisites" | log
 sudo apt update
