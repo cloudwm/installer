@@ -71,6 +71,7 @@ if sudo certbot certonly --standalone -d "${CWM_DOMAIN}" \
     echo "✅ SSL certificate obtained" | log
 else
     echo "⚠️ Let's Encrypt failed" | log
+    exit 1
 fi
 
 # Configure Nginx as reverse proxy
