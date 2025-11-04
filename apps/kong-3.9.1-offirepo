@@ -120,9 +120,8 @@ else
     exit 1
 fi
 
-sudo tee /etc/nginx/sites-available/kong > /dev/null << EOF
+sudo tee /etc/nginx/sites-available/kong > /dev/null << 'EOF'
 # HTTP to HTTPS redirect
-
 server {
     listen 80;
     server_name ${CWM_DOMAIN};
@@ -132,7 +131,6 @@ server {
 server {
     listen 443 ssl http2;
     server_name ${CWM_DOMAIN};
-
     ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
