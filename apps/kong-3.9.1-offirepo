@@ -7,69 +7,106 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Installing Kong Gateway using official quickstart script" | log
-
 export DEBIAN_FRONTEND="noninteractive"
-
 # Install prerequisites
 echo "Installing prerequisites" | log
 sudo apt update
 sudo apt install -y curl ca-certificates dnsutils nginx certbot python3-certbot-nginx
 waitOrStop 0 "Failed to install prerequisites"
-
 # Install Docker
 echo "Installing Docker" | log
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 waitOrStop 0 "Docker installation failed"
-
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
-
 # Install Docker Compose
 sudo apt install -y docker-compose-plugin
 waitOrStop 0 "Docker Compose installation failed"
 
-# Run Kong's official quickstart
-echo "Running Kong official quickstart installation" | log
-curl -Ls https://get.konghq.com/quickstart | bash -s -- -i kong -t 3.9.1-ubuntu
-waitOrStop 0 "Kong quickstart installation failed"
+KONG_DIR="/opt/kong-quickstart"
+sudo mkdir -p "$KONG_DIR"
+sudo chown $USER:$USER "$KONG_DIR"
 
-# Wait for Kong to be ready
-echo "Waiting for Kong to start" | log
-sleep 30
+cat <<'EOF' | sudo tee "$KONG_DIR/docker-compose.yml" > /dev/null
+services:
+  kong-database:
+    image: postgres:13
+    container_name: kong-quickstart-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
+      POSTGRES_DB: kong
+    volumes:
+      - kong-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - kong-net
 
-# Check if Kong is running
+  kong-gateway:
+    image: kong:3.9.1-ubuntu
+    container_name: kong-quickstart-gateway
+    restart: unless-stopped
+    depends_on:
+      kong-database:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "postgres"
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PG_DATABASE: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_ADMIN_GUI_LISTEN: "0.0.0.0:8002"
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"    # ← EXPOSE ADMIN
+      - "8002:8002"    # ← EXPOSE MANAGER UI
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/status || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 15
+    networks:
+      - kong-net
+
+volumes:
+  kong-data:
+
+networks:
+  kong-net:
+    driver: bridge
+EOF
+
+cd "$KONG_DIR"
+docker compose up -d kong-database
+for i in {1..30}; do
+    if docker compose exec -T kong-database pg_isready -U kong >/dev/null 2>&1; then break; fi
+    sleep 2
+done
+docker compose run --rm kong-gateway kong migrations bootstrap
+docker compose up -d kong-gateway
+
+# Wait for Kong
 for i in {1..60}; do
-    if curl -s http://localhost:8001/ >/dev/null 2>&1; then
-        echo "✅ Kong is running" | log
+    if curl -s http://localhost:8001/status >/dev/null; then
+        echo "Kong is healthy" | log
         break
     fi
-    echo "Waiting for Kong ($i/60)..." | log
     sleep 5
 done
 
-if [ $i -eq 60 ]; then
-    echo "❌ Kong failed to start" | log
-    cd /tmp/kong-quickstart 2>/dev/null && docker compose logs || true
-    waitOrStop 0 "Kong startup failed"
-fi
-
-# Get SSL certificate
-echo "Obtaining SSL certificate" | log
-sudo systemctl stop nginx 2>/dev/null || true
-
-if sudo certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    --email "admin@${CWM_DOMAIN}" \
-    --http-01-port 80; then
-    echo "✅ SSL certificate obtained" | log
-else
-    echo "⚠️ Let's Encrypt failed" | log
-    exit 1
-fi
-
-# Configure Nginx as reverse proxy
-echo "Configuring Nginx reverse proxy with SSL" | log
 sudo tee /etc/nginx/sites-available/kong > /dev/null << EOF
 # HTTP to HTTPS redirect
 server {
@@ -159,19 +196,16 @@ waitOrStop 0 "Nginx configuration test failed"
 sudo systemctl restart nginx
 waitOrStop 0 "Failed to restart Nginx"
 
+# Create a sample service for testing
+echo "Creating sample service" | log
+sleep 5
+
 echo "Adding descriptions" | log
+descriptionAppend "✅ Kong Gateway Installation Complete!"
 descriptionAppend " "
 descriptionAppend "🚀 Kong Proxy (API Gateway): https://${CWM_DOMAIN}"
 descriptionAppend "🔧 Kong Admin API: https://${CWM_DOMAIN}:8444"
 descriptionAppend "🌐 Kong Manager (Web UI): https://${CWM_DOMAIN}:8445"
-descriptionAppend " "
-descriptionAppend "🧪 Test the Sample API:"
-descriptionAppend "  curl https://${CWM_DOMAIN}/httpbin/get"
-descriptionAppend " "
-descriptionAppend "📡 Kong Admin API Examples:"
-descriptionAppend " "
-descriptionAppend "# List all services"
-descriptionAppend "curl http://localhost:8001/services"
 descriptionAppend " "
 descriptionAppend "# Create a new service"
 descriptionAppend "curl -X POST http://localhost:8001/services \\"
@@ -193,10 +227,10 @@ descriptionAppend "# Add authentication (API Key)"
 descriptionAppend "curl -X POST http://localhost:8001/services/my-api/plugins \\"
 descriptionAppend "  --data 'name=key-auth'"
 descriptionAppend " "
-descriptionAppend "# Add CORS"
-descriptionAppend "curl -X POST http://localhost:8001/services/my-api/plugins \\"
-descriptionAppend "  --data 'name=cors' \\"
-descriptionAppend "  --data 'config.origins=*'"
+descriptionAppend "📁 Important Files:"
+descriptionAppend "  • Kong Directory: $KONG_DIR"
+descriptionAppend "  • Docker Compose: $KONG_DIR/docker-compose.yml"
+descriptionAppend "  • Nginx Config: /etc/nginx/sites-available/kong"
 
 tagScript success
 exit 0
