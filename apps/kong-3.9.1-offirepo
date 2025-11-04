@@ -108,6 +108,8 @@ for i in {1..60}; do
     sleep 5
 done
 
+systemctl stop nginx
+
 if certbot certonly --standalone -d "${CWM_DOMAIN}" \
     --non-interactive --agree-tos \
     -m "admin@${CWM_DOMAIN}" -v; then
