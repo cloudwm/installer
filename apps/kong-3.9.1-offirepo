@@ -27,69 +27,8 @@ waitOrStop 0 "Docker Compose installation failed"
 KONG_DIR="/opt/kong-quickstart"
 sudo mkdir -p "$KONG_DIR"
 sudo chown $USER:$USER "$KONG_DIR"
-
-cat <<'EOF' | sudo tee "$KONG_DIR/docker-compose.yml" > /dev/null
-
-services:
-  kong-database:
-    image: postgres:13
-    container_name: kong-quickstart-database
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: kong
-      POSTGRES_PASSWORD: kong
-      POSTGRES_DB: kong
-    volumes:
-      - kong-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "kong"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - kong-net
-
-  kong-gateway:
-    image: kong:3.9.1-ubuntu
-    container_name: kong-quickstart-gateway
-    restart: unless-stopped
-    depends_on:
-      kong-database:
-        condition: service_healthy
-    environment:
-      KONG_DATABASE: "postgres"
-      KONG_PG_HOST: kong-database
-      KONG_PG_USER: kong
-      KONG_PG_PASSWORD: kong
-      KONG_PG_DATABASE: kong
-      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
-      KONG_ADMIN_GUI_LISTEN: "0.0.0.0:8002"
-      KONG_ADMIN_GUI_URL: https://${CWM_DOMAIN}.com
-      KONG_ADMIN_GUI_API_URL: https://${CWM_DOMAIN}/admin
-      KONG_PROXY_ACCESS_LOG: /dev/stdout
-      KONG_ADMIN_ACCESS_LOG: /dev/stdout
-      KONG_PROXY_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_ERROR_LOG: /dev/stderr
-    ports:
-      - "8000:8000"
-      - "8443:8443"
-      - "8001:8001"
-      - "8002:8002"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/status || exit 1"]
-      interval: 5s
-      timeout: 2s
-      retries: 15
-    networks:
-      - kong-net
-
-volumes:
-  kong-data:
-
-networks:
-  kong-net:
-    driver: bridge
-EOF
+cp /opt/installer/tweaks/extras/kong/docker-compose.yml $KONG_DIR
+echo "CWM_DOMAIN=${CWM_DOMAIN}" >> $KONG_DIR/.env
 
 cd "$KONG_DIR"
 docker compose up -d kong-database
@@ -120,51 +59,8 @@ else
     exit 1
 fi
 
-sudo tee /etc/nginx/sites-available/kong > /dev/null << 'EOF'
-# HTTP to HTTPS redirect
-server {
-    listen 80;
-    server_name ${CWM_DOMAIN};
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name ${CWM_DOMAIN};
-    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    client_max_body_size 100M;
-
-    # API Gateway (Proxy)
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Admin API
-    location /admin/ {
-        proxy_pass http://127.0.0.1:8001/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Manager UI
-    location / {
-        proxy_pass http://127.0.0.1:8002/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
+cp /opt/installer/tweaks/extras/kong/kong /etc/nginx/sites-available/
+sed -i "s/DOMAIN/${CWM_DOMAIN}/g" /etc/nginx/sites-available/kong
 
 # Enable site
 sudo ln -sf /etc/nginx/sites-available/kong /etc/nginx/sites-enabled/
