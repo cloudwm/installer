@@ -1,0 +1,97 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Factorio Dedicated Server" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Install Docker (if not already installed)
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+fi
+
+# Create Factorio directory
+appInstallDir="/opt/factorio"
+echo "Creating server directory: ${appInstallDir}" | log
+sudo mkdir -p ${appInstallDir}/data
+sudo chown -R $USER:$USER ${appInstallDir}
+
+# Generate RCON password
+RCON_PASSWORD=$(openssl rand -base64 32 | tr -d /= | cut -c1-16)
+echo "RCON Password: $RCON_PASSWORD" | log
+
+# Write .env
+cat << EOF > ${appInstallDir}/.env
+FACTORIO_PORT=34197
+FACTORIO_RCON_PORT=27015
+FACTORIO_RCON_PASSWORD=${RCON_PASSWORD}
+SERVER_NAME=${CWM_DOMAIN}
+FACTORIO_VERSION=2.0.69
+EOF
+
+cat << 'EOF' > ${appInstallDir}/docker-compose.yml
+services:
+  factorio:
+    image: factoriotools/factorio:${FACTORIO_VERSION}
+    restart: unless-stopped
+    ports:
+      - "${FACTORIO_PORT}:34197/udp"
+      - "${FACTORIO_RCON_PORT}:27015/tcp"
+    volumes:
+      - ./data:/factorio
+    environment:
+      - FACTORIO_SERVER_NAME=${SERVER_NAME}
+      - FACTORIO_SERVER_DESCRIPTION=Dedicated server via Docker
+      - FACTORIO_SERVER_MAX_PLAYERS=50
+      - FACTORIO_SERVER_VISIBILITY_PUBLIC=true
+      - FACTORIO_SERVER_GAME_PASSWORD=
+      - FACTORIO_RCON_PASSWORD=${FACTORIO_RCON_PASSWORD}
+      - FACTORIO_SAVE_NAME=dedicated
+      - FACTORIO_GENERATE_NEW_SAVE=true
+    networks:
+      - factorio-net
+
+networks:
+  factorio-net:
+    driver: bridge
+EOF
+
+# Start server
+echo "Starting Factorio server..." | log
+cd ${appInstallDir}
+docker compose pull
+docker compose up -d
+waitOrStop 0 "Failed to start Factorio server"
+
+sleep 30
+
+# Final info
+descriptionAppend "Factorio Server Running!"
+descriptionAppend "Connect in-game: ${CWM_DOMAIN}:${FACTORIO_PORT}"
+descriptionAppend "RCON: ${FACTORIO_RCON_PORT} | Password: ${RCON_PASSWORD}"
+descriptionAppend "Data: ${appInstallDir}/data"
+descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
+descriptionAppend " "
+descriptionAppend "Commands:"
+descriptionAppend "  docker compose -f ${appInstallDir}/docker-compose.yml logs -f"
+descriptionAppend "  docker compose -f ${appInstallDir}/docker-compose.yml down"
+descriptionAppend "  docker compose -f ${appInstallDir}/docker-compose.yml up -d"
+descriptionAppend "  docker exec -it \$(docker ps -qf 'name=factorio') rcon"
+descriptionAppend " "
+descriptionAppend "Tip: Edit .env or docker-compose.yml → then 'up -d' to apply."
+
+tagScript success
+exit 0
