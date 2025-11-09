@@ -29,11 +29,7 @@ else
 fi
 
 echo "Setting up Discourse..." | log
-if [[ -d "$DISCOURSE_DIR" ]]; then
-    echo "Discourse directory exists. Backing up..." | log
-    mv "$DISCOURSE_DIR" "${DISCOURSE_DIR}.backup.$(date +%s)"
-fi
-git clone https://github.com/discourse/discourse/tree/v3.5.2 "$DISCOURSE_DIR"
+git clone https://github.com/discourse/discourse_docker.git "$DISCOURSE_DIR"
 cd "$DISCOURSE_DIR"
 
 echo "Creating configuration..." | log
@@ -51,6 +47,7 @@ params:
   db_default_text_search_config: "pg_catalog.english"
   db_shared_buffers: "256MB"
 env:
+  DISCOURSE_VERSION: v3.5.2
   LANG: en_US.UTF-8
   DISCOURSE_DEFAULT_LOCALE: en
 
