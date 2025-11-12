@@ -1,0 +1,37 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+# Optional: Keep PPA for other deps, but skip ansible install from it
+echo "adding ppa:ansible/ansible repository" | log
+add-apt-repository --yes --update ppa:ansible/ansible
+
+# Install Python/pip deps if needed (adjust for your env)
+echo "Installing Python dependencies for Ansible" | log
+installPackage python3-pip python3-venv | log
+waitOrStop 0 "Failed apt install: Python deps"
+
+# Create a virtual env for isolation (best practice)
+echo "Setting up Ansible virtual environment" | log
+python3 -m venv /opt/ansible-env
+source /opt/ansible-env/bin/activate
+pip install --upgrade pip
+
+# Install ansible-core 2.20 exactly
+echo "Installing Ansible-core 2.20 via pip" | log
+pip install ansible-core==2.20.0 | log
+waitOrStop 0 "Failed pip install: Ansible-core 2.20"
+
+# Symlink to make ansible accessible system-wide (optional)
+echo "Creating system symlink for ansible" | log
+ln -sf /opt/ansible-env/bin/ansible /usr/local/bin/ansible
+
+echo "Adding descriptions" | log
+descriptionAppend "Default Inventory File: /etc/ansible/hosts"
+descriptionAppend "Ansible installed via pip in /opt/ansible-env (core 2.20.0)"
+descriptionAppend "To use: source /opt/ansible-env/bin/activate or use full path"
+tagScript success
