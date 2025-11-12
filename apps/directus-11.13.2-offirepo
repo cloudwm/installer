@@ -1,0 +1,156 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Directus Headless CMS with Docker + Nginx" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+echo "Installing Docker and dependencies" | log
+sudo apt update
+packages=(docker.io docker-compose nginx apache2-utils certbot python3-certbot-nginx)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed to install Docker dependencies"
+
+systemctl start docker
+systemctl enable docker
+
+echo "Creating Directus Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE IF NOT EXISTS directus CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'directususer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
+GRANT ALL PRIVILEGES ON directus.* TO 'directususer'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+echo "Setting up Directus Docker environment" | log
+appPath="/var/www/html/directus"
+mkdir -p $appPath
+cd $appPath
+
+cat <<EOF > docker-compose.yml
+version: "3"
+services:
+  database:
+    image: mysql:8
+    volumes:
+      - ./data/database:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "${ADMINPASSWORD}"
+      MYSQL_DATABASE: "directus"
+      MYSQL_USER: "directususer"
+      MYSQL_PASSWORD: "${ADMINPASSWORD}"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "directususer", "-p${ADMINPASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  directus:
+    image: directus/directus:11.13.2
+    ports:
+      - "127.0.0.1:8055:8055"
+    volumes:
+      - ./uploads:/directus/uploads
+      - ./extensions:/directus/extensions
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      SECRET: "$(openssl rand -base64 32)"
+      DB_CLIENT: "mysql"
+      DB_HOST: "database"
+      DB_PORT: "3306"
+      DB_DATABASE: "directus"
+      DB_USER: "directususer"
+      DB_PASSWORD: "${ADMINPASSWORD}"
+      ADMIN_EMAIL: "${ADMINEMAIL}"
+      ADMIN_PASSWORD: "${ADMINPASSWORD}"
+      PUBLIC_URL: "https://${CWM_DOMAIN}"
+      CORS_ENABLED: "true"
+      CORS_ORIGIN: "https://${CWM_DOMAIN}"
+    restart: always
+
+networks:
+  default:
+    driver: bridge
+EOF
+
+echo "Starting Directus Docker containers" | log
+docker-compose up -d
+waitOrStop 0 "Failed to start Docker containers"
+
+echo "Setting permissions for Directus volumes" | log
+chown -R www-data:www-data $appPath/uploads $appPath/extensions
+chmod -R 755 $appPath/uploads $appPath/extensions
+
+systemctl stop nginx
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
+        waitOrStop 0 "Certificate copy failed"
+    fi
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+echo "Configuring Nginx" | log
+cat << EOF > /etc/nginx/sites-available/directus
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8055;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+EOF
+
+sudo ln -sf /etc/nginx/sites-available/directus /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding descriptions" | log
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Admin: ${ADMINEMAIL} / ${ADMINPASSWORD}"
+descriptionAppend "Database: directus (directususer / ${ADMINPASSWORD})"
+descriptionAppend ""
+descriptionAppend "Commands:"
+descriptionAppend "  cd ${appPath} && docker compose logs -f directus" | log
+descriptionAppend "  cd ${appPath} && docker compose down" | log
+descriptionAppend "  cd ${appPath} && docker compose up -d" | log
+descriptionAppend "  sudo certbot renew" | log
+
+tagScript success
+exit 0
