@@ -18,7 +18,7 @@ mv .env $appDir
 mv docker-compose.yaml $appDir
 
 echo "Tweaking the downloaded files" | log
-sed -i 's|image: chatwoot/chatwoot:latest|image: chatwoot/chatwoot:${imageVersion}|g' docker-compose.production.yaml
+sed -i "s|image: chatwoot/chatwoot:latest|image: chatwoot/chatwoot:${imageVersion}|g" $appDir/docker-compose.yaml
 sed -i "s/^ENABLE_ACCOUNT_SIGNUP=.*/ENABLE_ACCOUNT_SIGNUP=true/" $appDir/.env
 sed -i "s/^FRONTEND_URL=.*/FRONTEND_URL=https://${CWM_DOMAIN}:3000/" $appDir/.env
 sed -i "s/^REDIS_PASSWORD=.*/REDIS_PASSWORD=${ADMINPASSWORD}/" $appDir/.env
