@@ -1,0 +1,107 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appVersion=19
+
+echo "Installing dependencies" | log
+packages=(python3-pip build-essential wget python3-dev python3-venv \
+          python3-wheel libfreetype6-dev libxml2-dev libzip-dev libldap2-dev libsasl2-dev \
+          python3-setuptools node-less libjpeg-dev zlib1g-dev libpq-dev \
+          libxslt1-dev libldap2-dev libtiff5-dev libjpeg8-dev libopenjp2-7-dev \
+          liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev libxcb1-dev)
+installPackage "${packages[@]}" | log
+waitOrStop 0 "Failed to install dependencies"
+
+echo "Create app user" | log
+useradd -m -d /opt/odoo${appVersion} -U -r -s /bin/bash odoo${appVersion}
+
+echo "Installing postgresql" | log
+installPackage postgresql | log
+waitOrStop 0 "Failed to install postgresql"
+
+echo "Downloading and installing wkhtmltox"
+curlDownload https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
+waitOrStop 0 "File not downloaded from official source"
+
+su odoo${appVersion} << EOF
+git clone https://www.github.com/odoo/odoo --depth 1 --branch ${appVersion}.0 /opt/odoo${appVersion}/odoo
+cd /opt/odoo18
+python3 -m venv odoo-venv
+source odoo-venv/bin/activate
+pip3 install wheel
+pip3 install -r odoo/requirements.txt
+deactivate
+mkdir -p /opt/odoo${appVersion}/odoo-custom-addons
+EOF
+
+echo "Creating Odoo service"
+cat << EOF > /etc/odoo${appVersion}.conf
+[options]
+; This is the password that allows database operations:
+admin_passwd = $ADMINPASSWORD
+db_host = False
+db_port = False
+db_user = odoo${appVersion}
+db_password = False
+addons_path = /opt/odoo${appVersion}/odoo/addons,/opt/odoo${appVersion}/odoo-custom-addons
+
+EOF
+
+cat << EOF > /etc/systemd/system/odoo${appVersion}.service
+[Unit]
+Description=Odoo${appVersion}
+Requires=postgresql.service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+SyslogIdentifier=odoo${appVersion}
+PermissionsStartOnly=true
+User=odoo${appVersion}
+Group=odoo${appVersion}
+ExecStart=/opt/odoo${appVersion}/odoo-venv/bin/python3 /opt/odoo${appVersion}/odoo/odoo-bin -c /etc/odoo${appVersion}.conf
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+ufw allow 8069
+
+echo "Enabling postgresql" | log
+systemctl enable postgresql
+systemctl stop postgresql
+sleep 2
+systemctl start postgresql
+sleep 5
+waitOrStop 0 "Failed to start postgresql"
+
+echo "Creating Odoo${appVersion} user in postgres" | log
+su - postgres <<EOF
+createuser -s odoo${appVersion}
+EOF
+
+systemctl daemon-reload
+waitOrStop 0 "Reloading daemon failed"
+systemctl enable odoo${appVersion}
+sleep 1
+systemctl start odoo${appVersion}
+sleep 2
+waitOrStop 0 "Start Odoo${appVersion} service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Odoo configuration file: /etc/odoo${appVersion}.conf"
+descriptionAppend "Odoo web UI: http://${CWM_DISPLAYED_ADDRESS}:8069"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
+
