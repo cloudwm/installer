@@ -1,0 +1,50 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appPath="/var/www/html"
+
+echo "Installing NGINX 1.28 from official repo" | log
+
+apt update -q
+apt install -yq curl gnupg2 ca-certificates lsb-release ubuntu-keyring
+
+curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
+    | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+
+gpg --dry-run --quiet --no-keyring --import --import-options import-show \
+    /usr/share/keyrings/nginx-archive-keyring.gpg | grep -q "573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62" || {
+    echo "Key fingerprint mismatch!" | log
+    waitOrStop 1 "Security check failed"
+}
+
+codename=$(lsb_release -cs)
+echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
+http://nginx.org/packages/ubuntu $codename nginx" \
+    | sudo tee /etc/apt/sources.list.d/nginx.list >/dev/null
+
+echo -e "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" \
+    | sudo tee /etc/apt/preferences.d/99nginx >/dev/null
+
+apt update
+installPackage nginx
+waitOrStop 0 "Failed to install NGINX"
+
+mkdir -p "$appPath"
+chown -R www-data:www-data "$appPath"
+chmod -R 755 "$appPath"
+
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to start NGINX"
+
+descriptionAppend "Web Root: $appPath"
+descriptionAppend "Config: /etc/nginx/nginx.conf"
+
+tag nginx.success
+tag httpd.success
+tagScript success
+exit 0
