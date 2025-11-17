@@ -5,7 +5,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Installing Axigen Mail Server (v11.6.22) with Docker + Nginx + SSL" | log
+echo "Installing Axigen Mail Server (v10.6.22) with Docker + Nginx + SSL" | log
 
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
@@ -31,7 +31,7 @@ sudo chown -R $USER:$USER ${appInstallDir}
 # Write .env file
 cat << EOF > ${appInstallDir}/.env
 DOMAIN=${CWM_DOMAIN}
-AXIGEN_VERSION=11.6.22
+AXIGEN_VERSION=10.6.22
 MYSQL_ROOT_PASSWORD=$(openssl rand -hex 16)
 MYSQL_DATABASE=axigen
 MYSQL_USER=axigen
