@@ -132,7 +132,6 @@ server {
 }
 EOF
 
-# Create basic auth for admin (optional)
 echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" | sudo tee /etc/nginx/.htpasswd
 
 # Enable Nginx site
