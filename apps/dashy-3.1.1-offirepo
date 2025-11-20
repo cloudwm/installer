@@ -1,0 +1,138 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Dashy - Self-hosted Homepage/Dashboard" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Install Docker (if not already installed)
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+fi
+
+# Create Dashy directory
+echo "Creating Dashy directory" | log
+appInstallDir="/opt/dashy"
+sudo mkdir -p ${appInstallDir}/config
+sudo chown -R $USER:$USER ${appInstallDir}
+
+PASSWORD_HASH=$(echo -n "${ADMINPASSWORD}" | sha256sum | cut -d' ' -f1)
+
+cat << EOF > ${appInstallDir}/config/conf.yml
+pageInfo:
+  title: My Dashboard
+  description: Welcome to Dashy
+appConfig:
+  theme: default
+  layout: auto
+  iconSize: medium
+  auth:
+    users:
+      - user: admin
+        hash: ${PASSWORD_HASH}
+        type: admin
+sections:
+  - name: Getting Started
+    items:
+      - title: Dashy Documentation
+        url: https://dashy.to
+        icon: hl-dashy
+      - title: Configure Dashboard
+        icon: fas fa-cog
+        url: https://${CWM_DOMAIN}
+EOF
+
+# Create docker-compose.yml
+cat << 'EOF' > ${appInstallDir}/docker-compose.yml
+services:
+  dashy:
+    image: lissy93/dashy:release-3.1.1
+    container_name: dashy
+    restart: unless-stopped
+    volumes:
+      - ./config/conf.yml:/app/user-data/conf.yml
+    ports:
+      - "127.0.0.1:4000:8080"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "node", "/app/services/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+EOF
+
+# Stop nginx for certbot
+systemctl stop nginx
+
+# Generate Let's Encrypt certs
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    exit 1
+fi
+
+# Configure Nginx
+cat << EOF > /etc/nginx/sites-available/dashy
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+
+# Enable Nginx site
+sudo ln -sf /etc/nginx/sites-available/dashy /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Starting Dashy" | log
+cd ${appInstallDir}
+docker compose up -d
+waitOrStop 0 "Failed to start Dashy"
+
+
+echo "Adding descriptions" | log
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Admin Login: admin / ${ADMINPASSWORD}"
+descriptionAppend "Config File: ${appInstallDir}/config/conf.yml"
+descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
+descriptionAppend "Nginx Config: /etc/nginx/sites-available/dashy"
+
+tagScript success
+exit 0
