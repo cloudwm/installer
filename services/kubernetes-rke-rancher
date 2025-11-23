@@ -81,7 +81,7 @@ descriptionAppend "    --worker" \\
 descriptionAppend "    --control-plane \\"
 descriptionAppend "    --etcd"
 descriptionAppend ""
-descriptionAppen "For a configured Rancher with existing nodes in the cluster run this:"
+descriptionAppend "For a configured Rancher with existing nodes in the cluster run this:"
 descriptionAppend "curl -fL https://YOUR-RANCHER-FQDN/system-agent-install.sh | sudo sh -s -- \\"
 descriptionAppend "    --server https://YOUR-RANCHER-FQDN \\"
 descriptionAppend "    --token YOUR-TOKEN-HERE \\"
