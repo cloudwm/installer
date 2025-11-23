@@ -78,7 +78,7 @@ descriptionAppend "curl -fL https://YOUR-RANCHER-FQDN/system-agent-install.sh | 
 descriptionAppend "    --server https://YOUR-RANCHER-FQDN \\"
 descriptionAppend "    --token YOUR-TOKEN-HERE \\"
 descriptionAppend "    --worker" \\
-descriptionAppend "    --control-plane \\"
+descriptionAppend "    --controlplane \\"
 descriptionAppend "    --etcd"
 descriptionAppend ""
 descriptionAppend "For a configured Rancher with existing nodes in the cluster run this:"
