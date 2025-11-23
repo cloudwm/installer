@@ -73,7 +73,7 @@ iptables-save  > /etc/iptables/rules.v4  2>/dev/null
 ip6tables-save > /etc/iptables/rules.v6 2>/dev/null
 systemctl enable netfilter-persistent >/dev/null 2>&1
 
-descriptionAppend "For first time intialize a worker into the Rancher use this command:"
+descriptionAppend "If this is the first time you initialize a cluster with Rancher use this command to setup a master/worker node:"
 descriptionAppend "curl -fL https://YOUR-RANCHER-FQDN/system-agent-install.sh | sudo sh -s -- \\"
 descriptionAppend "    --server https://YOUR-RANCHER-FQDN \\"
 descriptionAppend "    --token YOUR-TOKEN-HERE \\"
@@ -81,7 +81,7 @@ descriptionAppend "    --worker" \\
 descriptionAppend "    --control-plane \\"
 descriptionAppend "    --etcd"
 descriptionAppend ""
-descriptionAppen "For already configured Rancher with existing nodes in the cluster run this:"
+descriptionAppen "For a configured Rancher with existing nodes in the cluster run this:"
 descriptionAppend "curl -fL https://YOUR-RANCHER-FQDN/system-agent-install.sh | sudo sh -s -- \\"
 descriptionAppend "    --server https://YOUR-RANCHER-FQDN \\"
 descriptionAppend "    --token YOUR-TOKEN-HERE \\"
