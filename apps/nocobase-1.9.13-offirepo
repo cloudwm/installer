@@ -5,9 +5,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-CWM_DOMAIN="192-168-33-248.cloud-xip.com"
-ADMINPASSWORD="Lior1231231231"
-
 echo "Installing NocoBase Low-Code Platform with Docker + Nginx + SSL" | log
 
 export DEBIAN_FRONTEND="noninteractive"
