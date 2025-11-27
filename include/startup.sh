@@ -41,7 +41,7 @@ function log() {
     done | \
         tee -a "$CWM_LOGDIR/$(date '+%Y-%m-%d').log" \
              ${1:+"$CWM_ERRORFILE"} \
-             >/dev/ttyS0
+             >/dev/ttyS0 >/dev/null
 }
 
 function checkRootUser() {
