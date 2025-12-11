@@ -107,8 +107,8 @@ pm2 save
 pm2 startup systemd -u $USER --hp /home/$USER
 
 echo "Adding descriptions" | log
-descriptionAppend "Strapi Headless CMS v5 is LIVE!"
 descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Admin Login info: User: ${ADMINEMAIL}, Password: ${ADMINPASSWORD}"
 descriptionAppend "Start Strapi from ${appInstallDir} with: pm2 start npm --name "strapi" -- run start, if not already started"
 descriptionAppend "Initial Setup: Visit the URL and create your admin account"
 descriptionAppend "TypeScript: Yes"
