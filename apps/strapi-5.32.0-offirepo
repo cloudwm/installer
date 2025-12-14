@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+version="5.32.0"
+
 echo "Installing Strapi CMS v5 with TypeScript + SQLite + Nginx + SSL" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
@@ -18,7 +20,7 @@ sudo apt install -y nodejs
 cd /opt
 
 echo "Creating Strapi project (my-project)..." | log
-echo "N" | npx create-strapi@latest my-project \
+echo "N" | npx create-strapi@${version} my-project \
   --quickstart \
   --no-run \
   --typescript \
