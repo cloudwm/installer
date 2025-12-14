@@ -84,9 +84,9 @@ waitOrStop 0 "Failed to restart Nginx"
 echo "Installing PM2 for process management" | log
 npm install -g pm2
 
-source ~/.bashrc
+
 echo "Starting Strapi..." | log
-pm2 start npm --name "strapi" -- run start
+HOME=/$USER pm2 start npm --name "strapi" -- run start
 pm2 save
 pm2 startup systemd -u $USER --hp /$USER
 systemctl enable pm2-root
