@@ -88,7 +88,7 @@ npm install -g pm2
 echo "Starting Strapi..." | log
 pm2 start npm --name "strapi" -- run start
 pm2 save
-pm2 startup systemd -u $USER --hp /$USER
+pm2 startup systemd -u root --hp /root
 
 sleep 15
 
