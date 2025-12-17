@@ -27,13 +27,13 @@ mkdir -p "${appInstallDir}"
 cd "${appInstallDir}"
 
 echo "Creating React + Vite project..." | log
-npx -y create-vite@${version} . --template react-ts --no-interactive
+npx -y create-vite@latest . --template react-ts --no-interactive
 
 echo "Installing project dependencies..." | log
 npm install
 
 echo "Installing Storybook..." | log
-CI=true npx storybook@latest init --yes --skip-install --no-dev
+CI=true npx storybook@${version} init --yes --skip-install --no-dev
 
 echo "Installing Storybook dependencies..." | log
 npm install
