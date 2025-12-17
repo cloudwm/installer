@@ -1,0 +1,109 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+version="5.32.0"
+
+echo "Installing Strapi CMS v5 with TypeScript + SQLite + Nginx + SSL" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx apt-transport-https ca-certificates curl gnupg lsb-release git
+
+echo "Installing Node.js 20..." | log
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+cd /opt
+
+echo "Creating Strapi project (my-project)..." | log
+echo "N" | npx create-strapi@${version} my-project \
+  --quickstart \
+  --no-run \
+  --typescript \
+  --skip-cloud
+
+if [ ! -d "/opt/my-project" ]; then
+    echo "❌ Failed to create Strapi project" | log
+    exit 1
+fi
+
+cd /opt/my-project
+
+echo "Building Strapi..." | log
+npm run build
+
+systemctl stop nginx
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+cat << EOF > /etc/nginx/sites-available/strapi
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://127.0.0.1:1337;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+    }
+}
+EOF
+
+sudo ln -sf /etc/nginx/sites-available/strapi /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Installing PM2 for process management" | log
+npm install -g pm2
+
+export HOME=/$USER
+
+echo "Starting Strapi..." | log
+pm2 start npm --name "strapi" -- run start
+pm2 save
+pm2 startup systemd -u $USER --hp /$USER
+
+sleep 15
+
+echo "Adding descriptions" | log
+descriptionAppend "Strapi Headless CMS v5 is LIVE!"
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Admin Email: ${ADMINEMAIL}"
+descriptionAppend "Admin Password: ${ADMINPASSWORD}"
+descriptionAppend "TypeScript: Yes"
+descriptionAppend "Database: SQLite"
+descriptionAppend "Project: /opt/my-project"
+descriptionAppend "Nginx Config: /etc/nginx/sites-available/strapi"
+descriptionAppend " "
+descriptionAppend "To manage Strapi: pm2 list | pm2 restart strapi | pm2 logs strapi"
+
+tagScript success
+exit 0
