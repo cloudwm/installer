@@ -7,10 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="${pwd}"
-updateStatus="${rootDir}/include/updateInstallStatus.sh"
-HTML_PATH="/var/www/html/index.html"
-
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
 ADMIN_PASSWORD="{{ADMIN_PASSWORD}}"
@@ -217,11 +213,6 @@ print_summary() {
     local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
     local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
 	
-	"$updateStatus" "$HTML_PATH" -sc "cPanel is running on https://${fqdn}"
-	"$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "WHM is running on https://${whm_fqdn}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${whm_fqdn}"
-    
     cat > /etc/motd << EOF
 ================================================================================
                     cPanel Server - Installation Complete
@@ -285,19 +276,12 @@ EOF
 main() {
     echo "Starting Ubuntu 24.04 cPanel installer..." | log
     
-	"$updateStatus" "$HTML_PATH" -ap "Validating environment..."
     validate_environment
-	"$updateStatus" "$HTML_PATH" -ap "Setting up hostname..."
     set_hostname
-	"$updateStatus" "$HTML_PATH" -ap "Preparing system..."
     prepare_system
-	"$updateStatus" "$HTML_PATH" -ap "Installing cPanel (Might take some time)..."
     install_cpanel
-	"$updateStatus" "$HTML_PATH" -ap "Configuring MariaDB..."
     configure_mariadb
-	"$updateStatus" "$HTML_PATH" -ap "Setting up SSL certificates..."
     configure_ssl
-	
     print_summary
     
     echo "Rebooting..." | log
