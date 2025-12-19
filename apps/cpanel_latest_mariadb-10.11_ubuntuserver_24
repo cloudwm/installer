@@ -1,20 +1,18 @@
 #!/bin/bash
 
-set -euo pipefail
-
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="${rootDir}"
+rootDir="${pwd}"
 updateStatus="${rootDir}/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
-MARIADB_VERSION="${MARIADB_VERSION:-10.11}"
+MARIADB_VERSION="10.11"
 ADMIN_PASSWORD="{{ADMIN_PASSWORD}}"
 
 
