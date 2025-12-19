@@ -1,0 +1,324 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="/var/www/html/index.html"
+
+LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
+MARIADB_VERSION="${MARIADB_VERSION:-10.11}"
+ADMIN_PASSWORD="{{ADMIN_PASSWORD}}"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log()     { echo -e "[$(date '+%H:%M:%S')] $1" | tee -a "$LOGFILE"; }
+info()    { log "${GREEN}>>>${NC} $1"; }
+warn()    { log "${YELLOW}[WARN]${NC} $1"; }
+error()   { log "${RED}[ERROR]${NC} $1"; exit 1; }
+
+wait_for_apt() {
+    local max_wait=120
+    local waited=0
+    while fuser /var/lib/dpkg/lock-frontend &>/dev/null || fuser /var/lib/apt/lists/lock &>/dev/null; do
+        if [[ $waited -eq 0 ]]; then
+            info "Waiting for apt lock to be released..."
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [[ $waited -ge $max_wait ]]; then
+            warn "Timeout waiting for apt lock, attempting to continue..."
+            break
+        fi
+    done
+}
+
+validate_environment() {
+    [[ $EUID -eq 0 ]] || error "Run as root"
+    [[ -d /usr/local/cpanel ]] && error "cPanel already installed"
+    
+    [[ -f /etc/os-release ]] || error "Cannot detect OS"
+    . /etc/os-release
+    [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]] || error "Requires Ubuntu 24.04"
+    
+    [[ "$MARIADB_VERSION" =~ ^(10\.11|11\.4)$ ]] || error "MariaDB must be 10.11 or 11.4"
+}
+
+set_hostname() {
+    local ip=$(hostname -I | awk '{print $1}')
+    local ip_dashed=${ip//./-}
+    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
+    
+    hostnamectl set-hostname "$fqdn"
+    info "Hostname set to: $fqdn"
+}
+
+prepare_system() {
+    info "Preparing Ubuntu 24.04..."
+    
+    systemctl stop ufw 2>/dev/null && systemctl disable ufw
+    systemctl stop apparmor 2>/dev/null && systemctl disable apparmor
+    
+    # Pre-import GPG keys via port 80 before creating wrapper
+    info "Pre-importing Ubuntu GPG keys via port 80..."
+    mkdir -p /root/.gnupg
+    chmod 700 /root/.gnupg
+    
+    gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3A79BD29 2>/dev/null &
+    GPG_PID=$!
+    ( sleep 30; kill $GPG_PID 2>/dev/null ) &
+    wait $GPG_PID 2>/dev/null || true
+    
+    if ! gpg --list-keys 3A79BD29 &>/dev/null; then
+        curl -fsSL --max-time 30 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3A79BD29" | gpg --import 2>/dev/null || \
+        warn "GPG key import failed - continuing anyway"
+    fi
+    
+    gpg --export 3A79BD29 2>/dev/null | apt-key add - 2>/dev/null || true
+    
+    # Configure gpg to always use port 80
+    cat > /root/.gnupg/gpg.conf << 'EOF'
+keyserver hkp://keyserver.ubuntu.com:80
+keyserver-options auto-key-retrieve
+EOF
+    
+    # Create wrapper that forces port 80 for any keyserver call
+    mv /usr/bin/gpg /usr/bin/gpg.real
+    cat > /usr/bin/gpg << 'GPGWRAPPER'
+#!/bin/bash
+args=()
+skip_next=0
+for arg in "$@"; do
+    if [[ $skip_next -eq 1 ]]; then
+        skip_next=0
+        if [[ "$arg" =~ keyserver\.ubuntu\.com ]]; then
+            args+=("hkp://keyserver.ubuntu.com:80")
+        else
+            args+=("$arg")
+        fi
+        continue
+    fi
+    if [[ "$arg" == "--keyserver" ]]; then
+        args+=("$arg")
+        skip_next=1
+        continue
+    fi
+    if [[ "$arg" == "keyserver.ubuntu.com" ]]; then
+        args+=("hkp://keyserver.ubuntu.com:80")
+    elif [[ "$arg" =~ ^hkps?://keyserver\.ubuntu\.com($|:|/) ]]; then
+        args+=("hkp://keyserver.ubuntu.com:80")
+    else
+        args+=("$arg")
+    fi
+done
+exec /usr/bin/gpg.real "${args[@]}"
+GPGWRAPPER
+    chmod +x /usr/bin/gpg
+    
+    if /usr/bin/gpg.real --list-keys 3A79BD29 &>/dev/null; then
+        info "GPG key 3A79BD29 imported successfully"
+    else
+        warn "GPG key may not be available"
+    fi
+    
+    export DEBIAN_FRONTEND=noninteractive
+    wait_for_apt
+    apt-get update && apt-get -y upgrade
+    wait_for_apt
+    apt-get -y install perl curl wget
+}
+
+install_cpanel() {
+    info "Installing cPanel with MariaDB ${MARIADB_VERSION}..."
+    
+    mkdir -p /root/cpanel_profile
+    echo "mysql-version=${MARIADB_VERSION}" > /root/cpanel_profile/cpanel.config
+    
+    cd /home
+    curl -so latest -L https://securedownloads.cpanel.net/latest
+    sh latest --force
+    
+    [[ -f /usr/bin/gpg.real ]] && mv /usr/bin/gpg.real /usr/bin/gpg
+    
+    info "Setting root password..."
+    echo "root:${ADMIN_PASSWORD}" | chpasswd
+}
+
+configure_mariadb() {
+    info "Configuring MariaDB..."
+    
+    local retries=15
+    while ! pgrep -x mysqld &>/dev/null && ! pgrep -x mariadbd &>/dev/null && ((retries-- > 0)); do sleep 2; done
+    
+    cat > /etc/mysql/conf.d/optimized.cnf 2>/dev/null << 'EOF' || true
+[mysqld]
+innodb_buffer_pool_size = 256M
+innodb_log_file_size = 64M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+max_connections = 150
+local_infile = 0
+symbolic-links = 0
+slow_query_log = 1
+long_query_time = 2
+EOF
+
+    systemctl restart mariadb 2>/dev/null || systemctl restart mysql 2>/dev/null || true
+    info "MariaDB configured"
+}
+
+configure_ssl() {
+    local ip=$(hostname -I | awk '{print $1}')
+    local ip_dashed=${ip//./-}
+    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
+    local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
+    local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
+    local acme_server="https://192.168.30.67/directory"
+    
+    info "Configuring SSL using existing nginx..."
+    
+    # Ensure nginx is running for certbot nginx plugin
+    systemctl start nginx 2>/dev/null || true
+    
+    info "Requesting SSL certificate for all service FQDNs..."
+    certbot certonly --nginx \
+        --server "$acme_server" \
+        --no-verify-ssl \
+        -d "$fqdn" -d "$whm_fqdn" -d "$webmail_fqdn" \
+        --non-interactive --agree-tos -m "admin@${fqdn}" \
+        || warn "SSL request failed"
+    
+    if [[ -d /etc/letsencrypt/live/${fqdn} ]]; then
+        info "Installing SSL certificate directly..."
+        
+        cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
+        
+        cat /etc/letsencrypt/live/${fqdn}/fullchain.pem \
+            /etc/letsencrypt/live/${fqdn}/privkey.pem \
+            > /var/cpanel/ssl/cpanel/cpanel.pem
+        
+        chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
+        rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
+        
+        info "SSL certificate installed"
+    else
+        warn "SSL certificate not obtained"
+    fi
+    
+    /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>/dev/null || true
+    /usr/local/cpanel/scripts/restartsrv_httpd --hard 2>/dev/null || true
+    
+    info "SSL configured for all FQDNs"
+}
+
+print_summary() {
+    local ip=$(hostname -I | awk '{print $1}')
+    local ip_dashed=${ip//./-}
+    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
+    local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
+    local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
+	
+	"$updateStatus" "$HTML_PATH" -sc "cPanel is running on https://${fqdn}"
+	"$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "WHM is running on https://${whm_fqdn}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${whm_fqdn}"
+    
+    cat > /etc/motd << EOF
+================================================================================
+                    cPanel Server - Installation Complete
+================================================================================
+
+WHM (Web Host Manager) - Server Administration:
+  URL:        https://${whm_fqdn}:2087
+  Alt URL:    https://${fqdn}:2087
+  Username:   root
+  Password:   ${ADMIN_PASSWORD}
+
+  First Steps in WHM:
+    1. Accept license agreement
+    2. Create a cPanel account: Account Functions > Create a New Account
+    3. Set up nameservers if needed
+
+--------------------------------------------------------------------------------
+
+cPanel (User Control Panel) - Website/Email Management:
+  URL:        https://${fqdn}:2083
+  Alt URL:    https://${whm_fqdn}:2083
+  
+  NOTE: Requires a cPanel account created in WHM first!
+        Use the username/password set when creating the account in WHM.
+
+--------------------------------------------------------------------------------
+
+Webmail - Email Access:
+  URL:        https://${webmail_fqdn}:2096
+  Alt URL:    https://${fqdn}:2096
+  
+  NOTE: Requires an email account created in cPanel first!
+        In cPanel: Email > Email Accounts > Create
+
+--------------------------------------------------------------------------------
+
+SERVER DETAILS:
+  Hostname:   ${fqdn}
+  IP Address: ${ip}
+  MariaDB:    ${MARIADB_VERSION}
+  OS:         Ubuntu 24.04
+
+SSL CERTIFICATE:
+  Covers: ${fqdn}, ${whm_fqdn}, ${webmail_fqdn}
+
+PORTS:
+  2087 - WHM (root admin)
+  2083 - cPanel (user accounts)
+  2096 - Webmail (email accounts)
+  2095 - Webmail (non-SSL)
+  2086 - WHM (non-SSL)
+  2082 - cPanel (non-SSL)
+
+================================================================================
+EOF
+
+    cat /etc/motd
+    echo "LOG: ${LOGFILE}"
+    echo "================================================================================"
+}
+
+main() {
+    info "Starting Ubuntu 24.04 cPanel installer..."
+    
+	"$updateStatus" "$HTML_PATH" -ap "Validating environment..."
+    validate_environment
+	"$updateStatus" "$HTML_PATH" -ap "Setting up hostname..."
+    set_hostname
+	"$updateStatus" "$HTML_PATH" -ap "Preparing system..."
+    prepare_system
+	"$updateStatus" "$HTML_PATH" -ap "Installing cPanel (Might take some time)..."
+    install_cpanel
+	"$updateStatus" "$HTML_PATH" -ap "Configuring MariaDB..."
+    configure_mariadb
+	"$updateStatus" "$HTML_PATH" -ap "Setting up SSL certificates..."
+    configure_ssl
+	
+    print_summary
+    
+    info "Rebooting..."
+    reboot
+}
+
+[[ "${1:-}" =~ ^(-h|--help)$ ]] && {
+    echo "Usage: MARIADB_VERSION=10.11 $0"
+    echo "       MARIADB_VERSION=11.4 $0"
+    exit 0
+}
+
+main
