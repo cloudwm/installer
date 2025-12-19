@@ -16,10 +16,6 @@ LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="${MARIADB_VERSION:-10.11}"
 ADMIN_PASSWORD="{{ADMIN_PASSWORD}}"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
 
 log()     { echo -e "[$(date '+%H:%M:%S')] $1" | tee -a "$LOGFILE"; }
 info()    { log "${GREEN}>>>${NC} $1"; }
@@ -31,26 +27,26 @@ wait_for_apt() {
     local waited=0
     while fuser /var/lib/dpkg/lock-frontend &>/dev/null || fuser /var/lib/apt/lists/lock &>/dev/null; do
         if [[ $waited -eq 0 ]]; then
-            info "Waiting for apt lock to be released..."
+            echo "Waiting for apt lock to be released..." | log
         fi
         sleep 5
         waited=$((waited + 5))
         if [[ $waited -ge $max_wait ]]; then
-            warn "Timeout waiting for apt lock, attempting to continue..."
+            echo "Timeout waiting for apt lock, attempting to continue..." | log
             break
         fi
     done
 }
 
 validate_environment() {
-    [[ $EUID -eq 0 ]] || error "Run as root"
-    [[ -d /usr/local/cpanel ]] && error "cPanel already installed"
+    [[ $EUID -eq 0 ]] || echo "Run as root" | log
+    [[ -d /usr/local/cpanel ]] && echo "cPanel already installed" | log
     
-    [[ -f /etc/os-release ]] || error "Cannot detect OS"
+    [[ -f /etc/os-release ]] || echo "Cannot detect OS" | log
     . /etc/os-release
-    [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]] || error "Requires Ubuntu 24.04"
+    [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]] || echo "Requires Ubuntu 24.04" | log
     
-    [[ "$MARIADB_VERSION" =~ ^(10\.11|11\.4)$ ]] || error "MariaDB must be 10.11 or 11.4"
+    [[ "$MARIADB_VERSION" =~ ^(10\.11|11\.4)$ ]] || echo "MariaDB must be 10.11 or 11.4" | log
 }
 
 set_hostname() {
@@ -59,17 +55,17 @@ set_hostname() {
     local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
     
     hostnamectl set-hostname "$fqdn"
-    info "Hostname set to: $fqdn"
+    echo "Hostname set to: $fqdn" | log
 }
 
 prepare_system() {
-    info "Preparing Ubuntu 24.04..."
+    echo "Preparing Ubuntu 24.04..." | log
     
     systemctl stop ufw 2>/dev/null && systemctl disable ufw
     systemctl stop apparmor 2>/dev/null && systemctl disable apparmor
     
     # Pre-import GPG keys via port 80 before creating wrapper
-    info "Pre-importing Ubuntu GPG keys via port 80..."
+    echo "Pre-importing Ubuntu GPG keys via port 80..." | log
     mkdir -p /root/.gnupg
     chmod 700 /root/.gnupg
     
@@ -80,7 +76,7 @@ prepare_system() {
     
     if ! gpg --list-keys 3A79BD29 &>/dev/null; then
         curl -fsSL --max-time 30 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3A79BD29" | gpg --import 2>/dev/null || \
-        warn "GPG key import failed - continuing anyway"
+        echo "GPG key import failed - continuing anyway" | log
     fi
     
     gpg --export 3A79BD29 2>/dev/null | apt-key add - 2>/dev/null || true
@@ -125,9 +121,9 @@ GPGWRAPPER
     chmod +x /usr/bin/gpg
     
     if /usr/bin/gpg.real --list-keys 3A79BD29 &>/dev/null; then
-        info "GPG key 3A79BD29 imported successfully"
+        echo "GPG key 3A79BD29 imported successfully" | log
     else
-        warn "GPG key may not be available"
+        echo "GPG key may not be available" | log
     fi
     
     export DEBIAN_FRONTEND=noninteractive
@@ -138,7 +134,7 @@ GPGWRAPPER
 }
 
 install_cpanel() {
-    info "Installing cPanel with MariaDB ${MARIADB_VERSION}..."
+    echo "Installing cPanel with MariaDB ${MARIADB_VERSION}..." | log
     
     mkdir -p /root/cpanel_profile
     echo "mysql-version=${MARIADB_VERSION}" > /root/cpanel_profile/cpanel.config
@@ -149,12 +145,12 @@ install_cpanel() {
     
     [[ -f /usr/bin/gpg.real ]] && mv /usr/bin/gpg.real /usr/bin/gpg
     
-    info "Setting root password..."
+    echo "Setting root password..." | log
     echo "root:${ADMIN_PASSWORD}" | chpasswd
 }
 
 configure_mariadb() {
-    info "Configuring MariaDB..."
+    echo "Configuring MariaDB..." | log
     
     local retries=15
     while ! pgrep -x mysqld &>/dev/null && ! pgrep -x mariadbd &>/dev/null && ((retries-- > 0)); do sleep 2; done
@@ -173,7 +169,7 @@ long_query_time = 2
 EOF
 
     systemctl restart mariadb 2>/dev/null || systemctl restart mysql 2>/dev/null || true
-    info "MariaDB configured"
+    echo "MariaDB configured" | log
 }
 
 configure_ssl() {
@@ -184,12 +180,12 @@ configure_ssl() {
     local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
     local acme_server="https://192.168.30.67/directory"
     
-    info "Configuring SSL using existing nginx..."
+    echo "Configuring SSL using existing nginx..." | log
     
     # Ensure nginx is running for certbot nginx plugin
     systemctl start nginx 2>/dev/null || true
     
-    info "Requesting SSL certificate for all service FQDNs..."
+    echo "Requesting SSL certificate for all service FQDNs..." | log
     certbot certonly --nginx \
         --server "$acme_server" \
         --no-verify-ssl \
@@ -198,7 +194,7 @@ configure_ssl() {
         || warn "SSL request failed"
     
     if [[ -d /etc/letsencrypt/live/${fqdn} ]]; then
-        info "Installing SSL certificate directly..."
+        echo "Installing SSL certificate directly..." | log
         
         cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
         
@@ -209,15 +205,15 @@ configure_ssl() {
         chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
         rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
         
-        info "SSL certificate installed"
+        echo "SSL certificate installed" | log
     else
-        warn "SSL certificate not obtained"
+        echo "SSL certificate not obtained" | log
     fi
     
     /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>/dev/null || true
     /usr/local/cpanel/scripts/restartsrv_httpd --hard 2>/dev/null || true
     
-    info "SSL configured for all FQDNs"
+    echo "SSL configured for all FQDNs" | log
 }
 
 print_summary() {
@@ -289,12 +285,12 @@ PORTS:
 EOF
 
     cat /etc/motd
-    echo "LOG: ${LOGFILE}"
-    echo "================================================================================"
+    echo "LOG: ${LOGFILE}" | log
+    echo "================================================================================" | log
 }
 
 main() {
-    info "Starting Ubuntu 24.04 cPanel installer..."
+    echo "Starting Ubuntu 24.04 cPanel installer..." | log
     
 	"$updateStatus" "$HTML_PATH" -ap "Validating environment..."
     validate_environment
@@ -311,8 +307,11 @@ main() {
 	
     print_summary
     
-    info "Rebooting..."
+    echo "Rebooting..." | log
     reboot
+	
+	echo "Powering off..." | log
+	poweroff
 }
 
 [[ "${1:-}" =~ ^(-h|--help)$ ]] && {
