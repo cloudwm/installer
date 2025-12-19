@@ -17,11 +17,6 @@ MARIADB_VERSION="${MARIADB_VERSION:-10.11}"
 ADMIN_PASSWORD="{{ADMIN_PASSWORD}}"
 
 
-log()     { echo -e "[$(date '+%H:%M:%S')] $1" | tee -a "$LOGFILE"; }
-info()    { log "${GREEN}>>>${NC} $1"; }
-warn()    { log "${YELLOW}[WARN]${NC} $1"; }
-error()   { log "${RED}[ERROR]${NC} $1"; exit 1; }
-
 wait_for_apt() {
     local max_wait=120
     local waited=0
@@ -191,7 +186,7 @@ configure_ssl() {
         --no-verify-ssl \
         -d "$fqdn" -d "$whm_fqdn" -d "$webmail_fqdn" \
         --non-interactive --agree-tos -m "admin@${fqdn}" \
-        || warn "SSL request failed"
+        || echo "SSL request failed" | log
     
     if [[ -d /etc/letsencrypt/live/${fqdn} ]]; then
         echo "Installing SSL certificate directly..." | log
@@ -284,8 +279,7 @@ PORTS:
 ================================================================================
 EOF
 
-    cat /etc/motd
-    echo "LOG: ${LOGFILE}" | log
+    cat /etc/motd | log
     echo "================================================================================" | log
 }
 
