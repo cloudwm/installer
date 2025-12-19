@@ -2,13 +2,16 @@
 
 set -euo pipefail
 
-if [ -f "include/startup.sh" ]; then
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ -f "$ROOT_DIR/include/startup.sh" ]; then
+    . "$ROOT_DIR/include/startup.sh"
+elif [ -f "include/startup.sh" ]; then
     . include/startup.sh
-elif [ -f "../include/startup.sh" ]; then
-    . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
+rootDir="${ROOT_DIR}"
 updateStatus="$rootDir/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
 
@@ -306,12 +309,6 @@ main() {
 	
 	echo "Powering off..." | log
 	poweroff
-}
-
-[[ "${1:-}" =~ ^(-h|--help)$ ]] && {
-    echo "Usage: MARIADB_VERSION=10.11 $0"
-    echo "       MARIADB_VERSION=11.4 $0"
-    exit 0
 }
 
 main
