@@ -2,17 +2,15 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if [ -f "$ROOT_DIR/include/startup.sh" ]; then
-    . "$ROOT_DIR/include/startup.sh"
-elif [ -f "include/startup.sh" ]; then
+if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
 fi
 
-rootDir="${ROOT_DIR}"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
+rootDir="${rootDir}"
+updateStatus="${rootDir}/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
