@@ -9,8 +9,8 @@ fi
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
-PASSWORD="${ADMIN_PASSWORD}"
-
+PASSWORD="{{password}}"
+echo "PASSWORD: ${PASSWORD} | ADMIN_PASSWORD: ${ADMIN_PASSWORD}" | log
 
 wait_for_apt() {
     local max_wait=120
