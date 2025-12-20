@@ -206,7 +206,37 @@ configure_ssl() {
     echo "SSL configured for all FQDNs" | log
 }
 
+prepare_final_shutdown() {
+    echo "Creating one-time shutdown service..." | log
+
+    # 1. Create a systemd service file
+    cat <<EOF > /etc/systemd/system/post-install-shutdown.service
+[Unit]
+Description=Power off after first reboot
+After=multi-user.target
+
+[Service]
+Type=oneshot
+# The service deletes itself before powering off so you don't get stuck in a loop
+ExecStart=/usr/bin/rm -f /etc/systemd/system/post-install-shutdown.service
+ExecStartPost=/usr/sbin/poweroff
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # 2. Reload systemd and enable the service
+    systemctl daemon-reload
+    systemctl enable post-install-shutdown.service
+}
+
+format_duration() {
+    local seconds=$1
+    printf '%02dh %02dm %02ds\n' $((seconds/3600)) $((seconds%3600/60)) $((seconds%60))
+}
+
 print_summary() {
+	local duration=$1
     local ip=$(hostname -I | awk '{print $1}')
     local ip_dashed=${ip//./-}
     local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
@@ -217,6 +247,7 @@ print_summary() {
 ================================================================================
                     cPanel Server - Installation Complete
 ================================================================================
+INSTALLATION TIME: $duration
 
 WHM (Web Host Manager) - Server Administration:
   URL:        https://${whm_fqdn}:2087
@@ -274,6 +305,7 @@ EOF
 }
 
 main() {
+	local start_time=$(date +%s)
     echo "Starting Ubuntu 24.04 cPanel installer..." | log
     
     validate_environment
@@ -282,13 +314,17 @@ main() {
     install_cpanel
     configure_mariadb
     configure_ssl
-    print_summary
-    
-    echo "Rebooting..." | log
-    reboot
 	
-	echo "Powering off..." | log
-	poweroff
+	local end_time=$(date +%s)
+    local duration=$(format_duration $((end_time - start_time)))
+    print_summary "$duration"
+    
+	echo "Preparing for final power-off after reboot..." | log
+    prepare_final_shutdown
+    
+    echo "Rebooting now. The system will power off automatically once it comes back up." | log
+    sleep 5
+    reboot
 }
 
 main
