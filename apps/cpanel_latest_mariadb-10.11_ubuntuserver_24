@@ -9,7 +9,7 @@ fi
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
-PASSWORD="{{ADMIN_PASSWORD}}"
+PASSWORD="{{ADMINPASSWORD}}"
 
 
 wait_for_apt() {
