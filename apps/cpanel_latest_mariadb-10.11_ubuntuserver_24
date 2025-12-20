@@ -9,7 +9,7 @@ fi
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
-ADMIN_PASSWORD="{{ADMIN_PASSWORD}}"
+PASSWORD="{{ADMIN_PASSWORD}}"
 
 
 wait_for_apt() {
@@ -136,7 +136,7 @@ install_cpanel() {
     [[ -f /usr/bin/gpg.real ]] && mv /usr/bin/gpg.real /usr/bin/gpg
     
     echo "Setting root password..." | log
-    echo "root:${ADMIN_PASSWORD}" | chpasswd
+    echo "root:${PASSWORD}" | chpasswd
 }
 
 configure_mariadb() {
@@ -253,7 +253,7 @@ WHM (Web Host Manager) - Server Administration:
   URL:        https://${whm_fqdn}:2087
   Alt URL:    https://${fqdn}:2087
   Username:   root
-  Password:   ${ADMIN_PASSWORD}
+  Password:   ${PASSWORD}
 
   First Steps in WHM:
     1. Accept license agreement
