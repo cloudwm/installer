@@ -9,7 +9,8 @@ fi
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
-PASSWORD=$(grep -m1 '^password=' ~/guest.conf | cut -d= -f2-)
+PASSWORD=$(grep -m1 '^password=' /root/guest.conf | cut -d= -f2-)
+echo "${PASSWORD}" > /tmp/pw_debug.txt
 
 wait_for_apt() {
     local max_wait=120
@@ -134,8 +135,8 @@ install_cpanel() {
 
     [[ -f /usr/bin/gpg.real ]] && mv /usr/bin/gpg.real /usr/bin/gpg
 
-    echo "Setting root password..." | log
-    echo "root:${PASSWORD}" | chpasswd
+    #echo "Setting root password..." | log
+    #echo "root:${PASSWORD}" | chpasswd
 }
 
 configure_mariadb() {
@@ -317,11 +318,11 @@ main() {
     configure_mariadb
     configure_ssl
 
-        local end_time=$(date +%s)
+    local end_time=$(date +%s)
     local duration=$(format_duration $((end_time - start_time)))
     print_summary "$duration"
 
-        echo "Preparing for final power-off after reboot..." | log
+    echo "Preparing for final power-off after reboot..." | log
     prepare_final_shutdown
 
     echo "Rebooting now. The system will power off automatically once it comes back up." | log
