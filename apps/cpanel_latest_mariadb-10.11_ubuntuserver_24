@@ -9,8 +9,7 @@ fi
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
-PASSWORD="${ADMIN_PASSWORD}"
-
+PASSWORD=$(grep -m1 '^password=' ~/guest.conf | cut -d= -f2-)
 
 wait_for_apt() {
     local max_wait=120
@@ -253,7 +252,7 @@ WHM (Web Host Manager) - Server Administration:
   URL:        https://${whm_fqdn}:2087
   Alt URL:    https://${fqdn}:2087
   Username:   root
-  Password:   ${ADMIN_PASSWORD}
+  Password:   ${PASSWORD}
 
   First Steps in WHM:
     1. Accept license agreement
