@@ -2,15 +2,15 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-	
+
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
-PASSWORD="{{password}}"
-echo "PASSWORD: ${PASSWORD} | ADMIN_PASSWORD: ${ADMIN_PASSWORD}" | log
+PASSWORD="${ADMIN_PASSWORD}"
+
 
 wait_for_apt() {
     local max_wait=120
@@ -31,11 +31,11 @@ wait_for_apt() {
 validate_environment() {
     [[ $EUID -eq 0 ]] || echo "Run as root" | log
     [[ -d /usr/local/cpanel ]] && echo "cPanel already installed" | log
-    
+
     [[ -f /etc/os-release ]] || echo "Cannot detect OS" | log
     . /etc/os-release
     [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]] || echo "Requires Ubuntu 24.04" | log
-    
+
     [[ "$MARIADB_VERSION" =~ ^(10\.11|11\.4)$ ]] || echo "MariaDB must be 10.11 or 11.4" | log
 }
 
@@ -43,40 +43,40 @@ set_hostname() {
     local ip=$(hostname -I | awk '{print $1}')
     local ip_dashed=${ip//./-}
     local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
-    
+
     hostnamectl set-hostname "$fqdn"
     echo "Hostname set to: $fqdn" | log
 }
 
 prepare_system() {
     echo "Preparing Ubuntu 24.04..." | log
-    
+
     systemctl stop ufw 2>/dev/null && systemctl disable ufw
     systemctl stop apparmor 2>/dev/null && systemctl disable apparmor
-    
+
     # Pre-import GPG keys via port 80 before creating wrapper
     echo "Pre-importing Ubuntu GPG keys via port 80..." | log
     mkdir -p /root/.gnupg
     chmod 700 /root/.gnupg
-    
+
     gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3A79BD29 2>/dev/null &
     GPG_PID=$!
     ( sleep 30; kill $GPG_PID 2>/dev/null ) &
     wait $GPG_PID 2>/dev/null || true
-    
+
     if ! gpg --list-keys 3A79BD29 &>/dev/null; then
         curl -fsSL --max-time 30 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3A79BD29" | gpg --import 2>/dev/null || \
         echo "GPG key import failed - continuing anyway" | log
     fi
-    
+
     gpg --export 3A79BD29 2>/dev/null | apt-key add - 2>/dev/null || true
-    
+
     # Configure gpg to always use port 80
     cat > /root/.gnupg/gpg.conf << 'EOF'
 keyserver hkp://keyserver.ubuntu.com:80
 keyserver-options auto-key-retrieve
 EOF
-    
+
     # Create wrapper that forces port 80 for any keyserver call
     mv /usr/bin/gpg /usr/bin/gpg.real
     cat > /usr/bin/gpg << 'GPGWRAPPER'
@@ -109,13 +109,13 @@ done
 exec /usr/bin/gpg.real "${args[@]}"
 GPGWRAPPER
     chmod +x /usr/bin/gpg
-    
+
     if /usr/bin/gpg.real --list-keys 3A79BD29 &>/dev/null; then
         echo "GPG key 3A79BD29 imported successfully" | log
     else
         echo "GPG key may not be available" | log
     fi
-    
+
     export DEBIAN_FRONTEND=noninteractive
     wait_for_apt
     apt-get update && apt-get -y upgrade
@@ -125,26 +125,26 @@ GPGWRAPPER
 
 install_cpanel() {
     echo "Installing cPanel with MariaDB ${MARIADB_VERSION}..." | log
-    
+
     mkdir -p /root/cpanel_profile
     echo "mysql-version=${MARIADB_VERSION}" > /root/cpanel_profile/cpanel.config
-    
+
     cd /home
     curl -so latest -L https://securedownloads.cpanel.net/latest
     sh latest --force
-    
+
     [[ -f /usr/bin/gpg.real ]] && mv /usr/bin/gpg.real /usr/bin/gpg
-    
+
     echo "Setting root password..." | log
     echo "root:${PASSWORD}" | chpasswd
 }
 
 configure_mariadb() {
     echo "Configuring MariaDB..." | log
-    
+
     local retries=15
     while ! pgrep -x mysqld &>/dev/null && ! pgrep -x mariadbd &>/dev/null && ((retries-- > 0)); do sleep 2; done
-    
+
     cat > /etc/mysql/conf.d/optimized.cnf 2>/dev/null << 'EOF' || true
 [mysqld]
 innodb_buffer_pool_size = 256M
@@ -169,12 +169,12 @@ configure_ssl() {
     local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
     local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
     local acme_server="https://192.168.30.67/directory"
-    
+
     echo "Configuring SSL using existing nginx..." | log
-    
+
     # Ensure nginx is running for certbot nginx plugin
     systemctl start nginx 2>/dev/null || true
-    
+
     echo "Requesting SSL certificate for all service FQDNs..." | log
     certbot certonly --nginx \
         --server "$acme_server" \
@@ -182,27 +182,27 @@ configure_ssl() {
         -d "$fqdn" -d "$whm_fqdn" -d "$webmail_fqdn" \
         --non-interactive --agree-tos -m "admin@${fqdn}" \
         || echo "SSL request failed" | log
-    
+
     if [[ -d /etc/letsencrypt/live/${fqdn} ]]; then
         echo "Installing SSL certificate directly..." | log
-        
+
         cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
-        
+
         cat /etc/letsencrypt/live/${fqdn}/fullchain.pem \
             /etc/letsencrypt/live/${fqdn}/privkey.pem \
             > /var/cpanel/ssl/cpanel/cpanel.pem
-        
+
         chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
         rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
-        
+
         echo "SSL certificate installed" | log
     else
         echo "SSL certificate not obtained" | log
     fi
-    
+
     /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>/dev/null || true
     /usr/local/cpanel/scripts/restartsrv_httpd --hard 2>/dev/null || true
-    
+
     echo "SSL configured for all FQDNs" | log
 }
 
@@ -236,13 +236,13 @@ format_duration() {
 }
 
 print_summary() {
-	local duration=$1
+        local duration=$1
     local ip=$(hostname -I | awk '{print $1}')
     local ip_dashed=${ip//./-}
     local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
     local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
     local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
-	
+
     cat > /etc/motd << EOF
 ================================================================================
                     cPanel Server - Installation Complete
@@ -253,7 +253,7 @@ WHM (Web Host Manager) - Server Administration:
   URL:        https://${whm_fqdn}:2087
   Alt URL:    https://${fqdn}:2087
   Username:   root
-  Password:   ${PASSWORD}
+  Password:   ${ADMIN_PASSWORD}
 
   First Steps in WHM:
     1. Accept license agreement
@@ -265,7 +265,7 @@ WHM (Web Host Manager) - Server Administration:
 cPanel (User Control Panel) - Website/Email Management:
   URL:        https://${fqdn}:2083
   Alt URL:    https://${whm_fqdn}:2083
-  
+
   NOTE: Requires a cPanel account created in WHM first!
         Use the username/password set when creating the account in WHM.
 
@@ -274,7 +274,7 @@ cPanel (User Control Panel) - Website/Email Management:
 Webmail - Email Access:
   URL:        https://${webmail_fqdn}:2096
   Alt URL:    https://${fqdn}:2096
-  
+
   NOTE: Requires an email account created in cPanel first!
         In cPanel: Email > Email Accounts > Create
 
@@ -287,7 +287,10 @@ SERVER DETAILS:
   OS:         Ubuntu 24.04
 
 SSL CERTIFICATE:
-  Covers: ${fqdn}, ${whm_fqdn}, ${webmail_fqdn}
+  Covers: 
+	${fqdn}
+	${whm_fqdn}
+	${webmail_fqdn}
 
 PORTS:
   2087 - WHM (root admin)
@@ -305,23 +308,23 @@ EOF
 }
 
 main() {
-	local start_time=$(date +%s)
+        local start_time=$(date +%s)
     echo "Starting Ubuntu 24.04 cPanel installer..." | log
-    
+
     validate_environment
     set_hostname
     prepare_system
     install_cpanel
     configure_mariadb
     configure_ssl
-	
-	local end_time=$(date +%s)
+
+        local end_time=$(date +%s)
     local duration=$(format_duration $((end_time - start_time)))
     print_summary "$duration"
-    
-	echo "Preparing for final power-off after reboot..." | log
+
+        echo "Preparing for final power-off after reboot..." | log
     prepare_final_shutdown
-    
+
     echo "Rebooting now. The system will power off automatically once it comes back up." | log
     sleep 5
     reboot
