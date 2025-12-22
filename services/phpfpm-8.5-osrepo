@@ -1,0 +1,56 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+version="8.5"
+
+echo "Adding php${version} repo" | log
+installPackage software-properties-common | log
+waitOrStop 0 "Failed apt install: software-properties-common"
+add-apt-repository -y ppa:ondrej/php | log
+apt update
+
+echo "Installing php${version}-fpm" | log
+installPackage php${version}-fpm
+waitOrStop 0 "Failed apt install: php${version}-fpm"
+
+echo "Installing php${version} modules" | log
+packages=(
+    php${version}-cli
+    php${version}-bz2
+    php${version}-common
+    php${version}-curl
+    php${version}-gd
+    php${version}-json
+    php${version}-mbstring
+    php${version}-mysql
+    php${version}-readline
+    php${version}-xml
+    php${version}-zip
+    php${version}-bcmath
+    php${version}-intl
+    php${version}-soap
+)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
+
+echo "Configuring php-fpm to listen on correct socket" | log
+sed -i "s/listen = \/run\/php\/php${version}-fpm.sock/listen = 127.0.0.1:9000/g" /etc/php/${version}/fpm/pool.d/www.conf
+
+echo "Restarting service to implement changes" | log
+service php${version}-fpm restart
+waitOrStop 0 "Restarting fpm service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "PHP config files location: /etc/php/"
+descriptionAppend "PHP-FPM config files location: /etc/php/${version}/fpm/"
+descriptionAppend " "
+
+tag php.success
+tag php-fpm.success
+tagScript success
+
+exit 0
