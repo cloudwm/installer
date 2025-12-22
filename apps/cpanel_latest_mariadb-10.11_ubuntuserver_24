@@ -134,9 +134,6 @@ install_cpanel() {
     sh latest --force
 
     [[ -f /usr/bin/gpg.real ]] && mv /usr/bin/gpg.real /usr/bin/gpg
-
-    #echo "Setting root password..." | log
-    #echo "root:${PASSWORD}" | chpasswd
 }
 
 configure_mariadb() {
