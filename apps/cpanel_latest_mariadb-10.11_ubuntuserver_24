@@ -236,7 +236,7 @@ format_duration() {
 }
 
 print_summary() {
-        local duration=$1
+    local duration=$1
     local ip=$(hostname -I | awk '{print $1}')
     local ip_dashed=${ip//./-}
     local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
@@ -249,34 +249,28 @@ print_summary() {
 ================================================================================
 INSTALLATION TIME: $duration
 
-WHM (Web Host Manager) - Server Administration:
-  URL:        https://${whm_fqdn}:2087
-  Alt URL:    https://${fqdn}:2087
-  Username:   root
-  Password:   ${PASSWORD}
+ACCESS NOTES:
+  - Port 80 is handled by nginx and redirects to the correct SSL services
+  - Canonical access is always via explicit SSL ports
 
-  First Steps in WHM:
-    1. Accept license agreement
-    2. Create a cPanel account: Account Functions > Create a New Account
-    3. Set up nameservers if needed
+WHM (Server Administration):
+  https://${whm_fqdn}:2087
+  (http://${whm_fqdn} redirects here)
 
---------------------------------------------------------------------------------
-
-cPanel (User Control Panel) - Website/Email Management:
-  URL:        https://${fqdn}:2083
-  Alt URL:    https://${whm_fqdn}:2083
-
-  NOTE: Requires a cPanel account created in WHM first!
-        Use the username/password set when creating the account in WHM.
+Username: root
+Password: ${PASSWORD}
 
 --------------------------------------------------------------------------------
 
-Webmail - Email Access:
-  URL:        https://${webmail_fqdn}:2096
-  Alt URL:    https://${fqdn}:2096
+cPanel (User Control Panel):
+  https://${fqdn}:2083
+  (http://${fqdn} redirects here)
 
-  NOTE: Requires an email account created in cPanel first!
-        In cPanel: Email > Email Accounts > Create
+--------------------------------------------------------------------------------
+
+Webmail:
+  https://${webmail_fqdn}:2096
+  (http://${webmail_fqdn} redirects here)
 
 --------------------------------------------------------------------------------
 
@@ -287,24 +281,20 @@ SERVER DETAILS:
   OS:         Ubuntu 24.04
 
 SSL CERTIFICATE:
-  Covers: 
-	${fqdn}
-	${whm_fqdn}
-	${webmail_fqdn}
+  Covers:
+    ${fqdn}
+    ${whm_fqdn}
+    ${webmail_fqdn}
 
 PORTS:
-  2087 - WHM (root admin)
-  2083 - cPanel (user accounts)
-  2096 - Webmail (email accounts)
-  2095 - Webmail (non-SSL)
-  2086 - WHM (non-SSL)
-  2082 - cPanel (non-SSL)
+  2087 - WHM (SSL)
+  2083 - cPanel (SSL)
+  2096 - Webmail (SSL)
 
 ================================================================================
 EOF
 
     cat /etc/motd | log
-    echo "================================================================================" | log
 }
 
 main() {
