@@ -2,7 +2,6 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
@@ -167,46 +166,49 @@ configure_ssl() {
     local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
     local acme_server="https://192.168.30.67/directory"
 
-    echo "Configuring SSL using existing nginx..." | log
+    echo "Configuring cPanel to use custom ACME server..." | log
 
-    # Ensure nginx is running for certbot nginx plugin
-    systemctl start nginx 2>/dev/null || true
+    # Configure cPanel to use custom ACME server
+    mkdir -p /var/cpanel/ssl/cpanel/
+    
+    # Create custom ACME provider configuration
+    cat > /var/cpanel/autossl_provider_custom.yaml << EOF
+---
+provider: cPanel
+directory_url: ${acme_server}
+ssl_verify: false
+EOF
 
-    echo "Requesting SSL certificate for all service FQDNs..." | log
-    certbot certonly --nginx \
-        --server "$acme_server" \
-        --no-verify-ssl \
-        -d "$fqdn" -d "$whm_fqdn" -d "$webmail_fqdn" \
-        --non-interactive --agree-tos -m "admin@${fqdn}" \
-        || echo "SSL request failed" | log
+    # Install and configure AutoSSL with custom ACME server
+    echo "Installing AutoSSL provider..." | log
+    /usr/local/cpanel/scripts/install_lets_encrypt_autossl_provider 2>&1 | log
+    
+    # Set the custom ACME server
+    whmapi1 set_autossl_metadata_key key=provider value=LetsEncrypt 2>&1 | log
+    whmapi1 set_autossl_metadata_key key=enabled value=1 2>&1 | log
+    
+    # Configure to use custom ACME server
+    /usr/local/cpanel/bin/autossl_check \
+        --provider=cPanel \
+        --args="directory_url=${acme_server},ssl_verify=0" \
+        --all 2>&1 | log
 
-    if [[ -d /etc/letsencrypt/live/${fqdn} ]]; then
-        echo "Installing SSL certificate directly..." | log
+    echo "Waiting for AutoSSL to issue certificates..." | log
+    sleep 30
+    
+    # Force certificate check
+    /usr/local/cpanel/bin/autossl_check --all --verbose 2>&1 | log
+    
+    # Restart services to use new certificates
+    /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
+    /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
 
-        cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
-
-        cat /etc/letsencrypt/live/${fqdn}/fullchain.pem \
-            /etc/letsencrypt/live/${fqdn}/privkey.pem \
-            > /var/cpanel/ssl/cpanel/cpanel.pem
-
-        chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
-        rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
-
-        echo "SSL certificate installed" | log
-    else
-        echo "SSL certificate not obtained" | log
-    fi
-
-    /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>/dev/null || true
-    /usr/local/cpanel/scripts/restartsrv_httpd --hard 2>/dev/null || true
-
-    echo "SSL configured for all FQDNs" | log
+    echo "SSL configured via cPanel AutoSSL" | log
 }
 
 prepare_final_shutdown() {
     echo "Creating one-time shutdown service..." | log
 
-    # 1. Create a systemd service file
     cat <<EOF > /etc/systemd/system/post-install-shutdown.service
 [Unit]
 Description=Power off after first reboot
@@ -214,7 +216,6 @@ After=multi-user.target
 
 [Service]
 Type=oneshot
-# The service deletes itself before powering off so you don't get stuck in a loop
 ExecStart=/usr/bin/rm -f /etc/systemd/system/post-install-shutdown.service
 ExecStartPost=/usr/sbin/poweroff
 
@@ -222,7 +223,6 @@ ExecStartPost=/usr/sbin/poweroff
 WantedBy=multi-user.target
 EOF
 
-    # 2. Reload systemd and enable the service
     systemctl daemon-reload
     systemctl enable post-install-shutdown.service
 }
@@ -246,13 +246,8 @@ print_summary() {
 ================================================================================
 INSTALLATION TIME: $duration
 
-ACCESS NOTES:
-  - Port 80 is handled by nginx and redirects to the correct SSL services
-  - Canonical access is always via explicit SSL ports
-
 WHM (Server Administration):
   https://${whm_fqdn}:2087
-  (http://${whm_fqdn} redirects here)
 
 Username: root
 Password: ${PASSWORD}
@@ -261,13 +256,11 @@ Password: ${PASSWORD}
 
 cPanel (User Control Panel):
   https://${fqdn}:2083
-  (http://${fqdn} redirects here)
 
 --------------------------------------------------------------------------------
 
 Webmail:
   https://${webmail_fqdn}:2096
-  (http://${webmail_fqdn} redirects here)
 
 --------------------------------------------------------------------------------
 
@@ -278,10 +271,8 @@ SERVER DETAILS:
   OS:         Ubuntu 24.04
 
 SSL CERTIFICATE:
-  Covers:
-    ${fqdn}
-    ${whm_fqdn}
-    ${webmail_fqdn}
+  Managed by cPanel AutoSSL
+  Covers: ${fqdn}, ${whm_fqdn}, ${webmail_fqdn}
 
 PORTS:
   2087 - WHM (SSL)
@@ -295,7 +286,7 @@ EOF
 }
 
 main() {
-        local start_time=$(date +%s)
+    local start_time=$(date +%s)
     echo "Starting Ubuntu 24.04 cPanel installer..." | log
 
     validate_environment
