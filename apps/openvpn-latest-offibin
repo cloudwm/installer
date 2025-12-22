@@ -1,5 +1,4 @@
 #!/bin/bash
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -9,49 +8,52 @@ fi
 checkTagExist ntpd.success
 checkTagExist cwm-settimezone.success
 
-appVersion=3.1.0
-appPackage=openvpn-as-latest-ubuntu24.amd_64.deb
+appVersion=3.0.2-87c70987-Ubuntu24
+
 rootDir=$(rootDir)
+echo "Installing OpenVPN Access Server specific version $appVersion via apt repository" | log
 
-echo "Downloading binary" | log
 cd $rootDir/temp
-installPackage ca-certificates net-tools
-waitOrStop 0 "Failed apt install: ca-certificates net-tools"
-curlDownload  https://openvpn.net/downloads/openvpn-as-bundled-clients-latest.deb
-waitOrStop 0 "File not downloaded from official source (1/2)"
-curlDownload  https://openvpn.net/downloads/$appPackage
-waitOrStop 0 "File not downloaded from official source (2/2)"
 
-echo "Installing application" | log
-dpkg -i openvpn-as-bundled-clients-latest.deb | log
-rm -f openvpn-as-bundled-clients-latest.deb
+installPackage ca-certificates wget net-tools gnupg lsb-release
+waitOrStop 0 "Failed apt install prerequisites"
 
-dpkg -i $appPackage | log
-rm -f $appPackage
+echo "Adding OpenVPN AS repository" | log
+wget -qO- https://as-repository.openvpn.net/as-repo-public.gpg | apt-key add -
+waitOrStop 0 "Failed to add GPG key"
+echo "deb http://as-repository.openvpn.net/as/debian noble main" > /etc/apt/sources.list.d/openvpn-as-repo.list
 
-apt -y --fix-broken install
+apt update
+waitOrStop 0 "Failed apt update after adding repo"
+
+apt policy openvpn-as | log
+
+echo "Installing specific version $appVersion" | log
+apt install -y openvpn-as=$appVersion openvpn-as-bundled-clients
+waitOrStop 0 "Failed to install openvpn-as version $appVersion"
+
+apt-mark hold openvpn-as openvpn-as-bundled-clients
+echo "Version $appVersion held to prevent upgrades" | log
 
 echo "Configuring first user" | log
 cd /usr/local/openvpn_as/scripts/
-bash sacli --user openvpn  --key local --value "user_connect" UserPropPut
+bash sacli --user openvpn --key local --value "user_connect" UserPropPut
 bash sacli --user openvpn --new_pass ${ADMINPASSWORD} SetLocalPassword
 
 echo "Configuring certifications" | log
 service openvpnas stop
-
 ##OREN CHANGE##
 if [[ $certbot_failed==1 ]]
 then
 mv /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem
 fi
 ##OREN CHANGE##
-
 ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem /usr/local/openvpn_as/etc/web-ssl/server.crt
 ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem /usr/local/openvpn_as/etc/web-ssl/server.key
 service openvpnas start
 
 echo "Adding descriptions" | log
-descriptionAppend "OpenVPN Management Web UI:  https://${CWM_DISPLAYED_ADDRESS}:943/admin"
+descriptionAppend "OpenVPN Management Web UI: https://${CWM_DISPLAYED_ADDRESS}:943/admin"
 descriptionAppend "OpenVPN Username: openvpn"
 descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
@@ -60,7 +62,7 @@ descriptionAppend " "
 descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
 descriptionAppend "OpenVPN Command-line tools: /usr/local/openvpn_as/scripts"
 descriptionAppend " "
+descriptionAppend "Installed specific version: $appVersion (held to prevent upgrades)"
 
 tagScript success
-
 exit 0
