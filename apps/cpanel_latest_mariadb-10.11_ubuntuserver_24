@@ -164,46 +164,53 @@ configure_ssl() {
     local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
     local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
     local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
-    local acme_server="https://192.168.30.67/directory"
 
-    echo "Configuring cPanel to use custom ACME server..." | log
+    echo "Configuring SSL via cPanel AutoSSL..." | log
 
-    # Configure cPanel to use custom ACME server
-    mkdir -p /var/cpanel/ssl/cpanel/
-    
-    # Create custom ACME provider configuration
-    cat > /var/cpanel/autossl_provider_custom.yaml << EOF
----
-provider: cPanel
-directory_url: ${acme_server}
-ssl_verify: false
-EOF
+    # Wait for cPanel services to be fully up
+    echo "Waiting for cPanel services to start..." | log
+    local retries=30
+    while ! /usr/local/cpanel/cpanel -V &>/dev/null && ((retries-- > 0)); do 
+        sleep 2
+    done
 
-    # Install and configure AutoSSL with custom ACME server
-    echo "Installing AutoSSL provider..." | log
+    # Install AutoSSL provider
+    echo "Installing cPanel AutoSSL provider..." | log
     /usr/local/cpanel/scripts/install_lets_encrypt_autossl_provider 2>&1 | log
-    
-    # Set the custom ACME server
+
+    # Enable AutoSSL
+    echo "Enabling AutoSSL..." | log
     whmapi1 set_autossl_metadata_key key=provider value=LetsEncrypt 2>&1 | log
     whmapi1 set_autossl_metadata_key key=enabled value=1 2>&1 | log
-    
-    # Configure to use custom ACME server
-    /usr/local/cpanel/bin/autossl_check \
-        --provider=cPanel \
-        --args="directory_url=${acme_server},ssl_verify=0" \
-        --all 2>&1 | log
 
-    echo "Waiting for AutoSSL to issue certificates..." | log
-    sleep 30
-    
-    # Force certificate check
+    # Run AutoSSL check for all domains
+    echo "Running AutoSSL certificate check..." | log
     /usr/local/cpanel/bin/autossl_check --all --verbose 2>&1 | log
-    
-    # Restart services to use new certificates
+
+    # Wait for certificates to be issued
+    echo "Waiting for certificates to be issued..." | log
+    sleep 30
+
+    # Verify and restart services
+    echo "Restarting cPanel services with new certificates..." | log
     /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
     /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
 
-    echo "SSL configured via cPanel AutoSSL" | log
+    echo "SSL configuration complete via AutoSSL" | log
+}
+
+disable_apache_port80() {
+    echo "Disabling Apache on port 80 to prevent file indexing..." | log
+    
+    # Modify Apache configuration to not listen on port 80
+    if [ -f /etc/apache2/ports.conf ]; then
+        sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf
+    fi
+    
+    # Restart Apache
+    /usr/local/cpanel/scripts/restartsrv_httpd 2>&1 | log
+    
+    echo "Apache port 80 disabled" | log
 }
 
 prepare_final_shutdown() {
@@ -270,14 +277,20 @@ SERVER DETAILS:
   MariaDB:    ${MARIADB_VERSION}
   OS:         Ubuntu 24.04
 
-SSL CERTIFICATE:
-  Managed by cPanel AutoSSL
-  Covers: ${fqdn}, ${whm_fqdn}, ${webmail_fqdn}
+SSL CERTIFICATES:
+  Managed by: cPanel AutoSSL (Let's Encrypt)
+  Domains:    
+	${fqdn}
+	${whm_fqdn}
+	${webmail_fqdn}
+  Auto-renew: Yes
 
 PORTS:
   2087 - WHM (SSL)
   2083 - cPanel (SSL)
   2096 - Webmail (SSL)
+
+NOTE: Port 80 (HTTP) is disabled. Use HTTPS with explicit ports.
 
 ================================================================================
 EOF
@@ -295,6 +308,7 @@ main() {
     install_cpanel
     configure_mariadb
     configure_ssl
+    disable_apache_port80
 
     local end_time=$(date +%s)
     local duration=$(format_duration $((end_time - start_time)))
