@@ -221,54 +221,84 @@ configure_ssl() {
         sleep 2
     done
 
-    # Install acme.sh
-    echo "Installing acme.sh for certificate management..." | log
-    curl https://get.acme.sh | sh -s 2>&1 | log
-    
-    # Set up acme.sh to use custom ACME server
-    /root/.acme.sh/acme.sh --set-default-ca --server "${acme_server}" 2>&1 | log
-    
-    # Issue certificates using acme.sh with webroot mode (uses Apache on port 80)
-    echo "Requesting SSL certificates for all service FQDNs..." | log
-    /root/.acme.sh/acme.sh --issue \
+    # Install certbot if not present
+    echo "Installing certbot..." | log
+    apt-get update
+    apt-get install -y certbot || {
+        echo "ERROR: Failed to install certbot" | log
+        return 1
+    }
+
+    # Ensure Apache is running and configured for ACME
+    systemctl status apache2 || /usr/local/cpanel/scripts/restartsrv_httpd
+
+    # Issue certificates using certbot with webroot mode
+    echo "Requesting SSL certificates from ${acme_server}..." | log
+    certbot certonly \
+        --webroot \
+        --webroot-path /var/www/html \
         --server "${acme_server}" \
-        --insecure \
-        --webroot /var/www/html \
+        --no-verify-ssl \
         -d "${fqdn}" \
         -d "${whm_fqdn}" \
         -d "${webmail_fqdn}" \
-        --force 2>&1 | log
+        --non-interactive \
+        --agree-tos \
+        --email "admin@${fqdn}" \
+        --force-renewal 2>&1 | log
 
-    # Install certificates to cPanel
-    if [ -d "/root/.acme.sh/${fqdn}" ]; then
-        echo "Installing SSL certificates to cPanel..." | log
-        
-        # Backup existing certificate
-        cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
-        
-        # Combine cert and key for cPanel
-        cat /root/.acme.sh/${fqdn}/fullchain.cer \
-            /root/.acme.sh/${fqdn}/${fqdn}.key \
-            > /var/cpanel/ssl/cpanel/cpanel.pem
-        
-        chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
-        chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
-        rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
-        
-        # Restart cPanel services to use new certificates
-        echo "Restarting cPanel services with new certificates..." | log
-        /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
-        /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
-        
-        # Set up auto-renewal
-        echo "Configuring automatic certificate renewal..." | log
-        /root/.acme.sh/acme.sh --install-cronjob 2>&1 | log
-        
-        echo "SSL certificates installed successfully" | log
-    else
-        echo "ERROR: SSL certificate generation failed!" | log
-        echo "Certificates not found at /root/.acme.sh/${fqdn}" | log
+    # Check if certificates were actually issued
+    if [ ! -d "/etc/letsencrypt/live/${fqdn}" ]; then
+        echo "ERROR: Certificate issuance FAILED!" | log
+        echo "Directory /etc/letsencrypt/live/${fqdn} does not exist" | log
+        echo "Check logs above for certbot errors" | log
+        return 1
     fi
+
+    echo "Certificates issued successfully, installing to cPanel..." | log
+
+    # Backup existing certificate
+    cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
+
+    # Combine cert and key for cPanel
+    cat /etc/letsencrypt/live/${fqdn}/fullchain.pem \
+        /etc/letsencrypt/live/${fqdn}/privkey.pem \
+        > /var/cpanel/ssl/cpanel/cpanel.pem
+
+    chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
+    chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
+    rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
+
+    # Verify certificate was installed
+    if ! openssl x509 -in /var/cpanel/ssl/cpanel/cpanel.pem -text -noout | grep -q "${fqdn}"; then
+        echo "ERROR: Certificate installation verification failed!" | log
+        return 1
+    fi
+
+    # Restart cPanel services to use new certificates
+    echo "Restarting cPanel services with new certificates..." | log
+    /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
+    /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
+
+    # Set up auto-renewal cron job
+    echo "Setting up automatic certificate renewal..." | log
+    cat > /etc/cron.daily/renew-cpanel-ssl << 'CRONEOF'
+#!/bin/bash
+certbot renew --quiet --webroot --webroot-path /var/www/html
+if [ $? -eq 0 ]; then
+    cat /etc/letsencrypt/live/cpanel.*/fullchain.pem \
+        /etc/letsencrypt/live/cpanel.*/privkey.pem \
+        > /var/cpanel/ssl/cpanel/cpanel.pem
+    chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
+    chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
+    /usr/local/cpanel/scripts/restartsrv_cpsrvd
+    /usr/local/cpanel/scripts/restartsrv_cpanel
+fi
+CRONEOF
+    chmod +x /etc/cron.daily/renew-cpanel-ssl
+
+    echo "SSL certificates installed and configured successfully!" | log
+    return 0
 }
 
 prepare_final_shutdown() {
