@@ -1,0 +1,77 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist nginx.success
+checkTagExist php.success
+checkTagExist mysqld.success
+checkTagExist nginx-enable-php-ssl.success
+
+appPath=/var/www/html
+appVersion=1.45.1
+appArchive=mediawiki-$appVersion.tar.gz
+rootDir=$(rootDir)
+
+echo "Installing MediaWiki" | log
+
+echo "Downloading MediaWiki from original repo" | log
+cd $rootDir/temp
+curlDownload https://releases.wikimedia.org/mediawiki/${appVersion:: -2}/$appArchive
+waitOrStop 0 "File not downloaded from official source"
+mkdir -p $appPath
+mv $appArchive $appPath 
+
+echo "Extracting MediaWiki to $appPath/" | log
+tar -xzvf $appPath/$appArchive -C $appPath/ --strip 1
+waitOrStop 0 "Failed to extract application archive"
+rm -f $appPath/$appArchive
+
+echo "Setting directory permissions" | log
+chown -R www-data:www-data $appPath/
+find  $appPath/ -type f -exec chmod 644 {} \;
+find  $appPath/ -type d -exec chmod 755 {} \;
+
+echo "Creating MediaWiki Database" | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+CREATE DATABASE wikidb;
+CREATE USER 'wikiuser'@'localhost' IDENTIFIED BY '${ADMINPASSWORD}';
+GRANT ALL PRIVILEGES ON wikidb.* TO 'wikiuser'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
+
+echo "Installing MediaWiki" | log
+cd $appPath
+php maintenance/install.php --dbname=wikidb  --dbuser=wikiuser --dbpass=${ADMINPASSWORD} --lang=en --pass=${ADMINPASSWORD} --scriptpath="" --server https://${CWM_DISPLAYED_ADDRESS} "MediaWiki" "admin"
+waitOrStop 0 "Application install procedure failed"
+echo "\$wgUsePathInfo = TRUE;" >> LocalSettings.php 
+
+echo "Creating nginx configuration" | log
+#copy configs to nginx folder
+cp -f $rootDir/tweaks/extras/mediawiki-nginx/mediawiki.conf /etc/nginx/sites-available/
+# specific configs supplied by nginx for mediawiki
+mkdir -p /etc/nginx/config
+cp -f $rootDir/tweaks/extras/mediawiki-nginx/mediawiki-locations.conf /etc/nginx/config/
+# Symlink mediawiki vhost
+ln -s /etc/nginx/sites-available/mediawiki.conf /etc/nginx/sites-enabled/
+# Remove default vhosts
+unlink /etc/nginx/sites-enabled/default
+unlink /etc/nginx/sites-enabled/default-ssl
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Adding descriptions" | log
+descriptionAppend "Mediawiki Web UI: https://${CWM_DISPLAYED_ADDRESS}/Special:UserLogin"
+descriptionAppend "Mediawiki Username: admin"
+descriptionAppend "Mediawiki Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Mediawiki settings file: ${appPath}/LocalSettings.php"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
+
