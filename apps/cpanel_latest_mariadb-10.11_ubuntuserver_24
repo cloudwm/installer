@@ -328,9 +328,10 @@ SERVER DETAILS:
   MariaDB:    ${MARIADB_VERSION}
   OS:         Ubuntu 24.04
 
-SSL CERTIFICATES:
-  Managed by: certbot
-  Domains:    ${fqdn}, ${whm_fqdn}, ${webmail_fqdn}
+Domains:
+  ${fqdn}
+  ${whm_fqdn}
+  ${webmail_fqdn}
 
 PORTS (SSL ONLY):
   2087 - WHM (SSL)
