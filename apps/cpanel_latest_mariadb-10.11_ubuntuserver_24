@@ -2,6 +2,7 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
@@ -9,7 +10,6 @@ fi
 LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
 PASSWORD=$(grep -m1 '^password=' /root/guest.conf | cut -d= -f2-)
-echo "${PASSWORD}" > /tmp/pw_debug.txt
 
 wait_for_apt() {
     local max_wait=120
@@ -158,14 +158,61 @@ EOF
     echo "MariaDB configured" | log
 }
 
+configure_apache_for_acme() {
+    echo "Configuring Apache for ACME challenges only..." | log
+    
+    # Ensure the .well-known directory exists
+    mkdir -p /var/www/html/.well-known/acme-challenge
+    chown -R nobody:nobody /var/www/html/.well-known
+    
+    # Create a config that only serves ACME challenges
+    cat > /etc/apache2/conf-available/acme-only.conf << 'EOF'
+<VirtualHost *:80>
+    ServerName _default_
+    ServerAlias *
+    DocumentRoot /var/www/html
+    
+    # Deny access to everything by default
+    <Directory /var/www/html>
+        Require all denied
+    </Directory>
+    
+    # Only allow ACME challenges
+    <Directory /var/www/html/.well-known/acme-challenge>
+        Require all granted
+        Options -Indexes
+    </Directory>
+    
+    # Return 403 for everything else
+    <LocationMatch "^/(?!\.well-known/acme-challenge/)">
+        Require all denied
+    </LocationMatch>
+</VirtualHost>
+EOF
+    
+    # Enable the configuration
+    a2enconf acme-only 2>&1 | log
+    
+    # Make sure Apache is listening on port 80
+    if ! grep -q "^Listen 80" /etc/apache2/ports.conf; then
+        echo "Listen 80" >> /etc/apache2/ports.conf
+    fi
+    
+    # Restart Apache
+    /usr/local/cpanel/scripts/restartsrv_httpd 2>&1 | log
+    
+    echo "Apache configured for ACME challenges only on port 80" | log
+}
+
 configure_ssl() {
     local ip=$(hostname -I | awk '{print $1}')
     local ip_dashed=${ip//./-}
     local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
     local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
     local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
+    local acme_server="https://192.168.30.67/directory"
 
-    echo "Configuring SSL via cPanel AutoSSL..." | log
+    echo "Configuring SSL with custom ACME server..." | log
 
     # Wait for cPanel services to be fully up
     echo "Waiting for cPanel services to start..." | log
@@ -174,43 +221,54 @@ configure_ssl() {
         sleep 2
     done
 
-    # Install AutoSSL provider
-    echo "Installing cPanel AutoSSL provider..." | log
-    /usr/local/cpanel/scripts/install_lets_encrypt_autossl_provider 2>&1 | log
-
-    # Enable AutoSSL
-    echo "Enabling AutoSSL..." | log
-    whmapi1 set_autossl_metadata_key key=provider value=LetsEncrypt 2>&1 | log
-    whmapi1 set_autossl_metadata_key key=enabled value=1 2>&1 | log
-
-    # Run AutoSSL check for all domains
-    echo "Running AutoSSL certificate check..." | log
-    /usr/local/cpanel/bin/autossl_check --all --verbose 2>&1 | log
-
-    # Wait for certificates to be issued
-    echo "Waiting for certificates to be issued..." | log
-    sleep 30
-
-    # Verify and restart services
-    echo "Restarting cPanel services with new certificates..." | log
-    /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
-    /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
-
-    echo "SSL configuration complete via AutoSSL" | log
-}
-
-disable_apache_port80() {
-    echo "Disabling Apache on port 80 to prevent file indexing..." | log
+    # Install acme.sh
+    echo "Installing acme.sh for certificate management..." | log
+    curl https://get.acme.sh | sh -s 2>&1 | log
     
-    # Modify Apache configuration to not listen on port 80
-    if [ -f /etc/apache2/ports.conf ]; then
-        sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf
+    # Set up acme.sh to use custom ACME server
+    /root/.acme.sh/acme.sh --set-default-ca --server "${acme_server}" 2>&1 | log
+    
+    # Issue certificates using acme.sh with webroot mode (uses Apache on port 80)
+    echo "Requesting SSL certificates for all service FQDNs..." | log
+    /root/.acme.sh/acme.sh --issue \
+        --server "${acme_server}" \
+        --insecure \
+        --webroot /var/www/html \
+        -d "${fqdn}" \
+        -d "${whm_fqdn}" \
+        -d "${webmail_fqdn}" \
+        --force 2>&1 | log
+
+    # Install certificates to cPanel
+    if [ -d "/root/.acme.sh/${fqdn}" ]; then
+        echo "Installing SSL certificates to cPanel..." | log
+        
+        # Backup existing certificate
+        cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
+        
+        # Combine cert and key for cPanel
+        cat /root/.acme.sh/${fqdn}/fullchain.cer \
+            /root/.acme.sh/${fqdn}/${fqdn}.key \
+            > /var/cpanel/ssl/cpanel/cpanel.pem
+        
+        chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
+        chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
+        rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
+        
+        # Restart cPanel services to use new certificates
+        echo "Restarting cPanel services with new certificates..." | log
+        /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
+        /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
+        
+        # Set up auto-renewal
+        echo "Configuring automatic certificate renewal..." | log
+        /root/.acme.sh/acme.sh --install-cronjob 2>&1 | log
+        
+        echo "SSL certificates installed successfully" | log
+    else
+        echo "ERROR: SSL certificate generation failed!" | log
+        echo "Certificates not found at /root/.acme.sh/${fqdn}" | log
     fi
-    
-    # Restart Apache
-    /usr/local/cpanel/scripts/restartsrv_httpd 2>&1 | log
-    
-    echo "Apache port 80 disabled" | log
 }
 
 prepare_final_shutdown() {
@@ -278,19 +336,13 @@ SERVER DETAILS:
   OS:         Ubuntu 24.04
 
 SSL CERTIFICATES:
-  Managed by: cPanel AutoSSL (Let's Encrypt)
-  Domains:    
-	${fqdn}
-	${whm_fqdn}
-	${webmail_fqdn}
-  Auto-renew: Yes
+  Managed by: acme.sh (auto-renews every 60 days)
+  Domains:    ${fqdn}, ${whm_fqdn}, ${webmail_fqdn}
 
 PORTS:
   2087 - WHM (SSL)
   2083 - cPanel (SSL)
   2096 - Webmail (SSL)
-
-NOTE: Port 80 (HTTP) is disabled. Use HTTPS with explicit ports.
 
 ================================================================================
 EOF
@@ -307,8 +359,8 @@ main() {
     prepare_system
     install_cpanel
     configure_mariadb
+    configure_apache_for_acme
     configure_ssl
-    disable_apache_port80
 
     local end_time=$(date +%s)
     local duration=$(format_duration $((end_time - start_time)))
