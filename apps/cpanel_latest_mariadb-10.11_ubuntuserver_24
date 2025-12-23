@@ -158,52 +158,6 @@ EOF
     echo "MariaDB configured" | log
 }
 
-configure_apache_for_acme() {
-    echo "Configuring Apache for ACME challenges only..." | log
-    
-    # Ensure the .well-known directory exists
-    mkdir -p /var/www/html/.well-known/acme-challenge
-    chown -R nobody:nobody /var/www/html/.well-known
-    
-    # Create a config that only serves ACME challenges
-    cat > /etc/apache2/conf-available/acme-only.conf << 'EOF'
-<VirtualHost *:80>
-    ServerName _default_
-    ServerAlias *
-    DocumentRoot /var/www/html
-    
-    # Deny access to everything by default
-    <Directory /var/www/html>
-        Require all denied
-    </Directory>
-    
-    # Only allow ACME challenges
-    <Directory /var/www/html/.well-known/acme-challenge>
-        Require all granted
-        Options -Indexes
-    </Directory>
-    
-    # Return 403 for everything else
-    <LocationMatch "^/(?!\.well-known/acme-challenge/)">
-        Require all denied
-    </LocationMatch>
-</VirtualHost>
-EOF
-    
-    # Enable the configuration
-    a2enconf acme-only 2>&1 | log
-    
-    # Make sure Apache is listening on port 80
-    if ! grep -q "^Listen 80" /etc/apache2/ports.conf; then
-        echo "Listen 80" >> /etc/apache2/ports.conf
-    fi
-    
-    # Restart Apache
-    /usr/local/cpanel/scripts/restartsrv_httpd 2>&1 | log
-    
-    echo "Apache configured for ACME challenges only on port 80" | log
-}
-
 configure_ssl() {
     local ip=$(hostname -I | awk '{print $1}')
     local ip_dashed=${ip//./-}
@@ -221,7 +175,7 @@ configure_ssl() {
         sleep 2
     done
 
-    # Install certbot if not present
+    # Install certbot
     echo "Installing certbot..." | log
     apt-get update
     apt-get install -y certbot || {
@@ -229,14 +183,11 @@ configure_ssl() {
         return 1
     }
 
-    # Ensure Apache is running and configured for ACME
-    systemctl status apache2 || /usr/local/cpanel/scripts/restartsrv_httpd
-
-    # Issue certificates using certbot with webroot mode
+    # Use standalone mode - temporarily listen on port 80 for ACME challenge only
     echo "Requesting SSL certificates from ${acme_server}..." | log
     certbot certonly \
-        --webroot \
-        --webroot-path /var/www/html \
+        --standalone \
+        --preferred-challenges http \
         --server "${acme_server}" \
         --no-verify-ssl \
         -d "${fqdn}" \
@@ -251,7 +202,6 @@ configure_ssl() {
     if [ ! -d "/etc/letsencrypt/live/${fqdn}" ]; then
         echo "ERROR: Certificate issuance FAILED!" | log
         echo "Directory /etc/letsencrypt/live/${fqdn} does not exist" | log
-        echo "Check logs above for certbot errors" | log
         return 1
     fi
 
@@ -280,25 +230,38 @@ configure_ssl() {
     /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
     /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
 
-    # Set up auto-renewal cron job
-    echo "Setting up automatic certificate renewal..." | log
-    cat > /etc/cron.daily/renew-cpanel-ssl << 'CRONEOF'
-#!/bin/bash
-certbot renew --quiet --webroot --webroot-path /var/www/html
-if [ $? -eq 0 ]; then
-    cat /etc/letsencrypt/live/cpanel.*/fullchain.pem \
-        /etc/letsencrypt/live/cpanel.*/privkey.pem \
-        > /var/cpanel/ssl/cpanel/cpanel.pem
-    chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
-    chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
-    /usr/local/cpanel/scripts/restartsrv_cpsrvd
-    /usr/local/cpanel/scripts/restartsrv_cpanel
-fi
-CRONEOF
-    chmod +x /etc/cron.daily/renew-cpanel-ssl
+    echo "SSL certificates installed successfully!" | log
+}
 
-    echo "SSL certificates installed and configured successfully!" | log
-    return 0
+disable_port_80() {
+    echo "Disabling port 80 access..." | log
+
+    # Disable Apache on port 80
+    if [ -f /etc/apache2/ports.conf ]; then
+        sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf
+    fi
+
+    # Configure cPanel to always redirect to SSL
+    if [ -f /var/cpanel/cpanel.config ]; then
+        sed -i 's/^alwaysredirecttossl=0/alwaysredirecttossl=1/' /var/cpanel/cpanel.config
+        grep -q '^alwaysredirecttossl=' /var/cpanel/cpanel.config || echo 'alwaysredirecttossl=1' >> /var/cpanel/cpanel.config
+    fi
+
+    # Use cPanel's built-in tool to enforce SSL
+    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=alwaysredirecttossl value=1 2>&1 | log || true
+
+    # Restart Apache without port 80
+    /usr/local/cpanel/scripts/restartsrv_httpd 2>&1 | log || true
+
+    # Block port 80 with iptables
+    iptables -A INPUT -p tcp --dport 80 -j DROP 2>/dev/null || true
+    
+    # Save iptables rules
+    if command -v netfilter-persistent &>/dev/null; then
+        netfilter-persistent save 2>/dev/null || true
+    fi
+
+    echo "Port 80 disabled - all services SSL only" | log
 }
 
 prepare_final_shutdown() {
@@ -366,10 +329,10 @@ SERVER DETAILS:
   OS:         Ubuntu 24.04
 
 SSL CERTIFICATES:
-  Managed by: acme.sh (auto-renews every 60 days)
+  Managed by: certbot
   Domains:    ${fqdn}, ${whm_fqdn}, ${webmail_fqdn}
 
-PORTS:
+PORTS (SSL ONLY):
   2087 - WHM (SSL)
   2083 - cPanel (SSL)
   2096 - Webmail (SSL)
@@ -389,8 +352,8 @@ main() {
     prepare_system
     install_cpanel
     configure_mariadb
-    configure_apache_for_acme
     configure_ssl
+    disable_port_80
 
     local end_time=$(date +%s)
     local duration=$(format_duration $((end_time - start_time)))
