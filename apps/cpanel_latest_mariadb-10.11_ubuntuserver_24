@@ -11,6 +11,12 @@ LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
 MARIADB_VERSION="10.11"
 PASSWORD=$(grep -m1 '^password=' /root/guest.conf | cut -d= -f2-)
 
+PRODUCTION="false"
+DATACENTER=$(grep -m1 '^zone=' /root/guest.conf | cut -d= -f2-)
+if [[ ! "$DATACENTER" =~ [Dd][Ee][Vv] ]]; then
+    PRODUCTION="true"
+fi
+
 wait_for_apt() {
     local max_wait=120
     local waited=0
@@ -185,18 +191,31 @@ configure_ssl() {
 
     # Use standalone mode - temporarily listen on port 80 for ACME challenge only
     echo "Requesting SSL certificates from ${acme_server}..." | log
-    certbot certonly \
-        --standalone \
-        --preferred-challenges http \
-        --server "${acme_server}" \
-        --no-verify-ssl \
-        -d "${fqdn}" \
-        -d "${whm_fqdn}" \
-        -d "${webmail_fqdn}" \
-        --non-interactive \
-        --agree-tos \
-        --email "admin@${fqdn}" \
-        --force-renewal 2>&1 | log
+	if [[ "$PRODUCTION" == "false" ]]; then
+		certbot certonly \
+			--standalone \
+			--preferred-challenges http \
+			--server "${acme_server}" \
+			--no-verify-ssl \
+			-d "${fqdn}" \
+			-d "${whm_fqdn}" \
+			-d "${webmail_fqdn}" \
+			--non-interactive \
+			--agree-tos \
+			--email "admin@${fqdn}" \
+			--force-renewal 2>&1 | log
+	else
+		certbot certonly \
+			--standalone \
+			--preferred-challenges http \
+			-d "${fqdn}" \
+			-d "${whm_fqdn}" \
+			-d "${webmail_fqdn}" \
+			--non-interactive \
+			--agree-tos \
+			--email "admin@${fqdn}" \
+			--force-renewal 2>&1 | log
+	fi
 
     # Check if certificates were actually issued
     if [ ! -d "/etc/letsencrypt/live/${fqdn}" ]; then
