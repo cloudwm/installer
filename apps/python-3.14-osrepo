@@ -1,0 +1,24 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+rootDir=$(rootDir)
+echo "Updating OS" | log
+apt update
+echo "Adding deadsnakes PPA for newer Python versions" | log
+apt install -y software-properties-common
+add-apt-repository -y ppa:deadsnakes/ppa
+apt update
+echo "Installing Python 3.14" | log
+installPackage python3.14-full
+waitOrStop 0 "Failed apt install: python3.14-full"
+echo "Adding descriptions" | log
+descriptionAppend "To test basic functionality, run 'python3.14 --help' or 'python3.14 --version'"
+descriptionAppend " "
+descriptionAppend "Note: This installs Python 3.14 alongside the system default Python."
+descriptionAppend "Use 'python3.14' explicitly, or create virtual environments."
+descriptionAppend " "
+tagScript success
+exit 0
