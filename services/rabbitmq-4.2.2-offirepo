@@ -221,7 +221,6 @@ ln -sf /etc/nginx/sites-available/rabbitmq.conf /etc/nginx/sites-enabled/
 
 echo "Adding descriptions" | log
 descriptionAppend "RabbitMQ Management UI: https://${CWM_DOMAIN}"
-descriptionAppend "RabbitMQ Direct Access (HTTPS): https://${CWM_DOMAIN}:15671"
 descriptionAppend "RabbitMQ AMQPS Port: ${CWM_DOMAIN}:5671"
 descriptionAppend " "
 descriptionAppend "RabbitMQ Username: admin"
