@@ -1,6 +1,5 @@
 #!/bin/bash
-
-# Add this at the begining of all scripts.
+# Add this at the beginning of all scripts.
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -12,10 +11,12 @@ checkTagExist php.success
 checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
-appPath=/var/www/html
+rootDir=$(rootDir)
+moodleBase=/var/www/moodle          # New: Moodle code base (outside web root)
+moodlePublic=$moodleBase/public     # Web root for Nginx
+moodleData=/var/www/moodledata      # Secure data directory (outside web root)
 appVersion=5.1.1
 appBranch=stable501
-rootDir=$(rootDir)
 
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
@@ -23,13 +24,22 @@ curlDownload https://download.moodle.org/download.php/direct/$appBranch/moodle-$
 waitOrStop 0 "File not downloaded from official source"
 tar -xzvf moodle-$appVersion.tgz
 waitOrStop 0 "Failed to extract application archive"
-mkdir -p $appPath
-mv moodle $appPath
-rm -f moodle-$appVersion.tgz
-chown -R www-data:www-data $appPath/moodle/
-chmod -R 755 $appPath/moodle/
 
-echo "Setting database and db user " | log
+# Move to secure location
+mkdir -p $moodleBase
+mv moodle/* $moodleBase/
+rm -rf moodle moodle-$appVersion.tgz
+
+# Create moodledata directory
+mkdir -p $moodleData
+chown -R www-data:www-data $moodleData
+chmod 750 $moodleData
+
+# Permissions for Moodle code (www-data needs read/execute, write for install)
+chown -R www-data:www-data $moodleBase
+chmod -R 755 $moodleBase
+
+echo "Setting database and db user" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 CREATE DATABASE moodle CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 CREATE USER 'moodleuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
@@ -44,34 +54,56 @@ sed -i '/allow_url_fopen/s/Off/On/g' $ini
 sed -i '/max_execution_time/s/[0-9]\+/360/g' $ini
 sed -i '/cgi.fix_pathinfo/s/^;//g' $ini
 sed -i '/cgi.fix_pathinfo/s/[0-9]\+/0/g' $ini
-sed -i 's/;max_input_vars = 1000/max_input_vars = 5000/' /etc/php/8.0/fpm/php.ini
-
+sed -i 's/;max_input_vars = 1000/max_input_vars = 5000/' $ini
 
 echo "Move phpmyadmin into app if available" | log
 if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
-    mv $appPath/phpmyadmin $appPath/moodle
+    mv $moodlePublic/phpmyadmin $moodlePublic/  # Adjust if needed
 fi
 
 echo "Creating nginx configurations" | log
 cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
-ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
-unlink /etc/nginx/sites-enabled/default
-unlink /etc/nginx/sites-enabled/default-ssl
+ln -sf /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
+unlink /etc/nginx/sites-enabled/default 2>/dev/null || true
+unlink /etc/nginx/sites-enabled/default-ssl 2>/dev/null || true
 systemctl restart nginx.service
 waitOrStop 0 "Restart nginx service failed"
 
-echo "Adding descriptions" | log
+echo "Running Moodle CLI installation" | log
+cd $moodleBase
+sudo -u www-data php admin/cli/install.php \
+    --non-interactive \
+    --agree-license \
+    --wwwroot=https://${CWM_DISPLAYED_ADDRESS} \
+    --dataroot=$moodleData \
+    --dbtype=mariadb \
+    --dbhost=localhost \
+    --dbname=moodle \
+    --dbuser=moodleuser \
+    --dbpass=${ADMINPASSWORD} \
+    --fullname="Moodle Site" \
+    --shortname="moodle" \
+    --adminuser=admin \
+    --adminpass=${ADMINPASSWORD} \
+    --adminemail=admin@example.com \
+    --lang=en
 
+waitOrStop 0 "Moodle CLI installation failed"
+
+# Tighten permissions after install
+chown -R root:root $moodleBase
+chown -R www-data:www-data $moodleBase/config.php $moodleData
+chmod 640 $moodleBase/config.php
+chmod -R 750 $moodleData
+
+echo "Adding descriptions" | log
 descriptionAppend "Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
 descriptionAppend "Moodle Username: admin"
 descriptionAppend "Moodle Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Moodle Database Username: moodleuser"
 descriptionAppend "Moodle Database Password: ${ADMINPASSWORD}"
-descriptionAppend "(On initial setup, enter database user and password in the matching fields. Other fields should remain as is.)"
 descriptionAppend " "
 
 tagScript success
-
 exit 0
-
