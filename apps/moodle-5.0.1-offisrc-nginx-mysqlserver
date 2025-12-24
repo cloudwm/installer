@@ -13,8 +13,8 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
-appVersion=5.0.1
-appBranch=stable500
+appVersion=5.1.1
+appBranch=stable501
 rootDir=$(rootDir)
 
 echo "Downloading and extracting application" | log
