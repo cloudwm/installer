@@ -12,10 +12,10 @@ checkTagExist mysqld.success
 checkTagExist nginx-enable-php-ssl.success
 
 rootDir=$(rootDir)
-moodleBase=/var/www/moodle          # New: Moodle code base (outside web root)
-moodlePublic=$moodleBase/public     # Web root for Nginx
-moodleData=/var/www/moodledata      # Secure data directory (outside web root)
-appVersion=5.1.1
+moodleBase=/var/www/moodle          # Base dir (outside web root, holds config.php)
+moodlePublic=$moodleBase/public     # ONLY this is web-accessible
+moodleData=/var/www/moodledata      # Secure data dir
+appVersion=5.1.1                    # Current latest as of Dec 2025
 appBranch=stable501
 
 echo "Downloading and extracting application" | log
@@ -25,18 +25,16 @@ waitOrStop 0 "File not downloaded from official source"
 tar -xzvf moodle-$appVersion.tgz
 waitOrStop 0 "Failed to extract application archive"
 
-# Move to secure location
+# Clean and move to secure base location
+rm -rf $moodleBase
 mkdir -p $moodleBase
 mv moodle/* $moodleBase/
 rm -rf moodle moodle-$appVersion.tgz
 
-# Create moodledata directory
+# Create secure moodledata
 mkdir -p $moodleData
-chown -R www-data:www-data $moodleData
+chown -R www-data:www-data $moodleData $moodleBase
 chmod 750 $moodleData
-
-# Permissions for Moodle code (www-data needs read/execute, write for install)
-chown -R www-data:www-data $moodleBase
 chmod -R 755 $moodleBase
 
 echo "Setting database and db user" | log
@@ -58,11 +56,14 @@ sed -i 's/;max_input_vars = 1000/max_input_vars = 5000/' $ini
 
 echo "Move phpmyadmin into app if available" | log
 if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
-    mv $moodlePublic/phpmyadmin $moodlePublic/  # Adjust if needed
+    mv $moodlePublic/phpmyadmin $moodlePublic/ 2>/dev/null || true
 fi
 
 echo "Creating nginx configurations" | log
 cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
+# CRITICAL: Ensure your moodle.conf has: root /var/www/moodle/public;
+# Also add routing for clean URLs, e.g.:
+# location / { try_files $uri /r.php?$args; }
 ln -sf /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default 2>/dev/null || true
 unlink /etc/nginx/sites-enabled/default-ssl 2>/dev/null || true
@@ -85,16 +86,17 @@ sudo -u www-data php admin/cli/install.php \
     --shortname="moodle" \
     --adminuser=admin \
     --adminpass=${ADMINPASSWORD} \
-    --adminemail=admin@example.com \
+    --adminemail=${ADMINENAIL} \
     --lang=en
 
 waitOrStop 0 "Moodle CLI installation failed"
 
-# Tighten permissions after install
+# Secure permissions post-install
 chown -R root:root $moodleBase
-chown -R www-data:www-data $moodleBase/config.php $moodleData
+chown -R www-data:www-data $moodleBase/config.php $moodleData $moodlePublic
 chmod 640 $moodleBase/config.php
 chmod -R 750 $moodleData
+chmod -R 755 $moodlePublic
 
 echo "Adding descriptions" | log
 descriptionAppend "Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
