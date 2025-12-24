@@ -1,0 +1,241 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+RABBITMQ_VERSION="4.2.2-management"
+
+echo "Installing Docker and dependencies" | log
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx nginx jq
+
+# Install Docker if not already installed
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker..." | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+else
+    echo "Docker already installed" | log
+fi
+
+echo "Creating and cleaning RabbitMQ directories" | log
+sudo rm -rf /opt/rabbitmq
+sudo mkdir -p /opt/rabbitmq/{certs,data,config}
+sudo chmod -R 755 /opt/rabbitmq
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+# Stop Nginx temporarily for Certbot validation
+sudo systemctl stop nginx
+if certbot certonly --standalone -d "$CWM_DOMAIN" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate obtained for ${CWM_DOMAIN}" | log
+
+    # Copy certificates for RabbitMQ
+    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/rabbitmq/certs/server_certificate.pem
+    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/rabbitmq/certs/server_key.pem
+    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/chain.pem /opt/rabbitmq/certs/ca_certificate.pem 2>/dev/null || true
+    sudo chmod -R 644 /opt/rabbitmq/certs/*
+
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
+        waitOrStop 0 "Certificate copy failed"
+    fi
+    CERT_TYPE="Let's Encrypt"
+else
+    echo "⚠️  Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🔐 Generating self-signed certificate..." | log
+
+    sudo mkdir -p /opt/rabbitmq/certs
+    openssl req -x509 -sha256 -newkey rsa:2048 \
+        -keyout /opt/rabbitmq/certs/server_key.pem \
+        -out /opt/rabbitmq/certs/server_certificate.pem \
+        -days 365 -nodes \
+        -subj "/CN=${CWM_DOMAIN}"
+
+    sudo cp /opt/rabbitmq/certs/server_certificate.pem /opt/rabbitmq/certs/ca_certificate.pem
+    sudo chmod -R 644 /opt/rabbitmq/certs/*
+    CERT_TYPE="Self-signed"
+fi
+
+echo "Creating RabbitMQ configuration file..." | log
+cat << EOF > /opt/rabbitmq/config/rabbitmq.conf
+# Network and SSL Configuration
+listeners.tcp = none
+listeners.ssl.default = 5671
+
+ssl_options.cacertfile = /certs/ca_certificate.pem
+ssl_options.certfile   = /certs/server_certificate.pem
+ssl_options.keyfile    = /certs/server_key.pem
+ssl_options.verify     = verify_none
+ssl_options.fail_if_no_peer_cert = false
+
+# Management Plugin SSL Configuration
+management.tcp.port = 15672
+management.ssl.port = 15671
+management.ssl.cacertfile = /certs/ca_certificate.pem
+management.ssl.certfile   = /certs/server_certificate.pem
+management.ssl.keyfile    = /certs/server_key.pem
+
+# Logging
+log.file.level = info
+log.console = true
+log.console.level = info
+
+# Memory and Disk
+vm_memory_high_watermark.relative = 0.6
+disk_free_limit.absolute = 2GB
+EOF
+
+echo "Creating advanced RabbitMQ configuration..." | log
+cat << 'EOF' > /opt/rabbitmq/config/advanced.config
+[
+  {rabbit, [
+    {loopback_users, []},
+    {tcp_listeners, []},
+    {ssl_listeners, [5671]}
+  ]}
+].
+EOF
+
+echo "Creating enabled_plugins file..." | log
+cat << 'EOF' > /opt/rabbitmq/config/enabled_plugins
+[rabbitmq_management,rabbitmq_management_agent,rabbitmq_prometheus].
+EOF
+
+echo "Creating Docker Compose file for RabbitMQ..." | log
+cat << EOF > /opt/rabbitmq/docker-compose.yml
+services:
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_VERSION}
+    container_name: rabbitmq
+    hostname: rabbitmq-server
+    restart: always
+    ports:
+      - "5671:5671"    # AMQP SSL
+      - "15671:15671"  # Management UI HTTPS
+      - "15672:15672"  # Management UI HTTP (for local access)
+    volumes:
+      - /opt/rabbitmq/data:/var/lib/rabbitmq
+      - /opt/rabbitmq/certs:/certs:ro
+      - /opt/rabbitmq/config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - /opt/rabbitmq/config/advanced.config:/etc/rabbitmq/advanced.config:ro
+      - /opt/rabbitmq/config/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=${ADMINPASSWORD}
+      - RABBITMQ_DEFAULT_VHOST=/
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+EOF
+
+echo "Generated docker-compose.yml:" | log
+cat /opt/rabbitmq/docker-compose.yml | log
+
+echo "Starting RabbitMQ container..." | log
+cd /opt/rabbitmq
+docker compose down 2>/dev/null || true
+docker compose pull
+docker compose up -d
+waitOrStop 0 "Failed to start RabbitMQ container"
+
+echo "Waiting for RabbitMQ to initialize (45 seconds)..." | log
+sleep 45
+
+echo "Configuring Nginx reverse proxy for RabbitMQ Management UI..." | log
+
+# Create Nginx configuration
+cat << 'NGINXEOF' > /etc/nginx/sites-available/rabbitmq.conf
+server {
+    listen 80;
+    server_name DOMAIN_PLACEHOLDER;
+
+    # Redirect HTTP to HTTPS
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name DOMAIN_PLACEHOLDER;
+
+    # SSL Configuration
+    ssl_certificate /opt/rabbitmq/certs/server_certificate.pem;
+    ssl_certificate_key /opt/rabbitmq/certs/server_key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Proxy settings for RabbitMQ Management
+    location / {
+        proxy_pass http://localhost:15672;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # API endpoint
+    location /api/ {
+        proxy_pass http://localhost:15672/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+NGINXEOF
+
+sed -i "s/DOMAIN_PLACEHOLDER/${CWM_DOMAIN}/g" /etc/nginx/sites-available/rabbitmq.conf
+
+# Enable the site
+unlink /etc/nginx/sites-enabled/default 2>/dev/null || true
+ln -sf /etc/nginx/sites-available/rabbitmq.conf /etc/nginx/sites-enabled/
+
+echo "Adding descriptions" | log
+descriptionAppend "RabbitMQ Management UI: https://${CWM_DOMAIN}"
+descriptionAppend "RabbitMQ Direct Access (HTTPS): https://${CWM_DOMAIN}:15671"
+descriptionAppend "RabbitMQ AMQPS Port: ${CWM_DOMAIN}:5671"
+descriptionAppend " "
+descriptionAppend "RabbitMQ Username: admin"
+descriptionAppend "RabbitMQ Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "RabbitMQ Version: ${RABBITMQ_VERSION}"
+descriptionAppend "SSL Certificate Type: ${CERT_TYPE}"
+descriptionAppend " "
+descriptionAppend "Docker Container: rabbitmq"
+descriptionAppend "Docker Compose Location: /opt/rabbitmq/docker-compose.yml"
+descriptionAppend "RabbitMQ Data Directory: /opt/rabbitmq/data"
+descriptionAppend "RabbitMQ Config Directory: /opt/rabbitmq/config"
+descriptionAppend "RabbitMQ Certificates: /opt/rabbitmq/certs"
+
+tagScript success
+
+exit 0
