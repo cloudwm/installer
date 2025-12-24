@@ -16,7 +16,6 @@ appPath=/var/www/html
 appVersion=5.1.1
 appBranch=stable501
 rootDir=$(rootDir)
-moodleDataDir=/var/moodledata
 
 echo "Downloading and extracting application" | log
 cd $rootDir/temp
@@ -24,45 +23,38 @@ curlDownload https://download.moodle.org/download.php/direct/$appBranch/moodle-$
 waitOrStop 0 "File not downloaded from official source"
 tar -xzvf moodle-$appVersion.tgz
 waitOrStop 0 "Failed to extract application archive"
-
-# Move moodle to a parent directory and rename public directory
-echo "Setting up Moodle directory structure" | log
-mkdir -p $appPath/moodle
-mv moodle/* $appPath/moodle/
-rmdir moodle
+mkdir -p $appPath
+mv moodle $appPath
 rm -f moodle-$appVersion.tgz
-
-# Create moodledata directory (must be outside web root for security)
-echo "Creating moodledata directory" | log
-mkdir -p $moodleDataDir
-chown -R www-data:www-data $moodleDataDir
-chmod -R 770 $moodleDataDir
-
-# Set proper permissions for Moodle
 chown -R www-data:www-data $appPath/moodle/
 chmod -R 755 $appPath/moodle/
 
 echo "Setting database and db user" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
-CREATE DATABASE IF NOT EXISTS moodle CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-CREATE USER IF NOT EXISTS 'moodleuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
+CREATE DATABASE moodle CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER 'moodleuser'@'localhost' identified with mysql_native_password by '${ADMINPASSWORD}';
 GRANT all privileges on moodle.* to moodleuser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
 echo "Tweaking PHP settings for Moodle" | log
-ini=$(find /etc -type f -name "php.ini" | grep fpm)
+# Find the correct php.ini file (adjust for your PHP version)
+ini=$(find /etc -type f -name "php.ini" | grep fpm | head -1)
+if [ -z "$ini" ]; then
+    # Fallback to common location
+    ini="/etc/php/8.0/fpm/php.ini"
+fi
+
 sed -i '/file_uploads/s/Off/On/g' $ini
 sed -i '/allow_url_fopen/s/Off/On/g' $ini
-sed -i '/max_execution_time/s/[0-9]\+/360/g' $ini
-sed -i '/cgi.fix_pathinfo/s/^;//g' $ini
-sed -i '/cgi.fix_pathinfo/s/[0-9]\+/0/g' $ini
-sed -i 's/;max_input_vars = 1000/max_input_vars = 5000/' $ini
-sed -i 's/post_max_size = [0-9]\+M/post_max_size = 512M/' $ini
-sed -i 's/upload_max_filesize = [0-9]\+M/upload_max_filesize = 512M/' $ini
-sed -i 's/memory_limit = [0-9]\+M/memory_limit = 512M/' $ini
+sed -i 's/^max_execution_time = .*/max_execution_time = 360/' $ini
+sed -i 's/^;cgi.fix_pathinfo=.*/cgi.fix_pathinfo=0/' $ini
+sed -i 's/^;max_input_vars = .*/max_input_vars = 5000/' $ini
+sed -i 's/^post_max_size = .*/post_max_size = 512M/' $ini
+sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 512M/' $ini
+sed -i 's/^memory_limit = .*/memory_limit = 512M/' $ini
 
-# Enable required PHP extensions for Moodle
+# Enable required PHP extensions for Moodle 5.1.1
 echo "Enabling required PHP extensions" | log
 phpenmod mbstring
 phpenmod xml
@@ -72,51 +64,47 @@ phpenmod gd
 phpenmod intl
 phpenmod soap
 phpenmod xmlrpc
+phpenmod pgsql  # Only if needed
+phpenmod pdo_mysql
+phpenmod pdo_pgsql  # Only if needed
 
 echo "Move phpmyadmin into app if available" | log
 if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
     # Move phpmyadmin to a separate directory, not inside moodle
     mkdir -p $appPath/phpmyadmin
-    # Assuming phpmyadmin is extracted elsewhere and needs to be moved
-    # This part needs more context about your phpmyadmin setup
+    # This assumes phpmyadmin files are in $appPath/phpmyadmin-temp or similar
+    # Adjust based on your actual phpmyadmin setup
 fi
 
-echo "Creating nginx configurations for Moodle" | log
-# Create nginx configuration for Moodle
+echo "Creating nginx configurations" | log
+# Create a simple moodle.conf for nginx
 cat > /etc/nginx/sites-available/moodle.conf << 'NGINXCONF'
 server {
     listen 80;
+    listen [::]:80;
     server_name _;
     root /var/www/html/moodle;
     index index.php index.html index.htm;
 
     location / {
-        try_files $uri $uri/ =404;
+        try_files $uri $uri/ /index.php?$query_string;
     }
 
-    location ~ [^/]\.php(/|$) {
-        fastcgi_split_path_info ^(.+?\.php)(/.*)$;
-        if (!-f $document_root$fastcgi_script_name) {
-            return 404;
-        }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php-fpm.sock;
-        fastcgi_index index.php;
-        include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param PATH_INFO $fastcgi_path_info;
+        include fastcgi_params;
     }
 
-    location ~ /\. {
-        deny all;
-    }
-
-    location ~ ^/(README.md|LICENSE|composer.json|composer.lock|phpunit.xml|vendor|.git|.github|.env|node_modules|package.json|package-lock.json|Gruntfile.js|.eslintrc|.stylelintrc|webpack.config.js) {
+    location ~ /\.ht {
         deny all;
     }
 }
 
 server {
     listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name _;
     root /var/www/html/moodle;
     index index.php index.html index.htm;
@@ -127,26 +115,17 @@ server {
     ssl_ciphers HIGH:!aNULL:!MD5;
 
     location / {
-        try_files $uri $uri/ =404;
+        try_files $uri $uri/ /index.php?$query_string;
     }
 
-    location ~ [^/]\.php(/|$) {
-        fastcgi_split_path_info ^(.+?\.php)(/.*)$;
-        if (!-f $document_root$fastcgi_script_name) {
-            return 404;
-        }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php-fpm.sock;
-        fastcgi_index index.php;
-        include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param PATH_INFO $fastcgi_path_info;
+        include fastcgi_params;
     }
 
-    location ~ /\. {
-        deny all;
-    }
-
-    location ~ ^/(README.md|LICENSE|composer.json|composer.lock|phpunit.xml|vendor|.git|.github|.env|node_modules|package.json|package-lock.json|Gruntfile.js|.eslintrc|.stylelintrc|webpack.config.js) {
+    location ~ /\.ht {
         deny all;
     }
 }
@@ -156,115 +135,23 @@ ln -sf /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default 2>/dev/null || true
 unlink /etc/nginx/sites-enabled/default-ssl 2>/dev/null || true
 
-# Test nginx configuration
+# Test nginx configuration before restart
 nginx -t
-if [ $? -ne 0 ]; then
-    echo "Nginx configuration test failed" | log
+if [ $? -eq 0 ]; then
+    systemctl restart php*-fpm
+    systemctl restart nginx.service
+    waitOrStop 0 "Restart nginx service failed"
+else
+    echo "Nginx configuration test failed, please check moodle.conf" | log
     exit 1
 fi
 
-systemctl restart php*-fpm
-systemctl restart nginx.service
-waitOrStop 0 "Restart nginx service failed"
-
-echo "Creating Moodle config.php" | log
-cat > $appPath/moodle/config.php << 'MOODLECONFIG'
-<?php
-// Moodle configuration file
-unset($CFG);
-global $CFG;
-$CFG = new stdClass();
-
-$CFG->dbtype = 'mysqli';
-$CFG->dblibrary = 'native';
-$CFG->dbhost = 'localhost';
-$CFG->dbname = 'moodle';
-$CFG->dbuser = 'moodleuser';
-$CFG->dbpass = 'ADMINPASSWORD_PLACEHOLDER';
-$CFG->prefix = 'mdl_';
-$CFG->dboptions = array(
-  'dbpersist' => 0,
-  'dbport' => '',
-  'dbsocket' => '',
-  'dbcollation' => 'utf8mb4_general_ci',
-);
-
-$CFG->wwwroot = 'https://CWM_DOMAIN_PLACEHOLDER';
-$CFG->dataroot = '/var/moodledata';
-$CFG->admin = 'admin';
-$CFG->directorypermissions = 02777;
-
-// Security settings
-$CFG->preventexecpath = true;
-$CFG->disableupdateautodeploy = true;
-$CFG->allowthemechangeonurl = false;
-
-require_once(__DIR__ . '/lib/setup.php');
-
-// There is no php closing tag in this file,
-// it is intentional because it prevents trailing whitespace problems!
-MOODLECONFIG
-
-# Replace placeholders
-sed -i "s|ADMINPASSWORD_PLACEHOLDER|${ADMINPASSWORD}|g" $appPath/moodle/config.php
-sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DISPLAYED_ADDRESS}|g" $appPath/moodle/config.php
-
-chown www-data:www-data $appPath/moodle/config.php
-chmod 640 $appPath/moodle/config.php
-
-echo "Running Moodle CLI installation" | log
-cd $appPath/moodle
-
-# Create the dataroot directory with proper permissions
-mkdir -p /var/moodledata
-chown www-data:www-data /var/moodledata
-chmod 0777 /var/moodledata
-
-# Run the Moodle installation via CLI
-sudo -u www-data /usr/bin/php admin/cli/install_database.php \
-    --agree-license \
-    --fullname="Moodle Site" \
-    --shortname="Moodle" \
-    --adminuser=admin \
-    --adminpass="${ADMINPASSWORD}" \
-    --adminemail="admin@${CWM_DISPLAYED_ADDRESS}"
-
-if [ $? -eq 0 ]; then
-    echo "Moodle database installation completed successfully" | log
-else
-    echo "Error: Moodle CLI installation failed" | log
-    echo "Trying alternative installation method..." | log
-    
-    # Try to run the install script directly
-    cd $appPath/moodle
-    sudo -u www-data /usr/bin/php admin/cli/install.php \
-        --agree-license \
-        --wwwroot="https://${CWM_DISPLAYED_ADDRESS}" \
-        --dataroot="/var/moodledata" \
-        --dbtype=mysqli \
-        --dbhost=localhost \
-        --dbname=moodle \
-        --dbuser=moodleuser \
-        --dbpass="${ADMINPASSWORD}" \
-        --prefix=mdl_ \
-        --fullname="Moodle Site" \
-        --shortname="Moodle" \
-        --adminuser=admin \
-        --adminpass="${ADMINPASSWORD}" \
-        --adminemail="admin@${CWM_DISPLAYED_ADDRESS}" \
-        --non-interactive
-fi
-
-echo "Setting final permissions" | log
-chown -R www-data:www-data $appPath/moodle/
-find $appPath/moodle -type d -exec chmod 755 {} \;
-find $appPath/moodle -type f -exec chmod 644 {} \;
-chmod -R 755 $appPath/moodle/admin/cli
-
-# Set permissions for moodledata
-chown -R www-data:www-data /var/moodledata
-find /var/moodledata -type d -exec chmod 0777 {} \;
-find /var/moodledata -type f -exec chmod 0666 {} \;
+# Create moodledata directory with proper permissions
+echo "Creating moodledata directory" | log
+moodleDataDir="/var/moodledata"
+mkdir -p $moodleDataDir
+chown www-data:www-data $moodleDataDir
+chmod 0777 $moodleDataDir
 
 echo "Adding descriptions" | log
 descriptionAppend "Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
@@ -276,14 +163,20 @@ descriptionAppend "Moodle Database Username: moodleuser"
 descriptionAppend "Moodle Database Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Moodle Data Directory: /var/moodledata"
-descriptionAppend "Moodle Config File: $appPath/moodle/config.php"
 descriptionAppend " "
-descriptionAppend "Note: Installation has been automated. If you see any setup wizard,"
-descriptionAppend "the database is already configured with the credentials above."
+descriptionAppend "Installation Steps:"
+descriptionAppend "1. Visit https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "2. Select language and click 'Next'"
+descriptionAppend "3. On 'Database settings' page:"
+descriptionAppend "   - Database type: mysqli"
+descriptionAppend "   - Database host: localhost"
+descriptionAppend "   - Database name: moodle"
+descriptionAppend "   - Database user: moodleuser"
+descriptionAppend "   - Database password: ${ADMINPASSWORD}"
+descriptionAppend "   - Tables prefix: mdl_ (default)"
+descriptionAppend "4. Complete the web installer"
 descriptionAppend " "
-
-# Clean up
-rm -f $rootDir/temp/moodle-$appVersion.tgz 2>/dev/null || true
 
 tagScript success
+
 exit 0
