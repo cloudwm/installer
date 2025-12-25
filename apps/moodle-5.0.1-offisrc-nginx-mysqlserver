@@ -23,11 +23,24 @@ curlDownload https://download.moodle.org/download.php/direct/$appBranch/moodle-$
 waitOrStop 0 "File not downloaded from official source"
 tar -xzvf moodle-$appVersion.tgz
 waitOrStop 0 "Failed to extract application archive"
-mkdir -p $appPath
-mv moodle $appPath
+
+# Move moodle to correct location
+mv moodle $appPath/
 rm -f moodle-$appVersion.tgz
 
-# Set proper permissions for Moodle
+# Verify installation
+echo "Verifying Moodle installation..." | log
+echo "Moodle directory: $appPath/moodle/" | log
+echo "Files in moodle directory:" | log
+ls -la $appPath/moodle/ | head -10 | log
+
+if [ ! -f "$appPath/moodle/index.php" ]; then
+    echo "ERROR: index.php not found!" | log
+    echo "Check if moodle was extracted correctly" | log
+    exit 1
+fi
+
+# Set permissions - IMPORTANT: don't make moodle directory writable by web server
 chown -R www-data:www-data $appPath/moodle/
 find $appPath/moodle -type d -exec chmod 755 {} \;
 find $appPath/moodle -type f -exec chmod 644 {} \;
@@ -61,7 +74,7 @@ phpenmod soap
 phpenmod xmlrpc
 phpenmod pdo_mysql
 
-# Create moodledata directory with proper permissions
+# Create moodledata directory
 echo "Creating moodledata directory" | log
 moodleDataDir="/var/moodledata"
 mkdir -p $moodleDataDir
@@ -70,14 +83,22 @@ chmod 0777 $moodleDataDir
 
 echo "Move phpmyadmin into app if available" | log
 if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
-    mv $appPath/phpmyadmin $appPath/moodle
+    if [ -d "$appPath/phpmyadmin" ]; then
+        mv $appPath/phpmyadmin $appPath/moodle/ 2>/dev/null || echo "Could not move phpmyadmin" | log
+    fi
 fi
 
-echo "Creating nginx configurations" | log
+echo "Setting up nginx configuration" | log
+# Simply copy and enable the existing moodle.conf - NO MODIFICATIONS
 cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
-ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
-unlink /etc/nginx/sites-enabled/default
-unlink /etc/nginx/sites-enabled/default-ssl
+ln -sf /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default-ssl
+
+echo "Current nginx configuration:" | log
+echo "=== moodle.conf ===" | log
+cat /etc/nginx/sites-available/moodle.conf | log
+echo "==================" | log
 
 # Test nginx configuration
 echo "Testing nginx configuration..." | log
@@ -85,92 +106,79 @@ if nginx -t; then
     echo "Nginx configuration test passed" | log
     systemctl restart nginx.service
     waitOrStop 0 "Restart nginx service failed"
+    
+    # Give nginx time to start
+    sleep 2
+    
+    # Test if we can access the site
+    echo "Testing site accessibility..." | log
+    if curl -k -s -o /dev/null -w "%{http_code}" https://localhost/install.php 2>/dev/null | grep -q "200\|302"; then
+        echo "Site is accessible (HTTP 200/302)" | log
+    else
+        echo "Warning: Site might not be accessible, check manually" | log
+    fi
 else
     echo "Nginx configuration test failed" | log
-    # Show the error
+    echo "Error details:" | log
     nginx -t 2>&1 | log
     exit 1
 fi
 
-echo "Creating installer-friendly environment" | log
-# Remove any existing config.php to let installer create it fresh
-rm -f $appPath/moodle/config.php 2>/dev/null || true
-
-# Create a simple redirect to installer if config.php doesn't exist
-cat > $appPath/moodle/index.php << 'INDEX'
+echo "Creating diagnostic test files" | log
+# Create a simple test file to verify PHP is working
+cat > $appPath/moodle/diag-test.php << 'DIAG'
 <?php
-// Simple redirect to installer if config.php doesn't exist
-if (!file_exists(__DIR__ . '/config.php')) {
-    header('Location: /install.php');
-    exit;
+echo "<h1>Diagnostic Test</h1>";
+echo "<p>PHP is working!</p>";
+echo "<p>Server: " . $_SERVER['SERVER_SOFTWARE'] . "</p>";
+echo "<p>Document Root: " . $_SERVER['DOCUMENT_ROOT'] . "</p>";
+echo "<p>Request URI: " . $_SERVER['REQUEST_URI'] . "</p>";
+echo "<p>Script Name: " . $_SERVER['SCRIPT_NAME'] . "</p>";
+echo "<h2>Directory Listing of " . __DIR__ . ":</h2>";
+echo "<ul>";
+$files = scandir(__DIR__);
+foreach ($files as $file) {
+    if ($file != '.' && $file != '..' && !str_starts_with($file, '.')) {
+        $size = is_file($file) ? filesize($file) . " bytes" : "DIR";
+        echo "<li>" . htmlspecialchars($file) . " ($size)</li>";
+    }
 }
+echo "</ul>";
+DIAG
 
-// If config.php exists, include the real index.php
-require_once(__DIR__ . '/config.php');
-require_once($CFG->dirroot . '/lib/setup.php');
-require_once($CFG->libdir . '/outputrequirementslib.php');
+chown www-data:www-data $appPath/moodle/diag-test.php
+chmod 644 $appPath/moodle/diag-test.php
 
-$PAGE->set_context(context_system::instance());
-$PAGE->set_url('/');
-$PAGE->set_pagelayout('frontpage');
-
-echo $OUTPUT->header();
-echo $OUTPUT->footer();
-INDEX
-
-chown www-data:www-data $appPath/moodle/index.php
-chmod 644 $appPath/moodle/index.php
-
-# Create a minimal .htaccess to prevent directory listing
-cat > $appPath/moodle/.htaccess << 'HTACCESS'
-# Moodle .htaccess
-Options -Indexes
-HTACCESS
-
-chown www-data:www-data $appPath/moodle/.htaccess
-chmod 644 $appPath/moodle/.htaccess
-
-echo "Setting installer permissions" | log
-# Make sure the moodle directory is writable by installer
-chmod 775 $appPath/moodle
-
-echo "Adding descriptions" | log
-descriptionAppend "Moodle 5.1.1 Web UI: https://${CWM_DISPLAYED_ADDRESS}"
-descriptionAppend "Moodle Username: admin"
-descriptionAppend "Moodle Password: ${ADMINPASSWORD}"
+echo "Adding descriptions with troubleshooting" | log
+descriptionAppend "Moodle 5.1.1 Installation"
 descriptionAppend " "
-descriptionAppend "Moodle Database Name: moodle"
-descriptionAppend "Moodle Database Username: moodleuser"
-descriptionAppend "Moodle Database Password: ${ADMINPASSWORD}"
-descriptionAppend "Moodle Data Directory: /var/moodledata"
+descriptionAppend "🌐 Access URLs:"
+descriptionAppend "   - Diagnostic Test: https://${CWM_DISPLAYED_ADDRESS}/diag-test.php"
+descriptionAppend "   - Moodle Installer: https://${CWM_DISPLAYED_ADDRESS}/install.php"
+descriptionAppend "   - Moodle Home: https://${CWM_DISPLAYED_ADDRESS}/"
 descriptionAppend " "
-descriptionAppend "Installation Steps:"
-descriptionAppend "1. Visit https://${CWM_DISPLAYED_ADDRESS}"
-descriptionAppend "2. You will be redirected to the installer"
-descriptionAppend "3. On 'Database settings' page use:"
-descriptionAppend "   - Database type: mysqli"
-descriptionAppend "   - Database host: localhost"
-descriptionAppend "   - Database name: moodle"
-descriptionAppend "   - Database user: moodleuser"
-descriptionAppend "   - Database password: ${ADMINPASSWORD}"
-descriptionAppend "   - Tables prefix: mdl_ (default)"
-descriptionAppend "4. Complete the installation"
+descriptionAppend "🔧 If you get 404 error, check:"
+descriptionAppend "   1. Diagnostic page above to see document root"
+descriptionAppend "   2. Nginx config: cat /etc/nginx/sites-available/moodle.conf"
+descriptionAppend "   3. Directory contents: ls -la /var/www/html/moodle/"
+descriptionAppend "   4. Nginx error log: tail -f /var/log/nginx/error.log"
 descriptionAppend " "
-descriptionAppend "Troubleshooting:"
-descriptionAppend "If you see installation errors:"
-descriptionAppend "1. Check permissions: ls -la /var/www/html/moodle/"
-descriptionAppend "2. Check moodledata: ls -la /var/moodledata/"
-descriptionAppend "3. Check PHP: visit https://${CWM_DISPLAYED_ADDRESS}/test.php"
+descriptionAppend "🔑 Database Credentials:"
+descriptionAppend "   Database: moodle"
+descriptionAppend "   Username: moodleuser"
+descriptionAppend "   Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "📁 Moodle Data Directory: /var/moodledata"
+descriptionAppend " "
+descriptionAppend "🚀 To install Moodle:"
+descriptionAppend "   1. Visit https://${CWM_DISPLAYED_ADDRESS}/install.php"
+descriptionAppend "   2. Follow the installation wizard"
+descriptionAppend "   3. Use the database credentials above"
 descriptionAppend " "
 
-# Create a simple PHP test file
-cat > $appPath/moodle/test.php << 'TEST'
-<?php
-phpinfo();
-TEST
-
-chown www-data:www-data $appPath/moodle/test.php
-chmod 644 $appPath/moodle/test.php
+# Clean up - remove test file after some time (optional)
+echo "Test files will be available for debugging" | log
+echo "Remember to delete diag-test.php after installation" | log
 
 tagScript success
 
