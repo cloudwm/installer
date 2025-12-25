@@ -38,11 +38,17 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "Tweaking PHP settings for Moodle" | log
-# Find the correct php.ini file (adjust for your PHP version)
+# Find the correct php.ini file
 ini=$(find /etc -type f -name "php.ini" | grep fpm | head -1)
 if [ -z "$ini" ]; then
     # Fallback to common location
-    ini="/etc/php/8.0/fpm/php.ini"
+    if [ -f "/etc/php/8.2/fpm/php.ini" ]; then
+        ini="/etc/php/8.2/fpm/php.ini"
+    elif [ -f "/etc/php/8.1/fpm/php.ini" ]; then
+        ini="/etc/php/8.1/fpm/php.ini"
+    else
+        ini="/etc/php/8.0/fpm/php.ini"
+    fi
 fi
 
 sed -i '/file_uploads/s/Off/On/g' $ini
@@ -64,16 +70,32 @@ phpenmod gd
 phpenmod intl
 phpenmod soap
 phpenmod xmlrpc
-phpenmod pgsql  # Only if needed
 phpenmod pdo_mysql
-phpenmod pdo_pgsql  # Only if needed
 
 echo "Move phpmyadmin into app if available" | log
 if [ -f "$rootDir/temp/phpmyadmin.success" ]; then
-    # Move phpmyadmin to a separate directory, not inside moodle
-    mkdir -p $appPath/phpmyadmin
-    # This assumes phpmyadmin files are in $appPath/phpmyadmin-temp or similar
-    # Adjust based on your actual phpmyadmin setup
+    # phpmyadmin handling - adjust based on your actual setup
+    echo "phpMyAdmin detected - skipping integration with Moodle for security" | log
+fi
+
+echo "Generating SSL certificates if they don't exist" | log
+# Generate self-signed SSL certificate if it doesn't exist
+if [ ! -f /etc/ssl/certs/ssl-cert-snakeoil.pem ] || [ ! -f /etc/ssl/private/ssl-cert-snakeoil.key ]; then
+    echo "Creating self-signed SSL certificate..." | log
+    mkdir -p /etc/ssl/certs /etc/ssl/private
+    
+    # Generate self-signed certificate
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
+        -out /etc/ssl/certs/ssl-cert-snakeoil.pem \
+        -subj "/C=US/ST=State/L=City/O=Organization/CN=${CWM_DOMAIN:-localhost}"
+    
+    chmod 600 /etc/ssl/private/ssl-cert-snakeoil.key
+    chmod 644 /etc/ssl/certs/ssl-cert-snakeoil.pem
+    
+    echo "Self-signed SSL certificate created" | log
+else
+    echo "SSL certificates already exist, skipping generation" | log
 fi
 
 echo "Creating nginx configurations" | log
@@ -86,20 +108,8 @@ server {
     root /var/www/html/moodle;
     index index.php index.html index.htm;
 
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\.ht {
-        deny all;
-    }
+    # Redirect to HTTPS
+    return 301 https://$host$request_uri;
 }
 
 server {
@@ -109,40 +119,64 @@ server {
     root /var/www/html/moodle;
     index index.php index.html index.htm;
 
+    # SSL configuration
     ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
     ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
 
+    # Moodle specific settings
+    client_max_body_size 512M;
+    
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
+    location ~ [^/]\.php(/|$) {
+        fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+        if (!-f $document_root$fastcgi_script_name) {
+            return 404;
+        }
+        
         fastcgi_pass unix:/var/run/php/php-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_index index.php;
         include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS on;
     }
 
+    # Deny access to .htaccess files
     location ~ /\.ht {
+        deny all;
+    }
+    
+    # Deny access to some sensitive files
+    location ~ /(config.php|composer.json|composer.lock|README.md|LICENSE|phpunit.xml|.git|.github|.env|node_modules|package.json|package-lock.json|Gruntfile.js) {
         deny all;
     }
 }
 NGINXCONF
 
+# Remove existing symlinks and create new ones
+rm -f /etc/nginx/sites-enabled/moodle.conf
 ln -sf /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
-unlink /etc/nginx/sites-enabled/default 2>/dev/null || true
-unlink /etc/nginx/sites-enabled/default-ssl 2>/dev/null || true
+
+# Remove default sites
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default-ssl
 
 # Test nginx configuration before restart
-nginx -t
-if [ $? -eq 0 ]; then
+echo "Testing nginx configuration..." | log
+if nginx -t; then
+    echo "Nginx configuration test passed" | log
     systemctl restart php*-fpm
     systemctl restart nginx.service
     waitOrStop 0 "Restart nginx service failed"
 else
-    echo "Nginx configuration test failed, please check moodle.conf" | log
+    echo "Nginx configuration test failed" | log
+    echo "Showing nginx error log for debugging:" | log
+    tail -20 /var/log/nginx/error.log | log
     exit 1
 fi
 
@@ -153,28 +187,42 @@ mkdir -p $moodleDataDir
 chown www-data:www-data $moodleDataDir
 chmod 0777 $moodleDataDir
 
+# Set proper permissions for Moodle
+chown -R www-data:www-data $appPath/moodle/
+find $appPath/moodle -type d -exec chmod 755 {} \;
+find $appPath/moodle -type f -exec chmod 644 {} \;
+
 echo "Adding descriptions" | log
-descriptionAppend "Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
-descriptionAppend "Moodle Admin Username: admin"
-descriptionAppend "Moodle Admin Password: ${ADMINPASSWORD}"
+descriptionAppend "✅ Moodle 5.1.1 Installation Complete"
 descriptionAppend " "
-descriptionAppend "Moodle Database Name: moodle"
-descriptionAppend "Moodle Database Username: moodleuser"
-descriptionAppend "Moodle Database Password: ${ADMINPASSWORD}"
+descriptionAppend "🌐 Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "   (Use HTTPS - SSL certificate is self-signed)"
 descriptionAppend " "
-descriptionAppend "Moodle Data Directory: /var/moodledata"
+descriptionAppend "🔑 Admin Credentials:"
+descriptionAppend "   Username: admin"
+descriptionAppend "   Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "Installation Steps:"
+descriptionAppend "🗄️ Database Information:"
+descriptionAppend "   Database: moodle"
+descriptionAppend "   Username: moodleuser"
+descriptionAppend "   Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "📁 Data Directory: /var/moodledata"
+descriptionAppend " "
+descriptionAppend "🚀 Installation Steps:"
 descriptionAppend "1. Visit https://${CWM_DISPLAYED_ADDRESS}"
-descriptionAppend "2. Select language and click 'Next'"
-descriptionAppend "3. On 'Database settings' page:"
-descriptionAppend "   - Database type: mysqli"
-descriptionAppend "   - Database host: localhost"
-descriptionAppend "   - Database name: moodle"
-descriptionAppend "   - Database user: moodleuser"
-descriptionAppend "   - Database password: ${ADMINPASSWORD}"
-descriptionAppend "   - Tables prefix: mdl_ (default)"
-descriptionAppend "4. Complete the web installer"
+descriptionAppend "2. Accept the self-signed certificate warning"
+descriptionAppend "3. Select language and continue"
+descriptionAppend "4. On 'Database settings' page use:"
+descriptionAppend "   • Database type: mysqli"
+descriptionAppend "   • Host: localhost"
+descriptionAppend "   • Database: moodle"
+descriptionAppend "   • User: moodleuser"
+descriptionAppend "   • Password: ${ADMINPASSWORD}"
+descriptionAppend "   • Tables prefix: mdl_ (default)"
+descriptionAppend "5. Complete the web installer"
+descriptionAppend " "
+descriptionAppend "⚠️ Note: First visit may show security warning due to self-signed certificate"
 descriptionAppend " "
 
 tagScript success
