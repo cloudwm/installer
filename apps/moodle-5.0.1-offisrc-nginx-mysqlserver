@@ -26,8 +26,11 @@ waitOrStop 0 "Failed to extract application archive"
 mkdir -p $appPath
 mv moodle $appPath
 rm -f moodle-$appVersion.tgz
+
+# Set proper permissions for Moodle
 chown -R www-data:www-data $appPath/moodle/
-chmod -R 755 $appPath/moodle/
+find $appPath/moodle -type d -exec chmod 755 {} \;
+find $appPath/moodle -type f -exec chmod 644 {} \;
 
 echo "Setting database and db user" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -58,7 +61,7 @@ phpenmod soap
 phpenmod xmlrpc
 phpenmod pdo_mysql
 
-# Create moodledata directory
+# Create moodledata directory with proper permissions
 echo "Creating moodledata directory" | log
 moodleDataDir="/var/moodledata"
 mkdir -p $moodleDataDir
@@ -76,102 +79,60 @@ ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
 
-# Test nginx configuration before restarting
+# Test nginx configuration
 echo "Testing nginx configuration..." | log
 if nginx -t; then
     echo "Nginx configuration test passed" | log
     systemctl restart nginx.service
     waitOrStop 0 "Restart nginx service failed"
 else
-    echo "Nginx configuration test failed, showing error..." | log
+    echo "Nginx configuration test failed" | log
+    # Show the error
     nginx -t 2>&1 | log
-    echo "Attempting to fix common issues..." | log
-    
-    # Fix common issues in the moodle.conf
-    if [ -f "/etc/nginx/sites-available/moodle.conf" ]; then
-        # Make sure the root path is correct
-        sed -i "s|root /var/www/html;|root /var/www/html/moodle;|g" /etc/nginx/sites-available/moodle.conf
-        sed -i "s|root /var/www/html/moodle/;|root /var/www/html/moodle;|g" /etc/nginx/sites-available/moodle.conf
-        
-        # Test again
-        if nginx -t; then
-            echo "Fixed nginx configuration, restarting..." | log
-            systemctl restart nginx.service
-            waitOrStop 0 "Restart nginx service failed"
-        else
-            echo "Could not fix nginx configuration" | log
-            exit 1
-        fi
-    fi
+    exit 1
 fi
 
-echo "Creating proper config.php for Moodle installer" | log
-# Create a proper config.php that satisfies Moodle's requirements but still allows installer
-cat > $appPath/moodle/config.php << 'CONFIG'
+echo "Creating installer-friendly environment" | log
+# Remove any existing config.php to let installer create it fresh
+rm -f $appPath/moodle/config.php 2>/dev/null || true
+
+# Create a simple redirect to installer if config.php doesn't exist
+cat > $appPath/moodle/index.php << 'INDEX'
 <?php
-// Moodle configuration file for installer
-// This file contains minimal settings to allow installer to run
-// The installer will create a complete config.php
-
-unset($CFG);
-global $CFG;
-$CFG = new stdClass();
-
-// REQUIRED: dataroot - Moodle 5.1.1 requires this even for installer
-$CFG->dataroot = '/var/moodledata';
-
-// Allow installer to run
-$CFG->early_install_lang = true;
-$CFG->disableupdateautodeploy = true;
-
-// Directory permissions
-$CFG->directorypermissions = 02777;
-
-// Database settings (installer will override these)
-$CFG->dbtype    = 'mysqli';
-$CFG->dblibrary = 'native';
-$CFG->dbhost    = 'localhost';
-$CFG->dbname    = 'moodle';
-$CFG->dbuser    = 'moodleuser';
-$CFG->dbpass    = 'ADMINPASSWORD_PLACEHOLDER';
-$CFG->prefix    = 'mdl_';
-$CFG->dboptions = array(
-  'dbpersist' => 0,
-  'dbport' => '',
-  'dbsocket' => '',
-  'dbcollation' => 'utf8mb4_general_ci',
-);
-
-// wwwroot - will be detected by installer but we set it anyway
-$CFG->wwwroot = 'https://CWM_DOMAIN_PLACEHOLDER';
-
-// Force admin to be created by installer
-$CFG->admin = 'admin';
-
-// Required for setup.php
-require_once(__DIR__ . '/lib/setup.php');
-
-// If we reach here and installer hasn't run yet, redirect to installer
-// but only if we're not already on the installer page
-if (!defined('MOODLE_INTERNAL') && php_sapi_name() !== 'cli') {
-    $current_page = $_SERVER['SCRIPT_NAME'];
-    if ($current_page !== '/install.php' && $current_page !== '/admin/index.php') {
-        header('Location: /install.php');
-        exit;
-    }
+// Simple redirect to installer if config.php doesn't exist
+if (!file_exists(__DIR__ . '/config.php')) {
+    header('Location: /install.php');
+    exit;
 }
-CONFIG
 
-# Replace placeholders in config.php
-sed -i "s|ADMINPASSWORD_PLACEHOLDER|${ADMINPASSWORD}|g" $appPath/moodle/config.php
-sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DISPLAYED_ADDRESS}|g" $appPath/moodle/config.php
+// If config.php exists, include the real index.php
+require_once(__DIR__ . '/config.php');
+require_once($CFG->dirroot . '/lib/setup.php');
+require_once($CFG->libdir . '/outputrequirementslib.php');
 
-chown www-data:www-data $appPath/moodle/config.php
-chmod 644 $appPath/moodle/config.php
+$PAGE->set_context(context_system::instance());
+$PAGE->set_url('/');
+$PAGE->set_pagelayout('frontpage');
 
-echo "Setting final permissions for installer" | log
-# Make sure installer can write to config.php
-chmod 664 $appPath/moodle/config.php
+echo $OUTPUT->header();
+echo $OUTPUT->footer();
+INDEX
+
+chown www-data:www-data $appPath/moodle/index.php
+chmod 644 $appPath/moodle/index.php
+
+# Create a minimal .htaccess to prevent directory listing
+cat > $appPath/moodle/.htaccess << 'HTACCESS'
+# Moodle .htaccess
+Options -Indexes
+HTACCESS
+
+chown www-data:www-data $appPath/moodle/.htaccess
+chmod 644 $appPath/moodle/.htaccess
+
+echo "Setting installer permissions" | log
+# Make sure the moodle directory is writable by installer
+chmod 775 $appPath/moodle
 
 echo "Adding descriptions" | log
 descriptionAppend "Moodle 5.1.1 Web UI: https://${CWM_DISPLAYED_ADDRESS}"
@@ -185,18 +146,31 @@ descriptionAppend "Moodle Data Directory: /var/moodledata"
 descriptionAppend " "
 descriptionAppend "Installation Steps:"
 descriptionAppend "1. Visit https://${CWM_DISPLAYED_ADDRESS}"
-descriptionAppend "2. The installer should start automatically"
+descriptionAppend "2. You will be redirected to the installer"
 descriptionAppend "3. On 'Database settings' page use:"
-descriptionAppend "   - Database type: mysqli (already pre-filled)"
-descriptionAppend "   - Database host: localhost (already pre-filled)"
-descriptionAppend "   - Database name: moodle (already pre-filled)"
-descriptionAppend "   - Database user: moodleuser (already pre-filled)"
-descriptionAppend "   - Database password: ${ADMINPASSWORD} (already pre-filled)"
-descriptionAppend "   - Tables prefix: mdl_ (already pre-filled)"
-descriptionAppend "4. Click 'Next' and complete the installation"
+descriptionAppend "   - Database type: mysqli"
+descriptionAppend "   - Database host: localhost"
+descriptionAppend "   - Database name: moodle"
+descriptionAppend "   - Database user: moodleuser"
+descriptionAppend "   - Database password: ${ADMINPASSWORD}"
+descriptionAppend "   - Tables prefix: mdl_ (default)"
+descriptionAppend "4. Complete the installation"
 descriptionAppend " "
-descriptionAppend "Note: Most database fields are pre-filled in the installer"
+descriptionAppend "Troubleshooting:"
+descriptionAppend "If you see installation errors:"
+descriptionAppend "1. Check permissions: ls -la /var/www/html/moodle/"
+descriptionAppend "2. Check moodledata: ls -la /var/moodledata/"
+descriptionAppend "3. Check PHP: visit https://${CWM_DISPLAYED_ADDRESS}/test.php"
 descriptionAppend " "
+
+# Create a simple PHP test file
+cat > $appPath/moodle/test.php << 'TEST'
+<?php
+phpinfo();
+TEST
+
+chown www-data:www-data $appPath/moodle/test.php
+chmod 644 $appPath/moodle/test.php
 
 tagScript success
 
