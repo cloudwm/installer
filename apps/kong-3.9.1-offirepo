@@ -1,0 +1,99 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Kong Gateway using official quickstart script" | log
+export DEBIAN_FRONTEND="noninteractive"
+# Install prerequisites
+echo "Installing prerequisites" | log
+sudo apt update
+sudo apt install -y curl ca-certificates dnsutils nginx certbot python3-certbot-nginx
+waitOrStop 0 "Failed to install prerequisites"
+# Install Docker
+echo "Installing Docker" | log
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+waitOrStop 0 "Docker installation failed"
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+# Install Docker Compose
+sudo apt install -y docker-compose-plugin
+waitOrStop 0 "Docker Compose installation failed"
+
+KONG_DIR="/opt/kong-quickstart"
+sudo mkdir -p "$KONG_DIR"
+sudo chown $USER:$USER "$KONG_DIR"
+cp /opt/installer/tweaks/extras/kong/docker-compose.yml $KONG_DIR
+echo "CWM_DOMAIN=${CWM_DOMAIN}" >> $KONG_DIR/.env
+
+cd "$KONG_DIR"
+docker compose up -d kong-database
+for i in {1..30}; do
+    if docker compose exec -T kong-database pg_isready -U kong >/dev/null 2>&1; then break; fi
+    sleep 2
+done
+docker compose run --rm kong-gateway kong migrations bootstrap
+docker compose up -d kong-gateway
+
+# Wait for Kong
+for i in {1..60}; do
+    if curl -s http://localhost:8001/status >/dev/null; then
+        echo "Kong is healthy" | log
+        break
+    fi
+    sleep 5
+done
+
+systemctl stop nginx
+
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    exit 1
+fi
+
+cp /opt/installer/tweaks/extras/kong/kong /etc/nginx/sites-available/
+sed -i "s/DOMAIN/${CWM_DOMAIN}/g" /etc/nginx/sites-available/kong
+
+# Enable site
+sudo ln -sf /etc/nginx/sites-available/kong /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test and restart Nginx
+sudo nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+
+sudo systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding descriptions" | log
+descriptionAppend "🌐 Kong Manager (Web UI): https://${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "# Create a new service"
+descriptionAppend "curl -X POST http://localhost:8001/services \\"
+descriptionAppend "  --data 'name=my-api' \\"
+descriptionAppend "  --data 'url=https://api.example.com'"
+descriptionAppend " "
+descriptionAppend "# Create a route for the service"
+descriptionAppend "curl -X POST http://localhost:8001/services/my-api/routes \\"
+descriptionAppend "  --data 'name=my-route' \\"
+descriptionAppend "  --data 'paths[]=/api'"
+descriptionAppend " "
+descriptionAppend "# Add rate limiting plugin"
+descriptionAppend "curl -X POST http://localhost:8001/services/my-api/plugins \\"
+descriptionAppend "  --data 'name=rate-limiting' \\"
+descriptionAppend "  --data 'config.minute=100' \\"
+descriptionAppend "  --data 'config.policy=local'"
+descriptionAppend " "
+descriptionAppend "# Add authentication (API Key)"
+descriptionAppend "curl -X POST http://localhost:8001/services/my-api/plugins \\"
+descriptionAppend "  --data 'name=key-auth'"
+tagScript success
+exit 0

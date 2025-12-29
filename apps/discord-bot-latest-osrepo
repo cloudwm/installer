@@ -1,5 +1,4 @@
 #!/bin/bash
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -8,25 +7,64 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Installing Python3-pip" | log
-installPackage python3-pip | log
-waitOrStop 0 "Failed to install python3-pip"
+echo "Installing Python3 and pip" | log
+installPackage python3 python3-pip python3-venv | log
+waitOrStop 0 "Failed to install python3 and pip"
 
-echo "Installing discord.py" | log
-pip install discord.py
-waitOrStop 0 "Failed to install discord.py"
-mkdir -p /opt/discord/
-pip freeze > /opt/discord/requirements.txt
+# Create bot directory
+echo "Creating Discord bot directory..." | log
+mkdir -p /opt/discord
+cd /opt/discord
 
-echo "Copying default bot template" | log
-cp $rootDir/tweaks/extras/discord/bot.py /opt/discord/
+# Create virtual environment
+echo "Creating Python virtual environment..." | log
+python3 -m venv venv
+
+# Activate venv and upgrade pip
+echo "Upgrading pip in virtual environment..." | log
+source venv/bin/activate
+pip install --upgrade pip
+deactivate  # Deactivate temporarily
+
+# Install discord.py in venv
+echo "Installing discord.py in virtual environment..." | log
+source venv/bin/activate
+pip install -U discord.py
+pip freeze > requirements.txt
+deactivate
+
+# Copy default bot template
+echo "Copying default bot template..." | log
+cp "$rootDir/tweaks/extras/discord/bot.py" /opt/discord/
+
+# Make bot.py executable
+chmod +x /opt/discord/bot.py
 
 echo "Adding descriptions" | log
-descriptionAppend "Discord-bot default folder: /opt/discord"
-descriptionAppend "Default bot.py lcoation: /opt/discord/bot.py"
-descriptionAppend "Make sure to set your Token and Guild variables in bot.py"
+descriptionAppend "Discord Bot installed with virtual environment!"
+descriptionAppend "Folder: /opt/discord"
+descriptionAppend "Virtual env: /opt/discord/venv"
+descriptionAppend "Bot script: /opt/discord/bot.py"
+descriptionAppend "Requirements: /opt/discord/requirements.txt"
 descriptionAppend " "
+descriptionAppend "To run the bot:"
+descriptionAppend " cd /opt/discord"
+descriptionAppend " source venv/bin/activate"
+descriptionAppend " python bot.py"
+descriptionAppend " (Or: /opt/discord/venv/bin/python bot.py)"
+descriptionAppend " "
+descriptionAppend "To run in background (e.g., with screen/tmux):"
+descriptionAppend " screen -S discord-bot"
+descriptionAppend " cd /opt/discord && source venv/bin/activate && python bot.py"
+descriptionAppend " Detach with Ctrl+A+D"
+descriptionAppend " "
+descriptionAppend "IMPORTANT:"
+descriptionAppend "Edit /opt/discord/bot.py and set your Bot Token"
+descriptionAppend "Enable required Intents in Discord Developer Portal"
+descriptionAppend " "
+descriptionAppend "For voice support (music bots etc.):"
+descriptionAppend " sudo apt install ffmpeg"
+descriptionAppend " Then: source venv/bin/activate && pip install -U \"discord.py[voice]\""
 
 tagScript success
-
 exit 0

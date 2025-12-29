@@ -1,0 +1,166 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Vaultwarden (Bitwarden Compatible) with Docker + Nginx + SSL" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Install Docker (if not already installed)
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+fi
+
+# Create Vaultwarden directory
+echo "Creating Vaultwarden directory" | log
+appInstallDir="/opt/vaultwarden"
+sudo mkdir -p ${appInstallDir}/data
+sudo chown -R $USER:$USER ${appInstallDir}
+
+# Generate admin token (for initial setup)
+ADMIN_TOKEN=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-32)
+
+# Write .env file
+cat << EOF > ${appInstallDir}/.env
+DOMAIN=https://${CWM_DOMAIN}
+ADMIN_TOKEN=${ADMIN_TOKEN}
+WEBSOCKET_ENABLED=true
+EOF
+
+# Create docker-compose.yml
+cat << 'EOF' > ${appInstallDir}/docker-compose.yml
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      WEBSOCKET_ENABLED: ${WEBSOCKET_ENABLED}
+      SIGNUPS_ALLOWED: "false"
+    volumes:
+      - ./data:/data
+    networks:
+      - vaultwarden-net
+    ports:
+      - "127.0.0.1:8080:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/alive"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  vaultwarden-net:
+    driver: bridge
+EOF
+
+# Stop nginx for certbot
+systemctl stop nginx
+
+# Generate Let's Encrypt certs (YOUR EXACT BLOCK)
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    exit 1
+fi
+
+# Configure Nginx
+cat << EOF > /etc/nginx/sites-available/vaultwarden
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # WebSocket support for notifications
+    location /notifications/hub {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
+    }
+
+    # Admin page
+    location /admin {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        auth_basic "Admin Area";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+    }
+}
+EOF
+
+echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" | sudo tee /etc/nginx/.htpasswd
+
+# Enable Nginx site
+sudo ln -sf /etc/nginx/sites-available/vaultwarden /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+# Pull and start Vaultwarden services
+echo "Pulling and starting Vaultwarden services" | log
+cd ${appInstallDir}
+docker compose pull
+docker compose up -d
+waitOrStop 0 "Failed to start Vaultwarden services"
+
+ADMIN_TOKEN=$(grep "^ADMIN_TOKEN=" ${appInstallDir}/.env | cut -d= -f2)
+
+echo "Waiting for Vaultwarden to initialize..." | log
+sleep 30
+
+echo "Adding descriptions" | log
+descriptionAppend "Vaultwarden Password Manager is LIVE!"
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Admin: https://${CWM_DOMAIN}/admin (user: admin, pass: ${ADMINPASSWORD})"
+descriptionAppend "   Admin Token → ${ADMIN_TOKEN}"
+descriptionAppend "Data Volume: ${appInstallDir}/data"
+descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
+descriptionAppend "Nginx Config: /etc/nginx/sites-available/vaultwarden"
+descriptionAppend "SSL Certs: ${appInstallDir}/config/https-{cert,key}.pem"
+
+tagScript success
+exit 0

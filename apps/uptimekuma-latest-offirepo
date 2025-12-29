@@ -29,7 +29,7 @@ echo "Starting UpTime-Kuma container" | log
 systemctl restart docker
 sleep 5
 docker run -d --name uptime-kuma --restart unless-stopped \
-	-p 3001:3001 -v "uptime-kuma:/app/data" "louislam/uptime-kuma:1"
+	-p 3001:3001 -v "uptime-kuma:/app/data" "louislam/uptime-kuma:2"
 
 echo "Enabling Docker Service & Restarting Services" | log
 systemctl enable docker

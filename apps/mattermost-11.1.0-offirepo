@@ -1,0 +1,96 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+appPath="/opt/mattermost"
+confFile="/opt/mattermost/config/config.json"
+rootDir=$(rootDir)
+mmuser_name="mmuser"
+mmuser_password=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
+appVersion=11.1.0
+
+echo "Installing PostgreSQL" | log
+apt-get update
+apt-get install -y postgresql postgresql-contrib
+waitOrStop 0 "Failed to install PostgreSQL"
+
+echo "Starting PostgreSQL service" | log
+systemctl start postgresql
+systemctl enable postgresql
+waitOrStop 0 "Failed to start PostgreSQL"
+
+echo "Preparing database for application" | log
+sudo -u postgres psql <<EOF
+CREATE DATABASE mattermost;
+CREATE USER ${mmuser_name} WITH PASSWORD '${mmuser_password}';
+GRANT ALL PRIVILEGES ON DATABASE mattermost TO ${mmuser_name};
+\c mattermost
+GRANT ALL ON SCHEMA public TO ${mmuser_name};
+EOF
+
+echo "Downloading and extracting application" | log
+mkdir -p $appPath
+cd $rootDir/temp
+curlDownload https://releases.mattermost.com/$appVersion/mattermost-$appVersion-linux-amd64.tar.gz
+waitOrStop 0 "File not downloaded from official source"
+tar -xvzf mattermost*.gz
+waitOrStop 0 "Failed to extract archive"
+cd mattermost
+mv * $appPath/
+mkdir -p $appPath/data
+
+echo "Preparing system users for application" | log
+useradd --system --user-group mattermost
+chown -R mattermost:mattermost $appPath
+chmod -R g+w $appPath
+
+echo "Configuring database connection" | log
+jq '.SqlSettings.DriverName = "postgres"' $confFile > tmp.$$.json && mv tmp.$$.json $confFile
+jq --arg datasource "postgres://${mmuser_name}:${mmuser_password}@localhost:5432/mattermost?sslmode=disable&connect_timeout=10" \
+   '.SqlSettings.DataSource = $datasource' $confFile > tmp.$$.json && mv tmp.$$.json $confFile
+
+chown mattermost:mattermost $confFile
+
+echo "Setting up application as a system service" | log
+cat << EOF > /lib/systemd/system/mattermost.service
+[Unit]
+Description=Mattermost
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+ExecStart=${appPath}/bin/mattermost
+TimeoutStartSec=3600
+Restart=always
+RestartSec=10
+WorkingDirectory=${appPath}
+User=mattermost
+Group=mattermost
+LimitNOFILE=49152
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+waitOrStop 0 "Reload systemctl failed"
+systemctl enable mattermost.service
+systemctl start mattermost.service
+waitOrStop 0 "Starting mattermost service failed"
+
+echo "Allowing MatterMost App in UFW" | log
+ufw allow 8065
+
+echo "Adding descriptions" | log
+descriptionAppend "Mattermost Database Username: ${mmuser_name}"
+descriptionAppend "Mattermost Database Password: ${mmuser_password}"
+descriptionAppend " "
+descriptionAppend "Mattermost Web UI: http://${CWM_DISPLAYED_ADDRESS}:8065"
+descriptionAppend "# Open Web UI to set Admin Username and Password"
+descriptionAppend " "
+
+exit 0

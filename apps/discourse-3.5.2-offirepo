@@ -1,0 +1,127 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+DISCOURSE_DIR="/var/discourse"
+APP_NAME="app"
+
+echo "Installing Discourse Forum with Docker + Nginx + SSL" | log
+
+echo "Updating system packages..." | log
+apt-get update -q
+apt-get upgrade -yq
+apt-get install -yq curl wget certbot 
+
+echo "Installing Docker..." | log
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    rm get-docker.sh
+    systemctl enable docker
+    systemctl start docker
+    echo "Docker installed." | log
+else
+    echo "Docker already installed." | log
+fi
+
+echo "Setting up Discourse..." | log
+git clone https://github.com/discourse/discourse_docker.git "$DISCOURSE_DIR"
+cd "$DISCOURSE_DIR"
+
+echo "Creating configuration..." | log
+cat > "${DISCOURSE_DIR}/containers/${APP_NAME}.yml" << EOF
+templates:
+  - "templates/postgres.template.yml"
+  - "templates/redis.template.yml"
+  - "templates/web.template.yml"
+  - "templates/web.ssl.template.yml"
+  - "templates/web.letsencrypt.ssl.template.yml"
+expose:
+  - "80:80"
+  - "443:443"
+params:
+  db_default_text_search_config: "pg_catalog.english"
+  db_shared_buffers: "256MB"
+env:
+  DISCOURSE_VERSION: v3.5.2
+  LANG: en_US.UTF-8
+  DISCOURSE_DEFAULT_LOCALE: en
+
+  ## Hostname
+  DISCOURSE_HOSTNAME: '${CWM_DOMAIN}'
+
+  ## Email
+  DISCOURSE_DEVELOPER_EMAILS: '${ADMINEMAIL}'
+
+  LETSENCRYPT_HOST: '${CWM_DOMAIN}'
+  LETSENCRYPT_ACCOUNT_EMAIL: '${ADMINEMAIL}'
+
+  ## Uncomment if using a mail service that requires authentication
+  # DISCOURSE_SMTP_AUTHENTICATION: login
+  # DISCOURSE_SMTP_ENABLE_START_TLS: true
+volumes:
+  - volume:
+      host: /var/discourse/shared/standalone
+      guest: /shared
+  - volume:
+      host: /var/discourse/shared/standalone/log/var-log
+      guest: /var/log
+hooks:
+  after_code:
+    - exec:
+        cd: \$home/plugins
+        cmd:
+          - git clone https://github.com/discourse/docker_manager.git
+run:
+  - exec: echo "Beginning of custom commands"
+  - exec: echo "End of custom commands"
+EOF
+
+echo "Configuration created at: ${DISCOURSE_DIR}/containers/${APP_NAME}.yml" | log
+
+./launcher bootstrap ${APP_NAME}
+
+echo "Starting Discourse..." | log
+./launcher start ${APP_NAME}
+
+echo "Waiting for Discourse to become available..." | log
+for i in {1..30}; do
+    if curl -f -s -o /dev/null "http://localhost"; then
+        echo "Discourse is running!" | log
+        break
+    fi
+    echo "Waiting... (${i}/30)" | log
+    sleep 10
+done
+
+echo "Creating admin account..." | log
+sleep 5
+./launcher enter ${APP_NAME} <<EOFCMD
+cd /var/www/discourse
+sudo -u discourse RAILS_ENV=production bundle exec rake admin:create <<ADMINEOF
+${ADMINEMAIL}
+${ADMINPASSWORD}
+${ADMINPASSWORD}
+y
+ADMINEOF
+EOFCMD
+
+descriptionAppend "Discourse Forum Installation Complete!"
+descriptionAppend ""
+descriptionAppend "🌐 Forum URL: https://${CWM_DOMAIN}"
+descriptionAppend ""
+descriptionAppend "👤 Admin Account:"
+descriptionAppend "  Email: ${ADMINEMAIL}"
+descriptionAppend "  Password: ${ADMINPASSWORD}"
+descriptionAppend ""
+descriptionAppend "📁 Important Files:"
+descriptionAppend "  Configuration: ${DISCOURSE_DIR}/containers/${APP_NAME}.yml"
+descriptionAppend "  Discourse Dir: ${DISCOURSE_DIR}"
+descriptionAppend ""
+
+tagScript success
+exit 0

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set_motd() {
+	cat <<'EOF' >/etc/motd
+============================================================
+ Valkey Server Installed
+============================================================
+Service:   systemctl status valkey
+Start:     systemctl start valkey
+Stop:      systemctl stop valkey
+Config:    /etc/valkey/valkey.conf
+CLI usage: valkey-cli PING
+Data dir:  /var/lib/valkey
+
+============================================================
+EOF
+}
+
+apt update
+apt install -y valkey valkey-redis-compat
+
+if [ "$(valkey-cli ping 2>/dev/null)" = "PONG" ]; then
+    sed -i 's/^appendonly[[:space:]]\+no$/appendonly yes/' /etc/valkey/valkey.conf
+    sed -i '/^# *save 3600 1 300 100 60 10000$/s/^# *//' /etc/valkey/valkey.conf
+	
+	systemctl restart valkey
+fi
+
+set_motd
