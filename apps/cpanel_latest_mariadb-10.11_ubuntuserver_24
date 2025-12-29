@@ -1,0 +1,390 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+	
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+LOGFILE="/var/log/cpanel-install-$(date +%Y%m%d-%H%M%S).log"
+MARIADB_VERSION="10.11"
+PASSWORD=$(grep -m1 '^password=' /root/guest.conf | cut -d= -f2-)
+
+PRODUCTION="false"
+DATACENTER=$(grep -m1 '^zone=' /root/guest.conf | cut -d= -f2-)
+if [[ ! "$DATACENTER" =~ [Dd][Ee][Vv] ]]; then
+    PRODUCTION="true"
+fi
+
+wait_for_apt() {
+    local max_wait=120
+    local waited=0
+    while fuser /var/lib/dpkg/lock-frontend &>/dev/null || fuser /var/lib/apt/lists/lock &>/dev/null; do
+        if [[ $waited -eq 0 ]]; then
+            echo "Waiting for apt lock to be released..." | log
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [[ $waited -ge $max_wait ]]; then
+            echo "Timeout waiting for apt lock, attempting to continue..." | log
+            break
+        fi
+    done
+}
+
+validate_environment() {
+    [[ $EUID -eq 0 ]] || echo "Run as root" | log
+    [[ -d /usr/local/cpanel ]] && echo "cPanel already installed" | log
+
+    [[ -f /etc/os-release ]] || echo "Cannot detect OS" | log
+    . /etc/os-release
+    [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]] || echo "Requires Ubuntu 24.04" | log
+
+    [[ "$MARIADB_VERSION" =~ ^(10\.11|11\.4)$ ]] || echo "MariaDB must be 10.11 or 11.4" | log
+}
+
+set_hostname() {
+    local ip=$(hostname -I | awk '{print $1}')
+    local ip_dashed=${ip//./-}
+    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
+
+    hostnamectl set-hostname "$fqdn"
+    echo "Hostname set to: $fqdn" | log
+}
+
+prepare_system() {
+    echo "Preparing Ubuntu 24.04..." | log
+
+    systemctl stop ufw 2>/dev/null && systemctl disable ufw
+    systemctl stop apparmor 2>/dev/null && systemctl disable apparmor
+
+    # Pre-import GPG keys via port 80 before creating wrapper
+    echo "Pre-importing Ubuntu GPG keys via port 80..." | log
+    mkdir -p /root/.gnupg
+    chmod 700 /root/.gnupg
+
+    gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3A79BD29 2>/dev/null &
+    GPG_PID=$!
+    ( sleep 30; kill $GPG_PID 2>/dev/null ) &
+    wait $GPG_PID 2>/dev/null || true
+
+    if ! gpg --list-keys 3A79BD29 &>/dev/null; then
+        curl -fsSL --max-time 30 "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3A79BD29" | gpg --import 2>/dev/null || \
+        echo "GPG key import failed - continuing anyway" | log
+    fi
+
+    gpg --export 3A79BD29 2>/dev/null | apt-key add - 2>/dev/null || true
+
+    # Configure gpg to always use port 80
+    cat > /root/.gnupg/gpg.conf << 'EOF'
+keyserver hkp://keyserver.ubuntu.com:80
+keyserver-options auto-key-retrieve
+EOF
+
+    # Create wrapper that forces port 80 for any keyserver call
+    mv /usr/bin/gpg /usr/bin/gpg.real
+    cat > /usr/bin/gpg << 'GPGWRAPPER'
+#!/bin/bash
+args=()
+skip_next=0
+for arg in "$@"; do
+    if [[ $skip_next -eq 1 ]]; then
+        skip_next=0
+        if [[ "$arg" =~ keyserver\.ubuntu\.com ]]; then
+            args+=("hkp://keyserver.ubuntu.com:80")
+        else
+            args+=("$arg")
+        fi
+        continue
+    fi
+    if [[ "$arg" == "--keyserver" ]]; then
+        args+=("$arg")
+        skip_next=1
+        continue
+    fi
+    if [[ "$arg" == "keyserver.ubuntu.com" ]]; then
+        args+=("hkp://keyserver.ubuntu.com:80")
+    elif [[ "$arg" =~ ^hkps?://keyserver\.ubuntu\.com($|:|/) ]]; then
+        args+=("hkp://keyserver.ubuntu.com:80")
+    else
+        args+=("$arg")
+    fi
+done
+exec /usr/bin/gpg.real "${args[@]}"
+GPGWRAPPER
+    chmod +x /usr/bin/gpg
+
+    if /usr/bin/gpg.real --list-keys 3A79BD29 &>/dev/null; then
+        echo "GPG key 3A79BD29 imported successfully" | log
+    else
+        echo "GPG key may not be available" | log
+    fi
+
+    export DEBIAN_FRONTEND=noninteractive
+    wait_for_apt
+    apt-get update && apt-get -y upgrade
+    wait_for_apt
+    apt-get -y install perl curl wget
+}
+
+install_cpanel() {
+    echo "Installing cPanel with MariaDB ${MARIADB_VERSION}..." | log
+
+    mkdir -p /root/cpanel_profile
+    echo "mysql-version=${MARIADB_VERSION}" > /root/cpanel_profile/cpanel.config
+
+    cd /home
+    curl -so latest -L https://securedownloads.cpanel.net/latest
+    sh latest --force
+
+    [[ -f /usr/bin/gpg.real ]] && mv /usr/bin/gpg.real /usr/bin/gpg
+}
+
+configure_mariadb() {
+    echo "Configuring MariaDB..." | log
+
+    local retries=15
+    while ! pgrep -x mysqld &>/dev/null && ! pgrep -x mariadbd &>/dev/null && ((retries-- > 0)); do sleep 2; done
+
+    cat > /etc/mysql/conf.d/optimized.cnf 2>/dev/null << 'EOF' || true
+[mysqld]
+innodb_buffer_pool_size = 256M
+innodb_log_file_size = 64M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+max_connections = 150
+local_infile = 0
+symbolic-links = 0
+slow_query_log = 1
+long_query_time = 2
+EOF
+
+    systemctl restart mariadb 2>/dev/null || systemctl restart mysql 2>/dev/null || true
+    echo "MariaDB configured" | log
+}
+
+configure_ssl() {
+    local ip=$(hostname -I | awk '{print $1}')
+    local ip_dashed=${ip//./-}
+    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
+    local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
+    local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
+    local acme_server="https://192.168.30.67/directory"
+
+    echo "Configuring SSL with custom ACME server..." | log
+
+    # Wait for cPanel services to be fully up
+    echo "Waiting for cPanel services to start..." | log
+    local retries=30
+    while ! /usr/local/cpanel/cpanel -V &>/dev/null && ((retries-- > 0)); do 
+        sleep 2
+    done
+
+    # Install certbot
+    echo "Installing certbot..." | log
+    apt-get update
+    apt-get install -y certbot || {
+        echo "ERROR: Failed to install certbot" | log
+        return 1
+    }
+
+    # Use standalone mode - temporarily listen on port 80 for ACME challenge only
+    echo "Requesting SSL certificates from ${acme_server}..." | log
+	if [[ "$PRODUCTION" == "false" ]]; then
+		certbot certonly \
+			--standalone \
+			--preferred-challenges http \
+			--server "${acme_server}" \
+			--no-verify-ssl \
+			-d "${fqdn}" \
+			-d "${whm_fqdn}" \
+			-d "${webmail_fqdn}" \
+			--non-interactive \
+			--agree-tos \
+			--email "admin@${fqdn}" \
+			--force-renewal 2>&1 | log
+	else
+		certbot certonly \
+			--standalone \
+			--preferred-challenges http \
+			-d "${fqdn}" \
+			-d "${whm_fqdn}" \
+			-d "${webmail_fqdn}" \
+			--non-interactive \
+			--agree-tos \
+			--email "admin@${fqdn}" \
+			--force-renewal 2>&1 | log
+	fi
+
+    # Check if certificates were actually issued
+    if [ ! -d "/etc/letsencrypt/live/${fqdn}" ]; then
+        echo "ERROR: Certificate issuance FAILED!" | log
+        echo "Directory /etc/letsencrypt/live/${fqdn} does not exist" | log
+        return 1
+    fi
+
+    echo "Certificates issued successfully, installing to cPanel..." | log
+
+    # Backup existing certificate
+    cp /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
+
+    # Combine cert and key for cPanel
+    cat /etc/letsencrypt/live/${fqdn}/fullchain.pem \
+        /etc/letsencrypt/live/${fqdn}/privkey.pem \
+        > /var/cpanel/ssl/cpanel/cpanel.pem
+
+    chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
+    chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
+    rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
+
+    # Verify certificate was installed
+    if ! openssl x509 -in /var/cpanel/ssl/cpanel/cpanel.pem -text -noout | grep -q "${fqdn}"; then
+        echo "ERROR: Certificate installation verification failed!" | log
+        return 1
+    fi
+
+    # Restart cPanel services to use new certificates
+    echo "Restarting cPanel services with new certificates..." | log
+    /usr/local/cpanel/scripts/restartsrv_cpsrvd 2>&1 | log
+    /usr/local/cpanel/scripts/restartsrv_cpanel 2>&1 | log
+
+    echo "SSL certificates installed successfully!" | log
+}
+
+disable_port_80() {
+    echo "Disabling port 80 access..." | log
+
+    # Disable Apache on port 80
+    if [ -f /etc/apache2/ports.conf ]; then
+        sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf
+    fi
+
+    # Configure cPanel to always redirect to SSL
+    if [ -f /var/cpanel/cpanel.config ]; then
+        sed -i 's/^alwaysredirecttossl=0/alwaysredirecttossl=1/' /var/cpanel/cpanel.config
+        grep -q '^alwaysredirecttossl=' /var/cpanel/cpanel.config || echo 'alwaysredirecttossl=1' >> /var/cpanel/cpanel.config
+    fi
+
+    # Use cPanel's built-in tool to enforce SSL
+    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=alwaysredirecttossl value=1 2>&1 | log || true
+
+    # Restart Apache without port 80
+    /usr/local/cpanel/scripts/restartsrv_httpd 2>&1 | log || true
+
+    # Block port 80 with iptables
+    iptables -A INPUT -p tcp --dport 80 -j DROP 2>/dev/null || true
+    
+    # Save iptables rules
+    if command -v netfilter-persistent &>/dev/null; then
+        netfilter-persistent save 2>/dev/null || true
+    fi
+
+    echo "Port 80 disabled - all services SSL only" | log
+}
+
+prepare_final_shutdown() {
+    echo "Creating one-time shutdown service..." | log
+
+    cat <<EOF > /etc/systemd/system/post-install-shutdown.service
+[Unit]
+Description=Power off after first reboot
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/rm -f /etc/systemd/system/post-install-shutdown.service
+ExecStartPost=/usr/sbin/poweroff
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable post-install-shutdown.service
+}
+
+format_duration() {
+    local seconds=$1
+    printf '%02dh %02dm %02ds\n' $((seconds/3600)) $((seconds%3600/60)) $((seconds%60))
+}
+
+print_summary() {
+    local duration=$1
+    local ip=$(hostname -I | awk '{print $1}')
+    local ip_dashed=${ip//./-}
+    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
+    local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
+    local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
+
+    cat > /etc/motd << EOF
+================================================================================
+                    cPanel Server - Installation Complete
+================================================================================
+INSTALLATION TIME: $duration
+
+WHM (Server Administration):
+  https://${whm_fqdn}:2087
+
+Username: root
+Password: ${PASSWORD}
+
+--------------------------------------------------------------------------------
+
+cPanel (User Control Panel):
+  https://${fqdn}:2083
+
+--------------------------------------------------------------------------------
+
+Webmail:
+  https://${webmail_fqdn}:2096
+
+--------------------------------------------------------------------------------
+
+SERVER DETAILS:
+  Hostname:   ${fqdn}
+  IP Address: ${ip}
+  MariaDB:    ${MARIADB_VERSION}
+  OS:         Ubuntu 24.04
+
+Domains:
+  ${fqdn}
+  ${whm_fqdn}
+  ${webmail_fqdn}
+
+PORTS (SSL ONLY):
+  2087 - WHM (SSL)
+  2083 - cPanel (SSL)
+  2096 - Webmail (SSL)
+
+================================================================================
+EOF
+
+    cat /etc/motd | log
+}
+
+main() {
+    local start_time=$(date +%s)
+    echo "Starting Ubuntu 24.04 cPanel installer..." | log
+
+    validate_environment
+    set_hostname
+    prepare_system
+    install_cpanel
+    configure_mariadb
+    configure_ssl
+    disable_port_80
+
+    local end_time=$(date +%s)
+    local duration=$(format_duration $((end_time - start_time)))
+    print_summary "$duration"
+
+    echo "Preparing for final power-off after reboot..." | log
+    prepare_final_shutdown
+
+    echo "Rebooting now. The system will power off automatically once it comes back up." | log
+    sleep 5
+    reboot
+}
+
+main
