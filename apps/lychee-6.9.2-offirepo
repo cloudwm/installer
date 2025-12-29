@@ -41,8 +41,6 @@ EOF
 
 # Create docker-compose.yml
 cat << 'EOF' > ${appInstallDir}/docker-compose.yml
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -58,7 +56,7 @@ services:
       - lychee-net
 
   lychee:
-    image: lycheeserver/lychee:6.9.2
+    image: linuxserver/lychee:6.10.4
     restart: always
     depends_on:
       - mysql
@@ -121,7 +119,7 @@ server {
 }
 
 server {
-    listen 443 ssl;
+    listen 443 ssl;lycheserver
     server_name ${CWM_DOMAIN};
 
     ssl_certificate ${appInstallDir}/config/https-cert.pem;
