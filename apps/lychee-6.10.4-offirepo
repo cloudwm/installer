@@ -119,7 +119,7 @@ server {
 }
 
 server {
-    listen 443 ssl;lycheserver
+    listen 443 ssl;
     server_name ${CWM_DOMAIN};
 
     ssl_certificate ${appInstallDir}/config/https-cert.pem;
