@@ -10,7 +10,7 @@ AppDir="/home/devpush/devpush"
 DockerFileDir="/opt/installer/tweaks/extras/devpush/Dockerfile.app"
 
 # Installing Dev-Push from official URL
-curl -fsSL https://raw.githubusercontent.com/hunvreus/devpush/main/scripts/prod/install.sh | sudo bash
+curl -fsSL curl -fsSL https://install.devpu.sh | sudo bash
 waitOrStop 0 "Failed to install DevPush"
 
 cd $AppDir
