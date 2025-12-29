@@ -1,0 +1,172 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Axigen Mail Server (v10.6.22) with Docker + Nginx + SSL" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx apt-transport-https ca-certificates curl gnupg lsb-release
+
+# Install Docker (if not already installed)
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+fi
+
+# Create Axigen directory
+echo "Creating Axigen directory" | log
+appInstallDir="/opt/axigen"
+sudo mkdir -p ${appInstallDir}/data
+sudo chown -R $USER:$USER ${appInstallDir}
+
+# Write .env file
+cat << EOF > ${appInstallDir}/.env
+DOMAIN=${CWM_DOMAIN}
+AXIGEN_VERSION=10.6.22
+MYSQL_ROOT_PASSWORD=$(openssl rand -hex 16)
+MYSQL_DATABASE=axigen
+MYSQL_USER=axigen
+MYSQL_PASSWORD=$(openssl rand -hex 16)
+ADMIN_PASSWORD=${ADMINPASSWORD}
+EOF
+
+# Create docker-compose.yml
+cat << 'EOF' > ${appInstallDir}/docker-compose.yml
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    networks:
+      - axigen-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  axigen:
+    image: axigen/axigen:${AXIGEN_VERSION}
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DB: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "143:143"
+      - "993:993"
+      - "110:110"
+      - "995:995"
+      - "4190:4190"
+      - "9000:9000"
+      - "9433:9433"
+    volumes:
+      - ./data/axigen:/opt/axigen/data
+    networks:
+      - axigen-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  axigen-net:
+    driver: bridge
+EOF
+
+# Stop nginx for certbot
+systemctl stop nginx
+
+# Generate Let's Encrypt certs (YOUR EXACT BLOCK)
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+# Configure Nginx
+cat << EOF > /etc/nginx/sites-available/axigen
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://localhost:9000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+	proxy_buffering off;
+    }
+}
+EOF
+
+# Enable Nginx site
+sudo ln -sf /etc/nginx/sites-available/axigen /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+# Pull and start Axigen services
+echo "Pulling and starting Axigen services" | log
+cd ${appInstallDir}
+docker compose pull
+docker compose up -d
+waitOrStop 0 "Failed to start Axigen services"
+
+echo "Waiting for Axigen to initialize (DB migration)..." | log
+
+echo "Adding descriptions" | log
+descriptionAppend "Axigen Mail Server is LIVE!"
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Default user: admin, pass: ${ADMINPASSWORD})"
+descriptionAppend "Database: MySQL (root/${ADMINPASSWORD}, axigen/${ADMINPASSWORD})"
+descriptionAppend " "
+descriptionAppend "Commands:"
+descriptionAppend "  cd ${appInstallDir} && docker compose logs -f axigen # View logs"
+
+tagScript success
+exit 0

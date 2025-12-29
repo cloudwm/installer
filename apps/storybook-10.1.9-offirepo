@@ -1,0 +1,111 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+version="10.1.9"
+
+echo "Installing Storybook with React + Vite + Nginx + SSL" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+# Install system dependencies
+echo "Installing system dependencies..." | log
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx curl git ca-certificates
+sudo update-ca-certificates
+
+# Install Node.js 20
+echo "Installing Node.js 20..." | log
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+appInstallDir="/opt/storybook-app"
+mkdir -p "${appInstallDir}"
+cd "${appInstallDir}"
+
+echo "Creating React + Vite project..." | log
+npx -y create-vite@latest . --template react-ts --no-interactive
+
+echo "Installing project dependencies..." | log
+npm install
+
+echo "Installing Storybook..." | log
+CI=true npx storybook@${version} init --yes --skip-install --no-dev
+
+echo "Installing Storybook dependencies..." | log
+npm install
+
+echo "Building Storybook for production..." | log
+npm run build-storybook
+
+if [ ! -d "${appInstallDir}/storybook-static" ]; then
+    echo "❌ Storybook build failed: storybook-static directory not found" | log
+    exit 1
+fi
+
+systemctl stop nginx
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    exit 1
+fi
+
+echo "Configuring Nginx..." | log
+cat > /etc/nginx/sites-available/storybook << NGINXCONF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    root ${appInstallDir}/storybook-static;
+    index index.html;
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    # Cache static assets aggressively
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+NGINXCONF
+
+sudo ln -sf /etc/nginx/sites-available/storybook /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding descriptions" | log
+descriptionAppend "Storybook is LIVE!"
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "Framework: React + Vite + TypeScript"
+descriptionAppend "Project Location: ${appInstallDir}"
+descriptionAppend "Static Build: ${appInstallDir}/storybook-static"
+descriptionAppend " "
+descriptionAppend "To rebuild after changes:"
+descriptionAppend " cd ${appInstallDir}"
+descriptionAppend " npm run build-storybook"
+
+tagScript success
+exit 0

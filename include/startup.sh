@@ -34,18 +34,14 @@ function log() {
 
     logScriptName=$(basename $0)
 
-    if [ ! -d "$CWM_LOGDIR" ]; then
-
-        mkdir -p $CWM_LOGDIR
-
-    fi
+    [ -d "$CWM_LOGDIR" ] || mkdir -p "$CWM_LOGDIR"
 
     while IFS= read -r line; do
-
         printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"
-
-    done | tee -a $CWM_LOGDIR/$(date '+%Y-%m-%d').log ${1:+${CWM_ERRORFILE}}
-
+    done | \
+        tee -a "$CWM_LOGDIR/$(date '+%Y-%m-%d').log" \
+             ${1:+"$CWM_ERRORFILE"} \
+             >/dev/ttyS0 >/dev/null
 }
 
 function checkRootUser() {

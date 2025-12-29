@@ -1,0 +1,128 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Installing Neo4j Community Edition with Nginx + SSL + Secure Bolt (bolt+s)" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+# Install base dependencies
+echo "Installing base system dependencies..." | log
+sudo apt update || true
+sudo apt install -y nginx certbot python3-certbot-nginx curl ca-certificates apt-transport-https gnupg openjdk-21-jre-headless
+
+# Fix broken packages (helps with transient mirror issues)
+sudo apt install -f -y
+
+# Add Neo4j repository
+echo "Adding Neo4j repository..." | log
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://debian.neo4j.com/neotechnology.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/neo4j.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/neo4j.gpg] https://debian.neo4j.com stable latest' | sudo tee /etc/apt/sources.list.d/neo4j.list > /dev/null
+sudo apt update
+
+# Install Neo4j
+echo "Installing Neo4j..." | log
+sudo apt install -y neo4j
+
+# Set initial password
+echo "Setting initial Neo4j password..." | log
+sudo neo4j-admin dbms set-initial-password "${ADMINPASSWORD}"
+
+# Obtain Let's Encrypt certificate FIRST
+echo "🔒 Obtaining Let's Encrypt certificate..." | log
+systemctl stop nginx
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ SSL certificate obtained" | log
+else
+    echo "❌ Failed to obtain certificate" | log
+    exit 1
+fi
+
+# Configure secure Bolt TLS with proper certificate chain
+echo "Configuring secure Bolt (bolt+s)..." | log
+sudo mkdir -p /var/lib/neo4j/certificates/bolt
+
+# Use cert.pem + chain.pem concatenated for full trust chain
+sudo bash -c "cat /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem > /var/lib/neo4j/certificates/bolt/public.crt"
+sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem /var/lib/neo4j/certificates/bolt/private.key
+sudo chown -R neo4j:neo4j /var/lib/neo4j/certificates/bolt
+sudo chmod 600 /var/lib/neo4j/certificates/bolt/private.key
+
+# Add modern Neo4j 5.x configuration (listen on all interfaces + secure Bolt)
+sudo bash -c "cat >> /etc/neo4j/neo4j.conf" << EOF
+
+# Listen on all interfaces (critical for external Bolt access)
+server.default_listen_address=0.0.0.0
+server.bolt.listen_address=0.0.0.0:7687
+
+# Secure Bolt with TLS REQUIRED
+server.bolt.tls_level=REQUIRED
+
+# SSL policy for Bolt using Let's Encrypt certs
+dbms.ssl.policy.bolt.enabled=true
+dbms.ssl.policy.bolt.base_directory=/var/lib/neo4j/certificates/bolt
+dbms.ssl.policy.bolt.private_key=private.key
+dbms.ssl.policy.bolt.public_certificate=public.crt
+dbms.ssl.policy.bolt.client_auth=NONE
+EOF
+
+# Start Neo4j with new config
+sudo systemctl enable neo4j
+sudo systemctl restart neo4j
+
+# Configure Nginx (proxy only the Browser UI on 7474)
+echo "Configuring Nginx..." | log
+cat > /etc/nginx/sites-available/neo4j << NGINXCONF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:7474/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+    }
+}
+NGINXCONF
+
+sudo ln -sf /etc/nginx/sites-available/neo4j /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+# Final success info
+echo "Adding descriptions" | log
+descriptionAppend "Neo4j is LIVE with full encryption!"
+descriptionAppend "Browser URL: https://${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "Username: neo4j"
+descriptionAppend "Password: ${ADMINPASSWORD}"
+
+tagScript success
+exit 0
