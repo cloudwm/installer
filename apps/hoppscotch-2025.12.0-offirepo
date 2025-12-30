@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+version="2025.12.0"
+
 echo "Installing Hoppscotch API Testing Platform" | log
 
 export DEBIAN_FRONTEND="noninteractive"
@@ -49,6 +51,7 @@ echo "Creating environment configuration" | log
 cat > $appDir/.env << EOF
 # Domain
 CWM_DOMAIN=${CWM_DOMAIN}
+version=${version}
 
 # Database
 POSTGRES_USER=postgres
@@ -118,7 +121,7 @@ services:
       - hoppscotch-net
 
   hoppscotch-backend:
-    image: hoppscotch/hoppscotch-backend:2025.9.2
+    image: hoppscotch/hoppscotch-backend:${version}
     container_name: hoppscotch-backend
     restart: unless-stopped
     env_file: .env
@@ -144,7 +147,7 @@ services:
       - hoppscotch-net
 
   hoppscotch-frontend:
-    image: hoppscotch/hoppscotch-frontend:2025.9.2
+    image: hoppscotch/hoppscotch-frontend:${version}
     container_name: hoppscotch-frontend
     restart: unless-stopped
     env_file: .env
