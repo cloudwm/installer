@@ -47,7 +47,7 @@ params:
   db_default_text_search_config: "pg_catalog.english"
   db_shared_buffers: "256MB"
 env:
-  DISCOURSE_VERSION: v3.5.2
+  DISCOURSE_VERSION: v2025.12.0-latest
   LANG: en_US.UTF-8
   DISCOURSE_DEFAULT_LOCALE: en
 
