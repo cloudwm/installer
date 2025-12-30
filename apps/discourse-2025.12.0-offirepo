@@ -47,7 +47,7 @@ params:
   db_default_text_search_config: "pg_catalog.english"
   db_shared_buffers: "256MB"
 env:
-  DISCOURSE_VERSION: v3.5.2
+  DISCOURSE_VERSION: v2025.12.0-latest
   LANG: en_US.UTF-8
   DISCOURSE_DEFAULT_LOCALE: en
 
@@ -98,14 +98,16 @@ for i in {1..30}; do
     sleep 10
 done
 
+GEN_PASS=$(openssl rand -base64 32 | head -c 15)
+
 echo "Creating admin account..." | log
 sleep 5
 ./launcher enter ${APP_NAME} <<EOFCMD
 cd /var/www/discourse
 sudo -u discourse RAILS_ENV=production bundle exec rake admin:create <<ADMINEOF
 ${ADMINEMAIL}
-${ADMINPASSWORD}
-${ADMINPASSWORD}
+${GEN_PASS}
+${GEN_PASS}
 y
 ADMINEOF
 EOFCMD
@@ -116,7 +118,7 @@ descriptionAppend "🌐 Forum URL: https://${CWM_DOMAIN}"
 descriptionAppend ""
 descriptionAppend "👤 Admin Account:"
 descriptionAppend "  Email: ${ADMINEMAIL}"
-descriptionAppend "  Password: ${ADMINPASSWORD}"
+descriptionAppend "  Password: ${GEN_PASS}"
 descriptionAppend ""
 descriptionAppend "📁 Important Files:"
 descriptionAppend "  Configuration: ${DISCOURSE_DIR}/containers/${APP_NAME}.yml"
