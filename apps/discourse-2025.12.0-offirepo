@@ -115,7 +115,7 @@ EOFCMD
 descriptionAppend "Discourse Forum Installation Complete!"
 descriptionAppend ""
 descriptionAppend "🌐 Forum URL: https://${CWM_DOMAIN}/signup"
-descriptionAppend "Visit the URL to create your new account, your email in linked to admin previliges"
+descriptionAppend "Visit the URL to create your new account, your email in linked to admin privileges"
 descriptionAppend "👤 Admin Account:"
 descriptionAppend "  Email: ${ADMINEMAIL}"
 descriptionAppend "  Password: ${GEN_PASS}"
