@@ -8,9 +8,10 @@ fi
 
 rootDir=$(rootDir)
 
-echo "Installing dependenices" | log
-installPackage zip unzip php7.4 php7.4-zip
-waitOrStop 0 "Failed apt install: zip unzip php7.4 php7.4-zip"
+echo "Installing php8.5 modules for laravel" | log
+packages=(zip unzip php8.5-pear libapache2-mod-php8.5 php8.5-ctype php8.5-curl php8.5-dom php8.5-fileinfo php8.5-mbstring php8.5-openssl php8.5-pdo php8.5-tokenizer php8.5-xml)
+installPackage "${packages[@]}"
+waitOrStop 0 "Failed apt install: ${packages[@]}"
 
 echo "Installing composer" | log
 cd /var/www/
