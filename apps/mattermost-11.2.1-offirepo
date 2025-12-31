@@ -10,7 +10,7 @@ confFile="/opt/mattermost/config/config.json"
 rootDir=$(rootDir)
 mmuser_name="mmuser"
 mmuser_password=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
-appVersion=11.1.0
+appVersion=11.2.1
 
 echo "Installing PostgreSQL" | log
 apt-get update
