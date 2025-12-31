@@ -15,6 +15,9 @@ LOG_FILE="/tmp/fastpanel_install.log"
 wget https://repo.fastpanel.direct/install_fastpanel.sh -O - | bash - 2>&1 | tee "$LOG_FILE"
 waitOrStop 0 "Failed to install FastPanel"
 
+ufw allow 8888
+ufw reload
+
 FASTPASSWORD=$(grep -oP "Password:\s*\K.*" "$LOG_FILE")
 rm -f $LOG_FILE
 
