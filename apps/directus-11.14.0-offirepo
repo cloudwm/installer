@@ -5,6 +5,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+version="11.14.0"
+
 echo "Installing Directus Headless CMS with Docker + Nginx" | log
 
 export DEBIAN_FRONTEND="noninteractive"
@@ -51,7 +53,7 @@ services:
     restart: always
 
   directus:
-    image: directus/directus:11.13.2
+    image: directus/directus:${version}
     ports:
       - "127.0.0.1:8055:8055"
     volumes:
