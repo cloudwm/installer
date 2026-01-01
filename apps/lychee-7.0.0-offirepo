@@ -56,7 +56,7 @@ services:
       - lychee-net
 
   lychee:
-    image: linuxserver/lychee:6.10.4
+    image: linuxserver/lychee:7.0.0
     restart: always
     depends_on:
       - mysql
