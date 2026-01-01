@@ -127,7 +127,7 @@ services:
       retries: 5
 
   netbox:
-    image: netboxcommunity/netbox:latest-3.4.1
+    image: linuxserver/netbox:4.4.9
     container_name: netbox
     restart: unless-stopped
     depends_on:
