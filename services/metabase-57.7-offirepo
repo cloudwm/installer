@@ -60,7 +60,7 @@ echo "Creating Docker Compose file for Metabase" | log
 cat << EOF > ${appInstallDir}/docker-compose.yml
 services:
   metabase:
-    image: metabase/metabase:v0.56.10.x
+    image: metabase/metabase:v0.57.7.x
     container_name: metabase
     restart: always
     ports:
