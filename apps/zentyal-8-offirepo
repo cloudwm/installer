@@ -30,7 +30,8 @@ sed -i '/read ZEN_GUI/d' zentyal_installer_8.0.sh
 echo "Creating admin user and disabling ssh login to admin" | log
 useradd admin -s /bin/bash -m -g users -G sudo
 chpasswd <<< "admin:${ADMINPASSWORD}"
-passwd -l admin
+echo "DenyUsers admin" | sudo tee -a /etc/ssh/sshd_config
+systemctl restart sshd
 
 echo "Adding descriptions" | log
 descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
