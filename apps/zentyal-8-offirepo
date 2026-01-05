@@ -24,13 +24,13 @@ chmod u+x zentyal_installer_8.0.sh
 sed -i '/read ZEN_GUI/i\ZEN_GUI="n"' zentyal_installer_8.0.sh
 sed -i '/read ZEN_GUI/d' zentyal_installer_8.0.sh
 
+# Run the modified installer
+./zentyal_installer_8.0.sh
+
 echo "Creating admin user and disabling root" | log
 useradd admin -s /bin/bash -m -g users -G sudo
 chpasswd <<< "admin:${ADMINPASSWORD}"
 passwd -l admin
-
-# Run the modified installer
-./zentyal_installer_8.0.sh
 
 echo "Adding descriptions" | log
 descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
