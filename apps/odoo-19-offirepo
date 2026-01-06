@@ -30,7 +30,7 @@ waitOrStop 0 "File not downloaded from official source"
 
 su odoo${appVersion} << EOF
 git clone https://www.github.com/odoo/odoo --depth 1 --branch ${appVersion}.0 /opt/odoo${appVersion}/odoo
-cd /opt/odoo18
+cd /opt/odoo${appVersion}
 python3 -m venv odoo-venv
 source odoo-venv/bin/activate
 pip3 install wheel
