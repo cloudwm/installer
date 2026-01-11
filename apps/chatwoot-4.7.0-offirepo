@@ -36,7 +36,7 @@ systemctl reload nginx
 waitOrStop 0 "Failed to reload nginx"
 echo "Prepare the database by running the migrations" | log
 cd $appDir
-docker compose run --rm rails bundle exec rails db:chatwoot_prepare
+docker compose run --rm rails bundle exec rails db:chatwoot_prepare | log
 waitOrStop 0 "Failed to prepare database"
 echo "Getting the services up and running"
 docker compose up -d
