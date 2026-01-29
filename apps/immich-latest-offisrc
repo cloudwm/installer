@@ -1,0 +1,149 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+echo "Machine IP: $MACHINE_IP" | log
+echo "Domain: $DOMAIN_NAME" | log
+
+# ==============================
+# Docker installation
+# ==============================
+install_docker() {
+    if command -v docker >/dev/null 2>&1; then
+        echo "Docker is already installed. Skipping Docker installation." | log
+        "$updateStatus" "$HTML_PATH" -ap "Docker is already installed. Skipping Docker installation."
+        return
+    fi
+
+    echo "Adding docker GPG key..." | log
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
+
+    echo "Installing Docker engine & plugins..." | log
+    "$updateStatus" "$HTML_PATH" -ap "Installing Docker engine & plugins..."
+    apt update
+    apt install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin
+
+    systemctl enable --now docker
+
+    echo "Docker installation completed successfully." | log
+    "$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
+}
+
+# ==============================
+# Immich
+# ==============================
+run_immich() {
+  local TARGET_DIR="${1:-/opt/immich}"
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Docker is not installed" | log
+    return 1
+  fi
+
+  mkdir -p "$TARGET_DIR"
+  cd "$TARGET_DIR" || return 1
+
+  echo "Downloading Immich docker-compose.yml..." | log
+  wget -q -O docker-compose.yml \
+    https://github.com/immich-app/immich/releases/latest/download/docker-compose.yml || return 1
+
+  if [ ! -f ".env" ]; then
+    echo "Downloading Immich example.env..." | log
+    wget -q -O .env \
+      https://github.com/immich-app/immich/releases/latest/download/example.env || return 1
+  fi
+
+  UPLOAD_DIR="$(grep '^UPLOAD_LOCATION=' .env | cut -d'=' -f2-)"
+  DB_DIR="$(grep '^DB_DATA_LOCATION=' .env | cut -d'=' -f2-)"
+
+  [ -n "$UPLOAD_DIR" ] && mkdir -p "$UPLOAD_DIR"
+  [ -n "$DB_DIR" ] && mkdir -p "$DB_DIR"
+
+  echo "Starting Immich containers..." | log
+  docker compose up -d || return 1
+
+  echo "Immich is running on http://127.0.0.1:2283" | log
+}
+
+# ==============================
+# Nginx reverse proxy
+# ==============================
+switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for Immich..." | log
+
+    NGINX_CONF="/etc/nginx/sites-available/immich.conf"
+
+    cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    location / {
+        proxy_pass http://127.0.0.1:2283;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/immich.conf
+    nginx -t || return 1
+    systemctl reload nginx
+
+    echo "nginx configured for Immich." | log
+}
+
+# ==============================
+# SSL
+# ==============================
+obtain_ssl() {
+    systemctl reload nginx
+
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx \
+        -d "$DOMAIN_NAME" \
+        --non-interactive \
+        --agree-tos \
+        -m "admin@${DOMAIN_NAME}" \
+        --redirect
+
+    echo "Immich available at https://${DOMAIN_NAME}" | log
+    "$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Immich is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+
+# ==============================
+# Main
+# ==============================
+main() {
+    install_docker
+    run_immich
+    switch_nginx_to_proxy
+    obtain_ssl
+}
+
+main
