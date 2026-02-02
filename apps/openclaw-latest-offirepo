@@ -34,29 +34,28 @@ sleep 10  # give npm postinstall hooks a moment
 
 echo "Running minimal onboarding + installing gateway service" | log
 
-# FIX 1: Ensure XDG_RUNTIME_DIR is set for systemctl --user
+# FIX: Ensure proper user session environment
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 mkdir -p "$XDG_RUNTIME_DIR"
 chown $(whoami):$(whoami) "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
-# FIX 2: Set DBUS_SESSION_BUS_ADDRESS for user services
-export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
-
-# FIX 3: Enable lingering BEFORE onboarding (so user services can persist)
+# Enable lingering FIRST (critical for user services to persist)
 loginctl enable-linger $(whoami) || true
+sleep 2
 
-# FIX 4: Add explicit environment variables and ensure truly non-interactive
+# Start D-Bus user session if not running
+if ! pgrep -u $(whoami) dbus-daemon > /dev/null; then
+    echo "Starting D-Bus user session..." | log
+    eval $(dbus-launch --sh-syntax)
+    export DBUS_SESSION_BUS_ADDRESS
+fi
+
 export OPENCLAW_SKIP_INTERACTIVE=1
 export NO_UPDATE_NOTIFIER=1
 
-# FIX 5: Run with explicit flags and capture detailed error output
-echo "Attempting onboard with explicit environment..." | log
-if ! openclaw onboard --non-interactive --accept-risk --mode local --install-daemon 2>&1 | tee /tmp/openclaw-onboard.log; then
-    echo "❌ Onboarding failed. Log content:" | log
-    cat /tmp/openclaw-onboard.log | log
-    waitOrStop 1 "Onboarding / daemon setup failed - see logs above"
-fi
+openclaw onboard --non-interactive --accept-risk --mode local --install-daemon
+waitOrStop 0 "Onboarding / daemon setup failed"
 
 GATEWAY_TOKEN=$(openssl rand -hex 30)  # 60 chars
 
@@ -78,16 +77,55 @@ cat << EOF > ~/.openclaw/openclaw.json
 EOF
 chmod 600 ~/.openclaw/openclaw.json
 
-# FIX 6: Ensure D-Bus user session is running
-if ! pgrep -u $(whoami) dbus-daemon > /dev/null; then
-    echo "Starting D-Bus user session..." | log
-    dbus-daemon --session --fork 2>/dev/null || true
-    sleep 2
+echo "Reloading systemd user daemon..." | log
+systemctl --user daemon-reload
+
+# Check if service exists
+if ! systemctl --user list-unit-files | grep -q openclaw-gateway; then
+    echo "❌ openclaw-gateway.service not found in systemd!" | log
+    echo "Available user services:" | log
+    systemctl --user list-unit-files | grep openclaw | log
+    waitOrStop 1 "Gateway service not installed"
 fi
 
-systemctl --user daemon-reload
-systemctl --user restart openclaw-gateway || systemctl --user start openclaw-gateway
-waitOrStop 0 "Failed to start OpenClaw gateway"
+echo "Starting OpenClaw gateway service..." | log
+# Stop any existing instance first
+systemctl --user stop openclaw-gateway 2>/dev/null || true
+sleep 2
+
+# Start with detailed error capture
+if ! systemctl --user start openclaw-gateway 2>&1 | tee /tmp/gateway-start.log; then
+    echo "❌ Failed to start gateway. Checking status..." | log
+    systemctl --user status openclaw-gateway 2>&1 | tee /tmp/gateway-status.log | log
+    echo "Gateway service logs:" | log
+    journalctl --user -u openclaw-gateway -n 50 --no-pager 2>&1 | tee /tmp/gateway-journal.log | log
+    echo "Checking if port 18789 is already in use:" | log
+    netstat -tulpn | grep 18789 | log || echo "Port 18789 is free" | log
+    echo "Checking openclaw processes:" | log
+    ps aux | grep openclaw | log
+    waitOrStop 1 "Failed to start OpenClaw gateway - see logs above"
+fi
+
+# Wait and verify it's actually running
+sleep 3
+if ! systemctl --user is-active --quiet openclaw-gateway; then
+    echo "❌ Gateway service started but is not active!" | log
+    systemctl --user status openclaw-gateway 2>&1 | log
+    journalctl --user -u openclaw-gateway -n 50 --no-pager 2>&1 | log
+    waitOrStop 1 "Gateway service not running"
+fi
+
+# Test if gateway is responding on localhost
+echo "Testing gateway connectivity..." | log
+sleep 2
+if ! curl -f -s -o /dev/null http://127.0.0.1:18789/health 2>/dev/null; then
+    echo "⚠️ Gateway service running but not responding on port 18789" | log
+    echo "Checking listening ports:" | log
+    netstat -tulpn | grep openclaw | log || echo "No openclaw ports found" | log
+    journalctl --user -u openclaw-gateway -n 50 --no-pager 2>&1 | log
+fi
+
+echo "✅ OpenClaw gateway is running" | log
 
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
 systemctl stop nginx
@@ -133,7 +171,7 @@ rm -f /etc/nginx/sites-enabled/default 2>/dev/null
 nginx -t && systemctl restart nginx
 waitOrStop 0 "Nginx configuration or restart failed"
 
-# Descriptions with pairing info (unchanged from your request)
+# Descriptions with pairing info
 descriptionAppend " "
 descriptionAppend "🦞 OpenClaw AI Personal Assistant installed!"
 descriptionAppend " "
@@ -186,5 +224,10 @@ descriptionAppend " • Hatch your bot: openclaw tui"
 descriptionAppend " • Add channels: openclaw configure --section channels.telegram"
 descriptionAppend " • Service status: systemctl --user status openclaw-gateway"
 descriptionAppend " • Logs: journalctl --user -u openclaw-gateway -f"
+descriptionAppend " "
+descriptionAppend "Troubleshooting logs saved to:"
+descriptionAppend " • /tmp/gateway-start.log"
+descriptionAppend " • /tmp/gateway-status.log"
+descriptionAppend " • /tmp/gateway-journal.log"
 
 tagScript success
