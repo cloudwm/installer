@@ -33,10 +33,30 @@ openclaw --version || waitOrStop 1 "openclaw binary not found after install - PA
 sleep 10  # give npm postinstall hooks a moment
 
 echo "Running minimal onboarding + installing gateway service" | log
-openclaw onboard --non-interactive --accept-risk --mode local --install-daemon
-waitOrStop 0 "Onboarding / daemon setup failed"
 
+# FIX 1: Ensure XDG_RUNTIME_DIR is set for systemctl --user
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+mkdir -p "$XDG_RUNTIME_DIR"
+chown $(whoami):$(whoami) "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+
+# FIX 2: Set DBUS_SESSION_BUS_ADDRESS for user services
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+
+# FIX 3: Enable lingering BEFORE onboarding (so user services can persist)
 loginctl enable-linger $(whoami) || true
+
+# FIX 4: Add explicit environment variables and ensure truly non-interactive
+export OPENCLAW_SKIP_INTERACTIVE=1
+export NO_UPDATE_NOTIFIER=1
+
+# FIX 5: Run with explicit flags and capture detailed error output
+echo "Attempting onboard with explicit environment..." | log
+if ! openclaw onboard --non-interactive --accept-risk --mode local --install-daemon 2>&1 | tee /tmp/openclaw-onboard.log; then
+    echo "❌ Onboarding failed. Log content:" | log
+    cat /tmp/openclaw-onboard.log | log
+    waitOrStop 1 "Onboarding / daemon setup failed - see logs above"
+fi
 
 GATEWAY_TOKEN=$(openssl rand -hex 30)  # 60 chars
 
@@ -57,6 +77,13 @@ cat << EOF > ~/.openclaw/openclaw.json
 }
 EOF
 chmod 600 ~/.openclaw/openclaw.json
+
+# FIX 6: Ensure D-Bus user session is running
+if ! pgrep -u $(whoami) dbus-daemon > /dev/null; then
+    echo "Starting D-Bus user session..." | log
+    dbus-daemon --session --fork 2>/dev/null || true
+    sleep 2
+fi
 
 systemctl --user daemon-reload
 systemctl --user restart openclaw-gateway || systemctl --user start openclaw-gateway
