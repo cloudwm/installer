@@ -32,89 +32,37 @@ openclaw --version || waitOrStop 1 "openclaw binary not found after install - PA
 
 sleep 10  # give npm postinstall hooks a moment
 
-# Verify openclaw is working
-echo "Verifying openclaw installation..." | log
-openclaw --help > /tmp/openclaw-help.log 2>&1
-if [ $? -ne 0 ]; then
-    echo "❌ openclaw --help failed:" | log
-    cat /tmp/openclaw-help.log | log
-    waitOrStop 1 "openclaw binary not working properly"
-fi
-
 echo "Running minimal onboarding + installing gateway service" | log
 
-# Setup environment BEFORE onboarding
+# Setup environment for systemd user services
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 mkdir -p "$XDG_RUNTIME_DIR"
 chown $(whoami):$(whoami) "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
-# Enable lingering
-loginctl enable-linger $(whoami) 2>&1 | tee /tmp/loginctl.log | log
+loginctl enable-linger $(whoami) || true
 sleep 2
 
-# Start D-Bus session
+# Start D-Bus session if needed
 if ! pgrep -u $(whoami) dbus-daemon > /dev/null; then
     echo "Starting D-Bus user session..." | log
-    eval $(dbus-launch --sh-syntax) 2>&1 | tee -a /tmp/dbus.log | log
+    eval $(dbus-launch --sh-syntax) 2>/dev/null
     export DBUS_SESSION_BUS_ADDRESS
-    echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" | log
 fi
 
-# Set all possible environment variables
 export OPENCLAW_SKIP_INTERACTIVE=1
 export NO_UPDATE_NOTIFIER=1
 export HOME=/root
 export USER=root
 export LOGNAME=root
 
-# Show what we're about to run
-echo "Environment before onboarding:" | log
-echo "PWD=$(pwd)" | log
-echo "HOME=$HOME" | log
-echo "USER=$USER" | log
-echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" | log
-echo "PATH=$PATH" | log
-echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" | log
-
-# Try onboarding with maximum verbosity and error capture
-echo "Attempting openclaw onboard..." | log
-set -x  # Enable command tracing
-openclaw onboard --non-interactive --accept-risk --mode local --install-daemon > /tmp/openclaw-onboard-stdout.log 2> /tmp/openclaw-onboard-stderr.log
+# Try onboarding with full environment
+openclaw onboard --non-interactive --accept-risk --mode local --install-daemon > /tmp/openclaw-onboard.log 2>&1
 ONBOARD_EXIT=$?
-set +x  # Disable command tracing
-
-echo "Onboard exit code: $ONBOARD_EXIT" | log
 
 if [ $ONBOARD_EXIT -ne 0 ]; then
-    echo "❌ Onboarding failed with exit code $ONBOARD_EXIT" | log
+    echo "Onboarding failed, attempting manual daemon installation..." | log
     
-    echo "=== STDOUT ===" | log
-    if [ -f /tmp/openclaw-onboard-stdout.log ]; then
-        cat /tmp/openclaw-onboard-stdout.log | log
-    else
-        echo "No stdout log created" | log
-    fi
-    
-    echo "=== STDERR ===" | log
-    if [ -f /tmp/openclaw-onboard-stderr.log ]; then
-        cat /tmp/openclaw-onboard-stderr.log | log
-    else
-        echo "No stderr log created" | log
-    fi
-    
-    # Check if config directory exists
-    echo "=== Config directory check ===" | log
-    ls -la ~/.openclaw/ 2>&1 | log || echo "~/.openclaw does not exist" | log
-    
-    # Check systemd user directory
-    echo "=== Systemd user directory ===" | log
-    ls -la ~/.config/systemd/user/ 2>&1 | log || echo "~/.config/systemd/user does not exist" | log
-    
-    # Try alternative: skip onboard and manually install daemon
-    echo "⚠️ Attempting manual daemon installation as fallback..." | log
-    
-    # Create minimal config
     mkdir -p ~/.openclaw
     cat << 'EOFCONFIG' > ~/.openclaw/config.json
 {
@@ -127,18 +75,7 @@ if [ $ONBOARD_EXIT -ne 0 ]; then
 }
 EOFCONFIG
     
-    # Try to install daemon separately
-    if openclaw daemon install --mode local > /tmp/daemon-install.log 2>&1; then
-        echo "✅ Manual daemon installation succeeded" | log
-        cat /tmp/daemon-install.log | log
-    else
-        echo "❌ Manual daemon installation also failed" | log
-        cat /tmp/daemon-install.log | log
-        waitOrStop 1 "Both onboarding and manual daemon install failed"
-    fi
-else
-    echo "✅ Onboarding completed successfully" | log
-    cat /tmp/openclaw-onboard-stdout.log | log
+    openclaw daemon install --mode local || waitOrStop 1 "Onboarding / daemon setup failed"
 fi
 
 GATEWAY_TOKEN=$(openssl rand -hex 30)  # 60 chars
@@ -161,14 +98,9 @@ cat << EOF > ~/.openclaw/openclaw.json
 EOF
 chmod 600 ~/.openclaw/openclaw.json
 
-echo "Reloading systemd user daemon..." | log
-systemctl --user daemon-reload 2>&1 | log
+systemctl --user daemon-reload
 
-# Check if service exists
-echo "Checking for openclaw services..." | log
-systemctl --user list-unit-files 2>&1 | grep -i openclaw | log || echo "No openclaw services found" | log
-
-# Find the actual service name
+# Find the openclaw service
 SERVICE_NAME=""
 if systemctl --user list-unit-files | grep -q "openclaw-gateway"; then
     SERVICE_NAME="openclaw-gateway"
@@ -177,36 +109,17 @@ elif systemctl --user list-unit-files | grep -q "openclaw"; then
 fi
 
 if [ -z "$SERVICE_NAME" ]; then
-    echo "❌ No openclaw service found!" | log
-    echo "Service files in ~/.config/systemd/user/:" | log
-    ls -la ~/.config/systemd/user/ | log
-    waitOrStop 1 "Gateway service not installed"
+    waitOrStop 1 "Gateway service not found"
 fi
 
-echo "Found service: $SERVICE_NAME" | log
-
-# Start the service
-echo "Starting $SERVICE_NAME..." | log
+# Start the gateway service
 systemctl --user stop "$SERVICE_NAME" 2>/dev/null || true
 sleep 2
-
-if systemctl --user start "$SERVICE_NAME" 2>&1 | tee /tmp/service-start.log | log; then
-    echo "✅ Service start command completed" | log
-else
-    echo "❌ Service start command failed" | log
-fi
+systemctl --user start "$SERVICE_NAME"
+waitOrStop 0 "Failed to start OpenClaw gateway"
 
 sleep 3
-
-# Check status
-if systemctl --user is-active --quiet "$SERVICE_NAME"; then
-    echo "✅ $SERVICE_NAME is active" | log
-else
-    echo "❌ $SERVICE_NAME is not active" | log
-    systemctl --user status "$SERVICE_NAME" 2>&1 | tee /tmp/service-status.log | log
-    journalctl --user -u "$SERVICE_NAME" -n 100 --no-pager 2>&1 | tee /tmp/service-journal.log | log
-    waitOrStop 1 "Service failed to start"
-fi
+systemctl --user is-active --quiet "$SERVICE_NAME" || waitOrStop 1 "Gateway service not running"
 
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
 systemctl stop nginx
@@ -252,6 +165,7 @@ rm -f /etc/nginx/sites-enabled/default 2>/dev/null
 nginx -t && systemctl restart nginx
 waitOrStop 0 "Nginx configuration or restart failed"
 
+# Descriptions with pairing info (unchanged from your request)
 descriptionAppend " "
 descriptionAppend "🦞 OpenClaw AI Personal Assistant installed!"
 descriptionAppend " "
@@ -261,16 +175,48 @@ descriptionAppend " "
 descriptionAppend "Gateway token (save securely):"
 descriptionAppend "${GATEWAY_TOKEN}"
 descriptionAppend " "
-descriptionAppend "Debug logs available at:"
-descriptionAppend " • /tmp/openclaw-onboard-stdout.log"
-descriptionAppend " • /tmp/openclaw-onboard-stderr.log"
-descriptionAppend " • /tmp/service-start.log"
-descriptionAppend " • /tmp/service-status.log"
-descriptionAppend " • /tmp/service-journal.log"
+descriptionAppend "Local gateway endpoint:"
+descriptionAppend "http://127.0.0.1:18789"
 descriptionAppend " "
-descriptionAppend "Service management:"
-descriptionAppend " • Status: systemctl --user status $SERVICE_NAME"
-descriptionAppend " • Logs: journalctl --user -u $SERVICE_NAME -f"
-descriptionAppend " • Restart: systemctl --user restart $SERVICE_NAME"
+descriptionAppend "After opening the dashboard the first time, you will see:"
+descriptionAppend " • 'disconnected (1008): pairing required'"
+descriptionAppend "This is NORMAL and required for security."
+descriptionAppend " "
+descriptionAppend "Why pairing is needed:"
+descriptionAppend " - OpenClaw uses device/session pairing (like WhatsApp Web)"
+descriptionAppend " - Prevents unauthorized browsers from accessing your agent/chat"
+descriptionAppend " - Must approve new devices/browsers manually on the server"
+descriptionAppend " "
+descriptionAppend "How to complete pairing:"
+descriptionAppend "1. Open the dashboard link above"
+descriptionAppend "2. In the Chat or Overview tab, look for a pairing code (e.g. ABCDEF-123456) or QR code"
+descriptionAppend " (it may appear automatically or after clicking 'Connect'/'Reconnect')"
+descriptionAppend "3. On the server terminal, run:"
+descriptionAppend "   openclaw pairing list main"
+descriptionAppend " → You should see the pending code and browser info"
+descriptionAppend "4. Approve it:"
+descriptionAppend "   openclaw pairing approve main YOUR-CODE-HERE"
+descriptionAppend " (replace YOUR-CODE-HERE with the actual code)"
+descriptionAppend "5. Refresh the browser page → status should turn green/connected"
+descriptionAppend " "
+descriptionAppend "Useful pairing commands:"
+descriptionAppend " • List pending: openclaw pairing list main"
+descriptionAppend " • Approve: openclaw pairing approve main CODE"
+descriptionAppend " • Deny: openclaw pairing deny CODE"
+descriptionAppend " • Revoke all: openclaw pairing revoke main"
+descriptionAppend " "
+descriptionAppend "If no code appears:"
+descriptionAppend " - Refresh page"
+descriptionAppend " - Click Chat tab → select 'main' session"
+descriptionAppend " - Send a test message or click reconnect"
+descriptionAppend " - Check browser console (F12 → Console) for errors"
+descriptionAppend " "
+descriptionAppend "Next steps:"
+descriptionAppend " • Complete pairing as described above"
+descriptionAppend " • Configure model API keys: openclaw configure --section models"
+descriptionAppend " • Hatch your bot: openclaw tui"
+descriptionAppend " • Add channels: openclaw configure --section channels.telegram"
+descriptionAppend " • Service status: systemctl --user status openclaw-gateway"
+descriptionAppend " • Logs: journalctl --user -u openclaw-gateway -f"
 
 tagScript success
