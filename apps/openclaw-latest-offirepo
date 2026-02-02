@@ -25,6 +25,7 @@ fi
 echo "Running official OpenClaw installer" | log
 curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
 waitOrStop 0 "OpenClaw CLI installation failed"
+sleep 20
 
 echo "Running minimal onboarding + installing gateway service" | log
 openclaw onboard --non-interactive --accept-risk --mode local --install-daemon
