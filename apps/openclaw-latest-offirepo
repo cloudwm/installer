@@ -25,7 +25,6 @@ echo "Running OpenClaw global install via npm" | log
 npm install -g openclaw
 waitOrStop 0 "OpenClaw CLI installation failed"
 
-# Critical fix: refresh PATH and command cache so openclaw is immediately usable
 export PATH="/usr/local/bin:/root/.npm-global/bin:$PATH"
 hash -r
 openclaw --version || waitOrStop 1 "openclaw binary not found after install - PATH issue"
