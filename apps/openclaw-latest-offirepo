@@ -23,7 +23,7 @@ if ! command -v node &> /dev/null || [[ "$(node -v)" != v2[0-9]* ]]; then
 fi
 
 echo "Running official OpenClaw installer" | log
-curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
+npm i -g openclaw
 waitOrStop 0 "OpenClaw CLI installation failed"
 sleep 20
 
