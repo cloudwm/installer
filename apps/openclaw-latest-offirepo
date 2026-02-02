@@ -5,13 +5,15 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
 rootDir=$(rootDir)
 
-echo "Installing OpenClaw AI Personal Assistant with Nginx HTTPS reverse proxy" | log
+echo "Installing OpenClaw AI Personal Assistant (cloud-init compatible)" | log
 
 export DEBIAN_FRONTEND="noninteractive"
 
+# ────────────────────────────────────────────────────────────────
+# 1. Install prerequisites
+# ────────────────────────────────────────────────────────────────
 apt-get update
 installPackage curl git ca-certificates gnupg lsb-release build-essential nginx certbot python3-certbot-nginx jq openssl ufw
 
@@ -22,20 +24,27 @@ if ! command -v node &> /dev/null || [[ "$(node -v)" != v2[0-9]* ]]; then
     installPackage nodejs
 fi
 
+# ────────────────────────────────────────────────────────────────
+# 2. Install OpenClaw CLI (skip interactive wizard)
+# ────────────────────────────────────────────────────────────────
 echo "Running official OpenClaw installer" | log
-npm i -g openclaw
+curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
 waitOrStop 0 "OpenClaw CLI installation failed"
-sleep 20
 
-echo "Running minimal onboarding + installing gateway service" | log
-openclaw onboard --non-interactive --accept-risk --mode local --install-daemon
-waitOrStop 0 "Onboarding / daemon setup failed"
+# ────────────────────────────────────────────────────────────────
+# 3. Run onboarding WITHOUT daemon install (safe in cloud-init)
+# ────────────────────────────────────────────────────────────────
+echo "Running minimal onboarding (no daemon yet)" | log
+openclaw onboard --non-interactive --accept-risk --mode local --skip-daemon || {
+    echo "Onboarding failed - continuing anyway (daemon will be installed later)"
+}
 
-loginctl enable-linger $(whoami) || true
+# ────────────────────────────────────────────────────────────────
+# 4. Generate config early (mode local + loopback + token)
+# ────────────────────────────────────────────────────────────────
+GATEWAY_TOKEN=$(openssl rand -hex 30)   # 60 chars
 
-GATEWAY_TOKEN=$(openssl rand -hex 60)
-
-echo "Configuring gateway for loopback + Nginx proxy" | log
+echo "Pre-creating gateway config" | log
 mkdir -p ~/.openclaw
 cat << EOF > ~/.openclaw/openclaw.json
 {
@@ -51,33 +60,52 @@ cat << EOF > ~/.openclaw/openclaw.json
   }
 }
 EOF
-
 chmod 600 ~/.openclaw/openclaw.json
 
+# ────────────────────────────────────────────────────────────────
+# 5. Create a post-boot service to finish setup (daemon + Nginx)
+# ────────────────────────────────────────────────────────────────
+echo "Creating post-boot setup service" | log
+
+cat << EOF > /etc/systemd/system/openclaw-finish-setup.service
+[Unit]
+Description=OpenClaw post-boot finalization
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/openclaw-finish-setup.sh
+RemainAfterExit=yes
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat << 'EOF' > /opt/openclaw-finish-setup.sh
+#!/bin/bash
+set -e
+
+# Wait for user session / runtime dir
+sleep 10
+
+# Install daemon now (safe after boot)
+openclaw daemon install || openclaw gateway install --force
+
+# Enable lingering + start service
+loginctl enable-linger $(whoami) || true
 systemctl --user daemon-reload
-systemctl --user restart openclaw-gateway || systemctl --user start openclaw-gateway
-waitOrStop 0 "Failed to start OpenClaw gateway"
+systemctl --user enable --now openclaw-gateway
 
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+# Certbot (if not already done - can move here if preferred)
+systemctl stop nginx || true
+certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos -m "admin@${CWM_DOMAIN}" -v || echo "Certbot skipped or failed - check manually"
 
-systemctl stop nginx
-
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    waitOrStop 1 "Certbot failed"
-fi
-
-# Restart Nginx after cert issuance
 systemctl start nginx
 
-echo "Configuring Nginx reverse proxy for HTTPS" | log
-
-cat << EOF > /etc/nginx/sites-available/openclaw
+# Nginx config (same as before)
+cat << EON > /etc/nginx/sites-available/openclaw
 server {
     listen 80;
     server_name ${CWM_DOMAIN};
@@ -102,67 +130,54 @@ server {
         proxy_http_version 1.1;
     }
 }
-EOF
+EON
 
-# Enable site
 ln -sf /etc/nginx/sites-available/openclaw /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null
-
-# Test config & restart Nginx
 nginx -t && systemctl restart nginx
-waitOrStop 0 "Nginx configuration or restart failed"
 
+# Disable self after run
+systemctl disable openclaw-finish-setup.service
+EOF
+
+chmod +x /opt/openclaw-finish-setup.sh
+systemctl daemon-reload
+systemctl enable openclaw-finish-setup.service
+
+# ────────────────────────────────────────────────────────────────
+# 6. Descriptions (add note about delayed setup)
+# ────────────────────────────────────────────────────────────────
 descriptionAppend " "
-descriptionAppend "🦞 OpenClaw AI Personal Assistant installed!"
+descriptionAppend "🦞 OpenClaw AI Personal Assistant installation started!"
 descriptionAppend " "
-descriptionAppend "Control UI (Web Dashboard):"
-descriptionAppend "https://${CWM_DOMAIN}/?token=${GATEWAY_TOKEN}"
+descriptionAppend "Full setup (daemon, certs, Nginx) runs on first boot via systemd service"
+descriptionAppend "Check progress: journalctl -u openclaw-finish-setup.service -f"
 descriptionAppend " "
-descriptionAppend "Gateway token (save securely):"
-descriptionAppend "${GATEWAY_TOKEN}"
+descriptionAppend "Control UI (once ready): https://${CWM_DOMAIN}/?token=${GATEWAY_TOKEN}"
+descriptionAppend "Gateway token (60 chars - save securely): ${GATEWAY_TOKEN}"
 descriptionAppend " "
-descriptionAppend "Local gateway endpoint:"
-descriptionAppend "http://127.0.0.1:18789"
+descriptionAppend "Pairing required on first access (see below)"
 descriptionAppend " "
-descriptionAppend "After opening the dashboard the first time, you will see:"
-descriptionAppend "  • 'disconnected (1008): pairing required'"
-descriptionAppend "This is NORMAL and required for security."
+descriptionAppend "!!! PAIRING EXPLANATION !!!"
+descriptionAppend "After opening the dashboard, you may see 'disconnected (1008): pairing required'"
+descriptionAppend "This is normal security: approve new browsers/devices manually."
 descriptionAppend " "
-descriptionAppend "Why pairing is needed:"
-descriptionAppend "  - OpenClaw uses device/session pairing (like WhatsApp Web)"
-descriptionAppend "  - Prevents unauthorized browsers from accessing your agent/chat"
-descriptionAppend "  - Must approve new devices/browsers manually on the server"
+descriptionAppend "Steps:"
+descriptionAppend "1. Open https://${CWM_DOMAIN}/?token=${GATEWAY_TOKEN}"
+descriptionAppend "2. Look for pairing code in Chat/Overview tab (e.g. ABCDEF-123456)"
+descriptionAppend "3. On server run: openclaw pairing list main"
+descriptionAppend "4. Approve: openclaw pairing approve main YOUR-CODE-HERE"
+descriptionAppend "5. Refresh browser → connected!"
 descriptionAppend " "
-descriptionAppend "How to complete pairing:"
-descriptionAppend "1. Open the dashboard link above"
-descriptionAppend "2. In the Chat or Overview tab, look for a pairing code (e.g. ABCDEF-123456) or QR code"
-descriptionAppend "   (it may appear automatically or after clicking 'Connect'/'Reconnect')"
-descriptionAppend "3. On the server terminal, run:"
-descriptionAppend "   openclaw pairing list main"
-descriptionAppend "   → You should see the pending code and browser info"
-descriptionAppend "4. Approve it:"
-descriptionAppend "   openclaw pairing approve main YOUR-CODE-HERE"
-descriptionAppend "   (replace YOUR-CODE-HERE with the actual code)"
-descriptionAppend "5. Refresh the browser page → status should turn green/connected"
+descriptionAppend "Manage pairings:"
+descriptionAppend "  - List: openclaw pairing list main"
+descriptionAppend "  - Approve: openclaw pairing approve main CODE"
+descriptionAppend "  - Deny: openclaw pairing deny CODE"
+descriptionAppend "  - Revoke: openclaw pairing revoke main"
 descriptionAppend " "
-descriptionAppend "Useful pairing commands:"
-descriptionAppend "  • List pending: openclaw pairing list main"
-descriptionAppend "  • Approve:    openclaw pairing approve main CODE"
-descriptionAppend "  • Deny:       openclaw pairing deny CODE"
-descriptionAppend "  • Revoke all: openclaw pairing revoke main"
-descriptionAppend " "
-descriptionAppend "If no code appears:"
-descriptionAppend "  - Refresh page"
-descriptionAppend "  - Click Chat tab → select 'main' session"
-descriptionAppend "  - Send a test message or click reconnect"
-descriptionAppend "  - Check browser console (F12 → Console) for errors"
-descriptionAppend " "
-descriptionAppend "Next steps:"
-descriptionAppend "  • Complete pairing as described above"
-descriptionAppend "  • Configure model API keys: openclaw configure --section models"
-descriptionAppend "  • Hatch your bot: openclaw tui"
-descriptionAppend "  • Add channels: openclaw configure --section channels.telegram"
-descriptionAppend "  • Service status: systemctl --user status openclaw-gateway"
-descriptionAppend "  • Logs: journalctl --user -u openclaw-gateway -f"
+descriptionAppend "Next steps after boot:"
+descriptionAppend "  - Configure model keys: openclaw configure --section models"
+descriptionAppend "  - Hatch bot: openclaw tui"
+descriptionAppend "  - Logs: journalctl --user -u openclaw-gateway -f"
 
 tagScript success
