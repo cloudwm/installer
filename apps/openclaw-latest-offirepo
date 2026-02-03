@@ -77,7 +77,7 @@ EOFCONFIG
     openclaw daemon install --mode local || waitOrStop 1 "Onboarding / daemon setup failed"
 fi
 
-GATEWAY_TOKEN=$(openssl rand -hex 30)  # 60 chars
+GATEWAY_TOKEN=$(openssl rand -hex 64)
 
 echo "Configuring gateway for loopback + Nginx proxy" | log
 mkdir -p ~/.openclaw
