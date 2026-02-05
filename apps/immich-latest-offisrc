@@ -140,14 +140,67 @@ obtain_ssl() {
     "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
 
+configure_motd() {
+  echo "🧾 Configuring system MOTD with Immich info..." | log
+
+  chmod -x /etc/update-motd.d/* 2>/dev/null || true
+  rm -f /etc/motd 2>/dev/null
+
+  # runtime-derived values
+  MACHINE_IP="$(hostname -I | awk '{print $1}')"
+  DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+  IMMICH_LOCAL_URL="http://127.0.0.1:2283"
+  IMMICH_PUBLIC_URL="https://${DOMAIN_NAME}"
+  IMMICH_DIR="/opt/immich"
+  DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
+  NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+  cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+📸 Immich Photo Server – Installation Complete
+──────────────────────────────────────────────
+
+           Local URL: ${IMMICH_LOCAL_URL}
+          Public URL: ${IMMICH_PUBLIC_URL}
+           Machine IP: ${MACHINE_IP}
+              Domain: ${DOMAIN_NAME}
+
+        Docker Status: ${DOCKER_STATUS}
+         Nginx Status: ${NGINX_STATUS}
+
+       Install Path: ${IMMICH_DIR}
+       Compose File: ${IMMICH_DIR}/docker-compose.yml
+        Env File: ${IMMICH_DIR}/.env
+
+──────────────────────────────────────────────
+💡 Immich management:
+   cd ${IMMICH_DIR}
+   docker compose ps
+   docker compose logs -f
+   docker compose down
+   docker compose up -d
+
+🧹 Remove this message:
+   sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+  chmod 644 /etc/motd
+  echo "✅ Custom MOTD installed at /etc/motd with Immich details." | log
+}
+
+
 # ==============================
 # Main
 # ==============================
 main() {
     install_docker
+    "$updateStatus" "$HTML_PATH" -ap "Installing Immich..."
     run_immich
+    "$updateStatus" "$HTML_PATH" -ap "Finishing Immich installation..."
     switch_nginx_to_proxy
     obtain_ssl
+    configure_motd
 }
 
 main
