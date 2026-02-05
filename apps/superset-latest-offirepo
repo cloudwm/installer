@@ -70,10 +70,6 @@ run_superset() {
 
     cd "$TARGET_DIR" || return 1
 
-    # Generate admin password if not set
-    ADMINPASSWORD="${ADMINPASSWORD:-$(openssl rand -base64 12)}"
-    echo "ADMINPASSWORD=$ADMINPASSWORD" >> /root/.envVars
-
     # Configure admin credentials
     cat > docker/.env-local <<EOF
 ADMIN_USERNAME=admin
