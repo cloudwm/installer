@@ -70,6 +70,19 @@ run_superset() {
 
     cd "$TARGET_DIR" || return 1
 
+    # Generate admin password if not set
+    ADMINPASSWORD="${ADMINPASSWORD:-$(openssl rand -base64 12)}"
+    echo "ADMINPASSWORD=$ADMINPASSWORD" >> /root/.envVars
+
+    # Configure admin credentials
+    cat > docker/.env-local <<EOF
+ADMIN_USERNAME=admin
+ADMIN_FIRST_NAME=Admin
+ADMIN_LAST_NAME=User
+ADMIN_EMAIL=admin@localhost
+ADMIN_PASSWORD=${ADMINPASSWORD}
+EOF
+
     echo "Starting Superset containers..." | log
     docker compose up --build -d --scale nginx=0 || return 1
 
@@ -160,7 +173,7 @@ configure_motd() {
         Install Path: ${SUPERSET_DIR}
         Compose File: ${SUPERSET_DIR}/docker-compose.yml
 
-        Default Login: admin / admin
+        Default Login: admin / ${ADMINPASSWORD:-admin}
 
 ──────────────────────────────────────────────
 💡 Superset management:
