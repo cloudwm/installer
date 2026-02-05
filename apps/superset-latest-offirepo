@@ -80,7 +80,7 @@ ADMIN_USERNAME=admin
 ADMIN_FIRST_NAME=Admin
 ADMIN_LAST_NAME=User
 ADMIN_EMAIL=admin@localhost
-ADMIN_PASSWORD=${ADMINPASSWORD}
+ADMIN_PASSWORD='${ADMINPASSWORD}'
 EOF
 
     echo "Starting Superset containers..." | log
@@ -197,7 +197,7 @@ EOM
 # ==============================
 main() {
     install_docker
-    "$updateStatus" "$HTML_PATH" -ap "Installing Superset..."
+    "$updateStatus" "$HTML_PATH" -ap "Installing Superset (Might take some time)..."
     run_superset
     "$updateStatus" "$HTML_PATH" -ap "Finishing Superset installation..."
     switch_nginx_to_proxy
