@@ -15,6 +15,11 @@ DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
+if [ -z '$ADMINPASSWORD' ];then
+    echo "Setting temp password..." | log
+    export ADMINPASSWORD='Pass12344321!!'
+fi
+
 # ==============================
 # Docker installation
 # ==============================
@@ -71,7 +76,6 @@ run_superset() {
     cd "$TARGET_DIR" || return 1
 
     # Configure admin credentials
-    export ADMINPASSWORD='Pass12344321!!'
     cat > docker/.env-local <<EOF
 ADMIN_USERNAME=admin
 ADMIN_FIRST_NAME=Admin
@@ -80,24 +84,7 @@ ADMIN_EMAIL=admin@localhost
 ADMIN_PASSWORD='${ADMINPASSWORD}'
 EOF
 
-    # Add restart policy for all services
-    cat > docker-compose.override.yml <<EOF
-services:
-  superset:
-    restart: unless-stopped
-  superset-init:
-    restart: "no"
-  superset-worker:
-    restart: unless-stopped
-  superset-worker-beat:
-    restart: unless-stopped
-  db:
-    restart: unless-stopped
-  redis:
-    restart: unless-stopped
-EOF
-
-        # Make Superset trust the reverse proxy headers
+    # Make Superset trust the reverse proxy headers
     cat > docker/pythonpath_dev/superset_config_docker.py <<'PYEOF'
 ENABLE_PROXY_FIX = True
 PROXY_FIX_CONFIG = {
