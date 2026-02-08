@@ -15,11 +15,6 @@ DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
-if [ -z "$ADMINPASSWORD" ]; then
-    echo "Setting temp password..." | log
-    export ADMINPASSWORD='Pass12344321!!'
-fi
-
 # ==============================
 # Docker installation
 # ==============================
