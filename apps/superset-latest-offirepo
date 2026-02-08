@@ -71,6 +71,7 @@ run_superset() {
     cd "$TARGET_DIR" || return 1
 
     # Configure admin credentials
+    export ADMINPASSWORD='Pass12344321!!'
     cat > docker/.env-local <<EOF
 ADMIN_USERNAME=admin
 ADMIN_FIRST_NAME=Admin
