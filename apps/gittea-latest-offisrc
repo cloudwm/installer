@@ -30,29 +30,13 @@ install_gittea() {
     apt-get install -y snapd
     snap install gitea
 
-    echo "Waiting for Gitea to start initially..." | log
-    for i in $(seq 1 30); do
-        if curl -sf http://127.0.0.1:${GITEA_PORT}/ > /dev/null 2>&1; then
-            echo "Gitea is up after ${i}s." | log
-            break
-        fi
-        sleep 2
-    done
-
-    # Wait for app.ini to exist (created on first run)
-    echo "Waiting for app.ini to be created..." | log
-    for i in $(seq 1 15); do
-        [ -f "$GITEA_CONFIG" ] && break
-        sleep 2
-    done
-
-    if [ ! -f "$GITEA_CONFIG" ]; then
-        echo "WARNING: app.ini not found at $GITEA_CONFIG — skipping config." | log
-        return 1
-    fi
-
-    # Stop Gitea while we configure it
+    # Stop Gitea immediately — we need to configure before first real use
+    echo "Stopping Gitea to configure..." | log
     systemctl stop snap.gitea.web.service
+    sleep 2
+
+    # Ensure config directory exists
+    mkdir -p /var/snap/gitea/common/conf
 
     # Generate secrets
     echo "Generating Gitea secrets..." | log
@@ -67,19 +51,22 @@ APP_NAME = Gitea: Git with a cup of tea
 RUN_MODE = prod
 
 [server]
-DOMAIN          = ${DOMAIN_NAME}
-ROOT_URL        = https://${DOMAIN_NAME}/
-HTTP_PORT       = ${GITEA_PORT}
-SSH_DOMAIN      = ${DOMAIN_NAME}
-SSH_PORT        = ${GITEA_SSH_PORT}
+DOMAIN           = ${DOMAIN_NAME}
+ROOT_URL         = https://${DOMAIN_NAME}/
+HTTP_PORT        = ${GITEA_PORT}
+SSH_DOMAIN       = ${DOMAIN_NAME}
+SSH_PORT         = ${GITEA_SSH_PORT}
 START_SSH_SERVER = true
 LFS_START_SERVER = true
-LFS_JWT_SECRET  = ${LFS_JWT_SECRET}
-OFFLINE_MODE    = false
+LFS_JWT_SECRET   = ${LFS_JWT_SECRET}
+OFFLINE_MODE     = false
 
 [database]
 DB_TYPE = sqlite3
 PATH    = /var/snap/gitea/common/data/gitea.db
+
+[repository]
+ROOT = /var/snap/gitea/common/data/gitea-repositories
 
 [security]
 INSTALL_LOCK   = true
@@ -117,9 +104,14 @@ LEVEL     = info
 ROOT_PATH = /var/snap/gitea/common/log
 EOF
 
-    # Start Gitea with new config
+    # Initialize the database schema (this is what the wizard normally does)
+    echo "Running database migration to initialize SQLite..." | log
+    snap run gitea.gitea migrate
+    echo "Database initialized." | log
+
+    # Start Gitea with fully configured app.ini + initialized DB
     systemctl start snap.gitea.web.service
-    echo "Gitea configured and restarted." | log
+    echo "Gitea configured and started." | log
 
     # Wait for Gitea to be ready
     for i in $(seq 1 30); do
