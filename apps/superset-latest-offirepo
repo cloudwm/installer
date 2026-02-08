@@ -15,7 +15,7 @@ DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
-if [ -z '$ADMINPASSWORD' ];then
+if [ -z "$ADMINPASSWORD" ]; then
     echo "Setting temp password..." | log
     export ADMINPASSWORD='Pass12344321!!'
 fi
@@ -81,7 +81,7 @@ ADMIN_USERNAME=admin
 ADMIN_FIRST_NAME=Admin
 ADMIN_LAST_NAME=User
 ADMIN_EMAIL=admin@localhost
-ADMIN_PASSWORD='${ADMINPASSWORD}'
+ADMIN_PASSWORD=${ADMINPASSWORD}
 EOF
 
     # Make Superset trust the reverse proxy headers
