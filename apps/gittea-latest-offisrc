@@ -166,17 +166,13 @@ configure_motd() {
 🗂️  Gitea Git Server – Installation Complete
 ──────────────────────────────────────────────
 
-    Local URL: ${GITEA_LOCAL_URL}
     Public URL: ${GITEA_PUBLIC_URL}
     Machine IP: ${MACHINE_IP}
     Domain: ${DOMAIN_NAME}
-    Git SSH Port: ${GITEA_SSH_PORT}
-    SSH Clone: ssh://git@${DOMAIN_NAME}:${GITEA_SSH_PORT}/
 
     Gitea Service: ${GITEA_SERVICE_STATUS}
     Nginx Status: ${NGINX_STATUS}
 
-    Install Type: Canonical Snap
     Config File: ${GITEA_CONFIG}
     Data Path: /var/snap/gitea/common/data
     Repositories: /var/snap/gitea/common/data/gitea-repositories
