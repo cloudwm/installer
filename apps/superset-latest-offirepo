@@ -1,0 +1,249 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="/var/www/html/index.html"
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+echo "Machine IP: $MACHINE_IP" | log
+echo "Domain: $DOMAIN_NAME" | log
+
+# ==============================
+# Docker installation
+# ==============================
+install_docker() {
+    if command -v docker >/dev/null 2>&1; then
+        echo "Docker is already installed. Skipping Docker installation." | log
+        "$updateStatus" "$HTML_PATH" -ap "Docker is already installed. Skipping Docker installation."
+        return
+    fi
+
+    echo "Adding docker GPG key..." | log
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
+
+    echo "Installing Docker engine & plugins..." | log
+    "$updateStatus" "$HTML_PATH" -ap "Installing Docker engine & plugins..."
+    apt update
+    apt install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin
+
+    systemctl enable --now docker
+
+    echo "Docker installation completed successfully." | log
+    "$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
+}
+
+# ==============================
+# Superset
+# ==============================
+run_superset() {
+    local TARGET_DIR="${1:-/opt/superset}"
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "Docker is not installed" | log
+        return 1
+    fi
+
+    if [ ! -d "$TARGET_DIR" ]; then
+        echo "Cloning Superset repository..." | log
+        git clone --depth=1 https://github.com/apache/superset.git "$TARGET_DIR" || return 1
+    fi
+
+    cd "$TARGET_DIR" || return 1
+
+    # Configure admin credentials
+    cat > docker/.env-local <<EOF
+ADMIN_USERNAME=admin
+ADMIN_FIRST_NAME=Admin
+ADMIN_LAST_NAME=User
+ADMIN_EMAIL=admin@localhost
+ADMIN_PASSWORD=${ADMINPASSWORD}
+EOF
+
+    # Make Superset trust the reverse proxy headers
+    cat > docker/pythonpath_dev/superset_config_docker.py <<'PYEOF'
+ENABLE_PROXY_FIX = True
+PROXY_FIX_CONFIG = {
+    "x_for": 1,
+    "x_proto": 1,
+    "x_host": 1,
+    "x_prefix": 1,
+}
+PYEOF
+
+    # Build images now, but don't start containers (installer cleanup will wipe them)
+    echo "Building Superset images..." | log
+    docker compose build || return 1
+
+    # Create systemd service to start containers after boot/cleanup
+    cat > /etc/systemd/system/superset.service <<EOF
+[Unit]
+Description=Apache Superset
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${TARGET_DIR}
+ExecStart=/usr/bin/docker compose up -d --scale nginx=0
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable superset.service
+
+    echo "Superset will start automatically after boot." | log
+}
+
+# ==============================
+# Nginx reverse proxy
+# ==============================
+switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for Superset..." | log
+
+    NGINX_CONF="/etc/nginx/sites-available/superset.conf"
+
+    cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    location / {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # WebSocket support
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Prevent timeouts / hanging
+        proxy_connect_timeout 60s;
+        proxy_send_timeout    120s;
+        proxy_read_timeout    120s;
+        proxy_buffering       off;
+    }
+}
+EOF
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/superset.conf
+    rm -f /etc/nginx/sites-enabled/default
+    nginx -t || return 1
+    systemctl reload nginx
+
+    echo "nginx configured for Superset." | log
+}
+
+# ==============================
+# SSL
+# ==============================
+obtain_ssl() {
+    systemctl reload nginx
+
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx \
+        -d "$DOMAIN_NAME" \
+        --non-interactive \
+        --agree-tos \
+        -m "admin@${DOMAIN_NAME}" \
+        --redirect
+
+    echo "Superset available at https://${DOMAIN_NAME}" | log
+    "$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Superset is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+
+# ==============================
+# MOTD
+# ==============================
+configure_motd() {
+    echo "Configuring system MOTD with Superset info..." | log
+
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
+
+    MACHINE_IP="$(hostname -I | awk '{print $1}')"
+    DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+    SUPERSET_LOCAL_URL="http://127.0.0.1:8088"
+    SUPERSET_PUBLIC_URL="https://${DOMAIN_NAME}"
+    SUPERSET_DIR="/opt/superset"
+    DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
+    NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+📊 Apache Superset – Installation Complete
+──────────────────────────────────────────────
+
+           Local URL: ${SUPERSET_LOCAL_URL}
+          Public URL: ${SUPERSET_PUBLIC_URL}
+          Machine IP: ${MACHINE_IP}
+              Domain: ${DOMAIN_NAME}
+
+       Docker Status: ${DOCKER_STATUS}
+        Nginx Status: ${NGINX_STATUS}
+
+        Install Path: ${SUPERSET_DIR}
+        Compose File: ${SUPERSET_DIR}/docker-compose.yml
+
+        Default Login: admin / ${ADMINPASSWORD:-admin}
+
+──────────────────────────────────────────────
+💡 Superset management:
+   cd ${SUPERSET_DIR}
+   docker compose ps
+   docker compose logs -f
+   docker compose down
+   docker compose up -d
+
+🧹 Remove this message:
+   sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed at /etc/motd with Superset details." | log
+}
+
+# ==============================
+# Main
+# ==============================
+main() {
+    install_docker
+    "$updateStatus" "$HTML_PATH" -ap "Installing Superset (Might take some time)..."
+    run_superset
+    "$updateStatus" "$HTML_PATH" -ap "Finishing Superset installation..."
+    switch_nginx_to_proxy
+    obtain_ssl
+    configure_motd
+}
+
+main
