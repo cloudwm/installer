@@ -1,0 +1,233 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="/var/www/html/index.html"
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+echo "Machine IP: $MACHINE_IP" | log
+echo "Domain: $DOMAIN_NAME" | log
+
+GITEA_PORT=3000
+GITEA_SSH_PORT=2222
+GITEA_CONFIG="/var/snap/gitea/common/conf/app.ini"
+ADMINPASSWORD='Pass12344321!!'
+
+# ==============================
+# Install Gitea via Canonical Snap
+# ==============================
+install_gittea() {
+    echo "Installing Gitea via snap..." | log
+    apt-get update
+    apt-get install -y snapd
+    snap install gitea
+
+    echo "Waiting for Gitea to become available on port ${GITEA_PORT}..." | log
+    for i in $(seq 1 30); do
+        if curl -sf http://127.0.0.1:${GITEA_PORT}/ > /dev/null 2>&1; then
+            echo "Gitea is up after ${i}s." | log
+            break
+        fi
+        sleep 2
+    done
+
+    # Configure Gitea: domain, root URL, and built-in SSH server
+    echo "Configuring Gitea app.ini..." | log
+
+    # Wait for app.ini to exist (created on first run)
+    for i in $(seq 1 15); do
+        [ -f "$GITEA_CONFIG" ] && break
+        sleep 2
+    done
+
+    if [ ! -f "$GITEA_CONFIG" ]; then
+        echo "WARNING: app.ini not found at $GITEA_CONFIG — skipping config." | log
+        return 1
+    fi
+
+    # Update server section settings
+    # Use sed to set values in app.ini; create keys if missing
+    set_ini_value() {
+        local key="$1"
+        local value="$2"
+        local file="$GITEA_CONFIG"
+        if grep -q "^${key}\s*=" "$file"; then
+            sed -i "s|^${key}\s*=.*|${key} = ${value}|" "$file"
+        else
+            # Insert after [server] section header
+            sed -i "/^\[server\]/a ${key} = ${value}" "$file"
+        fi
+    }
+
+    set_ini_value "DOMAIN"          "$DOMAIN_NAME"
+    set_ini_value "ROOT_URL"        "https://${DOMAIN_NAME}/"
+    set_ini_value "SSH_DOMAIN"      "$DOMAIN_NAME"
+    set_ini_value "SSH_PORT"        "$GITEA_SSH_PORT"
+    set_ini_value "START_SSH_SERVER" "true"
+
+    # Restart Gitea to apply config
+    systemctl restart snap.gitea.web.service
+    echo "Gitea snap installed and configured." | log
+
+    # Open SSH port in firewall if ufw is active
+    if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+        ufw allow "${GITEA_SSH_PORT}/tcp"
+        echo "Opened port ${GITEA_SSH_PORT} in ufw." | log
+    fi
+
+    # Wait for Gitea to be ready after restart
+    for i in $(seq 1 15); do
+        curl -sf http://127.0.0.1:${GITEA_PORT}/ > /dev/null 2>&1 && break
+        sleep 2
+    done
+
+    # Create admin user
+    echo "Creating admin user..." | log
+    snap run gitea.gitea admin user create \
+        --admin \
+        --username "admin" \
+        --password "$ADMINPASSWORD" \
+        --email "admin@${DOMAIN_NAME}" \
+        --must-change-password=false
+
+    echo "Admin user created." | log
+}
+
+# ==============================
+# Nginx reverse proxy
+# ==============================
+switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for Gitea..." | log
+
+    NGINX_CONF="/etc/nginx/sites-available/gitea.conf"
+
+    cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    client_max_body_size 512M;
+
+    location / {
+        proxy_pass http://127.0.0.1:${GITEA_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/gitea.conf
+    rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+    nginx -t || return 1
+    systemctl reload nginx
+
+    echo "nginx configured for Gitea." | log
+}
+
+# ==============================
+# SSL
+# ==============================
+obtain_ssl() {
+    systemctl reload nginx
+
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx \
+        -d "$DOMAIN_NAME" \
+        --non-interactive \
+        --agree-tos \
+        -m "admin@${DOMAIN_NAME}" \
+        --redirect
+
+    echo "Gitea available at https://${DOMAIN_NAME}" | log
+    "$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Gitea is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+
+# ==============================
+# MOTD
+# ==============================
+configure_motd() {
+    echo "Configuring system MOTD with Gitea info..." | log
+
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
+
+    MACHINE_IP="$(hostname -I | awk '{print $1}')"
+    DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+    GITEA_PUBLIC_URL="https://${DOMAIN_NAME}"
+    GITEA_SERVICE_STATUS="$(systemctl is-active snap.gitea.web.service 2>/dev/null || echo unknown)"
+    NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🗂️  Gitea Git Server – Installation Complete
+──────────────────────────────────────────────
+
+    Local URL: ${GITEA_LOCAL_URL}
+    Public URL: ${GITEA_PUBLIC_URL}
+    Machine IP: ${MACHINE_IP}
+    Domain: ${DOMAIN_NAME}
+    Git SSH Port: ${GITEA_SSH_PORT}
+    SSH Clone: ssh://git@${DOMAIN_NAME}:${GITEA_SSH_PORT}/
+
+    Admin User: admin
+    Admin Pass: ${ADMINPASSWORD}
+
+    Gitea Service: ${GITEA_SERVICE_STATUS}
+    Nginx Status: ${NGINX_STATUS}
+
+    Install Type: Canonical Snap
+    Config File: ${GITEA_CONFIG}
+    Data Path: /var/snap/gitea/common/data
+    Repositories: /var/snap/gitea/common/data/gitea-repositories
+    Database: /var/snap/gitea/common/data/gitea.db (SQLite)
+    Logs: /var/snap/gitea/common/log
+
+──────────────────────────────────────────────
+💡  Gitea management:
+    sudo systemctl status snap.gitea.web.service
+    sudo systemctl restart snap.gitea.web.service
+    sudo snap logs gitea
+    sudo nano ${GITEA_CONFIG}
+
+📦  Snap operations:
+    sudo snap save gitea          # create backup
+    sudo snap saved                # list backups
+    sudo snap restore <id> gitea  # restore backup
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed at /etc/motd with Gitea details." | log
+}
+
+# ==============================
+# Main
+# ==============================
+main() {
+    "$updateStatus" "$HTML_PATH" -ap "Installing Gitea..."
+    install_gittea
+    "$updateStatus" "$HTML_PATH" -ap "Finishing installation..."
+    switch_nginx_to_proxy
+    obtain_ssl
+    configure_motd
+}
+
+main
