@@ -79,10 +79,38 @@ ADMIN_EMAIL=admin@localhost
 ADMIN_PASSWORD='${ADMINPASSWORD}'
 EOF
 
+    # Add restart policy for all services
+    cat > docker-compose.override.yml <<EOF
+services:
+  superset:
+    restart: unless-stopped
+  superset-init:
+    restart: "no"
+  superset-worker:
+    restart: unless-stopped
+  superset-worker-beat:
+    restart: unless-stopped
+  db:
+    restart: unless-stopped
+  redis:
+    restart: unless-stopped
+EOF
+
+        # Make Superset trust the reverse proxy headers
+    cat > docker/pythonpath_dev/superset_config_docker.py <<'PYEOF'
+ENABLE_PROXY_FIX = True
+PROXY_FIX_CONFIG = {
+    "x_for": 1,
+    "x_proto": 1,
+    "x_host": 1,
+    "x_prefix": 1,
+}
+PYEOF
+
     echo "Starting Superset containers..." | log
     docker compose up --build -d --scale nginx=0 || return 1
 
-    echo "Superset is running on http://127.0.0.1:8088" | log
+    echo "Superset is running on https://$DOMAIN_NAME" | log
 }
 
 # ==============================
@@ -101,15 +129,27 @@ server {
     location / {
         proxy_pass http://127.0.0.1:8088;
         proxy_http_version 1.1;
+
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # WebSocket support
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Prevent timeouts / hanging
+        proxy_connect_timeout 60s;
+        proxy_send_timeout    120s;
+        proxy_read_timeout    120s;
+        proxy_buffering       off;
     }
 }
 EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/superset.conf
+    rm -f /etc/nginx/sites-enabled/default
     nginx -t || return 1
     systemctl reload nginx
 
