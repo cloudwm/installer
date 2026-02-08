@@ -88,17 +88,6 @@ install_gittea() {
         curl -sf http://127.0.0.1:${GITEA_PORT}/ > /dev/null 2>&1 && break
         sleep 2
     done
-
-    # Create admin user
-    echo "Creating admin user..." | log
-    snap run gitea.gitea admin user create \
-        --admin \
-        --username "admin" \
-        --password "$ADMINPASSWORD" \
-        --email "admin@${DOMAIN_NAME}" \
-        --must-change-password=false
-
-    echo "Admin user created." | log
 }
 
 # ==============================
@@ -183,9 +172,6 @@ configure_motd() {
     Domain: ${DOMAIN_NAME}
     Git SSH Port: ${GITEA_SSH_PORT}
     SSH Clone: ssh://git@${DOMAIN_NAME}:${GITEA_SSH_PORT}/
-
-    Admin User: admin
-    Admin Pass: ${ADMINPASSWORD}
 
     Gitea Service: ${GITEA_SERVICE_STATUS}
     Nginx Status: ${NGINX_STATUS}
