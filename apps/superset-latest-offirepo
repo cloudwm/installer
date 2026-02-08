@@ -90,10 +90,32 @@ PROXY_FIX_CONFIG = {
 }
 PYEOF
 
-    echo "Starting Superset containers..." | log
-    docker compose up --build -d --scale nginx=0 || return 1
+    # Build images now, but don't start containers (installer cleanup will wipe them)
+    echo "Building Superset images..." | log
+    docker compose build || return 1
 
-    echo "Superset is running on https://$DOMAIN_NAME" | log
+    # Create systemd service to start containers after boot/cleanup
+    cat > /etc/systemd/system/superset.service <<EOF
+[Unit]
+Description=Apache Superset
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${TARGET_DIR}
+ExecStart=/usr/bin/docker compose up -d --scale nginx=0
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable superset.service
+
+    echo "Superset will start automatically after boot." | log
 }
 
 # ==============================
