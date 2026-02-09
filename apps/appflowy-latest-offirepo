@@ -134,19 +134,12 @@ run_appflowy() {
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
   echo "Starting AppFlowy Cloud containers..." | log
+  docker compose pull || return 1
   docker compose up -d || return 1
 
-  # Wait for containers to stabilize, then verify key services are running
-  echo "Waiting for containers to stabilize..." | log
-  sleep 30
-
-  # Check if critical containers are running; restart once if needed
-  if ! docker compose ps --format '{{.Service}} {{.State}}' | grep -q "appflowy_cloud.*running"; then
-    echo "Some containers not ready, restarting..." | log
-    docker compose down
-    docker compose up -d || return 1
-    sleep 30
-  fi
+  # Give containers time to initialize (postgres healthcheck, gotrue migrations, etc.)
+  echo "Waiting for services to initialize..." | log
+  sleep 45
 
   echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
 }
