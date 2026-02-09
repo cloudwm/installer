@@ -1,0 +1,244 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="/var/www/html/index.html"
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+echo "Machine IP: $MACHINE_IP" | log
+echo "Domain: $DOMAIN_NAME" | log
+
+# ==============================
+# Docker installation
+# ==============================
+install_docker() {
+    if command -v docker >/dev/null 2>&1; then
+        echo "Docker is already installed. Skipping Docker installation." | log
+        "$updateStatus" "$HTML_PATH" -ap "Docker is already installed. Skipping Docker installation."
+        return
+    fi
+
+    echo "Adding docker GPG key..." | log
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
+
+    echo "Installing Docker engine & plugins..." | log
+    "$updateStatus" "$HTML_PATH" -ap "Installing Docker engine & plugins..."
+    apt update
+    apt install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin
+
+    systemctl enable --now docker
+
+    echo "Docker installation completed successfully." | log
+    "$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
+}
+
+# ==============================
+# AppFlowy Cloud
+# ==============================
+run_appflowy() {
+  local TARGET_DIR="${1:-/opt/appflowy}"
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Docker is not installed" | log
+    return 1
+  fi
+
+  # Install git if not present (needed to clone the repo)
+  if ! command -v git >/dev/null 2>&1; then
+    echo "Installing git..." | log
+    apt install -y git || return 1
+  fi
+
+  # Clone the AppFlowy-Cloud repository
+  echo "Cloning AppFlowy-Cloud repository..." | log
+  git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
+  cd "$TARGET_DIR" || return 1
+
+  # Create .env from deploy.env template if not already present
+  if [ ! -f ".env" ]; then
+    echo "Creating .env from deploy.env template..." | log
+    cp deploy.env .env || return 1
+  fi
+
+  # Set the FQDN to our domain
+  echo "Configuring AppFlowy .env with FQDN=${DOMAIN_NAME}..." | log
+  sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
+
+  # Remap the AppFlowy-bundled nginx ports so they don't conflict
+  # with the host nginx (which will handle SSL via certbot).
+  # AppFlowy's docker-compose exposes nginx on 80 and 443 by default.
+  # We remap to 8080 and 8443 on the host.
+  echo "Remapping AppFlowy nginx ports to 8080/8443 to avoid host nginx conflict..." | log
+  sed -i 's|\${NGINX_PORT:-80}:80|${NGINX_PORT:-8080}:80|g' docker-compose.yml
+  sed -i 's|\${NGINX_TLS_PORT:-443}:443|${NGINX_TLS_PORT:-8443}:443|g' docker-compose.yml
+
+  echo "Starting AppFlowy Cloud containers..." | log
+  docker compose up -d || return 1
+
+  echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
+}
+
+# ==============================
+# Nginx reverse proxy
+# ==============================
+switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for AppFlowy Cloud..." | log
+
+    NGINX_CONF="/etc/nginx/sites-available/appflowy.conf"
+
+    cat > "$NGINX_CONF" <<'EOF'
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+EOF
+
+    cat >> "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    client_max_body_size 256m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # WebSocket support (required for AppFlowy real-time collaboration)
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}
+EOF
+
+    # Remove default site if it exists
+    rm -f /etc/nginx/sites-enabled/default
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/appflowy.conf
+    nginx -t || return 1
+    systemctl reload nginx
+
+    echo "nginx configured for AppFlowy Cloud." | log
+}
+
+# ==============================
+# SSL
+# ==============================
+obtain_ssl() {
+    systemctl reload nginx
+
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx \
+        -d "$DOMAIN_NAME" \
+        --non-interactive \
+        --agree-tos \
+        -m "admin@${DOMAIN_NAME}" \
+        --redirect
+
+    echo "AppFlowy Cloud available at https://${DOMAIN_NAME}" | log
+    "$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "AppFlowy Cloud is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+
+configure_motd() {
+  echo "🧾 Configuring system MOTD with AppFlowy info..." | log
+
+  chmod -x /etc/update-motd.d/* 2>/dev/null || true
+  rm -f /etc/motd 2>/dev/null
+
+  # runtime-derived values
+  MACHINE_IP="$(hostname -I | awk '{print $1}')"
+  DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+  APPFLOWY_LOCAL_URL="http://127.0.0.1:8080"
+  APPFLOWY_PUBLIC_URL="https://${DOMAIN_NAME}"
+  APPFLOWY_ADMIN_URL="https://${DOMAIN_NAME}/web/login"
+  APPFLOWY_DIR="/opt/appflowy"
+  DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
+  NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+  cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+📝 AppFlowy Cloud – Installation Complete
+──────────────────────────────────────────────
+
+          Public URL: ${APPFLOWY_PUBLIC_URL}
+         Admin Panel: ${APPFLOWY_ADMIN_URL}
+          Machine IP: ${MACHINE_IP}
+              Domain: ${DOMAIN_NAME}
+
+        Docker Status: ${DOCKER_STATUS}
+         Nginx Status: ${NGINX_STATUS}
+
+       Install Path: ${APPFLOWY_DIR}
+       Compose File: ${APPFLOWY_DIR}/docker-compose.yml
+          Env File: ${APPFLOWY_DIR}/.env
+
+──────────────────────────────────────────────
+💡 AppFlowy management:
+   cd ${APPFLOWY_DIR}
+   docker compose ps
+   docker compose logs -f
+   docker compose down
+   docker compose up -d
+
+🔄 Update AppFlowy:
+   cd ${APPFLOWY_DIR}
+   docker compose down
+   git pull
+   docker compose pull
+   docker compose up -d
+
+🧹 Remove this message:
+   sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+  chmod 644 /etc/motd
+  echo "✅ Custom MOTD installed at /etc/motd with AppFlowy details." | log
+}
+
+
+# ==============================
+# Main
+# ==============================
+main() {
+    install_docker
+    "$updateStatus" "$HTML_PATH" -ap "Installing AppFlowy Cloud..."
+    run_appflowy
+    "$updateStatus" "$HTML_PATH" -ap "Finishing AppFlowy Cloud installation..."
+    switch_nginx_to_proxy
+    obtain_ssl
+    configure_motd
+}
+
+main
