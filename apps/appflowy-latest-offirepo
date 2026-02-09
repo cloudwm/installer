@@ -103,8 +103,9 @@ run_appflowy() {
 
   # Set admin credentials from guest.conf
   echo "Setting admin credentials..." | log
+  SAFE_PASSWORD="$(echo "$ADMINPASSWORD" | tr -cd 'A-Za-z0-9_-')"
   sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
-  sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${ADMINPASSWORD}|" .env
+  sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${SAFE_PASSWORD}|" .env
 
   # Remap the AppFlowy-bundled nginx ports so they don't conflict
   # with the host nginx (which will handle SSL via certbot).
@@ -212,7 +213,6 @@ configure_motd() {
 📝 AppFlowy Cloud – Installation Complete
 ──────────────────────────────────────────────
 
-           Local URL: ${APPFLOWY_LOCAL_URL}
           Public URL: ${APPFLOWY_PUBLIC_URL}
          Admin Panel: ${APPFLOWY_ADMIN_URL}
           Machine IP: ${MACHINE_IP}
@@ -231,13 +231,6 @@ configure_motd() {
    docker compose ps
    docker compose logs -f
    docker compose down
-   docker compose up -d
-
-🔄 Update AppFlowy:
-   cd ${APPFLOWY_DIR}
-   docker compose down
-   git pull
-   docker compose pull
    docker compose up -d
 
 🧹 Remove this message:
