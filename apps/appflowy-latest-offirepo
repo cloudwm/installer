@@ -88,27 +88,61 @@ run_appflowy() {
   echo "Starting infrastructure services only..." | log
   COMPOSE_PROFILES=infra docker compose up -d postgres redis minio || return 1
 
+  # ------------------------------
+  # Wait for Postgres
+  # ------------------------------
   echo "Waiting for Postgres healthcheck..." | log
-  until [ "$(docker inspect -f '{{.State.Health.Status}}' appflowy-postgres-1 2>/dev/null)" = "healthy" ]; do
+  timeout=120
+  while [ "$timeout" -gt 0 ]; do
+    status=$(docker inspect -f '{{.State.Health.Status}}' appflowy-postgres-1 2>/dev/null || echo "none")
+    if [ "$status" = "healthy" ]; then break; fi
     sleep 2
+    timeout=$((timeout - 2))
   done
+  if [ "$status" != "healthy" ]; then
+    echo "Postgres did not become healthy in time." | log
+    return 1
+  fi
 
+  # ------------------------------
+  # Wait for Redis
+  # ------------------------------
   echo "Waiting for Redis healthcheck..." | log
-  until docker exec appflowy-redis-1 redis-cli ping >/dev/null 2>&1; do
+  timeout=60
+  while [ "$timeout" -gt 0 ]; do
+    if docker exec appflowy-redis-1 redis-cli ping >/dev/null 2>&1; then break; fi
     sleep 2
+    timeout=$((timeout - 2))
   done
+  if ! docker exec appflowy-redis-1 redis-cli ping >/dev/null 2>&1; then
+    echo "Redis did not become ready in time." | log
+    return 1
+  fi
 
+  # ------------------------------
+  # Wait for MinIO
+  # ------------------------------
   echo "Waiting for MinIO healthcheck..." | log
-  until curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; do
+  timeout=60
+  while [ "$timeout" -gt 0 ]; do
+    if docker exec appflowy-minio-1 curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then break; fi
     sleep 2
+    timeout=$((timeout - 2))
   done
+  if ! docker exec appflowy-minio-1 curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then
+    echo "MinIO did not become healthy in time." | log
+    return 1
+  fi
 
   echo "Infrastructure healthy. Starting AppFlowy services..." | log
   COMPOSE_PROFILES=app docker compose up -d || return 1
 
   echo "Waiting for AppFlowy Cloud API..." | log
-  until curl -sf http://127.0.0.1:8080/api/health >/dev/null 2>&1; do
+  timeout=60
+  while [ "$timeout" -gt 0 ]; do
+    if curl -sf http://127.0.0.1:8080/api/health >/dev/null 2>&1; then break; fi
     sleep 3
+    timeout=$((timeout - 3))
   done
 
   echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
