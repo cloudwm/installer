@@ -104,8 +104,23 @@ run_appflowy() {
   # Set admin credentials from guest.conf
   echo "Setting admin credentials..." | log
   SAFE_PASSWORD="$(echo "$ADMINPASSWORD" | tr -cd 'A-Za-z0-9_-')"
+  SAFE_JWT_SECRET="$(openssl rand -hex 32)"
+  SAFE_MINIO_KEY="minioadmin"
+  SAFE_MINIO_SECRET="${SAFE_PASSWORD}"
+
   sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
   sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${SAFE_PASSWORD}|" .env
+
+  sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${SAFE_PASSWORD}|" .env
+  sed -i "s|^PGADMIN_DEFAULT_PASSWORD=.*|PGADMIN_DEFAULT_PASSWORD=${SAFE_PASSWORD}|" .env
+
+  sed -i "s|^GOTRUE_JWT_SECRET=.*|GOTRUE_JWT_SECRET=${SAFE_JWT_SECRET}|" .env
+
+  sed -i "s|^AWS_ACCESS_KEY=.*|AWS_ACCESS_KEY=${SAFE_MINIO_KEY}|" .env
+  sed -i "s|^AWS_SECRET=.*|AWS_SECRET=${SAFE_MINIO_SECRET}|" .env
+
+  sed -i "s|^MINIO_ROOT_USER=.*|MINIO_ROOT_USER=${SAFE_MINIO_KEY}|" .env
+  sed -i "s|^MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=${SAFE_MINIO_SECRET}|" .env
 
   # Remap the AppFlowy-bundled nginx ports so they don't conflict
   # with the host nginx (which will handle SSL via certbot).
