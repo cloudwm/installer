@@ -86,9 +86,25 @@ run_appflowy() {
     cp deploy.env .env || return 1
   fi
 
+  # Parse credentials from guest.conf
+  local GUEST_CONF="/root/guest.conf"
+  local EMAIL ADMINPASSWORD
+  EMAIL="$(grep '^email=' "$GUEST_CONF" | cut -d'=' -f2-)"
+  ADMINPASSWORD="$(grep '^password=' "$GUEST_CONF" | cut -d'=' -f2-)"
+
   # Set the FQDN to our domain
   echo "Configuring AppFlowy .env with FQDN=${DOMAIN_NAME}..." | log
   sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
+
+  # Use HTTPS/WSS since host nginx handles TLS via certbot
+  echo "Setting scheme to HTTPS/WSS..." | log
+  sed -i 's/^SCHEME=.*/SCHEME=https/' .env
+  sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
+
+  # Set admin credentials from guest.conf
+  echo "Setting admin credentials..." | log
+  sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
+  sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${ADMINPASSWORD}|" .env
 
   # Remap the AppFlowy-bundled nginx ports so they don't conflict
   # with the host nginx (which will handle SSL via certbot).
