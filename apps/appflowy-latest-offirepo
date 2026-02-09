@@ -69,14 +69,9 @@ run_appflowy() {
     apt install -y git || return 1
   fi
 
-  if [ -d "$TARGET_DIR" ]; then
-    echo "AppFlowy directory already exists at $TARGET_DIR, pulling latest..." | log
-    cd "$TARGET_DIR" && git pull || return 1
-  else
-    echo "Cloning AppFlowy-Cloud repository..." | log
-    git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
-    cd "$TARGET_DIR" || return 1
-  fi
+  echo "Cloning AppFlowy-Cloud repository..." | log
+  git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
+  cd "$TARGET_DIR" || return 1
 
   if [ ! -f ".env" ]; then
     echo "Creating .env from deploy.env template..." | log
@@ -85,17 +80,36 @@ run_appflowy() {
 
   echo "Configuring AppFlowy .env with FQDN=${DOMAIN_NAME}..." | log
   sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
-
-  echo "Setting scheme to HTTPS/WSS..." | log
   sed -i 's/^SCHEME=.*/SCHEME=https/' .env
   sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
-
-  echo "Remapping AppFlowy nginx ports to 8080/8443..." | log
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
-  echo "Starting AppFlowy Cloud containers (profiles enabled)..." | log
-  COMPOSE_PROFILES=infra,app docker compose up -d || return 1
+  echo "Starting infrastructure services only..." | log
+  COMPOSE_PROFILES=infra docker compose up -d postgres redis minio || return 1
+
+  echo "Waiting for Postgres healthcheck..." | log
+  until [ "$(docker inspect -f '{{.State.Health.Status}}' appflowy-postgres-1 2>/dev/null)" = "healthy" ]; do
+    sleep 2
+  done
+
+  echo "Waiting for Redis healthcheck..." | log
+  until docker exec appflowy-redis-1 redis-cli ping >/dev/null 2>&1; do
+    sleep 2
+  done
+
+  echo "Waiting for MinIO healthcheck..." | log
+  until curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; do
+    sleep 2
+  done
+
+  echo "Infrastructure healthy. Starting AppFlowy services..." | log
+  COMPOSE_PROFILES=app docker compose up -d || return 1
+
+  echo "Waiting for AppFlowy Cloud API..." | log
+  until curl -sf http://127.0.0.1:8080/api/health >/dev/null 2>&1; do
+    sleep 3
+  done
 
   echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
 }
