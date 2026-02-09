@@ -93,20 +93,13 @@ run_appflowy() {
   echo "Starting AppFlowy infrastructure containers..." | log
   docker compose up -d postgres redis minio || return 1
 
-  echo "Waiting for postgres DNS and readiness..." | log
+  echo "Waiting for postgres readiness..." | log
   until docker compose exec -T postgres pg_isready >/dev/null 2>&1; do
     sleep 2
   done
 
-  echo "Starting AppFlowy application containers..." | log
-  docker compose up -d \
-    appflowy_cloud \
-    appflowy_worker \
-    gotrue \
-    admin_frontend \
-    appflowy_web \
-    appflowy_ai \
-    nginx || return 1
+  echo "Starting AppFlowy Cloud stack..." | log
+  docker compose up -d || return 1
 
   echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
 }
