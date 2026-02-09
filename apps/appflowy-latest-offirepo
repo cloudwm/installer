@@ -71,9 +71,14 @@ run_appflowy() {
   fi
 
   # Clone the AppFlowy-Cloud repository
-  echo "Cloning AppFlowy-Cloud repository..." | log
-  git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
-  cd "$TARGET_DIR" || return 1
+  if [ -d "$TARGET_DIR" ]; then
+    echo "AppFlowy directory already exists at $TARGET_DIR, pulling latest..." | log
+    cd "$TARGET_DIR" && git pull || return 1
+  else
+    echo "Cloning AppFlowy-Cloud repository..." | log
+    git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
+    cd "$TARGET_DIR" || return 1
+  fi
 
   # Create .env from deploy.env template if not already present
   if [ ! -f ".env" ]; then
@@ -87,11 +92,11 @@ run_appflowy() {
 
   # Remap the AppFlowy-bundled nginx ports so they don't conflict
   # with the host nginx (which will handle SSL via certbot).
-  # AppFlowy's docker-compose exposes nginx on 80 and 443 by default.
-  # We remap to 8080 and 8443 on the host.
+  # The .env has explicit NGINX_PORT=80 / NGINX_TLS_PORT=443 that
+  # override the docker-compose.yml defaults, so we fix it in .env.
   echo "Remapping AppFlowy nginx ports to 8080/8443 to avoid host nginx conflict..." | log
-  sed -i 's|\${NGINX_PORT:-80}:80|${NGINX_PORT:-8080}:80|g' docker-compose.yml
-  sed -i 's|\${NGINX_TLS_PORT:-443}:443|${NGINX_TLS_PORT:-8443}:443|g' docker-compose.yml
+  sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
+  sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
   echo "Starting AppFlowy Cloud containers..." | log
   docker compose up -d || return 1
@@ -191,6 +196,7 @@ configure_motd() {
 📝 AppFlowy Cloud – Installation Complete
 ──────────────────────────────────────────────
 
+           Local URL: ${APPFLOWY_LOCAL_URL}
           Public URL: ${APPFLOWY_PUBLIC_URL}
          Admin Panel: ${APPFLOWY_ADMIN_URL}
           Machine IP: ${MACHINE_IP}
