@@ -64,61 +64,38 @@ run_appflowy() {
     return 1
   fi
 
-  # Install git if not present (needed to clone the repo)
   if ! command -v git >/dev/null 2>&1; then
     echo "Installing git..." | log
     apt install -y git || return 1
   fi
 
-  # Clone the AppFlowy-Cloud repository
   if [ -d "$TARGET_DIR" ]; then
     echo "AppFlowy directory already exists at $TARGET_DIR, pulling latest..." | log
     cd "$TARGET_DIR" && git pull || return 1
-
   else
     echo "Cloning AppFlowy-Cloud repository..." | log
     git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
     cd "$TARGET_DIR" || return 1
   fi
 
-  # Create .env from deploy.env template if not already present
   if [ ! -f ".env" ]; then
     echo "Creating .env from deploy.env template..." | log
     cp deploy.env .env || return 1
   fi
 
-  # Parse credentials from guest.conf
-  local GUEST_CONF="/root/guest.conf"
-  local EMAIL ADMINPASSWORD
-  EMAIL="$(grep '^email=' "$GUEST_CONF" | cut -d'=' -f2-)"
-  ADMINPASSWORD="$(grep '^password=' "$GUEST_CONF" | cut -d'=' -f2-)"
-  echo "DEBUG: E-Mail: $EMAIL | Pass: $ADMINPASSWORD" | log
-
-  # Set the FQDN to our domain
   echo "Configuring AppFlowy .env with FQDN=${DOMAIN_NAME}..." | log
   sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
 
-  # Use HTTPS/WSS since host nginx handles TLS via certbot
   echo "Setting scheme to HTTPS/WSS..." | log
   sed -i 's/^SCHEME=.*/SCHEME=https/' .env
   sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
 
-  # Set admin credentials from guest.conf
-  echo "Setting admin credentials and service passwords..." | log
-  sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
-  sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${ADMINPASSWORD}|" .env
-
-
-  # Remap the AppFlowy-bundled nginx ports so they don't conflict
-  # with the host nginx (which will handle SSL via certbot).
-  # The .env has explicit NGINX_PORT=80 / NGINX_TLS_PORT=443 that
-  # override the docker-compose.yml defaults, so we fix it in .env.
-  echo "Remapping AppFlowy nginx ports to 8080/8443 to avoid host nginx conflict..." | log
+  echo "Remapping AppFlowy nginx ports to 8080/8443..." | log
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
-  echo "Starting AppFlowy Cloud containers..." | log
-  docker compose up -d
+  echo "Starting AppFlowy Cloud containers (profiles enabled)..." | log
+  COMPOSE_PROFILES=infra,app docker compose up -d || return 1
 
   echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
 }
