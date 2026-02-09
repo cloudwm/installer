@@ -17,6 +17,34 @@ echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
 # ==============================
+# Swap setup
+# ==============================
+setup_swap() {
+    if swapon --show | grep -q '/'; then
+        echo "Swap already enabled. Skipping." | log
+        return
+    fi
+
+    local TOTAL_RAM_KB
+    TOTAL_RAM_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+    local SWAP_SIZE_MB=$(( TOTAL_RAM_KB / 1024 ))  # swap = same as RAM
+
+    echo "Creating ${SWAP_SIZE_MB}MB swap file..." | log
+    "$updateStatus" "$HTML_PATH" -ap "Creating ${SWAP_SIZE_MB}MB swap file..."
+
+    fallocate -l "${SWAP_SIZE_MB}M" /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+
+    if ! grep -q '/swapfile' /etc/fstab; then
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+
+    echo "Swap enabled: ${SWAP_SIZE_MB}MB" | log
+}
+
+# ==============================
 # Docker installation
 # ==============================
 install_docker() {
@@ -92,7 +120,7 @@ run_appflowy() {
   sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
-  
+
   # Set admin credentials from guest.conf
   echo "Setting admin credentials..." | log
   sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
@@ -107,13 +135,17 @@ run_appflowy() {
   grep -q '^AZURE_OPENAI_API_VERSION=' .env || echo 'AZURE_OPENAI_API_VERSION=' >> .env
   sed -i "s|^APPFLOWY_S3_MINIO_URL=.*|APPFLOWY_S3_MINIO_URL=http://minio:9000|" .env
 
-  # Use stable image tags instead of latest
-  sed -i 's/:latest/:v0.1.50/g' docker-compose.yml
+  # ==============================
+  # Fix docker-compose.yml
+  # ==============================
+  echo "Patching docker-compose.yml..." | log
 
-  # Add restart policy to all services
-  if ! grep -q 'restart:' docker-compose.yml; then
-    sed -i '/^\s*image:/a\    restart: unless-stopped' docker-compose.yml
-  fi
+  # Restart policy: ensure all services use unless-stopped
+  sed -i 's/restart: on-failure/restart: unless-stopped/g' docker-compose.yml
+  sed -i 's/restart: always/restart: unless-stopped/g' docker-compose.yml
+
+  # Fix minio healthcheck: newer minio images don't ship curl
+  sed -i 's|"curl", "-f", "http://localhost:9000/minio/health/live"|"mc", "ready", "local"|g' docker-compose.yml
 
   # ==============================
   # Stop any running containers
@@ -264,15 +296,15 @@ configure_motd() {
    cd ${APPFLOWY_DIR}
    docker compose ps
    docker compose logs -f
-   docker compose down
-   docker compose up -d
+   COMPOSE_PROFILES=infra,app docker compose down
+   COMPOSE_PROFILES=infra,app docker compose up -d
 
 🔄 Update AppFlowy:
    cd ${APPFLOWY_DIR}
-   docker compose down
+   COMPOSE_PROFILES=infra,app docker compose down
    git pull
-   docker compose pull
-   docker compose up -d
+   COMPOSE_PROFILES=infra,app docker compose pull
+   COMPOSE_PROFILES=infra,app docker compose up -d
 
 🧹 Remove this message:
    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
@@ -287,6 +319,7 @@ EOM
 # Main
 # ==============================
 main() {
+    setup_swap
     install_docker
     "$updateStatus" "$HTML_PATH" -ap "Installing AppFlowy Cloud..."
     run_appflowy
