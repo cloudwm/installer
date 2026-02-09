@@ -92,40 +92,30 @@ run_appflowy() {
   EMAIL="$(grep '^email=' "$GUEST_CONF" | cut -d'=' -f2-)"
   ADMINPASSWORD="$(grep '^password=' "$GUEST_CONF" | cut -d'=' -f2-)"
 
-  # Helper: safely replace KEY=value in .env (handles special chars like ! @ $ etc)
-  # Only matches the key before the first '=' to avoid breaking lines with = in values
-  set_env_val() {
-    local key="$1" val="$2" file="$3"
-    awk -v k="$key" -v v="$val" '{
-      if (match($0, "^" k "=")) { print k "=" v } else { print }
-    }' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-  }
-
   # Set the FQDN to our domain
   echo "Configuring AppFlowy .env with FQDN=${DOMAIN_NAME}..." | log
-  set_env_val "FQDN" "$DOMAIN_NAME" .env
+  sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
 
   # Use HTTPS/WSS since host nginx handles TLS via certbot
   echo "Setting scheme to HTTPS/WSS..." | log
-  set_env_val "SCHEME" "https" .env
-  set_env_val "WS_SCHEME" "wss" .env
+  sed -i 's/^SCHEME=.*/SCHEME=https/' .env
+  sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
 
-  # Set admin credentials and service passwords
-  echo "Setting admin credentials and service passwords..." | log
-  set_env_val "GOTRUE_ADMIN_EMAIL" "$EMAIL" .env
-  set_env_val "GOTRUE_ADMIN_PASSWORD" "$ADMINPASSWORD" .env
+  # Set admin credentials from guest.conf
+  echo "Setting admin credentials..." | log
+  sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
+  sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${ADMINPASSWORD}|" .env
 
+  # Remap the AppFlowy-bundled nginx ports so they don't conflict
+  # with the host nginx (which will handle SSL via certbot).
+  # The .env has explicit NGINX_PORT=80 / NGINX_TLS_PORT=443 that
+  # override the docker-compose.yml defaults, so we fix it in .env.
   echo "Remapping AppFlowy nginx ports to 8080/8443 to avoid host nginx conflict..." | log
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
   echo "Starting AppFlowy Cloud containers..." | log
-  docker compose pull || return 1
   docker compose up -d || return 1
-
-  # Give containers time to initialize (postgres healthcheck, gotrue migrations, etc.)
-  echo "Waiting for services to initialize..." | log
-  sleep 45
 
   echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
 }
@@ -266,9 +256,9 @@ EOM
 main() {
     install_docker
     "$updateStatus" "$HTML_PATH" -ap "Installing AppFlowy Cloud..."
-    run_appflowy || { echo "ERROR: AppFlowy installation failed!" | log; exit 1; }
+    run_appflowy
     "$updateStatus" "$HTML_PATH" -ap "Finishing AppFlowy Cloud installation..."
-    switch_nginx_to_proxy || { echo "ERROR: Nginx configuration failed!" | log; exit 1; }
+    switch_nginx_to_proxy
     obtain_ssl
     configure_motd
 }
