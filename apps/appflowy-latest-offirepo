@@ -113,22 +113,8 @@ run_appflowy() {
   # Set admin credentials and service passwords
   echo "Setting admin credentials and service passwords..." | log
   set_env_val "GOTRUE_ADMIN_EMAIL" "$EMAIL" .env
-  set_env_val "PGADMIN_DEFAULT_EMAIL" "$EMAIL" .env
-
   set_env_val "GOTRUE_ADMIN_PASSWORD" "$ADMINPASSWORD" .env
-  set_env_val "PGADMIN_DEFAULT_PASSWORD" "$ADMINPASSWORD" .env
-  set_env_val "POSTGRES_PASSWORD" "$ADMINPASSWORD" .env
-  set_env_val "AWS_SECRET" "$ADMINPASSWORD" .env
 
-  # Generate a proper JWT secret (64 random hex chars)
-  local JWT_SECRET
-  JWT_SECRET="$(openssl rand -hex 32)"
-  set_env_val "GOTRUE_JWT_SECRET" "$JWT_SECRET" .env
-
-  # Remap the AppFlowy-bundled nginx ports so they don't conflict
-  # with the host nginx (which will handle SSL via certbot).
-  # The .env has explicit NGINX_PORT=80 / NGINX_TLS_PORT=443 that
-  # override the docker-compose.yml defaults, so we fix it in .env.
   echo "Remapping AppFlowy nginx ports to 8080/8443 to avoid host nginx conflict..." | log
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
