@@ -85,6 +85,13 @@ run_appflowy() {
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
+  grep -q '^APPFLOWY_S3_REGION=' .env || echo 'APPFLOWY_S3_REGION=us-east-1' >> .env
+  grep -q '^MINIO_ROOT_USER=' .env || echo 'MINIO_ROOT_USER=minioadmin' >> .env
+  grep -q '^MINIO_ROOT_PASSWORD=' .env || echo 'MINIO_ROOT_PASSWORD=minioadmin' >> .env
+  grep -q '^AZURE_OPENAI_API_KEY=' .env || echo 'AZURE_OPENAI_API_KEY=' >> .env
+  grep -q '^AZURE_OPENAI_ENDPOINT=' .env || echo 'AZURE_OPENAI_ENDPOINT=' >> .env
+  grep -q '^AZURE_OPENAI_API_VERSION=' .env || echo 'AZURE_OPENAI_API_VERSION=' >> .env
+
   echo "Starting infrastructure services only..." | log
   COMPOSE_PROFILES=infra docker compose up -d postgres redis minio || return 1
 
