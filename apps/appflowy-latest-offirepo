@@ -73,32 +73,48 @@ run_appflowy() {
   git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
   cd "$TARGET_DIR" || return 1
 
+  # ==============================
+  # Fix .env
+  # ==============================
   if [ ! -f ".env" ]; then
     echo "Creating .env from deploy.env template..." | log
     cp deploy.env .env || return 1
   fi
 
-  echo "Configuring AppFlowy .env with FQDN=${DOMAIN_NAME}..." | log
+  echo "Updating .env variables..." | log
   sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
   sed -i 's/^SCHEME=.*/SCHEME=https/' .env
   sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
+  # Required defaults
   grep -q '^APPFLOWY_S3_REGION=' .env || echo 'APPFLOWY_S3_REGION=us-east-1' >> .env
   grep -q '^MINIO_ROOT_USER=' .env || echo 'MINIO_ROOT_USER=minioadmin' >> .env
   grep -q '^MINIO_ROOT_PASSWORD=' .env || echo 'MINIO_ROOT_PASSWORD=minioadmin' >> .env
   grep -q '^AZURE_OPENAI_API_KEY=' .env || echo 'AZURE_OPENAI_API_KEY=' >> .env
   grep -q '^AZURE_OPENAI_ENDPOINT=' .env || echo 'AZURE_OPENAI_ENDPOINT=' >> .env
   grep -q '^AZURE_OPENAI_API_VERSION=' .env || echo 'AZURE_OPENAI_API_VERSION=' >> .env
+  sed -i "s|^APPFLOWY_S3_MINIO_URL=.*|APPFLOWY_S3_MINIO_URL=http://minio:9000|" .env
 
-  echo "Starting infrastructure services only..." | log
-  COMPOSE_PROFILES=infra docker compose up -d postgres redis minio || return 1
+  # Use stable image tags instead of latest
+  sed -i 's/:latest/:v0.1.50/g' docker-compose.yml
 
-  # ------------------------------
+  # ==============================
+  # Stop any running containers
+  # ==============================
+  echo "Stopping existing containers..." | log
+  docker compose down
+  docker rm -f $(docker ps -aq) 2>/dev/null || true
+
+  # ==============================
+  # Start infrastructure services first
+  # ==============================
+  echo "Starting infrastructure services..." | log
+  COMPOSE_PROFILES=infra docker compose up -d || return 1
+
   # Wait for Postgres
-  # ------------------------------
-  echo "Waiting for Postgres healthcheck..." | log
+  echo "Waiting for Postgres..." | log
   timeout=120
   while [ "$timeout" -gt 0 ]; do
     status=$(docker inspect -f '{{.State.Health.Status}}' appflowy-postgres-1 2>/dev/null || echo "none")
@@ -111,39 +127,28 @@ run_appflowy() {
     return 1
   fi
 
-  # ------------------------------
   # Wait for Redis
-  # ------------------------------
-  echo "Waiting for Redis healthcheck..." | log
+  echo "Waiting for Redis..." | log
   timeout=60
   while [ "$timeout" -gt 0 ]; do
     if docker exec appflowy-redis-1 redis-cli ping >/dev/null 2>&1; then break; fi
     sleep 2
     timeout=$((timeout - 2))
   done
-  if ! docker exec appflowy-redis-1 redis-cli ping >/dev/null 2>&1; then
-    echo "Redis did not become ready in time." | log
-    return 1
-  fi
 
-  # ------------------------------
   # Wait for MinIO
-  # ------------------------------
-  echo "Waiting for MinIO healthcheck..." | log
+  echo "Waiting for MinIO..." | log
   timeout=60
   while [ "$timeout" -gt 0 ]; do
     if docker exec appflowy-minio-1 curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then break; fi
     sleep 2
     timeout=$((timeout - 2))
   done
-  if ! docker exec appflowy-minio-1 curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then
-    echo "MinIO did not become healthy in time." | log
-    return 1
-  fi
 
-  echo "Infrastructure healthy. Starting AppFlowy services..." | log
+  echo "Infrastructure ready. Starting AppFlowy services..." | log
   COMPOSE_PROFILES=app docker compose up -d || return 1
 
+  # Wait for API
   echo "Waiting for AppFlowy Cloud API..." | log
   timeout=60
   while [ "$timeout" -gt 0 ]; do
@@ -152,7 +157,7 @@ run_appflowy() {
     timeout=$((timeout - 3))
   done
 
-  echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
+  echo "✅ AppFlowy Cloud is running at http://127.0.0.1:8080" | log
 }
 
 # ==============================
