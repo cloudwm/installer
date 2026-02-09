@@ -74,6 +74,7 @@ run_appflowy() {
   if [ -d "$TARGET_DIR" ]; then
     echo "AppFlowy directory already exists at $TARGET_DIR, pulling latest..." | log
     cd "$TARGET_DIR" && git pull || return 1
+
   else
     echo "Cloning AppFlowy-Cloud repository..." | log
     git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
@@ -91,6 +92,7 @@ run_appflowy() {
   local EMAIL ADMINPASSWORD
   EMAIL="$(grep '^email=' "$GUEST_CONF" | cut -d'=' -f2-)"
   ADMINPASSWORD="$(grep '^password=' "$GUEST_CONF" | cut -d'=' -f2-)"
+  echo "DEBUG: E-Mail: $EMAIL | Pass: $ADMINPASSWORD" | log
 
   # Set the FQDN to our domain
   echo "Configuring AppFlowy .env with FQDN=${DOMAIN_NAME}..." | log
@@ -105,20 +107,7 @@ run_appflowy() {
   echo "Setting admin credentials and service passwords..." | log
   sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
   sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${ADMINPASSWORD}|" .env
-  sed -i "s|^PGADMIN_DEFAULT_EMAIL=.*|PGADMIN_DEFAULT_EMAIL=${EMAIL}|" .env
-  sed -i "s|^PGADMIN_DEFAULT_PASSWORD=.*|PGADMIN_DEFAULT_PASSWORD=${ADMINPASSWORD}|" .env
 
-  # Set database password
-  sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${ADMINPASSWORD}|" .env
-
-  # Set MinIO credentials
-  sed -i "s|^AWS_ACCESS_KEY=.*|AWS_ACCESS_KEY=${EMAIL}|" .env
-  sed -i "s|^AWS_SECRET=.*|AWS_SECRET=${ADMINPASSWORD}|" .env
-
-  # Generate a proper JWT secret (64 random hex chars)
-  local JWT_SECRET
-  JWT_SECRET="$(openssl rand -hex 32)"
-  sed -i "s|^GOTRUE_JWT_SECRET=.*|GOTRUE_JWT_SECRET=${JWT_SECRET}|" .env
 
   # Remap the AppFlowy-bundled nginx ports so they don't conflict
   # with the host nginx (which will handle SSL via certbot).
@@ -129,7 +118,7 @@ run_appflowy() {
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
 
   echo "Starting AppFlowy Cloud containers..." | log
-  docker compose up -d || return 1
+  docker compose up -d
 
   echo "AppFlowy Cloud is running on http://127.0.0.1:8080" | log
 }
