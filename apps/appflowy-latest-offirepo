@@ -82,11 +82,21 @@ run_appflowy() {
   fi
 
   echo "Updating .env variables..." | log
+  local GUEST_CONF="/root/guest.conf"
+  local EMAIL ADMINPASSWORD
+  EMAIL="$(grep '^email=' "$GUEST_CONF" | cut -d'=' -f2-)"
+  ADMINPASSWORD="$(grep '^password=' "$GUEST_CONF" | cut -d'=' -f2-)"
+
   sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
   sed -i 's/^SCHEME=.*/SCHEME=https/' .env
   sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
   sed -i 's/^NGINX_TLS_PORT=.*/NGINX_TLS_PORT=8443/' .env
+  
+  # Set admin credentials from guest.conf
+  echo "Setting admin credentials..." | log
+  sed -i "s|^GOTRUE_ADMIN_EMAIL=.*|GOTRUE_ADMIN_EMAIL=${EMAIL}|" .env
+  sed -i "s|^GOTRUE_ADMIN_PASSWORD=.*|GOTRUE_ADMIN_PASSWORD=${ADMINPASSWORD}|" .env
 
   # Required defaults
   grep -q '^APPFLOWY_S3_REGION=' .env || echo 'APPFLOWY_S3_REGION=us-east-1' >> .env
@@ -100,6 +110,11 @@ run_appflowy() {
   # Use stable image tags instead of latest
   sed -i 's/:latest/:v0.1.50/g' docker-compose.yml
 
+  # Add restart policy to all services
+  if ! grep -q 'restart:' docker-compose.yml; then
+    sed -i '/^\s*image:/a\    restart: unless-stopped' docker-compose.yml
+  fi
+
   # ==============================
   # Stop any running containers
   # ==============================
@@ -108,10 +123,10 @@ run_appflowy() {
   docker rm -f $(docker ps -aq) 2>/dev/null || true
 
   # ==============================
-  # Start infrastructure services first
+  # Start all services together
   # ==============================
-  echo "Starting infrastructure services..." | log
-  COMPOSE_PROFILES=infra docker compose up -d || return 1
+  echo "Starting all AppFlowy services..." | log
+  COMPOSE_PROFILES=infra,app docker compose up -d || return 1
 
   # Wait for Postgres
   echo "Waiting for Postgres..." | log
@@ -127,30 +142,9 @@ run_appflowy() {
     return 1
   fi
 
-  # Wait for Redis
-  echo "Waiting for Redis..." | log
-  timeout=60
-  while [ "$timeout" -gt 0 ]; do
-    if docker exec appflowy-redis-1 redis-cli ping >/dev/null 2>&1; then break; fi
-    sleep 2
-    timeout=$((timeout - 2))
-  done
-
-  # Wait for MinIO
-  echo "Waiting for MinIO..." | log
-  timeout=60
-  while [ "$timeout" -gt 0 ]; do
-    if docker exec appflowy-minio-1 curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then break; fi
-    sleep 2
-    timeout=$((timeout - 2))
-  done
-
-  echo "Infrastructure ready. Starting AppFlowy services..." | log
-  COMPOSE_PROFILES=app docker compose up -d || return 1
-
   # Wait for API
   echo "Waiting for AppFlowy Cloud API..." | log
-  timeout=60
+  timeout=120
   while [ "$timeout" -gt 0 ]; do
     if curl -sf http://127.0.0.1:8080/api/health >/dev/null 2>&1; then break; fi
     sleep 3
