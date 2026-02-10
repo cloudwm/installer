@@ -1,0 +1,335 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="/var/www/html/index.html"
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+echo "Machine IP: $MACHINE_IP" | log
+echo "Domain: $DOMAIN_NAME" | log
+
+GITEA_VERSION="1.25.4"
+GITEA_PORT=3000
+GITEA_SSH_PORT=2222
+GITEA_BINARY="/usr/local/bin/gitea"
+GITEA_CONFIG="/etc/gitea/app.ini"
+GITEA_DATA="/var/lib/gitea"
+GITEA_LOG="/var/log/gitea"
+GITEA_USER="git"
+ADMINPASSWORD='Pass12344321!!'
+
+# ==============================
+# Install Gitea via binary download
+# ==============================
+install_gittea() {
+    echo "Installing Gitea ${GITEA_VERSION} from GitHub releases..." | log
+
+    # Determine architecture
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  GITEA_ARCH="linux-amd64" ;;
+        aarch64) GITEA_ARCH="linux-arm64" ;;
+        armv7l)  GITEA_ARCH="linux-arm-6" ;;
+        *)
+            echo "Unsupported architecture: $ARCH" | log
+            exit 1
+            ;;
+    esac
+
+    DOWNLOAD_URL="https://github.com/go-gitea/gitea/releases/download/v${GITEA_VERSION}/gitea-${GITEA_VERSION}-${GITEA_ARCH}"
+
+    echo "Downloading ${DOWNLOAD_URL}..." | log
+    wget -O "$GITEA_BINARY" "$DOWNLOAD_URL"
+    chmod +x "$GITEA_BINARY"
+
+    # Verify the binary runs
+    "$GITEA_BINARY" --version | log
+
+    # Install git (required dependency)
+    apt-get update
+    apt-get install -y git
+
+    # Create gitea system user
+    if ! id "$GITEA_USER" &>/dev/null; then
+        adduser --system --shell /bin/bash --gecos 'Gitea' \
+            --group --disabled-password --home /home/${GITEA_USER} ${GITEA_USER}
+        echo "Created system user: ${GITEA_USER}" | log
+    fi
+
+    # Create required directories
+    mkdir -p /etc/gitea
+    mkdir -p "${GITEA_DATA}"/{custom,data,gitea-repositories,lfs}
+    mkdir -p "${GITEA_LOG}"
+
+    chown -R ${GITEA_USER}:${GITEA_USER} /etc/gitea
+    chown -R ${GITEA_USER}:${GITEA_USER} "${GITEA_DATA}"
+    chown -R ${GITEA_USER}:${GITEA_USER} "${GITEA_LOG}"
+    chmod 750 /etc/gitea
+
+    # Generate secrets
+    echo "Generating Gitea secrets..." | log
+    SECRET_KEY=$("$GITEA_BINARY" generate secret SECRET_KEY)
+    INTERNAL_TOKEN=$("$GITEA_BINARY" generate secret INTERNAL_TOKEN)
+    LFS_JWT_SECRET=$("$GITEA_BINARY" generate secret LFS_JWT_SECRET)
+
+    # Write app.ini
+    echo "Writing pre-configured app.ini..." | log
+    cat > "$GITEA_CONFIG" <<EOF
+APP_NAME = Gitea: Git with a cup of tea
+RUN_MODE = prod
+RUN_USER = ${GITEA_USER}
+
+[server]
+DOMAIN           = ${DOMAIN_NAME}
+ROOT_URL         = https://${DOMAIN_NAME}/
+HTTP_PORT        = ${GITEA_PORT}
+SSH_DOMAIN       = ${DOMAIN_NAME}
+SSH_PORT         = ${GITEA_SSH_PORT}
+START_SSH_SERVER = true
+LFS_START_SERVER = true
+LFS_JWT_SECRET   = ${LFS_JWT_SECRET}
+OFFLINE_MODE     = false
+
+[database]
+DB_TYPE = sqlite3
+PATH    = ${GITEA_DATA}/data/gitea.db
+
+[repository]
+ROOT = ${GITEA_DATA}/gitea-repositories
+
+[security]
+INSTALL_LOCK   = true
+SECRET_KEY     = ${SECRET_KEY}
+INTERNAL_TOKEN = ${INTERNAL_TOKEN}
+
+[service]
+DISABLE_REGISTRATION              = false
+REQUIRE_SIGNIN_VIEW               = false
+REGISTER_EMAIL_CONFIRM            = false
+ENABLE_NOTIFY_MAIL                = false
+ALLOW_ONLY_EXTERNAL_REGISTRATION  = false
+ENABLE_CAPTCHA                    = false
+DEFAULT_KEEP_EMAIL_PRIVATE        = false
+DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+NO_REPLY_ADDRESS                  = noreply.${DOMAIN_NAME}
+
+[mailer]
+ENABLED = false
+
+[openid]
+ENABLE_OPENID_SIGNIN = false
+ENABLE_OPENID_SIGNUP = false
+
+[picture]
+DISABLE_GRAVATAR        = true
+ENABLE_FEDERATED_AVATAR = false
+
+[session]
+PROVIDER = file
+
+[log]
+MODE      = console
+LEVEL     = info
+ROOT_PATH = ${GITEA_LOG}
+EOF
+
+    chown ${GITEA_USER}:${GITEA_USER} "$GITEA_CONFIG"
+    chmod 640 "$GITEA_CONFIG"
+
+    # Create systemd service
+    echo "Creating systemd service..." | log
+    cat > /etc/systemd/system/gitea.service <<EOF
+[Unit]
+Description=Gitea (Git with a cup of tea)
+After=syslog.target
+After=network.target
+
+[Service]
+RestartSec=2s
+Type=simple
+User=${GITEA_USER}
+Group=${GITEA_USER}
+WorkingDirectory=${GITEA_DATA}
+ExecStart=${GITEA_BINARY} web --config ${GITEA_CONFIG}
+Restart=always
+Environment=USER=${GITEA_USER} HOME=/home/${GITEA_USER} GITEA_WORK_DIR=${GITEA_DATA}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+
+    # Initialize the database
+    echo "Running database migration to initialize SQLite..." | log
+    sudo -u ${GITEA_USER} GITEA_WORK_DIR=${GITEA_DATA} \
+        "$GITEA_BINARY" migrate --config "$GITEA_CONFIG"
+    echo "Database initialized." | log
+
+    # Start Gitea
+    systemctl enable gitea
+    systemctl start gitea
+    echo "Gitea configured and started." | log
+
+    # Wait for Gitea to be ready
+    for i in $(seq 1 30); do
+        curl -sf http://127.0.0.1:${GITEA_PORT}/ > /dev/null 2>&1 && break
+        sleep 2
+    done
+
+    # Create admin user
+    echo "Creating admin user..." | log
+    sudo -u ${GITEA_USER} GITEA_WORK_DIR=${GITEA_DATA} \
+        "$GITEA_BINARY" admin user create \
+        --config "$GITEA_CONFIG" \
+        --admin \
+        --username "root" \
+        --password "$ADMINPASSWORD" \
+        --email "root@${DOMAIN_NAME}" \
+        --must-change-password=false
+
+    echo "Admin user created." | log
+
+    # Open SSH port in firewall if ufw is active
+    if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+        ufw allow "${GITEA_SSH_PORT}/tcp"
+        echo "Opened port ${GITEA_SSH_PORT} in ufw." | log
+    fi
+}
+
+# ==============================
+# Nginx reverse proxy
+# ==============================
+switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for Gitea..." | log
+
+    NGINX_CONF="/etc/nginx/sites-available/gitea.conf"
+
+    cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    client_max_body_size 512M;
+
+    location / {
+        proxy_pass http://127.0.0.1:${GITEA_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/gitea.conf
+    rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+    nginx -t || return 1
+    systemctl reload nginx
+
+    echo "nginx configured for Gitea." | log
+}
+
+# ==============================
+# SSL
+# ==============================
+obtain_ssl() {
+    systemctl reload nginx
+
+    echo "Requesting Let's Encrypt certificate..." | log
+    certbot --nginx \
+        -d "$DOMAIN_NAME" \
+        --non-interactive \
+        --agree-tos \
+        -m "admin@${DOMAIN_NAME}" \
+        --redirect
+
+    echo "Gitea available at https://${DOMAIN_NAME}" | log
+    "$updateStatus" "$HTML_PATH" -sr
+    "$updateStatus" "$HTML_PATH" -ur "Gitea is running on https://${DOMAIN_NAME}"
+    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+}
+
+# ==============================
+# MOTD
+# ==============================
+configure_motd() {
+    echo "Configuring system MOTD with Gitea info..." | log
+
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
+
+    MACHINE_IP="$(hostname -I | awk '{print $1}')"
+    DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+    GITEA_LOCAL_URL="http://127.0.0.1:${GITEA_PORT}"
+    GITEA_PUBLIC_URL="https://${DOMAIN_NAME}"
+    GITEA_SERVICE_STATUS="$(systemctl is-active gitea 2>/dev/null || echo unknown)"
+    NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🗂️  Gitea Git Server – Installation Complete
+──────────────────────────────────────────────
+
+    Version: ${GITEA_VERSION}
+    Local URL: ${GITEA_LOCAL_URL}
+    Public URL: ${GITEA_PUBLIC_URL}
+    Machine IP: ${MACHINE_IP}
+    Domain: ${DOMAIN_NAME}
+    Git SSH Port: ${GITEA_SSH_PORT}
+    SSH Clone: ssh://git@${DOMAIN_NAME}:${GITEA_SSH_PORT}/
+
+    Admin User: root
+    Admin Pass: ${ADMINPASSWORD}
+
+    Gitea Service: ${GITEA_SERVICE_STATUS}
+    Nginx Status: ${NGINX_STATUS}
+
+    Install Type: Binary (v${GITEA_VERSION})
+    Binary: ${GITEA_BINARY}
+    Config File: ${GITEA_CONFIG}
+    Data Path: ${GITEA_DATA}
+    Repositories: ${GITEA_DATA}/gitea-repositories
+    Database: ${GITEA_DATA}/data/gitea.db (SQLite)
+    Logs: ${GITEA_LOG}
+
+──────────────────────────────────────────────
+💡  Gitea management:
+    sudo systemctl status gitea
+    sudo systemctl restart gitea
+    sudo journalctl -u gitea
+    sudo nano ${GITEA_CONFIG}
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed at /etc/motd with Gitea details." | log
+}
+
+# ==============================
+# Main
+# ==============================
+main() {
+    "$updateStatus" "$HTML_PATH" -ap "Installing Gitea..."
+    install_gittea
+    "$updateStatus" "$HTML_PATH" -ap "Finishing installation..."
+    switch_nginx_to_proxy
+    obtain_ssl
+    configure_motd
+}
+
+main
