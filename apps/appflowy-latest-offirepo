@@ -274,10 +274,11 @@ configure_motd() {
 ──────────────────────────────────────────────
 📝 AppFlowy Cloud – Installation Complete
 ──────────────────────────────────────────────
-
-           Local URL: ${APPFLOWY_LOCAL_URL}
-          Public URL: ${APPFLOWY_PUBLIC_URL}
          Admin Panel: ${APPFLOWY_ADMIN_URL}
+                        This is where you first login with your E-Mail & the password 
+                        you used to create the server.
+
+          Public URL: ${APPFLOWY_PUBLIC_URL}
           Machine IP: ${MACHINE_IP}
               Domain: ${DOMAIN_NAME}
 
