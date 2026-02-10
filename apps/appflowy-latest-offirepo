@@ -16,9 +16,6 @@ DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
-# ==============================
-# Swap setup
-# ==============================
 setup_swap() {
     if swapon --show | grep -q '/'; then
         echo "Swap already enabled. Skipping." | log
@@ -44,9 +41,6 @@ setup_swap() {
     echo "Swap enabled: ${SWAP_SIZE_MB}MB" | log
 }
 
-# ==============================
-# Docker installation
-# ==============================
 install_docker() {
     if command -v docker >/dev/null 2>&1; then
         echo "Docker is already installed. Skipping Docker installation." | log
@@ -81,9 +75,6 @@ install_docker() {
     "$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
 }
 
-# ==============================
-# AppFlowy Cloud
-# ==============================
 run_appflowy() {
   local TARGET_DIR="${1:-/opt/appflowy}"
 
@@ -101,9 +92,6 @@ run_appflowy() {
   git clone https://github.com/AppFlowy-IO/AppFlowy-Cloud.git "$TARGET_DIR" || return 1
   cd "$TARGET_DIR" || return 1
 
-  # ==============================
-  # Fix .env
-  # ==============================
   if [ ! -f ".env" ]; then
     echo "Creating .env from deploy.env template..." | log
     cp deploy.env .env || return 1
@@ -135,28 +123,15 @@ run_appflowy() {
   grep -q '^AZURE_OPENAI_API_VERSION=' .env || echo 'AZURE_OPENAI_API_VERSION=' >> .env
   sed -i "s|^APPFLOWY_S3_MINIO_URL=.*|APPFLOWY_S3_MINIO_URL=http://minio:9000|" .env
 
-  # ==============================
-  # Fix docker-compose.yml
-  # ==============================
   echo "Patching docker-compose.yml..." | log
-
-  # Restart policy: ensure all services use unless-stopped
   sed -i 's/restart: on-failure/restart: unless-stopped/g' docker-compose.yml
   sed -i 's/restart: always/restart: unless-stopped/g' docker-compose.yml
-
-  # Fix minio healthcheck: newer minio images don't ship curl
   sed -i 's|"curl", "-f", "http://localhost:9000/minio/health/live"|"mc", "ready", "local"|g' docker-compose.yml
 
-  # ==============================
-  # Stop any running containers
-  # ==============================
   echo "Stopping existing containers..." | log
   docker compose down
   docker rm -f $(docker ps -aq) 2>/dev/null || true
 
-  # ==============================
-  # Start all services together
-  # ==============================
   echo "Starting all AppFlowy services..." | log
   COMPOSE_PROFILES=infra,app docker compose up -d || return 1
 
@@ -183,12 +158,37 @@ run_appflowy() {
     timeout=$((timeout - 3))
   done
 
+  echo "Creating admin user profile and workspace..." | log
+  # Wait for gotrue to create the admin user in auth.users
+  local admin_uuid=""
+  local wait=60
+  while [ "$wait" -gt 0 ]; do
+    admin_uuid=$(docker exec appflowy-postgres-1 psql -U postgres -d postgres -t -A -c \
+      "SELECT id FROM auth.users WHERE email = '${EMAIL}' LIMIT 1;" 2>/dev/null)
+    if [ -n "$admin_uuid" ]; then break; fi
+    sleep 2
+    wait=$((wait - 2))
+  done
+
+  if [ -n "$admin_uuid" ]; then
+    docker exec appflowy-postgres-1 psql -U postgres -d postgres -c "
+      INSERT INTO af_user (uid, uuid, email, name)
+      VALUES (1, '${admin_uuid}', '${EMAIL}', 'Admin')
+      ON CONFLICT (uuid) DO NOTHING;
+    "
+    docker exec appflowy-postgres-1 psql -U postgres -d postgres -c "
+      INSERT INTO af_workspace (workspace_id, database_storage_id, owner_uid, workspace_name, is_initialized)
+      SELECT gen_random_uuid(), gen_random_uuid(), 1, 'Default Workspace', true
+      WHERE NOT EXISTS (SELECT 1 FROM af_workspace WHERE owner_uid = 1);
+    "
+    echo "Admin user profile and workspace created." | log
+  else
+    echo "WARNING: Could not find admin user in auth.users. Admin panel login may not work." | log
+  fi
+
   echo "✅ AppFlowy Cloud is running at http://127.0.0.1:8080" | log
 }
 
-# ==============================
-# Nginx reverse proxy
-# ==============================
 switch_nginx_to_proxy() {
     echo "Configuring nginx reverse proxy for AppFlowy Cloud..." | log
 
@@ -237,9 +237,6 @@ EOF
     echo "nginx configured for AppFlowy Cloud." | log
 }
 
-# ==============================
-# SSL
-# ==============================
 obtain_ssl() {
     systemctl reload nginx
 
@@ -268,7 +265,7 @@ configure_motd() {
   DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
   APPFLOWY_LOCAL_URL="http://127.0.0.1:8080"
   APPFLOWY_PUBLIC_URL="https://${DOMAIN_NAME}"
-  APPFLOWY_ADMIN_URL="https://${DOMAIN_NAME}/web/login"
+  APPFLOWY_ADMIN_URL="https://${DOMAIN_NAME}/console"
   APPFLOWY_DIR="/opt/appflowy"
   DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
   NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
@@ -315,9 +312,6 @@ EOM
   echo "✅ Custom MOTD installed at /etc/motd with AppFlowy details." | log
 }
 
-# ==============================
-# Main
-# ==============================
 main() {
     setup_swap
     install_docker
