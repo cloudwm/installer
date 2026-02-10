@@ -16,39 +16,76 @@ DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
+GITEA_VERSION="1.25.4"
 GITEA_PORT=3000
 GITEA_SSH_PORT=2222
-GITEA_CONFIG="/var/snap/gitea/common/conf/app.ini"
+GITEA_BINARY="/usr/local/bin/gitea"
+GITEA_CONFIG="/etc/gitea/app.ini"
+GITEA_DATA="/var/lib/gitea"
+GITEA_LOG="/var/log/gitea"
+GITEA_USER="git"
 ADMINPASSWORD='Pass12344321!!'
 
 # ==============================
-# Install Gitea via Canonical Snap
+# Install Gitea via binary download
 # ==============================
 install_gittea() {
-    echo "Installing Gitea via snap..." | log
+    echo "Installing Gitea ${GITEA_VERSION} from GitHub releases..." | log
+
+    # Determine architecture
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  GITEA_ARCH="linux-amd64" ;;
+        aarch64) GITEA_ARCH="linux-arm64" ;;
+        armv7l)  GITEA_ARCH="linux-arm-6" ;;
+        *)
+            echo "Unsupported architecture: $ARCH" | log
+            exit 1
+            ;;
+    esac
+
+    DOWNLOAD_URL="https://github.com/go-gitea/gitea/releases/download/v${GITEA_VERSION}/gitea-${GITEA_VERSION}-${GITEA_ARCH}"
+
+    echo "Downloading ${DOWNLOAD_URL}..." | log
+    wget -O "$GITEA_BINARY" "$DOWNLOAD_URL"
+    chmod +x "$GITEA_BINARY"
+
+    # Verify the binary runs
+    "$GITEA_BINARY" --version | log
+
+    # Install git (required dependency)
     apt-get update
-    apt-get install -y snapd
-    snap install gitea
+    apt-get install -y git
 
-    # Stop Gitea immediately — we need to configure before first real use
-    echo "Stopping Gitea to configure..." | log
-    systemctl stop snap.gitea.web.service
-    sleep 2
+    # Create gitea system user
+    if ! id "$GITEA_USER" &>/dev/null; then
+        adduser --system --shell /bin/bash --gecos 'Gitea' \
+            --group --disabled-password --home /home/${GITEA_USER} ${GITEA_USER}
+        echo "Created system user: ${GITEA_USER}" | log
+    fi
 
-    # Ensure config directory exists
-    mkdir -p /var/snap/gitea/common/conf
+    # Create required directories
+    mkdir -p /etc/gitea
+    mkdir -p "${GITEA_DATA}"/{custom,data,gitea-repositories,lfs}
+    mkdir -p "${GITEA_LOG}"
+
+    chown -R ${GITEA_USER}:${GITEA_USER} /etc/gitea
+    chown -R ${GITEA_USER}:${GITEA_USER} "${GITEA_DATA}"
+    chown -R ${GITEA_USER}:${GITEA_USER} "${GITEA_LOG}"
+    chmod 750 /etc/gitea
 
     # Generate secrets
     echo "Generating Gitea secrets..." | log
-    SECRET_KEY=$(snap run gitea.gitea generate secret SECRET_KEY)
-    INTERNAL_TOKEN=$(snap run gitea.gitea generate secret INTERNAL_TOKEN)
-    LFS_JWT_SECRET=$(snap run gitea.gitea generate secret LFS_JWT_SECRET)
+    SECRET_KEY=$("$GITEA_BINARY" generate secret SECRET_KEY)
+    INTERNAL_TOKEN=$("$GITEA_BINARY" generate secret INTERNAL_TOKEN)
+    LFS_JWT_SECRET=$("$GITEA_BINARY" generate secret LFS_JWT_SECRET)
 
-    # Write a complete app.ini that skips the install wizard
+    # Write app.ini
     echo "Writing pre-configured app.ini..." | log
     cat > "$GITEA_CONFIG" <<EOF
 APP_NAME = Gitea: Git with a cup of tea
 RUN_MODE = prod
+RUN_USER = ${GITEA_USER}
 
 [server]
 DOMAIN           = ${DOMAIN_NAME}
@@ -63,10 +100,10 @@ OFFLINE_MODE     = false
 
 [database]
 DB_TYPE = sqlite3
-PATH    = /var/snap/gitea/common/data/gitea.db
+PATH    = ${GITEA_DATA}/data/gitea.db
 
 [repository]
-ROOT = /var/snap/gitea/common/data/gitea-repositories
+ROOT = ${GITEA_DATA}/gitea-repositories
 
 [security]
 INSTALL_LOCK   = true
@@ -101,16 +138,45 @@ PROVIDER = file
 [log]
 MODE      = console
 LEVEL     = info
-ROOT_PATH = /var/snap/gitea/common/log
+ROOT_PATH = ${GITEA_LOG}
 EOF
 
-    # Initialize the database schema (this is what the wizard normally does)
+    chown ${GITEA_USER}:${GITEA_USER} "$GITEA_CONFIG"
+    chmod 640 "$GITEA_CONFIG"
+
+    # Create systemd service
+    echo "Creating systemd service..." | log
+    cat > /etc/systemd/system/gitea.service <<EOF
+[Unit]
+Description=Gitea (Git with a cup of tea)
+After=syslog.target
+After=network.target
+
+[Service]
+RestartSec=2s
+Type=simple
+User=${GITEA_USER}
+Group=${GITEA_USER}
+WorkingDirectory=${GITEA_DATA}
+ExecStart=${GITEA_BINARY} web --config ${GITEA_CONFIG}
+Restart=always
+Environment=USER=${GITEA_USER} HOME=/home/${GITEA_USER} GITEA_WORK_DIR=${GITEA_DATA}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+
+    # Initialize the database
     echo "Running database migration to initialize SQLite..." | log
-    snap run gitea.gitea migrate
+    sudo -u ${GITEA_USER} GITEA_WORK_DIR=${GITEA_DATA} \
+        "$GITEA_BINARY" migrate --config "$GITEA_CONFIG"
     echo "Database initialized." | log
 
-    # Start Gitea with fully configured app.ini + initialized DB
-    systemctl start snap.gitea.web.service
+    # Start Gitea
+    systemctl enable gitea
+    systemctl start gitea
     echo "Gitea configured and started." | log
 
     # Wait for Gitea to be ready
@@ -121,7 +187,9 @@ EOF
 
     # Create admin user
     echo "Creating admin user..." | log
-    snap run gitea.gitea admin user create \
+    sudo -u ${GITEA_USER} GITEA_WORK_DIR=${GITEA_DATA} \
+        "$GITEA_BINARY" admin user create \
+        --config "$GITEA_CONFIG" \
         --admin \
         --username "root" \
         --password "$ADMINPASSWORD" \
@@ -206,7 +274,7 @@ configure_motd() {
     DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
     GITEA_LOCAL_URL="http://127.0.0.1:${GITEA_PORT}"
     GITEA_PUBLIC_URL="https://${DOMAIN_NAME}"
-    GITEA_SERVICE_STATUS="$(systemctl is-active snap.gitea.web.service 2>/dev/null || echo unknown)"
+    GITEA_SERVICE_STATUS="$(systemctl is-active gitea 2>/dev/null || echo unknown)"
     NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
 
     cat > /etc/motd <<EOM
@@ -214,6 +282,7 @@ configure_motd() {
 🗂️  Gitea Git Server – Installation Complete
 ──────────────────────────────────────────────
 
+    Version: ${GITEA_VERSION}
     Local URL: ${GITEA_LOCAL_URL}
     Public URL: ${GITEA_PUBLIC_URL}
     Machine IP: ${MACHINE_IP}
@@ -227,24 +296,20 @@ configure_motd() {
     Gitea Service: ${GITEA_SERVICE_STATUS}
     Nginx Status: ${NGINX_STATUS}
 
-    Install Type: Canonical Snap
+    Install Type: Binary (v${GITEA_VERSION})
+    Binary: ${GITEA_BINARY}
     Config File: ${GITEA_CONFIG}
-    Data Path: /var/snap/gitea/common/data
-    Repositories: /var/snap/gitea/common/data/gitea-repositories
-    Database: /var/snap/gitea/common/data/gitea.db (SQLite)
-    Logs: /var/snap/gitea/common/log
+    Data Path: ${GITEA_DATA}
+    Repositories: ${GITEA_DATA}/gitea-repositories
+    Database: ${GITEA_DATA}/data/gitea.db (SQLite)
+    Logs: ${GITEA_LOG}
 
 ──────────────────────────────────────────────
 💡  Gitea management:
-    sudo systemctl status snap.gitea.web.service
-    sudo systemctl restart snap.gitea.web.service
-    sudo snap logs gitea
+    sudo systemctl status gitea
+    sudo systemctl restart gitea
+    sudo journalctl -u gitea
     sudo nano ${GITEA_CONFIG}
-
-📦  Snap operations:
-    sudo snap save gitea          # create backup
-    sudo snap saved                # list backups
-    sudo snap restore <id> gitea  # restore backup
 
 🧹  Remove this message:
     sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
