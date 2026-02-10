@@ -283,10 +283,7 @@ configure_motd() {
 ──────────────────────────────────────────────
 
     Version: ${GITEA_VERSION}
-    Local URL: ${GITEA_LOCAL_URL}
     Public URL: ${GITEA_PUBLIC_URL}
-    Machine IP: ${MACHINE_IP}
-    Domain: ${DOMAIN_NAME}
     Git SSH Port: ${GITEA_SSH_PORT}
     SSH Clone: ssh://git@${DOMAIN_NAME}:${GITEA_SSH_PORT}/
 
@@ -305,12 +302,6 @@ configure_motd() {
     Logs: ${GITEA_LOG}
 
 ──────────────────────────────────────────────
-💡  Gitea management:
-    sudo systemctl status gitea
-    sudo systemctl restart gitea
-    sudo journalctl -u gitea
-    sudo nano ${GITEA_CONFIG}
-
 🧹  Remove this message:
     sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
 ──────────────────────────────────────────────
