@@ -1,0 +1,179 @@
+#!/bin/bash
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+rootDir=$(rootDir)
+
+echo "Installing PocketBase (latest GitHub binary + Nginx + Let's Encrypt)" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+apt-get update
+installPackage curl unzip ca-certificates gnupg lsb-release openssl jq ufw nginx certbot python3-certbot-nginx
+
+APP_DIR="/opt/pocketbase"
+mkdir -p "$APP_DIR"
+cd "$APP_DIR" || waitOrStop 1 "Cannot cd to $APP_DIR"
+
+echo "Downloading latest PocketBase binary from GitHub" | log
+LATEST_TAG=$(curl -s https://api.github.com/repos/pocketbase/pocketbase/releases/latest | jq -r .tag_name)
+
+ARCH=$(dpkg --print-architecture)
+if [ "$ARCH" = "arm64" ]; then
+    ASSET="pocketbase_${LATEST_TAG#v}_linux_arm64.zip"
+else
+    ASSET="pocketbase_${LATEST_TAG#v}_linux_amd64.zip"
+fi
+
+curl -L -o pocketbase.zip "https://github.com/pocketbase/pocketbase/releases/download/${LATEST_TAG}/${ASSET}"
+waitOrStop 0 "Failed to download PocketBase"
+
+unzip pocketbase.zip
+rm pocketbase.zip
+chmod +x pocketbase
+
+echo "Preparing pb_data directory" | log
+rm -rf ./pb_data
+mkdir -p ./pb_data
+chown -R www-data:www-data ./pb_data
+chmod -R 755 ./pb_data
+
+echo "Creating systemd service for PocketBase" | log
+cat << EOF > /etc/systemd/system/pocketbase.service
+[Unit]
+Description=PocketBase Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=${APP_DIR}
+ExecStart=${APP_DIR}/pocketbase serve --http=127.0.0.1:8090 --dir=${APP_DIR}/pb_data
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable pocketbase
+
+echo "Creating initial admin account" | log
+
+# Set default admin credentials if not provided
+ADMIN_EMAIL="${ADMINEMAIL:-admin@${CWM_DOMAIN}}"
+ADMIN_PASSWORD="${ADMINPASSWORD:-$(openssl rand -base64 16)}"
+
+# Create admin user (this also initializes the database)
+sudo -u www-data ${APP_DIR}/pocketbase superuser create "${ADMIN_EMAIL}" "${ADMIN_PASSWORD}" <<EOF
+${ADMIN_PASSWORD}
+EOF
+
+waitOrStop 0 "Failed to create admin user"
+
+echo "Starting PocketBase service" | log
+systemctl start pocketbase
+waitOrStop 0 "PocketBase service failed to start"
+
+# Give server time to initialize
+sleep 5
+
+# Verify service is running
+if systemctl is-active --quiet pocketbase; then
+    echo "✅ PocketBase service is running" | log
+else
+    echo "❌ PocketBase service failed to start" | log
+    waitOrStop 1 "Service verification failed"
+fi
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+systemctl stop nginx
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    waitOrStop 1 "Certbot failed"
+fi
+systemctl start nginx
+
+echo "Configuring Nginx reverse proxy for HTTPS" | log
+cat << EOF > /etc/nginx/sites-available/pocketbase
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    # SSL security settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+
+    # Increase upload size if needed
+    client_max_body_size 10M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/pocketbase /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+nginx -t && systemctl restart nginx
+waitOrStop 0 "Nginx configuration or restart failed"
+
+echo "Setting up automatic SSL certificate renewal" | log
+systemctl enable certbot.timer
+systemctl start certbot.timer
+
+descriptionAppend " "
+descriptionAppend "╔════════════════════════════════════════════════════════════════╗"
+descriptionAppend "║         PocketBase Successfully Installed! 🚀                  ║"
+descriptionAppend "╚════════════════════════════════════════════════════════════════╝"
+descriptionAppend " "
+descriptionAppend "📍 Admin UI: https://${CWM_DOMAIN}/_/"
+descriptionAppend "📍 API Base: https://${CWM_DOMAIN}/api/"
+descriptionAppend " "
+descriptionAppend "🔐 ADMIN CREDENTIALS (SAVE THESE!):"
+descriptionAppend "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+descriptionAppend "   Email:    ${ADMIN_EMAIL}"
+descriptionAppend "   Password: ${ADMIN_PASSWORD}"
+descriptionAppend "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+descriptionAppend " "
+descriptionAppend "📂 Installation Details:"
+descriptionAppend "   • Installation path: ${APP_DIR}"
+descriptionAppend "   • Binary: ${APP_DIR}/pocketbase"
+descriptionAppend "   • Data directory: ${APP_DIR}/pb_data"
+descriptionAppend "   • Nginx config: /etc/nginx/sites-available/pocketbase"
+descriptionAppend "   • Systemd service: pocketbase.service"
+descriptionAppend "   • PocketBase version: ${LATEST_TAG}"
+
+tagScript success
