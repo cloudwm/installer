@@ -1,0 +1,132 @@
+#!/bin/bash
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+version="4.108.2-39"
+
+echo "Installing code-server (VS Code in browser) with Docker Compose, Nginx + Let's Encrypt" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+apt-get update
+installPackage curl git ca-certificates gnupg lsb-release apt-transport-https \
+               openssl jq ufw nginx certbot python3-certbot-nginx
+
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update
+    installPackage docker-ce docker-ce-cli containerd.io docker-compose-plugin
+fi
+
+APP_DIR="/opt/code-server"
+mkdir -p "$APP_DIR"
+cd "$APP_DIR" || waitOrStop 1 "Cannot cd to $APP_DIR"
+
+echo "Preparing volumes with correct permissions (UID/GID 1000)" | log
+mkdir -p ./config ./project
+chown -R 1000:1000 ./config ./project
+chmod -R 755 ./config ./project
+
+CODE_PASSWORD=$(openssl rand -hex 30)
+
+echo "Creating docker-compose.yml" | log
+cat << EOF > docker-compose.yml
+services:
+  code-server:
+    image: codercom/code-server:${version}
+    container_name: code-server
+    restart: unless-stopped
+    user: "1000:1000"
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - PASSWORD=${CODE_PASSWORD}
+      - BIND_ADDR=0.0.0.0:8080
+      - SUDO_PASSWORD=${CODE_PASSWORD}  # optional: for sudo inside VS Code terminal
+    volumes:
+      - ./config:/home/coder/.config/code-server
+      - ./project:/home/coder/project
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+EOF
+
+echo "Starting code-server container" | log
+docker compose up -d
+waitOrStop 0 "Failed to start code-server container"
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+systemctl stop nginx
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+else
+    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
+    echo "🛑 Aborting installation — SSL is required." | log
+    waitOrStop 1 "Certbot failed"
+fi
+systemctl start nginx
+
+echo "Configuring Nginx reverse proxy for HTTPS" | log
+cat << EOF > /etc/nginx/sites-available/code-server
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/code-server /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+nginx -t && systemctl restart nginx
+waitOrStop 0 "Nginx configuration or restart failed"
+
+# ────────────────────────────────────────────────────────────────
+# 7. Final descriptions
+# ────────────────────────────────────────────────────────────────
+descriptionAppend " "
+descriptionAppend "code-server (VS Code in browser) installed successfully!"
+descriptionAppend " "
+descriptionAppend "Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Password: ${CODE_PASSWORD}"
+descriptionAppend "CHANGE THE PASSWORD IMMEDIATELY AFTER FIRST LOGIN!"
+descriptionAppend " "
+descriptionAppend "Installation path: ${APP_DIR}"
+descriptionAppend "Docker Compose file: ${APP_DIR}/docker-compose.yml"
+descriptionAppend "Nginx config: /etc/nginx/sites-available/code-server"
+descriptionAppend " "
+descriptionAppend "Persistent data:"
+descriptionAppend " • Config: ${APP_DIR}/config"
+descriptionAppend " • Projects: ${APP_DIR}/project"
+
+tagScript success
