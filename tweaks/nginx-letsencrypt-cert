@@ -1,0 +1,34 @@
+#!/bin/bash
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+CONFIG_FILE=/root/guest.conf
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_CERT="${LE_DIR}/fullchain.pem"
+PK_CERT="${LE_DIR}/privkey.pem"
+
+apt-get update
+installPackage certbot python3-certbot-nginx openssl nginx
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+systemctl stop nginx
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
+else
+    mkdir -p "${LE_DIR}"
+    chmod 755 /etc/letsencrypt/live
+    chmod 755 "${LE_DIR}"
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${PK_FILE}" \
+        -out    "${FC_FILE}" \
+        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
+        2>/dev/null
+    echo "Self signed cert has been created" | log
+fi

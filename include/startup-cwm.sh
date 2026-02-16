@@ -247,24 +247,10 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export CWM_UUID=$(cat /sys/class/dmi/id/product_serial | cut -d '-' -f 2,3 | tr -d ' -' | sed 's/./&-/20;s/./&-/16;s/./&-/12;s/./&-/8')
     export CWM_SERVERIP="$(getServerIP)"
 
-    host -t a 8-8-8-8.cloud-xip.com
-    if [ $? -eq 0 ]
-    then
-    export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
-    export CWM_ROOT_DOMAIN="com"
-    else
-    host -t a 8-8-8-8.cloud-xip.io
-        if [ $? -eq 0 ]
-        then
-        export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.io"
-        export CWM_ROOT_DOMAIN="io"
-        else
-        # both test failed - define the domain anyway
-        export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
-        export CWM_ROOT_DOMAIN="com"
-        fi
-    fi   
-
+    CONFIG_FILE="/root/guest.conf"
+    export CWM_DOMAIN=$(grep -E '^[[:space:]]*cwm_domain0[[:space:]]*=' "${CONFIG_FILE}" \
+         | sed -E 's/^[[:space:]]*cwm_domain0[[:space:]]*=[[:space:]]*//; s/["'\'']//g; s/[[:space:]]*$//' \
+         | head -n 1)
 
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
@@ -289,10 +275,6 @@ if [ -f "$rootDir/temp/global-domain-set.success" ]; then
     export CWM_DISPLAYED_ADDRESS=${CWM_DOMAIN}
 
 fi
-
-
-
-
 
 # fail install if cwm api key or secret is missing
 if [ -z "$CWM_NO_API_KEY" ] && [[ -z "$CWM_APICLIENTID" || -z "$CWM_APISECRET" ]]; then
