@@ -8,7 +8,7 @@ fi
 
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 FC_FILE="${LE_DIR}/fullchain.pem"
-PK_CERT="${LE_DIR}/privkey.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
 version="2025.12.0"
 
 echo "Installing Hoppscotch API Testing Platform" | log

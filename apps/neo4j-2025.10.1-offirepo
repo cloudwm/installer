@@ -7,7 +7,7 @@ fi
 
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 FC_FILE="${LE_DIR}/fullchain.pem"
-PK_CERT="${LE_DIR}/privkey.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
 
 echo "Installing Neo4j Community Edition with Nginx + SSL + Secure Bolt (bolt+s)" | log
 
