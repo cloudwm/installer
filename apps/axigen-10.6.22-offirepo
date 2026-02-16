@@ -7,6 +7,10 @@ fi
 
 echo "Installing Axigen Mail Server (v10.6.22) with Docker + Nginx + SSL" | log
 
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_CERT="${LE_DIR}/fullchain.pem"
+PK_CERT="${LE_DIR}/privkey.pem"
+
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
 sudo apt install -y nginx certbot python3-certbot-nginx apt-transport-https ca-certificates curl gnupg lsb-release
@@ -86,7 +90,7 @@ services:
       - "9000:9000"
       - "9433:9433"
     volumes:
-      - ./data/axigen:/opt/axigen/data
+- ./data/axigen:/opt/axigen/data
     networks:
       - axigen-net
     healthcheck:
@@ -103,16 +107,22 @@ EOF
 # Stop nginx for certbot
 systemctl stop nginx
 
-# Generate Let's Encrypt certs (YOUR EXACT BLOCK)
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+systemctl stop nginx
 if certbot certonly --standalone -d "${CWM_DOMAIN}" \
     --non-interactive --agree-tos \
     -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
+    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
 else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    exit 1
+    mkdir -p "${LE_DIR}"
+    chmod 755 /etc/letsencrypt/live
+    chmod 755 "${LE_DIR}"
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${PK_FILE}" \
+        -out    "${FC_FILE}" \
+        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
+        2>/dev/null
+    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
 fi
 
 # Configure Nginx
