@@ -144,7 +144,11 @@ EOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/anythingllm.conf
     nginx -t
+
+    systemctl start nginx
+    systemctl enable nginx
     systemctl reload nginx
+    
     echo "nginx configuration switched to AnythingLLM." | log
 }
 
