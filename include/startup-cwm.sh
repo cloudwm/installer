@@ -248,10 +248,7 @@ if [ ! -f "$rootDir/temp/globals-set.success" ]; then
     export CWM_SERVERIP="$(getServerIP)"
 
     CONFIG_FILE="/root/guest.conf"
-    export CWM_DOMAIN=$(grep -E '^[[:space:]]*fqdn0[[:space:]]*=' "${CONFIG_FILE}" \
-         | sed -E 's/^[[:space:]]*cwm_domain0[[:space:]]*=[[:space:]]*//; s/["'\'']//g; s/[[:space:]]*$//' \
-         | head -n 1)
-
+    export CWM_DOMAIN=$(grep '^fqdn0=' /root/guest.conf | cut -d= -f2)
     export CWM_DISPLAYED_ADDRESS=${CWM_SERVERIP}
 
    
