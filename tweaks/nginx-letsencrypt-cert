@@ -6,7 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir=$(rootDir)
 CONFIG_FILE=/root/guest.conf
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 FC_CERT="${LE_DIR}/fullchain.pem"
@@ -30,5 +29,5 @@ else
         -out    "${FC_FILE}" \
         -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
         2>/dev/null
-    echo "Self signed cert has been created" | log
+    echo "Self signed cert has been issued for server ${CWM_DOMAIN}" | log
 fi
