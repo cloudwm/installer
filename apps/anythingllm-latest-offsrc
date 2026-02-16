@@ -22,6 +22,9 @@ fi
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
+# Restarting nginx to show the UI installer
+systemctl start nginx 2>/dev/null
+
 # ==============================
 # Install prerequisites
 # ==============================
