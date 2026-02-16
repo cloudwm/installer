@@ -27,26 +27,56 @@ export PATH="$HOME/.rbenv/bin:$PATH"
 export RBENV_ROOT="$HOME/.rbenv"
 
 # Initialize rbenv manually (don't rely on shell init)
-if [ -d "$HOME/.rbenv/bin" ]; then
-    export PATH="$HOME/.rbenv/bin:$PATH"
-    eval "$($HOME/.rbenv/bin/rbenv init - bash)" 2>/dev/null || true
+if [ ! -d "$HOME/.rbenv" ]; then
+    echo "Installing rbenv + ruby-build" | log
+    git clone https://github.com/rbenv/rbenv.git ~/.rbenv
+    git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
+    
+    # Add rbenv to bashrc for persistence
+    if ! grep -q "rbenv init" ~/.bashrc 2>/dev/null; then
+        cat >> ~/.bashrc <<'RBENV_EOF'
+export PATH="$HOME/.rbenv/bin:$PATH"
+eval "$(rbenv init - bash)"
+RBENV_EOF
+    fi
+    
+    # Source bashrc to load rbenv in current shell
+    source ~/.bashrc 2>/dev/null || true
 fi
 
-# Verify rbenv is working
-which rbenv || { echo "ERROR: rbenv not in PATH"; export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; }
+# CRITICAL: Set up rbenv in PATH for non-interactive shells (cloud-init)
+export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
+export RBENV_ROOT="$HOME/.rbenv"
+
+# Initialize rbenv in current shell - CRITICAL for cloud-init
+if [ -x "$HOME/.rbenv/bin/rbenv" ]; then
+    eval "$($HOME/.rbenv/bin/rbenv init - bash)"
+else
+    echo "ERROR: rbenv binary not found at $HOME/.rbenv/bin/rbenv" | log
+    ls -la "$HOME/.rbenv/bin/" | log
+    exit 1
+fi
+
+# Verify rbenv command is available
+if ! command -v rbenv >/dev/null 2>&1; then
+    echo "ERROR: rbenv command not found after initialization" | log
+    echo "PATH: $PATH" | log
+    echo "RBENV_ROOT: $RBENV_ROOT" | log
+    exit 1
+fi
+
+echo "rbenv initialized successfully: $(which rbenv)" | log
 
 if ! rbenv versions 2>/dev/null | grep -q 3.2.2; then
     echo "Installing Ruby 3.2.2 (this may take 5-10 minutes)..." | log
     
     # Use single-threaded build for reliability in cloud-init
-    # Parallel builds can fail due to resource constraints
     RUBY_CONFIGURE_OPTS="--disable-install-doc" rbenv install 3.2.2 -s 2>&1 | tee /tmp/ruby_install.log
     
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
         echo "ERROR: Ruby installation failed" | log
         echo "Last 30 lines of install log:" | log
         tail -30 /tmp/ruby_install.log | log
-        # Don't fail immediately - show the error but continue to help debug
         cat /tmp/ruby_install.log > /var/log/ruby-install-error.log
         waitOrStop 1 "Ruby installation failed - full log saved to /var/log/ruby-install-error.log"
     fi
