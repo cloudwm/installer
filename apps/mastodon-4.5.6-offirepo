@@ -28,7 +28,7 @@ fi
 
 if ! rbenv versions | grep -q 3.2.2; then
     echo "Installing Ruby 3.2.2" | log
-    rbenv install 3.2.2 -s
+    rbenv install 3.2.2 -s | log
 fi
 
 rbenv global 3.2.2
