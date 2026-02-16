@@ -6,8 +6,8 @@ fi
 
 echo "Installing Pterodactyl Panel 1.0-develop with Wings using Docker on Ubuntu" | log
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_CERT="${LE_DIR}/fullchain.pem"
-PK_CERT="${LE_DIR}/privkey.pem"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
 
 export DEBIAN_FRONTEND="noninteractive"
 export PYTHONWARNINGS="ignore"
