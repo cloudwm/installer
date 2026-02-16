@@ -7,6 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+HTML_PATH="/var/www/html/index.html"
+
 CONFIG_FILE=/root/guest.conf
 MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
@@ -172,15 +176,22 @@ EOF
 }
 
 main() {
+    "$updateStatus" "$HTML_PATH" -ap "Installing dependencies..."
     install_dependencies
+    "$updateStatus" "$HTML_PATH" -ap "Creating environment..."
     create_venv
+    "$updateStatus" "$HTML_PATH" -ap "Configuring spark service..."
     setup_spark_wrapper
+    "$updateStatus" "$HTML_PATH" -ap "Concluding..."
     create_systemd_service
     configure_nginx
     set_motd
 
     echo "Spark installation and service setup complete." | log
     echo "Access Spark Web UI at: ${SCHEME}://$DOMAIN_NAME/" | log
+
+    sleep 10
+	"$updateStatus" "$HTML_PATH" -tr " ${SCHEME}://${DOMAIN_NAME}"
 }
 
 main "$@"
