@@ -114,6 +114,7 @@ if certbot certonly --standalone -d "${CWM_DOMAIN}" \
     -m "admin@${CWM_DOMAIN}" -v; then
     echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
 else
+    echo "Issuing self signed cert" | log
     mkdir -p "${LE_DIR}"
     chmod 755 /etc/letsencrypt/live
     chmod 755 "${LE_DIR}"
