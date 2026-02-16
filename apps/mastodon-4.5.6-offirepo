@@ -17,43 +17,35 @@ export DEBIAN_FRONTEND="noninteractive"
 apt-get update
 apt-get install -y curl ca-certificates gnupg lsb-release openssl jq ufw nginx certbot python3-certbot-nginx git build-essential autoconf bison libssl-dev libyaml-dev libreadline-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev libjemalloc-dev libxml2-dev libxslt1-dev libpq-dev imagemagick libimage-exiftool-perl libidn11-dev libvips42 libvips-dev pkg-config tree
 
-if [ ! -d "$HOME/.rbenv" ]; then
-    echo "Installing rbenv + ruby-build" | log
-    git clone https://github.com/rbenv/rbenv.git ~/.rbenv
-    git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
-fi
+RBENV_ROOT="/root/.rbenv"
 
-export PATH="$HOME/.rbenv/bin:$PATH"
-export RBENV_ROOT="$HOME/.rbenv"
-
-# Initialize rbenv manually (don't rely on shell init)
-if [ ! -d "$HOME/.rbenv" ]; then
-    echo "Installing rbenv + ruby-build" | log
-    git clone https://github.com/rbenv/rbenv.git ~/.rbenv
-    git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
+if [ ! -d "$RBENV_ROOT" ]; then
+    echo "Installing rbenv + ruby-build to $RBENV_ROOT" | log
+    git clone https://github.com/rbenv/rbenv.git "$RBENV_ROOT"
+    git clone https://github.com/rbenv/ruby-build.git "$RBENV_ROOT/plugins/ruby-build"
     
     # Add rbenv to bashrc for persistence
-    if ! grep -q "rbenv init" ~/.bashrc 2>/dev/null; then
-        cat >> ~/.bashrc <<'RBENV_EOF'
-export PATH="$HOME/.rbenv/bin:$PATH"
+    if ! grep -q "rbenv init" /root/.bashrc 2>/dev/null; then
+        cat >> /root/.bashrc <<'RBENV_EOF'
+export PATH="/root/.rbenv/bin:$PATH"
 eval "$(rbenv init - bash)"
 RBENV_EOF
     fi
     
     # Source bashrc to load rbenv in current shell
-    source ~/.bashrc 2>/dev/null || true
+    source /root/.bashrc 2>/dev/null || true
 fi
 
-# CRITICAL: Set up rbenv in PATH for non-interactive shells (cloud-init)
-export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
-export RBENV_ROOT="$HOME/.rbenv"
+export PATH="/root/.rbenv/bin:/root/.rbenv/shims:$PATH"
+export RBENV_ROOT="/root/.rbenv"
 
 # Initialize rbenv in current shell - CRITICAL for cloud-init
-if [ -x "$HOME/.rbenv/bin/rbenv" ]; then
-    eval "$($HOME/.rbenv/bin/rbenv init - bash)"
+if [ -x "/root/.rbenv/bin/rbenv" ]; then
+    eval "$(/root/.rbenv/bin/rbenv init - bash)"
 else
-    echo "ERROR: rbenv binary not found at $HOME/.rbenv/bin/rbenv" | log
-    ls -la "$HOME/.rbenv/bin/" | log
+    echo "ERROR: rbenv binary not found at /root/.rbenv/bin/rbenv" | log
+    echo "HOME variable is: $HOME" | log
+    ls -la /root/.rbenv/bin/ 2>&1 | log
     exit 1
 fi
 
