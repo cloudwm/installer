@@ -13,9 +13,8 @@ MASTODON_VERSION="v4.5.6"
 echo "Installing Mastodon ${MASTODON_VERSION} (Docker Compose + Nginx + Let's Encrypt)" | log
 export DEBIAN_FRONTEND="noninteractive"
 
-# 1. System packages + build deps
 apt-get update
-apt-get install -y curl ca-certificates gnupg lsb-release openssl jq ufw nginx certbot python3-certbot-nginx git build-essential autoconf bison libssl-dev libyaml-dev libreadline-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev libjemalloc-dev libxml2-dev libxslt1-dev libpq-dev imagemagick libimage-exiftool-perl libidn11-dev libvips42 libvips-dev pkg-config tree
+apt-get install -y curl ca-certificates gnupg lsb-release openssl jq ufw git build-essential autoconf bison libssl-dev libyaml-dev libreadline-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev libjemalloc-dev libxml2-dev libxslt1-dev libpq-dev imagemagick libimage-exiftool-perl libidn11-dev libvips42 libvips-dev pkg-config tree
 
 RBENV_ROOT="/root/.rbenv"
 
@@ -24,7 +23,6 @@ if [ ! -d "$RBENV_ROOT" ]; then
     git clone https://github.com/rbenv/rbenv.git "$RBENV_ROOT"
     git clone https://github.com/rbenv/ruby-build.git "$RBENV_ROOT/plugins/ruby-build"
     
-    # Add rbenv to bashrc for persistence
     if ! grep -q "rbenv init" /root/.bashrc 2>/dev/null; then
         cat >> /root/.bashrc <<'RBENV_EOF'
 export PATH="/root/.rbenv/bin:$PATH"
@@ -32,14 +30,12 @@ eval "$(rbenv init - bash)"
 RBENV_EOF
     fi
     
-    # Source bashrc to load rbenv in current shell
     source /root/.bashrc 2>/dev/null || true
 fi
 
 export PATH="/root/.rbenv/bin:/root/.rbenv/shims:$PATH"
 export RBENV_ROOT="/root/.rbenv"
 
-# Initialize rbenv in current shell - CRITICAL for cloud-init
 if [ -x "/root/.rbenv/bin/rbenv" ]; then
     eval "$(/root/.rbenv/bin/rbenv init - bash)"
 else
@@ -49,7 +45,6 @@ else
     exit 1
 fi
 
-# Verify rbenv command is available
 if ! command -v rbenv >/dev/null 2>&1; then
     echo "ERROR: rbenv command not found after initialization" | log
     echo "PATH: $PATH" | log
@@ -62,7 +57,6 @@ echo "rbenv initialized successfully: $(which rbenv)" | log
 if ! rbenv versions 2>/dev/null | grep -q 3.2.2; then
     echo "Installing Ruby 3.2.2 (this may take 5-10 minutes)..." | log
     
-    # Use single-threaded build for reliability in cloud-init
     RUBY_CONFIGURE_OPTS="--disable-install-doc" rbenv install 3.2.2 -s 2>&1 | tee /tmp/ruby_install.log
     
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
@@ -84,21 +78,18 @@ rbenv rehash
 
 gem install bundler -v 2.5.23
 
-# 3. Node.js 20 + Yarn (FIXED: proper corepack handling)
 if ! command -v node >/dev/null 2>&1; then
     echo "Installing Node.js 20" | log
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt-get install -y nodejs
 fi
 
-# Enable corepack WITHOUT prompts by setting env vars BEFORE running commands
 echo "Enabling corepack..." | log
 export COREPACK_ENABLE_AUTO_PIN=0
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 corepack enable || true
 corepack prepare yarn@stable --activate || true
 
-# 4. Docker + Compose
 echo "Installing Docker" | log
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
@@ -118,7 +109,6 @@ EOF
 systemctl restart docker
 sleep 5
 
-# 5. Clone Mastodon + force Ruby version
 APP_DIR="/opt/mastodon"
 mkdir -p "$APP_DIR"
 git clone https://github.com/mastodon/mastodon.git "$APP_DIR"
@@ -133,7 +123,6 @@ git reset --hard HEAD
 git clean -fd
 git checkout "${MASTODON_VERSION}" --force || waitOrStop 1 "Git checkout ${MASTODON_VERSION} failed"
 
-# 6. Secrets & .env.production with encryption keys
 SECRET_KEY_BASE=$(openssl rand -hex 64)
 OTP_SECRET=$(openssl rand -hex 64)
 
@@ -143,7 +132,6 @@ VAPID_PRIVATE_KEY=$(openssl ec -in /tmp/vapid_priv.pem -outform DER | tail -c +8
 VAPID_PUBLIC_KEY=$(openssl ec -in /tmp/vapid_priv.pem -pubout -outform DER | tail -c +8 | base64 -w0 | tr '+/' '-_' | tr -d '=')
 rm -f /tmp/vapid_priv.pem
 
-# Generate Active Record Encryption keys
 echo "Generating Active Record Encryption keys" | log
 ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=$(openssl rand -hex 32)
 ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=$(openssl rand -hex 32)
@@ -187,7 +175,6 @@ TRUSTED_PROXY=127.0.0.1
 TRUSTED_PROXY_IPS=127.0.0.1,::1
 EOF
 
-# 7. docker-compose.yml
 cat << 'EOF' > docker-compose.yml
 services:
   db:
@@ -307,37 +294,29 @@ EOF
 sed -i "s/VERSION_PLACEHOLDER/${MASTODON_VERSION}/g" docker-compose.yml
 sed -i "s/DB_PASS_PLACEHOLDER/${DB_PASS}/g" docker-compose.yml
 
-# 8. Directories & permissions
 mkdir -p public/system public/vite public/assets public/packs postgres14 redis
 chown -R 991:991 public
 
-# 9. Pull images
 docker pull postgres:14-alpine
 docker pull redis:7-alpine
 docker pull ghcr.io/mastodon/mastodon:${MASTODON_VERSION}
 docker pull ghcr.io/mastodon/mastodon-streaming:${MASTODON_VERSION}
 
-# 10. Host-side asset precompilation - FIXED yarn install
 echo "Installing gems" | log
 bundle config set --local without 'development test'
 bundle install --jobs 4 --retry 3 || waitOrStop 1 "bundle install failed"
 
 echo "Installing frontend dependencies" | log
-# Set env vars globally for this session
 export COREPACK_ENABLE_AUTO_PIN=0
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
-# Set yarn version WITHOUT prompts (already set above, but ensure it's active)
 yarn set version stable 2>&1 | grep -v "Corepack is about to download" || true
 
-# Install dependencies - NO yes pipe, just run normally with env vars set
 yarn install --immutable || waitOrStop 1 "yarn install failed"
 
-# Clean everything first
 rm -rf public/assets public/packs public/vite tmp/cache
 mkdir -p public/assets public/packs public/vite
 
-# Build with proper environment variables
 echo "Building Vite assets (this creates the manifest)" | log
 export RAILS_ENV=production
 export NODE_ENV=production
@@ -348,21 +327,15 @@ echo "Checking Vite manifest..." | log
 find public/vite -name "*.json" -type f | head -5
 ls -la public/vite/ 2>/dev/null || echo "public/vite is empty"
 
-# Precompile Rails assets (needed for images and other assets)
 echo "Precompiling Rails assets" | log
 bundle exec rails assets:precompile || waitOrStop 1 "assets:precompile failed"
 
-# CRITICAL: Ensure static images are accessible
-echo "Ensuring static assets are accessible..." | log
-
-# Copy any images that exist in source to public locations
 if [ -d "app/javascript/images" ]; then
     mkdir -p public/vite/assets
     cp -r app/javascript/images public/vite/assets/ 2>/dev/null || true
     echo "Copied images to public/vite/assets/images/" | log
 fi
 
-# Find all built image assets and ensure they're in the right place
 if [ -d "public/vite" ]; then
     find public/vite -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.svg" \) | while read img; do
         if [[ ! "$img" =~ "assets/images" ]]; then
@@ -372,13 +345,11 @@ if [ -d "public/vite" ]; then
     done
 fi
 
-# Set proper ownership for all public assets
 chown -R 991:991 public/
 
 echo "Final public directory structure:" | log
 tree -L 2 public/ 2>/dev/null || ls -la public/
 
-# 11. Start DB + Redis → prepare DB → setup DB
 docker-compose up -d db redis
 
 timeout_sec=300 elapsed=0 interval=5
@@ -415,10 +386,8 @@ EOSQL
 docker-compose run --rm web rails db:setup
 waitOrStop 0 "rails db:setup failed"
 
-# Create admin account using tootctl
 echo "Creating admin account: ${ADMIN_USERNAME}" | log
 
-# Create the account - tootctl handles everything properly
 docker-compose run --rm -e "DISABLE_DATABASE_ENVIRONMENT_CHECK=1" web \
     bin/tootctl accounts create "${ADMIN_USERNAME}" \
     --email "${ADMIN_EMAIL}" \
@@ -426,16 +395,13 @@ docker-compose run --rm -e "DISABLE_DATABASE_ENVIRONMENT_CHECK=1" web \
     --role Owner \
     2>&1 | tee /tmp/admin_creation.log
 
-# Wait a moment for account to be fully created
 sleep 2
 
-# Ensure account is confirmed, approved, and has Owner role
 echo "Setting account privileges..." | log
 docker-compose run --rm web bin/tootctl accounts modify "${ADMIN_USERNAME}" --confirm
 docker-compose run --rm web bin/tootctl accounts modify "${ADMIN_USERNAME}" --approve  
 docker-compose run --rm web bin/tootctl accounts modify "${ADMIN_USERNAME}" --role Owner
 
-# Set the password
 echo "Setting password..." | log
 docker-compose run --rm web rails runner "
 user = User.find_by(email: '${ADMIN_EMAIL}')
@@ -450,7 +416,6 @@ else
 end
 " 2>&1 | tee -a /tmp/admin_creation.log
 
-# Verify the account was created properly
 echo "Verifying admin account..." | log
 docker-compose exec -T db psql -U mastodon -d mastodon_production -c \
     "SELECT a.username, u.email, u.admin, u.confirmed, u.approved, ur.name as role
@@ -459,21 +424,9 @@ docker-compose exec -T db psql -U mastodon -d mastodon_production -c \
      LEFT JOIN user_roles ur ON u.role_id = ur.id
      WHERE a.username='${ADMIN_USERNAME}';" 2>&1 | tee -a /tmp/admin_creation.log
 
-if grep -q "Owner" /tmp/admin_creation.log; then
-    echo "Admin account verified as Owner" | log
-else
-    echo "Warning: Admin account may not have Owner privileges" | log
-fi
-
-rm -f /tmp/admin_creation.log
-
 docker-compose up -d
 
-# 12. Let's Encrypt & Nginx
-systemctl stop nginx || true
-certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos -m "admin@${CWM_DOMAIN}" || waitOrStop 1 "Certbot failed"
-systemctl start nginx || true
+systemctl start nginx
 
 cat << 'EOF' > /etc/nginx/sites-available/mastodon
 map $http_upgrade $connection_upgrade {
@@ -578,10 +531,8 @@ rm -f /etc/nginx/sites-enabled/default
 
 nginx -t && systemctl restart nginx || waitOrStop 1 "Nginx config failed"
 
-# Automatic renewal
 systemctl enable certbot.timer --now
 
-# Systemd service
 cat << EOF > /etc/systemd/system/mastodon.service
 [Unit]
 Description=Mastodon Docker Compose
