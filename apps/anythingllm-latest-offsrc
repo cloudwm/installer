@@ -164,9 +164,6 @@ obtain_ssl() {
     "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
 }
 
-# ==============================
-# Main
-# ==============================
 main() {
     install_docker
     install_anythingLLM
