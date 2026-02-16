@@ -172,7 +172,7 @@ main() {
     install_anythingLLM
     wait_for_container
     switch_nginx_to_proxy
-    obtain_ssl
+    #obtain_ssl
 }
 
 main
