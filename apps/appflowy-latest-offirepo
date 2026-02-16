@@ -11,8 +11,14 @@ rootDir="$(rootDir)"
 updateStatus="$rootDir/include/updateInstallStatus.sh"
 HTML_PATH="/var/www/html/index.html"
 
+CONFIG_FILE=/root/guest.conf
 MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
+if [ -z "$DOMAIN_NAME" ]; then
+    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
+    exit 1
+fi
+
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
@@ -192,6 +198,10 @@ run_appflowy() {
 switch_nginx_to_proxy() {
     echo "Configuring nginx reverse proxy for AppFlowy Cloud..." | log
 
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
     NGINX_CONF="/etc/nginx/sites-available/appflowy.conf"
 
     cat > "$NGINX_CONF" <<'EOF'
@@ -201,7 +211,47 @@ map $http_upgrade $connection_upgrade {
 }
 EOF
 
-    cat >> "$NGINX_CONF" <<EOF
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat >> "$NGINX_CONF" <<EOF
+
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN_NAME};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    client_max_body_size 256m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # WebSocket support (required for AppFlowy real-time collaboration)
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}
+EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat >> "$NGINX_CONF" <<EOF
+
 server {
     listen 80;
     server_name ${DOMAIN_NAME};
@@ -226,6 +276,7 @@ server {
     }
 }
 EOF
+    fi
 
     # Remove default site if it exists
     rm -f /etc/nginx/sites-enabled/default
@@ -237,32 +288,12 @@ EOF
     echo "nginx configured for AppFlowy Cloud." | log
 }
 
-obtain_ssl() {
-    systemctl reload nginx
-
-    echo "Requesting Let's Encrypt certificate..." | log
-    certbot --nginx \
-        -d "$DOMAIN_NAME" \
-        --non-interactive \
-        --agree-tos \
-        -m "admin@${DOMAIN_NAME}" \
-        --redirect
-
-    echo "AppFlowy Cloud available at https://${DOMAIN_NAME}" | log
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "AppFlowy Cloud is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
-}
-
 configure_motd() {
   echo "🧾 Configuring system MOTD with AppFlowy info..." | log
 
   chmod -x /etc/update-motd.d/* 2>/dev/null || true
   rm -f /etc/motd 2>/dev/null
 
-  # runtime-derived values
-  MACHINE_IP="$(hostname -I | awk '{print $1}')"
-  DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
   APPFLOWY_LOCAL_URL="http://127.0.0.1:8080"
   APPFLOWY_PUBLIC_URL="https://${DOMAIN_NAME}"
   APPFLOWY_ADMIN_URL="https://${DOMAIN_NAME}/console"
@@ -320,7 +351,6 @@ main() {
     run_appflowy
     "$updateStatus" "$HTML_PATH" -ap "Finishing AppFlowy Cloud installation..."
     switch_nginx_to_proxy
-    obtain_ssl
     configure_motd
 }
 
