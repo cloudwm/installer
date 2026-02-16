@@ -7,8 +7,14 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+CONFIG_FILE=/root/guest.conf
 MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
+if [ -z "$DOMAIN_NAME" ]; then
+    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
+    exit 1
+fi
+
 PASSWORD="${ADMINPASSWORD}"
 
 rootDir="$(rootDir)"
@@ -20,6 +26,9 @@ AIRFLOW_ENV="/opt/airflow/venv"
 AIRFLOW_USER="admin"
 PYTHON_BIN="python3.12"
 AIRFLOW_VERSION="3.1.0"
+
+# Restarting nginx to show the UI installer
+systemctl start nginx 2>/dev/null
 
 install_dependencies() {
     echo "[INFO] Installing system dependencies..." | log
@@ -185,8 +194,42 @@ EOF
 
 switch_nginx_to_proxy() {
     echo "[INFO] Switching nginx to Airflow reverse proxy..." | log
+
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
     NGINX_CONF="/etc/nginx/sites-available/airflow.conf"
-    cat > "$NGINX_CONF" <<EOF
+
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "[INFO] SSL certificates found, configuring HTTPS..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN_NAME};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+    else
+        echo "[INFO] No SSL certificates found, configuring HTTP only..." | log
+        cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN_NAME};
@@ -201,33 +244,29 @@ server {
     }
 }
 EOF
+    fi
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/airflow.conf
     nginx -t && systemctl reload nginx
     echo "[INFO] nginx configuration switched to Airflow reverse proxy." | log
 }
 
-obtain_ssl() {
-    echo "[INFO] Reloading nginx before requesting certificate..." | log
-    systemctl reload nginx
-
-    echo "[INFO] Requesting Let's Encrypt certificate..." | log
-    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
-
-    echo "[INFO] SSL successfully configured for https://${DOMAIN_NAME}" | log
-	
-	"$updateStatus" "$HTML_PATH" -sr
-	"$updateStatus" "$HTML_PATH" -ur "Airflow is available on https://${DOMAIN_NAME}"
-}
-
 configure_motd() {
     echo "[INFO] Configuring custom MOTD..." | log
+
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        SCHEME="https"
+    else
+        SCHEME="http"
+    fi
+
     rm -f /etc/update-motd.d/* /etc/motd
     cat <<EOF >/etc/motd
 --------------------------------------------------
         Apache Airflow Installed Successfully
 --------------------------------------------------
-Web Interface: https://${DOMAIN_NAME}
+Web Interface: ${SCHEME}://${DOMAIN_NAME}
 Username: admin
 Password: ${PASSWORD}
 
@@ -254,14 +293,13 @@ main() {
 	
 	"$updateStatus" "$HTML_PATH" -ap "Finishing up..."
     switch_nginx_to_proxy
-    obtain_ssl
 	configure_motd
 	
     echo "[INFO] Apache Airflow installation complete." | log
-    echo "[INFO] Access Airflow UI at https://${DOMAIN_NAME}" | log
+    echo "[INFO] Access Airflow UI at ${SCHEME}://${DOMAIN_NAME}" | log
 	
 	sleep 10
-	"$updateStatus" "$HTML_PATH" -tr " https://${DOMAIN_NAME}"
+	"$updateStatus" "$HTML_PATH" -tr " ${SCHEME}://${DOMAIN_NAME}"
 }
 
 
