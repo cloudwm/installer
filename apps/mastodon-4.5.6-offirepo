@@ -17,18 +17,29 @@ export DEBIAN_FRONTEND="noninteractive"
 apt-get update
 apt-get install -y curl ca-certificates gnupg lsb-release openssl jq ufw nginx certbot python3-certbot-nginx git build-essential autoconf bison libssl-dev libyaml-dev libreadline-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev libjemalloc-dev libxml2-dev libxslt1-dev libpq-dev imagemagick libimage-exiftool-perl libidn11-dev libvips42 libvips-dev pkg-config tree
 
-echo "Installing rbenv + ruby-build" | log
-git clone https://github.com/rbenv/rbenv.git ~/.rbenv
-git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
-export PATH="$HOME/.rbenv/bin:$PATH"
-eval "$(rbenv init -)"
+if [ ! -d "$HOME/.rbenv" ]; then
+    echo "Installing rbenv + ruby-build" | log
+    git clone https://github.com/rbenv/rbenv.git ~/.rbenv
+    git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
+fi
 
-echo "Installing Ruby 3.2.2" | log
-rbenv install 3.2.2 -s | log
+export PATH="$HOME/.rbenv/bin:$PATH"
+export RBENV_ROOT="$HOME/.rbenv"
+
+if [ -d "$HOME/.rbenv/bin" ]; then
+    export PATH="$HOME/.rbenv/bin:$PATH"
+    eval "$($HOME/.rbenv/bin/rbenv init - bash)"
+fi
+
+which rbenv || { echo "ERROR: rbenv not in PATH"; export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; }
+
+if ! rbenv versions 2>/dev/null | grep -q 3.2.2; then
+    echo "Installing Ruby 3.2.2" | log
+    MAKE_OPTS="-j$(nproc)" rbenv install 3.2.2 -s || waitOrStop 1 "Ruby installation failed"
+fi
+
 rbenv global 3.2.2
 rbenv rehash
-
-ruby -v || { echo "Ruby 3.2.2 not active"; exit 1; }
 
 gem install bundler -v 2.5.23
 
