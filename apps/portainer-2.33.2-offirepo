@@ -27,8 +27,6 @@ sudo mkdir -p /opt/portainer/{certs,data}
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-# Stop Nginx temporarily for Certbot validation
 sudo systemctl stop nginx
 
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
@@ -126,9 +124,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
       - /opt/portainer/certs:/certs
-    environment:
-      - PORTAINER_SSLCERT=/certs/portainer.crt
-      - PORTAINER_SSLKEY=/certs/portainer.key
+    command:
+      - --sslcert 
+      - /certs/portainer.crt
+      - --sslkey
+      - /certs/portainer.key
 EOFCOMPOSE
 
     # Add the hashed password to the command
