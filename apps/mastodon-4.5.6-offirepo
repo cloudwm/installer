@@ -17,20 +17,14 @@ export DEBIAN_FRONTEND="noninteractive"
 apt-get update
 apt-get install -y curl ca-certificates gnupg lsb-release openssl jq ufw nginx certbot python3-certbot-nginx git build-essential autoconf bison libssl-dev libyaml-dev libreadline-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm-dev libjemalloc-dev libxml2-dev libxslt1-dev libpq-dev imagemagick libimage-exiftool-perl libidn11-dev libvips42 libvips-dev pkg-config tree
 
-# 2. Install rbenv + Ruby 3.2.2 (force PATH in current session)
-if [ ! -d "$HOME/.rbenv" ]; then
-    echo "Installing rbenv + ruby-build" | log
-    git clone https://github.com/rbenv/rbenv.git ~/.rbenv
-    git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
-    export PATH="$HOME/.rbenv/bin:$PATH"
-    eval "$(rbenv init -)"
-fi
+echo "Installing rbenv + ruby-build" | log
+git clone https://github.com/rbenv/rbenv.git ~/.rbenv
+git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
+export PATH="$HOME/.rbenv/bin:$PATH"
+eval "$(rbenv init -)"
 
-if ! rbenv versions | grep -q 3.2.2; then
-    echo "Installing Ruby 3.2.2" | log
-    rbenv install 3.2.2 -s | log
-fi
-
+echo "Installing Ruby 3.2.2" | log
+rbenv install 3.2.2 -s | log
 rbenv global 3.2.2
 rbenv rehash
 
