@@ -26,16 +26,35 @@ fi
 export PATH="$HOME/.rbenv/bin:$PATH"
 export RBENV_ROOT="$HOME/.rbenv"
 
+# Initialize rbenv manually (don't rely on shell init)
 if [ -d "$HOME/.rbenv/bin" ]; then
     export PATH="$HOME/.rbenv/bin:$PATH"
-    eval "$($HOME/.rbenv/bin/rbenv init - bash)"
+    eval "$($HOME/.rbenv/bin/rbenv init - bash)" 2>/dev/null || true
 fi
 
+# Verify rbenv is working
 which rbenv || { echo "ERROR: rbenv not in PATH"; export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; }
 
 if ! rbenv versions 2>/dev/null | grep -q 3.2.2; then
-    echo "Installing Ruby 3.2.2" | log
-    MAKE_OPTS="-j$(nproc)" rbenv install 3.2.2 -s || waitOrStop 1 "Ruby installation failed"
+    echo "Installing Ruby 3.2.2 (this may take 5-10 minutes)..." | log
+    
+    # Use single-threaded build for reliability in cloud-init
+    # Parallel builds can fail due to resource constraints
+    RUBY_CONFIGURE_OPTS="--disable-install-doc" rbenv install 3.2.2 -s 2>&1 | tee /tmp/ruby_install.log
+    
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+        echo "ERROR: Ruby installation failed" | log
+        echo "Last 30 lines of install log:" | log
+        tail -30 /tmp/ruby_install.log | log
+        # Don't fail immediately - show the error but continue to help debug
+        cat /tmp/ruby_install.log > /var/log/ruby-install-error.log
+        waitOrStop 1 "Ruby installation failed - full log saved to /var/log/ruby-install-error.log"
+    fi
+    
+    rm -f /tmp/ruby_install.log
+    echo "Ruby 3.2.2 installed successfully" | log
+else
+    echo "Ruby 3.2.2 already installed" | log
 fi
 
 rbenv global 3.2.2
