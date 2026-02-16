@@ -15,9 +15,10 @@ CONFIG_FILE=/root/guest.conf
 MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
 if [ -z "$DOMAIN_NAME" ]; then
-    echo "ERROR: fqdn0 not found in $CONFIG_FILE, falling back to IP-based domain." | log
-    DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-').cloud-xip.io"
+    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
+    exit 1
 fi
+
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
