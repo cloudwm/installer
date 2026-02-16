@@ -16,7 +16,7 @@ MACHINE_IP=$(hostname -I | awk '{print $1}')
 DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
 if [ -z "$DOMAIN_NAME" ]; then
     echo "ERROR: fqdn0 not found in $CONFIG_FILE, falling back to IP-based domain." | log
-    DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-').cloud-xip.com"
+    DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-').cloud-xip.io"
 fi
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
@@ -130,8 +130,42 @@ wait_for_container() {
 # ==============================
 switch_nginx_to_proxy() {
     echo "Switching nginx from progress page to AnythingLLM reverse proxy..." | log
+
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
     NGINX_CONF="/etc/nginx/sites-available/anythingllm.conf"
-    cat > "$NGINX_CONF" <<EOF
+
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN_NAME};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    location / {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN_NAME};
@@ -146,6 +180,7 @@ server {
     }
 }
 EOF
+    fi
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/anythingllm.conf
     nginx -t
