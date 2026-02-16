@@ -6,6 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_CERT="${LE_DIR}/fullchain.pem"
+PK_CERT="${LE_DIR}/privkey.pem"
+
 echo "Installing NetBox (Network Management) with Docker + Nginx + SSL" | log
 
 export DEBIAN_FRONTEND=noninteractive
@@ -172,19 +176,26 @@ services:
   #   command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "housekeeping"]
 EOF
 
-echo "Obtaining SSL certificate..." | log
-systemctl stop nginx 2>/dev/null || true
-
-if certbot certonly --standalone -d "$CWM_DOMAIN" \
-     --non-interactive --agree-tos -m "admin@$CWM_DOMAIN" --http-01-port 80; then
-    echo "SSL obtained via Let's Encrypt" | log
-    cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem $appDir/config/https-cert.pem
-    cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem $appDir/config/https-key.pem
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+systemctl stop nginx
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
 else
-    echo "Failed to generate ssl"
-    exit 1
+    mkdir -p "${LE_DIR}"
+    chmod 755 /etc/letsencrypt/live
+    chmod 755 "${LE_DIR}"
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${PK_FILE}" \
+        -out    "${FC_FILE}" \
+        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
+        2>/dev/null
+    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
 fi
 
+cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem $appDir/config/https-cert.pem
+cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem $appDir/config/https-key.pem
 chown $USER:$USER $appDir/config/https-*.pem
 chmod 644 $appDir/config/https-cert.pem
 chmod 600 $appDir/config/https-key.pem

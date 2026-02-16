@@ -6,6 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_CERT="${LE_DIR}/fullchain.pem"
+PK_CERT="${LE_DIR}/privkey.pem"
+
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
@@ -23,26 +27,29 @@ sudo mkdir -p /opt/portainer/{certs,data}
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-# Stop Nginx temporarily for Certbot validation
 sudo systemctl stop nginx
-if certbot --nginx -d "$CWM_DOMAIN" \
+
+echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+systemctl stop nginx
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
     --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" --redirect -v; then
-    echo "✅ Let's Encrypt SSL certificate active at https://${CWM_DOMAIN}" | log
-    sudo nginx -t && sudo systemctl reload nginx
-    # Copy certificates for Portainer
-    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
-    sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
-        waitOrStop 0 "Certificate copy failed"
-    fi
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
 else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    exit 1
+    mkdir -p "${LE_DIR}"
+    chmod 755 /etc/letsencrypt/live
+    chmod 755 "${LE_DIR}"
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${PK_FILE}" \
+        -out    "${FC_FILE}" \
+        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
+        2>/dev/null
+    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
 fi
+
+cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
+cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
+
 
 echo "Creating Docker Compose file for Portainer (without initial password)" | log
 cat << 'EOF' > /opt/portainer/docker-compose.yml
@@ -117,9 +124,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
       - /opt/portainer/certs:/certs
-    environment:
-      - PORTAINER_SSLCERT=/certs/portainer.crt
-      - PORTAINER_SSLKEY=/certs/portainer.key
+    command:
+      - --sslcert 
+      - /certs/portainer.crt
+      - --sslkey
+      - /certs/portainer.key
 EOFCOMPOSE
 
     # Add the hashed password to the command
