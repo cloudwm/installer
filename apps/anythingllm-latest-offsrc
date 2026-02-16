@@ -12,7 +12,7 @@ LOG_PATH="/var/log/anythingllm-setup.log"
 HTML_PATH="/var/www/html/index.html"
 
 MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
+DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.io
 echo "Machine IP: $MACHINE_IP" | log
 echo "Domain: $DOMAIN_NAME" | log
 
@@ -148,28 +148,11 @@ EOF
     echo "nginx configuration switched to AnythingLLM." | log
 }
 
-# ==============================
-# SSL
-# ==============================
-obtain_ssl() {
-    echo "Reloading nginx before requesting certificate..." | log
-    systemctl reload nginx
-
-    echo "Requesting Let's Encrypt certificate..." | log
-    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
-
-    echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "AnythingLLM is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
-}
-
 main() {
     install_docker
     install_anythingLLM
     wait_for_container
     switch_nginx_to_proxy
-    #obtain_ssl
 }
 
 main
