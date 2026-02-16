@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_CERT="${LE_DIR}/fullchain.pem"
+FC_FILE="${LE_DIR}/fullchain.pem"
 PK_CERT="${LE_DIR}/privkey.pem"
 
 version="10.1.9"
