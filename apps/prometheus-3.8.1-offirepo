@@ -7,7 +7,6 @@ fi
 
 prom_version="3.8.1"
 
-checkTagExist enable-ssl.success
 rootDir=$(rootDir)
 ubuntu_version=$(lsb_release -rs)
 
