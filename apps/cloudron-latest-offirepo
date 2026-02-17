@@ -6,60 +6,196 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Downloading and installing CloudRon" | log
-curlDownload https://cloudron.io/cloudron-setup
-chmod u+x cloudron-setup
+# ── Logging ──────────────────────────────────────────────────────────
+LOG_FILE="/var/log/cloudron-installation.log"
+LOG_LEVEL="DEBUG" # DEBUG, INFO, WARN, ERROR
 
-echo "Enabling and starting cron service..." | log
-systemctl enable cron
-systemctl start cron
+_log_level_value() {
+    case "$1" in
+        DEBUG) echo 0 ;;
+        INFO)  echo 1 ;;
+        WARN)  echo 2 ;;
+        ERROR) echo 3 ;;
+        *)     echo 1 ;;
+    esac
+}
+
+log_msg() {
+    local level="${1:-INFO}"
+    local message="$2"
+    local timestamp
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    local caller="${FUNCNAME[1]:-main}"
+    local line="${BASH_LINENO[0]}"
+
+    # Skip if below configured log level
+    if (( $(_log_level_value "$level") < $(_log_level_value "$LOG_LEVEL") )); then
+        return
+    fi
+
+    local entry="[${timestamp}] [${level}] [${caller}:${line}] ${message}"
+
+    # Write to log file
+    echo "$entry" >> "$LOG_FILE"
+
+    # Also print to stdout/stderr for the framework's log pipe
+    if [[ "$level" == "ERROR" || "$level" == "WARN" ]]; then
+        echo "$entry" >&2
+    else
+        echo "$entry"
+    fi
+}
+
+log_cmd() {
+    # Runs a command, logs its stdout and stderr, and returns its exit code
+    local description="$1"
+    shift
+    local cmd_string="$*"
+
+    log_msg "INFO" "Running: ${description}"
+    log_msg "DEBUG" "Command: ${cmd_string}"
+
+    local tmp_stdout tmp_stderr
+    tmp_stdout=$(mktemp)
+    tmp_stderr=$(mktemp)
+
+    "$@" > "$tmp_stdout" 2> "$tmp_stderr"
+    local exit_code=$?
+
+    if [[ -s "$tmp_stdout" ]]; then
+        while IFS= read -r line; do
+            log_msg "DEBUG" "[stdout] $line"
+        done < "$tmp_stdout"
+    fi
+
+    if [[ -s "$tmp_stderr" ]]; then
+        while IFS= read -r line; do
+            log_msg "WARN" "[stderr] $line"
+        done < "$tmp_stderr"
+    fi
+
+    if (( exit_code != 0 )); then
+        log_msg "ERROR" "Command failed (exit code: ${exit_code}): ${cmd_string}"
+    else
+        log_msg "DEBUG" "Command succeeded (exit code: 0): ${cmd_string}"
+    fi
+
+    rm -f "$tmp_stdout" "$tmp_stderr"
+    return $exit_code
+}
+
+log_section() {
+    local title="$1"
+    log_msg "INFO" "════════════════════════════════════════════════════════════"
+    log_msg "INFO" "  ${title}"
+    log_msg "INFO" "════════════════════════════════════════════════════════════"
+}
+
+log_env() {
+    log_section "Environment Details"
+    log_msg "INFO" "Hostname: $(hostname)"
+    log_msg "INFO" "OS: $(lsb_release -ds 2>/dev/null || cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2)"
+    log_msg "INFO" "Kernel: $(uname -r)"
+    log_msg "INFO" "Architecture: $(uname -m)"
+    log_msg "INFO" "User: $(whoami)"
+    log_msg "INFO" "Working Directory: $(pwd)"
+    log_msg "INFO" "Domain: ${CWM_DOMAIN:-not set}"
+    log_msg "INFO" "Disk Space: $(df -h / | awk 'NR==2{print $4}') free"
+    log_msg "INFO" "Memory: $(free -h | awk '/Mem:/{print $7}') available"
+    log_msg "INFO" "Uptime: $(uptime -p)"
+}
+
+# ── Initialize ───────────────────────────────────────────────────────
+mkdir -p "$(dirname "$LOG_FILE")"
+: > "$LOG_FILE"
+
+log_section "CloudRon Installation Started"
+log_env
+
+# ── Download & Prepare ───────────────────────────────────────────────
+log_section "Downloading CloudRon"
+log_cmd "Download cloudron-setup" curlDownload https://cloudron.io/cloudron-setup
+log_cmd "Make cloudron-setup executable" chmod u+x cloudron-setup
+
+# ── Cron Service ─────────────────────────────────────────────────────
+log_section "Cron Service"
+log_cmd "Enable cron" systemctl enable cron
+log_cmd "Start cron" systemctl start cron
 
 ubuntu_version=$(lsb_release -rs)
+log_msg "INFO" "Detected Ubuntu version: ${ubuntu_version}"
+
 if [[ "$ubuntu_version" == "24.04" ]]; then
-    echo "Adding shutdown cron job to root's crontab for Ubuntu 24..." | log
+    log_msg "INFO" "Adding shutdown cron job for Ubuntu 24.04"
     CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
     (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-    echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
+    log_msg "INFO" "Shutdown cron job added. System will shut down on next reboot."
 else
-    echo "This is not Ubuntu 24. Shutdown cron job will not be added." | log
+    log_msg "INFO" "Not Ubuntu 24.04 — skipping shutdown cron job."
 fi
 
-echo "Running CloudRon setup..." | log
-echo Y | bash cloudron-setup
+# ── CloudRon Setup ───────────────────────────────────────────────────
+log_section "Running CloudRon Setup"
+log_msg "INFO" "Launching cloudron-setup (auto-accepting with Y)..."
+echo Y | bash cloudron-setup >> "$LOG_FILE" 2>&1
+setup_exit=$?
 
-# Wait for the dashboard directories to be available
-echo "Waiting for Cloud-Ron app directories..." | log
+if (( setup_exit != 0 )); then
+    log_msg "ERROR" "cloudron-setup exited with code ${setup_exit}"
+else
+    log_msg "INFO" "cloudron-setup completed successfully."
+fi
+
+# ── Wait for Dashboard ───────────────────────────────────────────────
+log_section "Waiting for Dashboard Directories"
 
 html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
 setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
 js_target_dir="/home/yellowtent/box/dashboard/dist/js"
 js_target="${js_target_dir}/setupdns.js"
 
+wait_count=0
 while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
+    (( wait_count++ ))
+    if (( wait_count % 15 == 0 )); then
+        log_msg "WARN" "Still waiting for dashboard directories... (${wait_count} checks / $((wait_count * 2))s elapsed)"
+    fi
     sleep 2
 done
 
-echo "Cloud-Ron Directories found. Performing operations..." | log
+log_msg "INFO" "Dashboard directories found after ${wait_count} checks ($((wait_count * 2))s)."
 
-# Replace placeholders in HTML and JS files
-sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
-sed -i "s/example.com/${CWM_DOMAIN}/g" "$html_target"
-sed -i "s/example.com/${CWM_DOMAIN}/g" "$js_target"
+# ── DNS Placeholder Replacement ──────────────────────────────────────
+log_section "Replacing DNS Placeholders"
+log_msg "INFO" "Replacing example.com with ${CWM_DOMAIN}"
 
-echo "Setup DNS files have been updated." | log
+for target_file in "$setup_target" "$html_target" "$js_target"; do
+    if [[ -f "$target_file" ]]; then
+        log_cmd "sed replace in ${target_file}" sed -i "s/example.com/${CWM_DOMAIN}/g" "$target_file"
+    else
+        log_msg "WARN" "File not found, skipping: ${target_file}"
+    fi
+done
 
-# Touchups
-bash tweaks/motd-description-append
-bash tweaks/cwm-description-autoconfig
+log_msg "INFO" "DNS placeholder replacement complete."
 
-echo "Adding descriptions" | log
+# ── Touchups ─────────────────────────────────────────────────────────
+log_section "Touchups & Descriptions"
+log_cmd "MOTD description append" bash tweaks/motd-description-append
+log_cmd "CWM description autoconfig" bash tweaks/cwm-description-autoconfig
+
 descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "SSL will be configured after the first step."
+log_msg "INFO" "Descriptions added."
 
-# Cleanup
-echo "Cleaning up..." | log
-apt-get autoremove -y
-apt-get autoclean -y
+# ── Cleanup ──────────────────────────────────────────────────────────
+log_section "Cleanup"
+log_cmd "Autoremove packages" apt-get autoremove -y
+log_cmd "Autoclean packages" apt-get autoclean -y
+
+# ── Done ─────────────────────────────────────────────────────────────
+log_section "Installation Complete"
+log_msg "INFO" "Full log available at: ${LOG_FILE}"
 
 tagScript success
 exit 0
