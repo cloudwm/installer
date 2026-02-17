@@ -142,6 +142,10 @@ test_db_connection() {
 
 switch_nginx_to_proxy() {
     echo "Switching Nginx to reverse proxy for Cassandra Web UI..." | log
+    
+    # Restarting nginx to show the UI installer
+    systemctl start nginx 2>/dev/null
+
     NGINX_CONF="/etc/nginx/sites-available/cassandra-web.conf"
     cat > "$NGINX_CONF" <<EOF
 server {
