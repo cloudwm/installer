@@ -6,10 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-CONFIG_FILE=/root/guest.conf
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_CERT="${LE_DIR}/fullchain.pem"
-PK_CERT="${LE_DIR}/privkey.pem"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
 
 apt-get update
 installPackage certbot python3-certbot-nginx openssl nginx

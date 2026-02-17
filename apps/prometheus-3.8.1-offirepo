@@ -30,23 +30,13 @@ mv consoles/ console_libraries/ /etc/prometheus/
 mv prometheus.yml /etc/prometheus/prometheus.yml
 
 echo "Configuring SSL" | log
-if [[ ! -f /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem ]]; then
-    cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /etc/prometheus/
-    cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem /etc/prometheus/
+cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /etc/prometheus/
+cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem /etc/prometheus/
     cat << EOF > /etc/prometheus/web-config.yml
 tls_server_config:
   cert_file: /etc/prometheus/fullchain.pem
   key_file: /etc/prometheus/privkey.pem
 EOF
-else
-    cp /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem /etc/prometheus/
-    cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem /etc/prometheus/
-    cat << EOF > /etc/prometheus/web-config.yml
-tls_server_config:
-  cert_file: /etc/prometheus/cert.pem
-  key_file: /etc/prometheus/privkey.pem
-EOF
-fi
 
 echo "Creating Prometheus group and user" | log
 groupadd --system prometheus

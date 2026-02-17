@@ -9,7 +9,7 @@ fi
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx apache2-utils jq
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools  apache2-utils jq
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
@@ -33,26 +33,10 @@ sudo mkdir -p ${appInstallDir}/{certs,config,data}
 sudo chown -R ${syncthingUser}:${syncthingGroup} ${appInstallDir}/{config,data,certs}
 sudo chmod -R 750 ${appInstallDir}/{config,data,certs}
 
-systemctl stop nginx.service
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-    sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem ${appInstallDir}/config/https-cert.pem
-    sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem ${appInstallDir}/config/https-key.pem
-    sudo chown ${syncthingUser}:${syncthingGroup} ${appInstallDir}/config/https-{cert,key}.pem
-    sudo chmod 640 ${appInstallDir}/config/https-{cert,key}.pem
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
-        waitOrStop 0 "Certificate copy failed"
-    fi
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    exit 1
-fi
+sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem ${appInstallDir}/config/https-cert.pem
+sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem ${appInstallDir}/config/https-key.pem
+sudo chown ${syncthingUser}:${syncthingGroup} ${appInstallDir}/config/https-{cert,key}.pem
+sudo chmod 640 ${appInstallDir}/config/https-{cert,key}.pem
 
 systemctl enbale nginx && systemctl start nginx
 

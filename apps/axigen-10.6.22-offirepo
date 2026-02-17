@@ -100,9 +100,6 @@ networks:
     driver: bridge
 EOF
 
-# Stop nginx for certbot
-systemctl stop nginx
-
 # Configure Nginx
 cat << EOF > /etc/nginx/sites-available/axigen
 server {
