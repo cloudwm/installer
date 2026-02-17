@@ -1,263 +1,119 @@
 #!/bin/bash
 
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-# ── Logging ──────────────────────────────────────────────────────────
-LOG_FILE="/var/log/cloudron-installation.log"
-LOG_LEVEL="DEBUG" # DEBUG, INFO, WARN, ERROR
+rootDir="$(rootDir)"
+updateStatus="$rootDir/include/updateInstallStatus.sh"
+LOG_PATH="/var/log/cloudron-setup.log"
+WEB_PATH="/var/www/html"
+HTML_PATH="/var/www/html/index.html"
 
-_log_level_value() {
-    case "$1" in
-        DEBUG) echo 0 ;;
-        INFO)  echo 1 ;;
-        WARN)  echo 2 ;;
-        ERROR) echo 3 ;;
-        *)     echo 1 ;;
-    esac
+
+updateAndFinalize() {
+    local rootDir="$1"
+    local CWM_DOMAIN="$2"
+
+    # Target directories and files
+    local html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
+	local setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
+    local js_target_dir="/home/yellowtent/box/dashboard/dist/js"
+    local js_target="${js_target_dir}/setupdns.js"
+
+    # Check every if the directories and files exist
+    while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
+        sleep 2
+    done
+
+    # Perform operations once the directories exist
+    echo "Cloud-Ron Directories found. Performing operations..." | log
+
+    # Replace placeholders in HTML and JS files
+	sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
+    sed -i "s/example.com/${CWM_DOMAIN}/g" "$html_target"
+    sed -i "s/example.com/${CWM_DOMAIN}/g" "$js_target"
+
+    echo "Setup DNS files have been updated." | log
+	
+	# Touchups
+	bash tweaks/motd-description-append
+	bash tweaks/cwm-description-autoconfig
+	
+	echo "Adding descriptions" | log
+	descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
+	descriptionAppend "SSL will be configured after the first step."
+	
+	# Cleanup
+	echo "Cleaning up..." | log
+	sleep 5
+	systemctl stop apache2
+	apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
+	rm -rf /etc/apache2
+	apt-get autoremove -y
+	apt-get autoclean -y
+	
+	end_time=$(date +%s)
+	duration=$((end_time - start_time))
+	echo "Installation completed in $duration seconds." | log
+	
+	tagScript success
+	exit 0
 }
 
-log_msg() {
-    local level="${1:-INFO}"
-    local message="$2"
-    local timestamp
-    timestamp="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
-    local caller="${FUNCNAME[1]:-main}"
-    local line="${BASH_LINENO[0]}"
+#clear
+echo "Downloading and installing CloudRon" | log
+curlDownload https://cloudron.io/cloudron-setup
+chmod u+x cloudron-setup
 
-    if (( $(_log_level_value "$level") < $(_log_level_value "$LOG_LEVEL") )); then
-        return
-    fi
+# Run the Cloudron setup and tee the output to both stdout and the log file
+if [ ! -f "$LOG_PATH" ]; then
+	touch "$LOG_PATH"
+fi
 
-    local entry="[${timestamp}] [${level}] [${caller}:${line}] ${message}"
-    echo "$entry" >> "$LOG_FILE"
-
-    if [[ "$level" == "ERROR" || "$level" == "WARN" ]]; then
-        echo "$entry" >&2
-    else
-        echo "$entry"
-    fi
-}
-
-log_cmd() {
-    local description="$1"
-    shift
-    local cmd_string="$*"
-
-    log_msg "INFO" "Running: ${description}"
-    log_msg "DEBUG" "Command: ${cmd_string}"
-
-    local tmp_stdout tmp_stderr
-    tmp_stdout=$(mktemp)
-    tmp_stderr=$(mktemp)
-
-    "$@" > "$tmp_stdout" 2> "$tmp_stderr"
-    local exit_code=$?
-
-    if [[ -s "$tmp_stdout" ]]; then
-        while IFS= read -r line; do
-            log_msg "DEBUG" "[stdout] $line"
-        done < "$tmp_stdout"
-    fi
-
-    if [[ -s "$tmp_stderr" ]]; then
-        while IFS= read -r line; do
-            log_msg "WARN" "[stderr] $line"
-        done < "$tmp_stderr"
-    fi
-
-    if (( exit_code != 0 )); then
-        log_msg "ERROR" "Command failed (exit code: ${exit_code}): ${cmd_string}"
-    else
-        log_msg "DEBUG" "Command succeeded (exit code: 0): ${cmd_string}"
-    fi
-
-    rm -f "$tmp_stdout" "$tmp_stderr"
-    return $exit_code
-}
-
-log_section() {
-    local title="$1"
-    log_msg "INFO" "════════════════════════════════════════════════════════════"
-    log_msg "INFO" "  ${title}"
-    log_msg "INFO" "════════════════════════════════════════════════════════════"
-}
-
-log_env() {
-    log_section "Environment Details"
-    log_msg "INFO" "Hostname: $(hostname)"
-    log_msg "INFO" "OS: $(lsb_release -ds 2>/dev/null || cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2)"
-    log_msg "INFO" "Kernel: $(uname -r)"
-    log_msg "INFO" "Architecture: $(uname -m)"
-    log_msg "INFO" "User: $(whoami)"
-    log_msg "INFO" "Working Directory: $(pwd)"
-    log_msg "INFO" "Domain: ${CWM_DOMAIN:-not set}"
-    log_msg "INFO" "Disk Space: $(df -h / | awk 'NR==2{print $4}') free"
-    log_msg "INFO" "Memory: $(free -h | awk '/Mem:/{print $7}') available"
-    log_msg "INFO" "Uptime: $(uptime -p)"
-}
-
-# ── Initialize ───────────────────────────────────────────────────────
-mkdir -p "$(dirname "$LOG_FILE")"
-: > "$LOG_FILE"
-
-log_section "CloudRon Installation Started"
-log_env
-
-# ── Download & Prepare ───────────────────────────────────────────────
-log_section "Downloading CloudRon"
-log_cmd "Download cloudron-setup" curlDownload https://cloudron.io/cloudron-setup
-log_cmd "Make cloudron-setup executable" chmod u+x cloudron-setup
-
-# ── Cron Service ─────────────────────────────────────────────────────
-log_section "Cron Service"
-log_cmd "Enable cron" systemctl enable cron
-log_cmd "Start cron" systemctl start cron
+echo "Enabling and starting cron service..." | log
+sudo systemctl enable cron
+sudo systemctl start cron
 
 ubuntu_version=$(lsb_release -rs)
-log_msg "INFO" "Detected Ubuntu version: ${ubuntu_version}"
-
-# ── Create post-reboot service ───────────────────────────────────────
-log_section "Creating Post-Reboot Service"
-
-POST_REBOOT_SCRIPT="/opt/cloudron-post-reboot.sh"
-cat > "$POST_REBOOT_SCRIPT" <<'POSTEOF'
-#!/bin/bash
-
-LOG_FILE="/var/log/cloudron-installation.log"
-
-log_post() {
-    local timestamp
-    timestamp="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
-    echo "[${timestamp}] [INFO] [post-reboot] $1" >> "$LOG_FILE"
-}
-
-DOMAIN_FILE="/opt/cloudron-domain.conf"
-if [[ -f "$DOMAIN_FILE" ]]; then
-    CWM_DOMAIN="$(cat "$DOMAIN_FILE")"
-else
-    log_post "ERROR: Domain file not found at ${DOMAIN_FILE}. Exiting."
-    exit 1
-fi
-
-log_post "Post-reboot script started. Domain: ${CWM_DOMAIN}"
-
-# Wait for the dashboard directories
-html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
-setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
-js_target_dir="/home/yellowtent/box/dashboard/dist/js"
-js_target="${js_target_dir}/setupdns.js"
-
-wait_count=0
-max_wait=150  # 5 minutes max
-
-while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
-    (( wait_count++ ))
-    if (( wait_count >= max_wait )); then
-        log_post "ERROR: Timed out waiting for dashboard directories after $((wait_count * 2))s."
-        break
-    fi
-    if (( wait_count % 15 == 0 )); then
-        log_post "Still waiting for dashboard directories... (${wait_count} checks / $((wait_count * 2))s elapsed)"
-    fi
-    sleep 2
-done
-
-if [[ -d "/home/yellowtent/box/dashboard/dist" && -d "$js_target_dir" ]]; then
-    log_post "Dashboard directories found after ${wait_count} checks ($((wait_count * 2))s)."
-
-    # Replace DNS placeholders
-    log_post "Replacing example.com with ${CWM_DOMAIN}"
-    for target_file in "$setup_target" "$html_target" "$js_target"; do
-        if [[ -f "$target_file" ]]; then
-            sed -i "s/example.com/${CWM_DOMAIN}/g" "$target_file"
-            log_post "Updated: ${target_file}"
-        else
-            log_post "WARN: File not found, skipping: ${target_file}"
-        fi
-    done
-    log_post "DNS placeholder replacement complete."
-else
-    log_post "WARN: Dashboard directories not found. Skipping DNS replacement."
-fi
-
-# Cleanup: remove this service so it doesn't run again
-log_post "Removing post-reboot service..."
-systemctl disable cloudron-post-reboot.service 2>/dev/null
-rm -f /etc/systemd/system/cloudron-post-reboot.service
-rm -f "$DOMAIN_FILE"
-rm -f "$POST_REBOOT_SCRIPT"
-systemctl daemon-reload
-
-log_post "Post-reboot tasks complete."
-POSTEOF
-
-chmod +x "$POST_REBOOT_SCRIPT"
-
-# Save the domain for the post-reboot script
-echo "${CWM_DOMAIN}" > /opt/cloudron-domain.conf
-
-# Create the systemd one-shot service
-cat > /etc/systemd/system/cloudron-post-reboot.service <<EOF
-[Unit]
-Description=CloudRon Post-Reboot DNS Setup
-After=network-online.target docker.service
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=${POST_REBOOT_SCRIPT}
-RemainAfterExit=false
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable cloudron-post-reboot.service
-
-log_msg "INFO" "Post-reboot service created and enabled."
-
-# ── Ubuntu 24 shutdown cron ──────────────────────────────────────────
 if [[ "$ubuntu_version" == "24.04" ]]; then
-    log_msg "INFO" "Adding shutdown cron job for Ubuntu 24.04"
+    echo "Adding shutdown cron job to root's crontab for Ubuntu 24..." | log
     CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
     (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-    log_msg "INFO" "Shutdown cron job added."
+    echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
+
 else
-    log_msg "INFO" "Not Ubuntu 24.04 — skipping shutdown cron job."
+    echo "This is not Ubuntu 24. Shutdown cron job will not be added." | log
 fi
 
-# ── Touchups & Descriptions ─────────────────────────────────────────
-log_section "Touchups & Descriptions"
-log_cmd "MOTD description append" bash tweaks/motd-description-append
-log_cmd "CWM description autoconfig" bash tweaks/cwm-description-autoconfig
+# Wait for App dir and replace files
+echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
+updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
-descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
-descriptionAppend "SSL will be configured after the first step."
-log_msg "INFO" "Descriptions added."
+echo "Running CloudRon setup..." | log
+# Define lists to hold log messages
+declare -a pre_display_list=()
 
-# ── Cleanup ──────────────────────────────────────────────────────────
-log_section "Cleanup"
-log_cmd "Autoremove packages" apt-get autoremove -y
-log_cmd "Autoclean packages" apt-get autoclean -y
-
-# ── Mark success BEFORE cloudron-setup triggers reboot ───────────────
-log_section "Marking Script Success"
-log_msg "INFO" "Calling tagScript success before cloudron-setup (which may reboot)."
-tagScript success
-
-# ── Run CloudRon Setup (may reboot) ─────────────────────────────────
-log_section "Running CloudRon Setup"
-log_msg "INFO" "Launching cloudron-setup (auto-accepting with Y)..."
-echo Y | bash cloudron-setup >> "$LOG_FILE" 2>&1
-setup_exit=$?
-
-# If we get here, cloudron-setup did NOT reboot
-log_msg "INFO" "cloudron-setup exited with code ${setup_exit} (no reboot detected)."
-log_msg "INFO" "Full log available at: ${LOG_FILE}"
-
-exit 0
+start_time=$(date +%s)
+echo Y | bash cloudron-setup | while IFS= read -r line; do
+    # Check if the line contains "=>"
+    if [[ "$line" == *"=>"* ]]; then
+        # Process each line that contains "=>"
+        line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
+        pre_display_list+=("$line")
+        "$updateStatus" "$HTML_PATH" -cp
+        
+        for stage in "${pre_display_list[@]}"; do
+            # Clean and append dots to the output
+            cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
+            final_stage="${cleaned_stage}..."
+            
+            # Update the installation landing page
+            "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+        done
+    fi
+done
