@@ -7,24 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-HTML_PATH="/var/www/html/index.html"
-
-CONFIG_FILE=/root/guest.conf
-MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
-if [ -z "$DOMAIN_NAME" ]; then
-    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
-    exit 1
-fi
-
-echo "Machine IP: $MACHINE_IP" | log
-echo "Domain: $DOMAIN_NAME" | log
-
-# Restarting nginx to show the UI installer
-systemctl start nginx 2>/dev/null
-
 setup_swap() {
     if swapon --show | grep -q '/'; then
         echo "Swap already enabled. Skipping." | log
@@ -112,7 +94,7 @@ run_appflowy() {
   EMAIL="$(grep '^email=' "$GUEST_CONF" | cut -d'=' -f2-)"
   ADMINPASSWORD="$(grep '^password=' "$GUEST_CONF" | cut -d'=' -f2-)"
 
-  sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
+  sed -i "s|^FQDN=.*|FQDN=${CWM_DOMAIN}|" .env
   sed -i 's/^SCHEME=.*/SCHEME=https/' .env
   sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
@@ -201,10 +183,13 @@ run_appflowy() {
 switch_nginx_to_proxy() {
     echo "Configuring nginx reverse proxy for AppFlowy Cloud..." | log
 
+    # Restarting nginx to show the UI installer
+    systemctl start nginx 2>/dev/null
+
     # Remove the install progress site so it doesn't conflict
     rm -f /etc/nginx/sites-enabled/installProgress.conf
 
-    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
     NGINX_CONF="/etc/nginx/sites-available/appflowy.conf"
 
     cat > "$NGINX_CONF" <<'EOF'
@@ -220,13 +205,13 @@ EOF
 
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
     return 301 https://\$host\$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
 
     ssl_certificate     ${LE_DIR}/fullchain.pem;
     ssl_certificate_key ${LE_DIR}/privkey.pem;
@@ -257,7 +242,7 @@ EOF
 
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
 
     client_max_body_size 256m;
 
@@ -298,8 +283,8 @@ configure_motd() {
   rm -f /etc/motd 2>/dev/null
 
   APPFLOWY_LOCAL_URL="http://127.0.0.1:8080"
-  APPFLOWY_PUBLIC_URL="https://${DOMAIN_NAME}"
-  APPFLOWY_ADMIN_URL="https://${DOMAIN_NAME}/console"
+  APPFLOWY_PUBLIC_URL="https://${CWM_DOMAIN}"
+  APPFLOWY_ADMIN_URL="https://${CWM_DOMAIN}/console"
   APPFLOWY_DIR="/opt/appflowy"
   DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
   NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
@@ -313,8 +298,7 @@ configure_motd() {
                         you used to create the server.
 
           Public URL: ${APPFLOWY_PUBLIC_URL}
-          Machine IP: ${MACHINE_IP}
-              Domain: ${DOMAIN_NAME}
+              Domain: ${CWM_DOMAIN}
 
         Docker Status: ${DOCKER_STATUS}
          Nginx Status: ${NGINX_STATUS}
@@ -350,9 +334,7 @@ EOM
 main() {
     setup_swap
     install_docker
-    "$updateStatus" "$HTML_PATH" -ap "Installing AppFlowy Cloud..."
     run_appflowy
-    "$updateStatus" "$HTML_PATH" -ap "Finishing AppFlowy Cloud installation..."
     switch_nginx_to_proxy
     configure_motd
 }
