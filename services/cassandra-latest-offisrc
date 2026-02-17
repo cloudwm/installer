@@ -6,6 +6,17 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+CONFIG_FILE=/root/guest.conf
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
+if [ -z "$DOMAIN_NAME" ]; then
+    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
+    exit 1
+fi
+
+# nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+systemctl start nginx 2>/dev/null
+
 install_dependencies() {
     echo "Installing Nginx and Certbot..." | log
     apt-get update
@@ -123,7 +134,6 @@ install_cassandra_web() {
 
     sleep 10
     if docker ps | grep -q cassandra-web; then
-        MACHINE_IP=$(hostname -I | awk '{print $1}')
         echo "Cassandra Web UI is running at http://${MACHINE_IP}:3000" | log
     else
         echo "Cassandra Web UI failed to start. Check logs with: docker logs cassandra-web" | log
@@ -131,7 +141,7 @@ install_cassandra_web() {
 }
 
 test_db_connection() {
-	echo "Testing CQLSH connectivity..." | log
+    echo "Testing CQLSH connectivity..." | log
     docker exec cassandra cqlsh -e "SHOW VERSION;" >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         echo "Cassandra CQLSH is responding." | log
@@ -141,34 +151,75 @@ test_db_connection() {
 }
 
 switch_nginx_to_proxy() {
-    echo "Switching Nginx to reverse proxy for Cassandra Web UI..." | log
-    
-    # Restarting nginx to show the UI installer
-    systemctl start nginx 2>/dev/null
+    echo "Configuring nginx reverse proxy for Cassandra Web UI..." | log
 
-    NGINX_CONF="/etc/nginx/sites-available/cassandra-web.conf"
-    cat > "$NGINX_CONF" <<EOF
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    NGINX_CONF="/etc/nginx/sites-available/cassandra.conf"
+
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name ${CWM_DOMAIN};
+    server_name ${DOMAIN_NAME} ${MACHINE_IP};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN_NAME} ${MACHINE_IP};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
 
     location / {
         proxy_pass         http://127.0.0.1:3000;
         proxy_http_version 1.1;
-        proxy_set_header   Upgrade \$http_upgrade;
-        proxy_set_header   Connection 'upgrade';
         proxy_set_header   Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
     }
 }
 EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME} ${MACHINE_IP};
 
-    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/cassandra-web.conf
-    nginx -t && systemctl reload nginx
-    echo "Nginx configuration switched to Cassandra Web reverse proxy." | log
+    location / {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    fi
+
+    rm -f /etc/nginx/sites-enabled/default
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/cassandra.conf
+    nginx -t || return 1
+    systemctl reload nginx
+
+    echo "nginx configured for Cassandra Web UI." | log
 }
 
 configure_motd() {
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        SCHEME="https"
+    else
+        SCHEME="http"
+    fi
+
     echo "Configuring MOTD..." | log
     rm -f /etc/update-motd.d/*
     : > /etc/motd
@@ -179,7 +230,7 @@ configure_motd() {
 ============================================================
 
 Cassandra service:    docker container named 'cassandra'
-Web UI:               https://${CWM_DOMAIN}
+Web UI:               ${SCHEME}://${DOMAIN_NAME}
 Default credentials:  cassandra / cassandra
 
 Useful commands:
@@ -200,7 +251,7 @@ main() {
     install_cassandra
     install_cassandra_web
     switch_nginx_to_proxy
-	test_db_connection
+    test_db_connection
     configure_motd
 }
 
