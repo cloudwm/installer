@@ -28,17 +28,13 @@ log_msg() {
     local caller="${FUNCNAME[1]:-main}"
     local line="${BASH_LINENO[0]}"
 
-    # Skip if below configured log level
     if (( $(_log_level_value "$level") < $(_log_level_value "$LOG_LEVEL") )); then
         return
     fi
 
     local entry="[${timestamp}] [${level}] [${caller}:${line}] ${message}"
-
-    # Write to log file
     echo "$entry" >> "$LOG_FILE"
 
-    # Also print to stdout/stderr for the framework's log pipe
     if [[ "$level" == "ERROR" || "$level" == "WARN" ]]; then
         echo "$entry" >&2
     else
@@ -47,7 +43,6 @@ log_msg() {
 }
 
 log_cmd() {
-    # Runs a command, logs its stdout and stderr, and returns its exit code
     local description="$1"
     shift
     local cmd_string="$*"
@@ -125,61 +120,118 @@ log_cmd "Start cron" systemctl start cron
 ubuntu_version=$(lsb_release -rs)
 log_msg "INFO" "Detected Ubuntu version: ${ubuntu_version}"
 
-if [[ "$ubuntu_version" == "24.04" ]]; then
-    log_msg "INFO" "Adding shutdown cron job for Ubuntu 24.04"
-    CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
-    (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-    log_msg "INFO" "Shutdown cron job added. System will shut down on next reboot."
+# ── Create post-reboot service ───────────────────────────────────────
+log_section "Creating Post-Reboot Service"
+
+POST_REBOOT_SCRIPT="/opt/cloudron-post-reboot.sh"
+cat > "$POST_REBOOT_SCRIPT" <<'POSTEOF'
+#!/bin/bash
+
+LOG_FILE="/var/log/cloudron-installation.log"
+
+log_post() {
+    local timestamp
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    echo "[${timestamp}] [INFO] [post-reboot] $1" >> "$LOG_FILE"
+}
+
+DOMAIN_FILE="/opt/cloudron-domain.conf"
+if [[ -f "$DOMAIN_FILE" ]]; then
+    CWM_DOMAIN="$(cat "$DOMAIN_FILE")"
 else
-    log_msg "INFO" "Not Ubuntu 24.04 — skipping shutdown cron job."
+    log_post "ERROR: Domain file not found at ${DOMAIN_FILE}. Exiting."
+    exit 1
 fi
 
-# ── CloudRon Setup ───────────────────────────────────────────────────
-log_section "Running CloudRon Setup"
-log_msg "INFO" "Launching cloudron-setup (auto-accepting with Y)..."
-echo Y | bash cloudron-setup >> "$LOG_FILE" 2>&1
-setup_exit=$?
+log_post "Post-reboot script started. Domain: ${CWM_DOMAIN}"
 
-if (( setup_exit != 0 )); then
-    log_msg "ERROR" "cloudron-setup exited with code ${setup_exit}"
-else
-    log_msg "INFO" "cloudron-setup completed successfully."
-fi
-
-# ── Wait for Dashboard ───────────────────────────────────────────────
-log_section "Waiting for Dashboard Directories"
-
+# Wait for the dashboard directories
 html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
 setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
 js_target_dir="/home/yellowtent/box/dashboard/dist/js"
 js_target="${js_target_dir}/setupdns.js"
 
 wait_count=0
+max_wait=150  # 5 minutes max
+
 while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
     (( wait_count++ ))
+    if (( wait_count >= max_wait )); then
+        log_post "ERROR: Timed out waiting for dashboard directories after $((wait_count * 2))s."
+        break
+    fi
     if (( wait_count % 15 == 0 )); then
-        log_msg "WARN" "Still waiting for dashboard directories... (${wait_count} checks / $((wait_count * 2))s elapsed)"
+        log_post "Still waiting for dashboard directories... (${wait_count} checks / $((wait_count * 2))s elapsed)"
     fi
     sleep 2
 done
 
-log_msg "INFO" "Dashboard directories found after ${wait_count} checks ($((wait_count * 2))s)."
+if [[ -d "/home/yellowtent/box/dashboard/dist" && -d "$js_target_dir" ]]; then
+    log_post "Dashboard directories found after ${wait_count} checks ($((wait_count * 2))s)."
 
-# ── DNS Placeholder Replacement ──────────────────────────────────────
-log_section "Replacing DNS Placeholders"
-log_msg "INFO" "Replacing example.com with ${CWM_DOMAIN}"
+    # Replace DNS placeholders
+    log_post "Replacing example.com with ${CWM_DOMAIN}"
+    for target_file in "$setup_target" "$html_target" "$js_target"; do
+        if [[ -f "$target_file" ]]; then
+            sed -i "s/example.com/${CWM_DOMAIN}/g" "$target_file"
+            log_post "Updated: ${target_file}"
+        else
+            log_post "WARN: File not found, skipping: ${target_file}"
+        fi
+    done
+    log_post "DNS placeholder replacement complete."
+else
+    log_post "WARN: Dashboard directories not found. Skipping DNS replacement."
+fi
 
-for target_file in "$setup_target" "$html_target" "$js_target"; do
-    if [[ -f "$target_file" ]]; then
-        log_cmd "sed replace in ${target_file}" sed -i "s/example.com/${CWM_DOMAIN}/g" "$target_file"
-    else
-        log_msg "WARN" "File not found, skipping: ${target_file}"
-    fi
-done
+# Cleanup: remove this service so it doesn't run again
+log_post "Removing post-reboot service..."
+systemctl disable cloudron-post-reboot.service 2>/dev/null
+rm -f /etc/systemd/system/cloudron-post-reboot.service
+rm -f "$DOMAIN_FILE"
+rm -f "$POST_REBOOT_SCRIPT"
+systemctl daemon-reload
 
-log_msg "INFO" "DNS placeholder replacement complete."
+log_post "Post-reboot tasks complete."
+POSTEOF
 
-# ── Touchups ─────────────────────────────────────────────────────────
+chmod +x "$POST_REBOOT_SCRIPT"
+
+# Save the domain for the post-reboot script
+echo "${CWM_DOMAIN}" > /opt/cloudron-domain.conf
+
+# Create the systemd one-shot service
+cat > /etc/systemd/system/cloudron-post-reboot.service <<EOF
+[Unit]
+Description=CloudRon Post-Reboot DNS Setup
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=${POST_REBOOT_SCRIPT}
+RemainAfterExit=false
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable cloudron-post-reboot.service
+
+log_msg "INFO" "Post-reboot service created and enabled."
+
+# ── Ubuntu 24 shutdown cron ──────────────────────────────────────────
+if [[ "$ubuntu_version" == "24.04" ]]; then
+    log_msg "INFO" "Adding shutdown cron job for Ubuntu 24.04"
+    CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
+    (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
+    log_msg "INFO" "Shutdown cron job added."
+else
+    log_msg "INFO" "Not Ubuntu 24.04 — skipping shutdown cron job."
+fi
+
+# ── Touchups & Descriptions ─────────────────────────────────────────
 log_section "Touchups & Descriptions"
 log_cmd "MOTD description append" bash tweaks/motd-description-append
 log_cmd "CWM description autoconfig" bash tweaks/cwm-description-autoconfig
@@ -193,9 +245,19 @@ log_section "Cleanup"
 log_cmd "Autoremove packages" apt-get autoremove -y
 log_cmd "Autoclean packages" apt-get autoclean -y
 
-# ── Done ─────────────────────────────────────────────────────────────
-log_section "Installation Complete"
+# ── Mark success BEFORE cloudron-setup triggers reboot ───────────────
+log_section "Marking Script Success"
+log_msg "INFO" "Calling tagScript success before cloudron-setup (which may reboot)."
+tagScript success
+
+# ── Run CloudRon Setup (may reboot) ─────────────────────────────────
+log_section "Running CloudRon Setup"
+log_msg "INFO" "Launching cloudron-setup (auto-accepting with Y)..."
+echo Y | bash cloudron-setup >> "$LOG_FILE" 2>&1
+setup_exit=$?
+
+# If we get here, cloudron-setup did NOT reboot
+log_msg "INFO" "cloudron-setup exited with code ${setup_exit} (no reboot detected)."
 log_msg "INFO" "Full log available at: ${LOG_FILE}"
 
-tagScript success
 exit 0
