@@ -1,56 +1,11 @@
 #!/bin/bash
 
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-
-updateAndFinalize() {
-    local rootDir="$1"
-    local CWM_DOMAIN="$2"
-
-    # Target directories and files
-    local html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
-	local setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
-    local js_target_dir="/home/yellowtent/box/dashboard/dist/js"
-    local js_target="${js_target_dir}/setupdns.js"
-
-    # Check every if the directories and files exist
-    while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
-        sleep 2
-    done
-
-    # Perform operations once the directories exist
-    echo "Cloud-Ron Directories found. Performing operations..." | log
-
-    # Replace placeholders in HTML and JS files
-	sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
-    sed -i "s/example.com/${CWM_DOMAIN}/g" "$html_target"
-    sed -i "s/example.com/${CWM_DOMAIN}/g" "$js_target"
-
-    echo "Setup DNS files have been updated." | log
-	
-	# Touchups
-	bash tweaks/motd-description-append
-	bash tweaks/cwm-description-autoconfig
-	
-	echo "Adding descriptions" | log
-	descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
-	descriptionAppend "SSL will be configured after the first step."
-	
-	# Cleanup
-	echo "Cleaning up..." | log
-	apt-get autoremove -y
-	apt-get autoclean -y
-	
-	tagScript success
-	exit 0
-}
-
-#clear
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
@@ -69,9 +24,42 @@ else
     echo "This is not Ubuntu 24. Shutdown cron job will not be added." | log
 fi
 
-# Wait for App dir and replace files
-echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
-updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
-
 echo "Running CloudRon setup..." | log
 echo Y | bash cloudron-setup
+
+# Wait for the dashboard directories to be available
+echo "Waiting for Cloud-Ron app directories..." | log
+
+html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
+setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
+js_target_dir="/home/yellowtent/box/dashboard/dist/js"
+js_target="${js_target_dir}/setupdns.js"
+
+while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
+    sleep 2
+done
+
+echo "Cloud-Ron Directories found. Performing operations..." | log
+
+# Replace placeholders in HTML and JS files
+sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
+sed -i "s/example.com/${CWM_DOMAIN}/g" "$html_target"
+sed -i "s/example.com/${CWM_DOMAIN}/g" "$js_target"
+
+echo "Setup DNS files have been updated." | log
+
+# Touchups
+bash tweaks/motd-description-append
+bash tweaks/cwm-description-autoconfig
+
+echo "Adding descriptions" | log
+descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "SSL will be configured after the first step."
+
+# Cleanup
+echo "Cleaning up..." | log
+apt-get autoremove -y
+apt-get autoclean -y
+
+tagScript success
+exit 0
