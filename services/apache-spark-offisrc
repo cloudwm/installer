@@ -7,21 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-HTML_PATH="/var/www/html/index.html"
-
-CONFIG_FILE=/root/guest.conf
-MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
-if [ -z "$DOMAIN_NAME" ]; then
-    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
-    exit 1
-fi
-
-# Restarting nginx to show the UI installer
-systemctl start nginx 2>/dev/null
-
 install_dependencies() {
     echo "Installing dependencies..." | log
     apt update -y
@@ -89,10 +74,13 @@ EOF
 configure_nginx() {
     echo "Configuring Nginx reverse proxy for Spark UI..." | log
 
+    # Restarting nginx to show the UI installer
+    systemctl start nginx 2>/dev/null
+
     # Remove the install progress site so it doesn't conflict
     rm -f /etc/nginx/sites-enabled/installProgress.conf
 
-    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
     NGINX_CONF="/etc/nginx/sites-available/spark.conf"
 
     if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
@@ -100,13 +88,13 @@ configure_nginx() {
         cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
     return 301 https://\$host\$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
 
     ssl_certificate     ${LE_DIR}/fullchain.pem;
     ssl_certificate_key ${LE_DIR}/privkey.pem;
@@ -125,7 +113,7 @@ EOF
         cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
 
     location / {
         proxy_pass http://127.0.0.1:4040;
@@ -145,7 +133,7 @@ EOF
 set_motd() {
     echo "Configuring MOTD..." | log
 
-    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
     if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
         SCHEME="https"
     else
@@ -158,7 +146,7 @@ set_motd() {
  Apache Spark Service (Persistent Mode)
 =============================================
 
- Web UI:   ${SCHEME}://$DOMAIN_NAME/
+ Web UI:   ${SCHEME}://$CWM_DOMAIN/
  Service:  pyspark.service
  Logs:     /var/log/spark/
 
@@ -176,22 +164,15 @@ EOF
 }
 
 main() {
-    "$updateStatus" "$HTML_PATH" -ap "Installing dependencies..."
     install_dependencies
-    "$updateStatus" "$HTML_PATH" -ap "Creating environment..."
     create_venv
-    "$updateStatus" "$HTML_PATH" -ap "Configuring spark service..."
     setup_spark_wrapper
-    "$updateStatus" "$HTML_PATH" -ap "Concluding..."
     create_systemd_service
     configure_nginx
     set_motd
 
     echo "Spark installation and service setup complete." | log
-    echo "Access Spark Web UI at: ${SCHEME}://$DOMAIN_NAME/" | log
-
-    sleep 10
-	"$updateStatus" "$HTML_PATH" -tr " ${SCHEME}://${DOMAIN_NAME}"
+    echo "Access Spark Web UI at: ${SCHEME}://$CWM_DOMAIN/" | log
 }
 
 main "$@"
