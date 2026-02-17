@@ -178,6 +178,8 @@ EOF
 }
 
 switch_nginx_to_proxy() {
+    systemctl start nginx 2>/dev/null
+    
     echo "[INFO] Switching nginx to Airflow reverse proxy..." | log
 
     # Remove the install progress site so it doesn't conflict
