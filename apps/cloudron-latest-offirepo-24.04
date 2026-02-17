@@ -3,16 +3,9 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-LOG_PATH="/var/log/cloudron-setup.log"
-WEB_PATH="/var/www/html"
-HTML_PATH="/var/www/html/index.html"
 
 
 updateAndFinalize() {
@@ -50,16 +43,8 @@ updateAndFinalize() {
 	
 	# Cleanup
 	echo "Cleaning up..." | log
-	sleep 5
-	systemctl stop apache2
-	apt-get purge apache2 apache2-utils apache2-bin apache2.2-common
-	rm -rf /etc/apache2
 	apt-get autoremove -y
 	apt-get autoclean -y
-	
-	end_time=$(date +%s)
-	duration=$((end_time - start_time))
-	echo "Installation completed in $duration seconds." | log
 	
 	tagScript success
 	exit 0
@@ -76,8 +61,8 @@ if [ ! -f "$LOG_PATH" ]; then
 fi
 
 echo "Enabling and starting cron service..." | log
-sudo systemctl enable cron
-sudo systemctl start cron
+systemctl enable cron
+systemctl start cron
 
 ubuntu_version=$(lsb_release -rs)
 if [[ "$ubuntu_version" == "24.04" ]]; then
@@ -95,17 +80,14 @@ echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
 updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
 
 echo "Running CloudRon setup..." | log
-# Define lists to hold log messages
 declare -a pre_display_list=()
-
-start_time=$(date +%s)
 echo Y | bash cloudron-setup | while IFS= read -r line; do
     # Check if the line contains "=>"
     if [[ "$line" == *"=>"* ]]; then
         # Process each line that contains "=>"
         line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
         pre_display_list+=("$line")
-        "$updateStatus" "$HTML_PATH" -cp
+        #"$updateStatus" "$HTML_PATH" -cp
         
         for stage in "${pre_display_list[@]}"; do
             # Clean and append dots to the output
@@ -113,7 +95,7 @@ echo Y | bash cloudron-setup | while IFS= read -r line; do
             final_stage="${cleaned_stage}..."
             
             # Update the installation landing page
-            "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
+         #   "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
         done
     fi
 done
