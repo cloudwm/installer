@@ -6,28 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-LOG_PATH="/var/log/anythingllm-setup.log"
-HTML_PATH="/var/www/html/index.html"
-
-CONFIG_FILE=/root/guest.conf
-MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
-if [ -z "$DOMAIN_NAME" ]; then
-    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
-    exit 1
-fi
-
-echo "Machine IP: $MACHINE_IP" | log
-echo "Domain: $DOMAIN_NAME" | log
-
-# Restarting nginx to show the UI installer
-systemctl start nginx 2>/dev/null
-
-# ==============================
-# Install prerequisites
-# ==============================
 echo "Installing prerequisites..." | log
 "$updateStatus" "$HTML_PATH" -ap "Installing prerequisites..."
 apt update
@@ -43,9 +21,6 @@ apt install -y \
     certbot \
     python3-certbot-nginx
 
-# ==============================
-# Docker installation
-# ==============================
 install_docker() {
     if command -v docker >/dev/null 2>&1; then
         echo "Docker is already installed. Skipping Docker installation." | log
@@ -82,9 +57,6 @@ install_docker() {
     echo "Verify with:  sudo docker run hello-world" | log
 }
 
-# ==============================
-# AnythingLLM container
-# ==============================
 install_anythingLLM() {
     echo "Creating base directory for AnythingLLM data..." | log
     STORAGE_LOCATION="$HOME/anythingllm"
@@ -129,16 +101,16 @@ wait_for_container() {
     return 1
 }
 
-# ==============================
-# Nginx reverse proxy
-# ==============================
 switch_nginx_to_proxy() {
     echo "Switching nginx from progress page to AnythingLLM reverse proxy..." | log
+
+    # Restarting nginx to show the UI installer
+    systemctl start nginx 2>/dev/null
 
     # Remove the install progress site so it doesn't conflict
     rm -f /etc/nginx/sites-enabled/installProgress.conf
 
-    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
     NGINX_CONF="/etc/nginx/sites-available/anythingllm.conf"
 
     if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
@@ -146,13 +118,13 @@ switch_nginx_to_proxy() {
         cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
     return 301 https://\$host\$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
 
     ssl_certificate     ${LE_DIR}/fullchain.pem;
     ssl_certificate_key ${LE_DIR}/privkey.pem;
@@ -172,7 +144,7 @@ EOF
         cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
 
     location / {
         proxy_pass         http://127.0.0.1:3001;
