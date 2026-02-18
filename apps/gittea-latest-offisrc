@@ -209,56 +209,47 @@ EOF
 # Nginx reverse proxy
 # ==============================
 switch_nginx_to_proxy() {
-    echo "Configuring nginx reverse proxy for Gitea..." | log
+    local app_name="gittea"
+    local conf_name="${app_name}.conf"
+    local nginx_conf="/etc/nginx/sites-available/${conf_name}"
+    local sites_enabled="/etc/nginx/sites-enabled/${conf_name}"
+    local LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    local port="8080"
 
-    NGINX_CONF="/etc/nginx/sites-available/gitea.conf"
+    echo "[INFO] Configuring nginx reverse proxy for ${app_name}..." | log
+    # Remove conflicting default/install site
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
 
-    cat > "$NGINX_CONF" <<EOF
+        cat > "$nginx_conf" <<'EOF'
 server {
     listen 80;
     server_name ${DOMAIN_NAME};
+    return 301 https://$host$request_uri;
+}
 
-    client_max_body_size 512M;
+server {
+    listen 443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:${GITEA_PORT};
+        proxy_pass http://127.0.0.1:${port}/${app_name}/;
         proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host $host;
+        proxy_cache_bypass $http_upgrade;
     }
 }
 EOF
 
-    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/gitea.conf
-    rm -f /etc/nginx/sites-enabled/default 2>/dev/null
-    nginx -t || return 1
-    systemctl reload nginx
-
-    echo "nginx configured for Gitea." | log
-}
-
-# ==============================
-# SSL
-# ==============================
-obtain_ssl() {
-    systemctl reload nginx
-
-    echo "Requesting Let's Encrypt certificate..." | log
-    certbot --nginx \
-        -d "$DOMAIN_NAME" \
-        --non-interactive \
-        --agree-tos \
-        -m "admin@${DOMAIN_NAME}" \
-        --redirect
-
-    echo "Gitea available at https://${DOMAIN_NAME}" | log
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "Gitea is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+    # Enable Nginx site
+    sudo ln -sf ${nginx_conf} ${sites_enabled} 
+    sudo rm -f /etc/nginx/sites-enabled/default
+    systemctl restart nginx
+    waitOrStop 0 "Failed to restart Nginx"}
 }
 
 # ==============================
@@ -328,7 +319,6 @@ main() {
     install_gittea
     "$updateStatus" "$HTML_PATH" -ap "Finishing installation..."
     switch_nginx_to_proxy
-    obtain_ssl
     configure_motd
 }
 
