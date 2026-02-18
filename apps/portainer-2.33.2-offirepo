@@ -6,10 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_FILE="${LE_DIR}/fullchain.pem"
-PK_FILE="${LE_DIR}/privkey.pem"
-
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
