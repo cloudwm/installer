@@ -6,8 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
-
 prepare_env() {
     echo "Opening UFW port 8080..." | log
     ufw allow 8080/tcp
@@ -64,6 +62,11 @@ start_service() {
 }
 
 switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for Open WebUI..." | log
+
+    # nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+    systemctl start nginx 2>/dev/null
+
     rm -f /etc/nginx/sites-enabled/installProgress.conf
     rm -f /etc/nginx/sites-enabled/default
 
@@ -71,7 +74,7 @@ switch_nginx_to_proxy() {
     NGINX_CONF="/etc/nginx/sites-available/open-webui.conf"
 
     if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
-        # SSL: redirect 80 → 443, serve on 443
+        echo "SSL certificates found, configuring HTTPS..." | log
         cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
@@ -86,17 +89,31 @@ server {
     ssl_certificate     ${LE_DIR}/fullchain.pem;
     ssl_certificate_key ${LE_DIR}/privkey.pem;
 
-    location / { ... }
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
 }
 EOF
     else
-        # HTTP only fallback
+        echo "No SSL certificates found, configuring HTTP only..." | log
         cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
     server_name ${CWM_DOMAIN};
 
-    location / { ... }
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
 }
 EOF
     fi
@@ -104,6 +121,8 @@ EOF
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/open-webui.conf
     nginx -t || return 1
     systemctl reload nginx
+
+    echo "nginx configured for Open WebUI." | log
 }
 
 health_check_and_cleanup() {
@@ -112,18 +131,66 @@ health_check_and_cleanup() {
     START=$(date +%s)
     while true; do
         if curl -s http://localhost:8080/ >/dev/null 2>&1; then
-            echo "✅ Open WebUI is ready at https://${CWM_DOMAIN}" | log
+            echo "Open WebUI is ready at https://${CWM_DOMAIN}" | log
             sleep 10
             echo "Installation complete." | log
             break
         fi
 
         if (( $(date +%s) - START > MAX_WAIT )); then
-            echo "❌ Timed out after ${MAX_WAIT}s. Check: journalctl -u open-webui"
+            echo "Timed out after ${MAX_WAIT}s. Check: journalctl -u open-webui" | log
             exit 1
         fi
         sleep 2
     done
+}
+
+configure_motd() {
+    echo "Configuring system MOTD with Open WebUI info..." | log
+
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
+
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        SCHEME="https"
+    else
+        SCHEME="http"
+    fi
+
+    MACHINE_IP=$(hostname -I | awk '{print $1}')
+    OPENWEBUI_STATUS="$(systemctl is-active open-webui 2>/dev/null || echo unknown)"
+    NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🌐  Open WebUI – Installation Complete
+──────────────────────────────────────────────
+
+    Public URL: ${SCHEME}://${CWM_DOMAIN}
+    Local URL: http://127.0.0.1:8080
+    Machine IP: ${MACHINE_IP}
+    Domain: ${CWM_DOMAIN}
+
+    Open WebUI Service: ${OPENWEBUI_STATUS}
+    Nginx Status: ${NGINX_STATUS}
+
+    Venv: $HOME/open-webui-venv
+    Service File: /etc/systemd/system/open-webui.service
+
+──────────────────────────────────────────────
+💡  Management:
+    sudo systemctl status open-webui
+    sudo systemctl restart open-webui
+    sudo journalctl -u open-webui
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed." | log
 }
 
 main() {
@@ -134,6 +201,7 @@ main() {
     start_service
     switch_nginx_to_proxy
     health_check_and_cleanup
+    configure_motd
     tag Script.success
 }
 
