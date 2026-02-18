@@ -24,7 +24,6 @@ GITEA_CONFIG="/etc/gitea/app.ini"
 GITEA_DATA="/var/lib/gitea"
 GITEA_LOG="/var/log/gitea"
 GITEA_USER="git"
-ADMINPASSWORD='Pass12344321!!'
 
 # ==============================
 # Install Gitea via binary download
@@ -249,7 +248,7 @@ EOF
     sudo ln -sf ${nginx_conf} ${sites_enabled} 
     sudo rm -f /etc/nginx/sites-enabled/default
     systemctl restart nginx
-    waitOrStop 0 "Failed to restart Nginx"}
+    waitOrStop 0 "Failed to restart Nginx"
 }
 
 # ==============================
