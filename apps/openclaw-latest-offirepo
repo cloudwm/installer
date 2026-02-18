@@ -6,6 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 rootDir=$(rootDir)
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
 
 echo "Installing OpenClaw AI Personal Assistant with Nginx HTTPS reverse proxy" | log
 

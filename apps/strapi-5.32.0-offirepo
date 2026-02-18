@@ -6,6 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
+
 version="5.32.0"
 
 echo "Installing Strapi CMS v5 with TypeScript + SQLite + Nginx + SSL" | log

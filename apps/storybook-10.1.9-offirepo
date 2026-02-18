@@ -5,6 +5,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
+
 version="10.1.9"
 
 echo "Installing Storybook with React + Vite + Nginx + SSL" | log
