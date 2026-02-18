@@ -219,7 +219,7 @@ switch_nginx_to_proxy() {
     # Remove conflicting default/install site
     rm -f /etc/nginx/sites-enabled/installProgress.conf
 
-        cat > "$nginx_conf" <<'EOF'
+        cat > "$nginx_conf" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN_NAME};
