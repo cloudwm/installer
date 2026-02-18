@@ -21,6 +21,7 @@ declare -a REMOVE_PACKAGES=("docker.io" "docker-doc" "docker-compose" "docker-co
 declare -a INSTALL_PACKAGES=("ca-certificates" "curl" "ufw")
 
 # nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+# Restart it so the install progress page is visible during setup
 systemctl start nginx 2>/dev/null
 
 pre_install() {
@@ -46,7 +47,6 @@ pre_install() {
 	ufw status
 }
 
-
 install_docker() {
 	echo "Adding GPG Key..."
 	install -m 0755 -d /etc/apt/keyrings &> /dev/null
@@ -66,9 +66,8 @@ install_docker() {
 	docker -v
 }
 
-
 configure_harbor() {
-    echo "Configuring harbor YML file..."
+    echo "Configuring harbor YML file..." | log
     cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
 
     sed -i "s/^hostname:.*/hostname: ${CWM_DOMAIN}/" /opt/harbor/harbor.yml &> /dev/null
@@ -85,7 +84,6 @@ download_and_extract() {
     echo "Downloading $filename..."
     if curl -L -O "$url"; then
         echo "$filename downloaded successfully."
-		
     else
         echo "Failed to download $filename. Exiting."
         exit 1
@@ -94,7 +92,6 @@ download_and_extract() {
     echo "Extracting $filename..."
     if tar xzvf "$filename" &> /dev/null; then
         echo "$filename extracted successfully."
-		
     else
         echo "Failed to extract $filename. Exiting."
         exit 1
@@ -103,7 +100,6 @@ download_and_extract() {
     echo "Removing tar file..."
     if rm "$filename" &> /dev/null; then
         echo "Tar file removed successfully."
-		
     else
         echo "Failed to remove $filename."
     fi
@@ -112,10 +108,8 @@ download_and_extract() {
 install_harbor() {
 	if [ "$INSTALL_TYPE" = "offline" ]; then
 		download_and_extract "$OFFLINE_APP_URL"
-
 	elif [ "$INSTALL_TYPE" = "online" ]; then
 		download_and_extract "$ONLINE_APP_URL"
-		
 	else
 		echo "Invalid INSTALL_TYPE. Please specify 'offline' or 'online'. Exiting."
 		exit 1
@@ -123,7 +117,7 @@ install_harbor() {
 }
 
 prepare_harbor() {
-	echo "Running harbor prep phase..."
+	echo "Running harbor prep phase..." | log
 	bash /opt/harbor/prepare
 }
 
@@ -159,7 +153,6 @@ finalize_harbor_installation() {
 
                     sleep $interval
                     elapsed=$((elapsed + interval))
-					
                 else
                     echo "No exited containers found. Checking other container statuses..." | log
 
@@ -175,7 +168,6 @@ finalize_harbor_installation() {
 							sleep $interval
 							elapsed=$((elapsed + interval))
 						fi
-						
                     else
                         echo "Checking if there are ANY containers at all..." | log
                         total_containers=$(/usr/bin/docker ps -a -q)
@@ -193,11 +185,10 @@ finalize_harbor_installation() {
         fi
     done
 	
-	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24...\n" | log
+	echo "Adding Docker Compose cron job to root's crontab..." | log
     CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
     (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-    echo "Docker Compose cron job added successfully. It will run on next reboot.\n" | log
-	
+    echo "Docker Compose cron job added successfully. It will run on next reboot." | log
 }
 
 configure_motd() {
@@ -216,7 +207,7 @@ configure_motd() {
     Version: ${HarborVersion}
     Public URL: https://${CWM_DOMAIN}
     Machine IP: ${IP_ADDR}
-    DOMAIN: ${CWM_DOMAIN}
+    Domain: ${CWM_DOMAIN}
 
     Admin User: admin
     Admin Pass: ${ADMIN_PASSWORD}
@@ -252,9 +243,8 @@ EOM
 }
 
 main() {
-	lines=()
-	done_lines=()
-	
+	pre_install
+
 	echo "Installing Docker-CE & Docker-Compose..." | log
 	install_docker
 	
@@ -272,16 +262,19 @@ main() {
 	
 	echo "Preparing Harbor ${HarborVersion}..." | log
 	prepare_harbor
+
+	# Stop system nginx — Harbor runs its own on ports 80/443
+	echo "Stopping system nginx before Harbor starts..." | log
+	systemctl stop nginx
+	systemctl disable nginx
+	rm -f /etc/nginx/sites-enabled/installProgress.conf
 	
 	echo "Finalizing Harbor ${HarborVersion} installation..." | log
 	finalize_harbor_installation
+
+	configure_motd
 	
 	echo "Install script completed successfully!"
-	
-	descriptionAppend "Harbor Web UI: https://${CWM_CWM_DOMAIN}"
-	descriptionAppend "Harbor Username: admin"
-	descriptionAppend "Harbor Password: ${ADMINPASSWORD}"
-	
 	tag Script.success
 	exit 0
 }
