@@ -11,7 +11,7 @@ export DEBIAN_FRONTEND="noninteractive"
 # Install prerequisites
 echo "Installing prerequisites" | log
 sudo apt update
-sudo apt install -y curl ca-certificates dnsutils nginx certbot python3-certbot-nginx
+sudo apt install -y curl ca-certificates dnsutils
 waitOrStop 0 "Failed to install prerequisites"
 # Install Docker
 echo "Installing Docker" | log
@@ -47,17 +47,6 @@ for i in {1..60}; do
     fi
     sleep 5
 done
-
-systemctl stop nginx
-
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    exit 1
-fi
 
 cp /opt/installer/tweaks/extras/kong/kong /etc/nginx/sites-available/
 sed -i "s/DOMAIN/${CWM_DOMAIN}/g" /etc/nginx/sites-available/kong

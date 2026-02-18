@@ -14,8 +14,7 @@ echo "Installing code-server (VS Code in browser) with Docker Compose, Nginx + L
 export DEBIAN_FRONTEND="noninteractive"
 
 apt-get update
-installPackage curl git ca-certificates gnupg lsb-release apt-transport-https \
-               openssl jq ufw nginx certbot python3-certbot-nginx
+installPackage curl git ca-certificates gnupg lsb-release apt-transport-https jq ufw
 
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker" | log
@@ -65,17 +64,6 @@ echo "Starting code-server container" | log
 docker compose up -d
 waitOrStop 0 "Failed to start code-server container"
 
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    waitOrStop 1 "Certbot failed"
-fi
 systemctl start nginx
 
 echo "Configuring Nginx reverse proxy for HTTPS" | log

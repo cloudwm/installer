@@ -9,7 +9,7 @@ echo "Installing NocoBase Low-Code Platform with Docker + Nginx + SSL" | log
 
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx apt-transport-https ca-certificates curl gnupg lsb-release
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
 
 # Install Docker (if not already installed)
 if ! command -v docker &> /dev/null; then
@@ -87,21 +87,6 @@ services:
 volumes:
   postgres_data:
 EOF
-
-# Stop nginx for certbot
-systemctl stop nginx
-
-# Generate Let's Encrypt certs (YOUR EXACT BLOCK)
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    exit 1
-fi
 
 # Configure Nginx
 cat << EOF > /etc/nginx/sites-available/nocobase
