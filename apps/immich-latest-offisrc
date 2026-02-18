@@ -84,8 +84,8 @@ run_immich() {
 
   echo "Starting Immich containers..." | log
   docker compose up -d | log
-  waitOrstop 0 "Failed to run container"
   sleep 120
+
 }
 
 # ==============================
