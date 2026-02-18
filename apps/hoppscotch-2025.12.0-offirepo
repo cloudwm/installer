@@ -16,8 +16,7 @@ export DEBIAN_FRONTEND="noninteractive"
 echo "Installing prerequisites" | log
 sudo apt update
 apt update
-apt install -y nginx certbot python3-certbot-nginx \
-               apt-transport-https ca-certificates curl gnupg lsb-release
+apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
 
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..." | log
@@ -162,21 +161,6 @@ networks:
   hoppscotch-net:
     driver: bridge
 EOF
-
-# Get SSL certificate
-echo "Obtaining SSL certificate" | log
-sudo systemctl stop nginx 2>/dev/null || true
-
-if sudo certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    --email "admin@${CWM_DOMAIN}" \
-    --http-01-port 80; then
-    echo "✅ SSL certificate obtained" | log
-    USE_LETSENCRYPT=true
-else
-    echo "⚠️ Let's Encrypt failed" | log
-    exit 1
-fi
 
 # Copy SSL certificates
 sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem $appDir/config/https-cert.pem

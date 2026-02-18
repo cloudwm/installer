@@ -6,6 +6,7 @@ fi
 
 echo "Installing Pterodactyl Panel 1.0-develop with Wings using Docker on Ubuntu" | log
 
+
 export DEBIAN_FRONTEND="noninteractive"
 export PYTHONWARNINGS="ignore"
 
@@ -38,11 +39,6 @@ echo "Creating directories" | log
 sudo mkdir -p /var/www/pterodactyl /etc/pterodactyl /var/lib/pterodactyl/volumes /var/lib/pterodactyl/mysql
 sudo chmod -R 755 /var/www/pterodactyl /etc/pterodactyl /var/lib/pterodactyl
 
-# Install certbot BEFORE creating nginx config
-echo "Installing certbot" | log
-sudo apt install -y certbot
-waitOrStop 0 "Certbot installation failed"
-
 # Check if domain resolves to this server
 echo "Checking DNS resolution for ${CWM_DOMAIN}" | log
 SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com)
@@ -51,35 +47,12 @@ DOMAIN_IP=$(dig +short ${CWM_DOMAIN} | tail -n1)
 echo "Server IP: $SERVER_IP" | log
 echo "Domain resolves to: $DOMAIN_IP" | log
 
-# Generate Let's Encrypt certificate
-echo "🔒 Obtaining Let's Encrypt SSL certificate..." | log
-
-# Try to get certificate
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    --email "admin@${CWM_DOMAIN}" \
-    --http-01-port 80 \
-    --preferred-challenges http; then
-    echo "✅ SSL certificate obtained successfully" | log
-    USE_LETSENCRYPT=true
-fi
-
-# Verify certificate files exist
-if [ ! -f "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" ] || [ ! -f "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem" ]; then
-    echo "❌ SSL certificate files not found!" | log
-    waitOrStop 0 "SSL certificate generation failed"
-fi
-
-echo "✅ SSL certificate files verified" | log
-
 # Generate random APP_KEY
 APP_KEY=$(openssl rand -base64 32)
 
 # Create Docker Compose file
 echo "Creating Docker Compose configuration" | log
 cat << EOF > /var/www/pterodactyl/docker-compose.yml
-version: '3.8'
-
 services:
   mariadb:
     image: mariadb:10.11
@@ -457,10 +430,6 @@ if (\$node) {
     echo \"Created {\$count} allocations\";
 }
 "
-
-# Set up SSL auto-renewal
-echo "Setting up SSL auto-renewal" | log
-(crontab -l 2>/dev/null; echo "0 0,12 * * * certbot renew --quiet --deploy-hook 'docker restart pterodactyl_nginx pterodactyl_wings'") | crontab -
 
 echo "Adding descriptions" | log
 descriptionAppend "✅ Pterodactyl Panel Installation Complete!"

@@ -5,6 +5,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+
 version="10.1.9"
 
 echo "Installing Storybook with React + Vite + Nginx + SSL" | log
@@ -14,7 +15,7 @@ export DEBIAN_FRONTEND="noninteractive"
 # Install system dependencies
 echo "Installing system dependencies..." | log
 sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx curl git ca-certificates
+sudo apt install -y curl git ca-certificates
 sudo update-ca-certificates
 
 # Install Node.js 20
@@ -43,19 +44,6 @@ npm run build-storybook
 
 if [ ! -d "${appInstallDir}/storybook-static" ]; then
     echo "❌ Storybook build failed: storybook-static directory not found" | log
-    exit 1
-fi
-
-systemctl stop nginx
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
     exit 1
 fi
 

@@ -6,10 +6,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx apache2-utils jq nginx
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools apache2-utils jq
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
@@ -32,24 +33,6 @@ sudo rm -rf ${appInstallDir}/data ${appInstallDir}/config
 sudo mkdir -p ${appInstallDir}/{config,data}
 sudo chown -R ${metabaseUser}:${metabaseGroup} ${appInstallDir}/{config,data}
 sudo chmod -R 750 ${appInstallDir}/{config,data}
-
-echo "🔒 Clearing port conflicts and obtaining Let's Encrypt SSL certificate..." | log
-# Kill any processes using ports 80/443
-sudo fuser -k 80/tcp 443/tcp 2>/dev/null || true
-sleep 2
-
-# Stop any existing nginx
-sudo systemctl stop nginx 2>/dev/null || true
-
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    exit 1
-fi
 
 echo "Starting Nginx service" | log
 sudo systemctl start nginx
