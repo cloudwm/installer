@@ -6,6 +6,7 @@ fi
 
 echo "Installing Pterodactyl Panel 1.0-develop with Wings using Docker on Ubuntu" | log
 
+
 export DEBIAN_FRONTEND="noninteractive"
 export PYTHONWARNINGS="ignore"
 

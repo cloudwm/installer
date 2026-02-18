@@ -104,9 +104,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
       - /opt/portainer/certs:/certs
-    environment:
-      - PORTAINER_SSLCERT=/certs/portainer.crt
-      - PORTAINER_SSLKEY=/certs/portainer.key
+    command:
+      - --sslcert 
+      - /certs/portainer.crt
+      - --sslkey
+      - /certs/portainer.key
 EOFCOMPOSE
 
     # Add the hashed password to the command

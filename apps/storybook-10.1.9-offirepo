@@ -5,6 +5,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+
 version="10.1.9"
 
 echo "Installing Storybook with React + Vite + Nginx + SSL" | log
