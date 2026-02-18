@@ -12,7 +12,7 @@ export DEBIAN_FRONTEND="noninteractive"
 # Install base dependencies
 echo "Installing base system dependencies..." | log
 sudo apt update || true
-sudo apt install -y nginx certbot python3-certbot-nginx curl ca-certificates apt-transport-https gnupg openjdk-21-jre-headless
+sudo apt install -y curl ca-certificates apt-transport-https gnupg openjdk-21-jre-headless
 
 # Fix broken packages (helps with transient mirror issues)
 sudo apt install -f -y
@@ -31,18 +31,6 @@ sudo apt install -y neo4j
 # Set initial password
 echo "Setting initial Neo4j password..." | log
 sudo neo4j-admin dbms set-initial-password "${ADMINPASSWORD}"
-
-# Obtain Let's Encrypt certificate FIRST
-echo "🔒 Obtaining Let's Encrypt certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ SSL certificate obtained" | log
-else
-    echo "❌ Failed to obtain certificate" | log
-    exit 1
-fi
 
 # Configure secure Bolt TLS with proper certificate chain
 echo "Configuring secure Bolt (bolt+s)..." | log

@@ -90,23 +90,6 @@ echo "Setting permissions for Directus volumes" | log
 chown -R www-data:www-data $appPath/uploads $appPath/extensions
 chmod -R 755 $appPath/uploads $appPath/extensions
 
-systemctl stop nginx
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to copy certificates. Check permissions or Certbot output." | log
-        waitOrStop 0 "Certificate copy failed"
-    fi
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    exit 1
-fi
-
 echo "Configuring Nginx" | log
 cat << EOF > /etc/nginx/sites-available/directus
 server {
