@@ -83,9 +83,9 @@ run_immich() {
   [ -n "$DB_DIR" ] && mkdir -p "$DB_DIR"
 
   echo "Starting Immich containers..." | log
-  docker compose up -d || return 1
+  docker compose up -d | log
+  sleep 120
 
-  echo "Immich is running on http://127.0.0.1:2283" | log
 }
 
 # ==============================
