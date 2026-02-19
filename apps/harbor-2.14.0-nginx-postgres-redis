@@ -7,20 +7,22 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-
-DOMAIN="${CWM_DOMAIN}"
 IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
-EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
-CERT_DIR="/opt/certs"
 ADMIN_PASSWORD="${ADMINPASSWORD}"
 HarborVersion="2.14.0"
+
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
 OFFLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v${HarborVersion}/harbor-offline-installer-v${HarborVersion}.tgz"
 ONLINE_APP_URL="https://github.com/goharbor/harbor/releases/download/v${HarborVersion}/harbor-online-installer-v${HarborVersion}.tgz"
 INSTALL_TYPE="online"
 
 declare -a REMOVE_PACKAGES=("docker.io" "docker-doc" "docker-compose" "docker-compose-v2" "podman-docker" "containerd" "runc")
-declare -a INSTALL_PACKAGES=("ca-certificates" "certbot" "curl" "ufw")
+declare -a INSTALL_PACKAGES=("ca-certificates" "curl" "ufw")
+
+# nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+# Restart it so the install progress page is visible during setup
+systemctl start nginx 2>/dev/null
 
 pre_install() {
 	echo "Removing possible conflicting packages..." | log
@@ -45,7 +47,6 @@ pre_install() {
 	ufw status
 }
 
-
 install_docker() {
 	echo "Adding GPG Key..."
 	install -m 0755 -d /etc/apt/keyrings &> /dev/null
@@ -65,67 +66,13 @@ install_docker() {
 	docker -v
 }
 
-
-generate_certs() {
-    if [[ ! -d $CERT_DIR ]]; then
-        mkdir -p $CERT_DIR
-        echo "Created Cert directory: ${CERT_DIR}" | log
-    fi
-
-    if ! command -v certbot &> /dev/null; then
-        echo "Certbot not found. Installing Certbot..." | log
-        sudo apt-get update
-        sudo apt-get install -y certbot
-    fi
-
-    echo "Obtaining Let's Encrypt certificate for ${DOMAIN}..." | log
-    if systemctl is-active --quiet nginx; then
-        sudo systemctl stop nginx
-        NGINX_STOPPED=true
-    fi
-	
-    if systemctl is-active --quiet apache2; then
-        sudo systemctl stop apache2
-        APACHE_STOPPED=true
-    fi
-
-	echo "DEBUG: Email: ${EMAIL_ADDR}" | log
-    sudo certbot certonly --standalone -d "${DOMAIN}" \
-        --non-interactive --agree-tos --email "${EMAIL_ADDR}"
-
-    if [ "$NGINX_STOPPED" = true ]; then
-        sudo systemctl start nginx
-    fi
-	
-    if [ "$APACHE_STOPPED" = true ]; then
-        sudo systemctl start apache2
-    fi
-
-    echo "Copying certificates to ${CERT_DIR}..." | log
-    CERTBOT_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
-    sudo cp "${CERTBOT_LIVE_DIR}/fullchain.pem" "${CERT_DIR}"
-    sudo cp "${CERTBOT_LIVE_DIR}/privkey.pem" "${CERT_DIR}"
-    sudo chown $(whoami):$(whoami) "${CERT_DIR}"
-	
-	echo "Creating SAN file..." | log
-    cat > "$CERT_DIR/v3.ext" <<-EOF
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = ${DOMAIN}
-IP.1 = ${IP_ADDR}
-EOF
-    
-	echo "Certificate generation complete!" | log
-}
-
 configure_harbor() {
-    echo "Configuring harbor YML file..."
+    echo "Configuring harbor YML file..." | log
     cp /opt/harbor/harbor.yml.tmpl /opt/harbor/harbor.yml &> /dev/null
 
-    sed -i "s/^hostname:.*/hostname: ${DOMAIN}/" /opt/harbor/harbor.yml &> /dev/null
-    sed -i "s|^\([ \t]*\)certificate:.*|\1certificate: ${CERT_DIR}/fullchain.pem|" /opt/harbor/harbor.yml &> /dev/null
-    sed -i "s|^\([ \t]*\)private_key:.*|\1private_key: ${CERT_DIR}/privkey.pem|" /opt/harbor/harbor.yml &> /dev/null
+    sed -i "s/^hostname:.*/hostname: ${CWM_DOMAIN}/" /opt/harbor/harbor.yml &> /dev/null
+    sed -i "s|^\([ \t]*\)certificate:.*|\1certificate: ${LE_DIR}/fullchain.pem|" /opt/harbor/harbor.yml &> /dev/null
+    sed -i "s|^\([ \t]*\)private_key:.*|\1private_key: ${LE_DIR}/privkey.pem|" /opt/harbor/harbor.yml &> /dev/null
     sed -i "s/^harbor_admin_password:.*/harbor_admin_password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
     sed -i "s/^\([ \t]*\)password:.*/\1password: ${ADMIN_PASSWORD}/" /opt/harbor/harbor.yml &> /dev/null
 }
@@ -137,7 +84,6 @@ download_and_extract() {
     echo "Downloading $filename..."
     if curl -L -O "$url"; then
         echo "$filename downloaded successfully."
-		
     else
         echo "Failed to download $filename. Exiting."
         exit 1
@@ -146,7 +92,6 @@ download_and_extract() {
     echo "Extracting $filename..."
     if tar xzvf "$filename" &> /dev/null; then
         echo "$filename extracted successfully."
-		
     else
         echo "Failed to extract $filename. Exiting."
         exit 1
@@ -155,7 +100,6 @@ download_and_extract() {
     echo "Removing tar file..."
     if rm "$filename" &> /dev/null; then
         echo "Tar file removed successfully."
-		
     else
         echo "Failed to remove $filename."
     fi
@@ -164,10 +108,8 @@ download_and_extract() {
 install_harbor() {
 	if [ "$INSTALL_TYPE" = "offline" ]; then
 		download_and_extract "$OFFLINE_APP_URL"
-
 	elif [ "$INSTALL_TYPE" = "online" ]; then
 		download_and_extract "$ONLINE_APP_URL"
-		
 	else
 		echo "Invalid INSTALL_TYPE. Please specify 'offline' or 'online'. Exiting."
 		exit 1
@@ -175,7 +117,7 @@ install_harbor() {
 }
 
 prepare_harbor() {
-	echo "Running harbor prep phase..."
+	echo "Running harbor prep phase..." | log
 	bash /opt/harbor/prepare
 }
 
@@ -211,7 +153,6 @@ finalize_harbor_installation() {
 
                     sleep $interval
                     elapsed=$((elapsed + interval))
-					
                 else
                     echo "No exited containers found. Checking other container statuses..." | log
 
@@ -227,7 +168,6 @@ finalize_harbor_installation() {
 							sleep $interval
 							elapsed=$((elapsed + interval))
 						fi
-						
                     else
                         echo "Checking if there are ANY containers at all..." | log
                         total_containers=$(/usr/bin/docker ps -a -q)
@@ -245,107 +185,98 @@ finalize_harbor_installation() {
         fi
     done
 	
-	echo "Adding Docker Compose cron job to root's crontab for Ubuntu 24...\n" | log
+	echo "Adding Docker Compose cron job to root's crontab..." | log
     CRON_JOB="@reboot (cd /opt/harbor && /usr/bin/docker compose up -d)"
     (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-    echo "Docker Compose cron job added successfully. It will run on next reboot.\n" | log
-	
+    echo "Docker Compose cron job added successfully. It will run on next reboot." | log
+}
+
+configure_motd() {
+    echo "Configuring system MOTD with Harbor info..." | log
+
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
+
+    DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
+
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🚢  Harbor Registry – Installation Complete
+──────────────────────────────────────────────
+
+    Version: ${HarborVersion}
+    Public URL: https://${CWM_DOMAIN}
+    Machine IP: ${IP_ADDR}
+    Domain: ${CWM_DOMAIN}
+
+    Admin User: admin
+    Admin Pass: ${ADMIN_PASSWORD}
+
+    Docker Status: ${DOCKER_STATUS}
+
+    Install Type: ${INSTALL_TYPE}
+    Install Path: /opt/harbor
+    Compose File: /opt/harbor/docker-compose.yml
+    Config File: /opt/harbor/harbor.yml
+    Certificates: ${LE_DIR}
+
+──────────────────────────────────────────────
+💡  Harbor management:
+    cd /opt/harbor
+    docker compose ps
+    docker compose logs -f
+    docker compose down
+    docker compose up -d
+
+🔄  Update Harbor:
+    cd /opt/harbor
+    docker compose down
+    # download new version, re-run prepare & install
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed at /etc/motd with Harbor details." | log
 }
 
 main() {
-	lines=()
-	done_lines=()
-	
-	mark_previous_done() {
-	    for (( i=0; i<${#lines[@]}; i++ )); do
-	        if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then	# Check if the line is not already marked as [DONE]
-	            lines[$i]="${lines[$i]} [DONE]"
-	            done_lines+=("${lines[$i]}")  # Add to done_lines to prevent duplicate updates
-	        fi
-	    done
-	}
-
-	display_all_lines() {
-		"$update_status" "$HTML_PATH" -cp
-	    for line in "${lines[@]}"; do
-	        "$update_status" "$HTML_PATH" -ap "$line"
-	    done
-	}
-	
-	update_status="$rootDir/include/updateInstallStatus.sh"
-	HTML_PATH="/var/www/html/index.html"
-
-	lines+=("Getting Ready...")
-	"$update_status" "$HTML_PATH" -cp
-	display_all_lines
-	
 	pre_install
-	
-	mark_previous_done
-	lines+=("Installing Docker-CE & Docker-Compose...")
-	display_all_lines
 
 	echo "Installing Docker-CE & Docker-Compose..." | log
 	install_docker
 	
-	echo "Switching to /opt..."
+	echo "Switching to /opt..." | log
 	cd /opt
 	
-	echo "Restarting docker..."
+	echo "Restarting docker..." | log
 	systemctl restart docker
-	
-	mark_previous_done
-	lines+=("Downloading Harbor ${HarborVersion}...")
-	display_all_lines
 	
 	echo "Downloading Harbor ${HarborVersion}..." | log
 	install_harbor
 	
-	mark_previous_done
-	lines+=("Generating certificates...")
-	display_all_lines
-	
-	echo "Generating certificates..." | log
-	generate_certs
-	
-	mark_previous_done
-	lines+=("Configuring Harbor ${HarborVersion}...")
-	display_all_lines
-	
 	echo "Configuring Harbor ${HarborVersion}..." | log
 	configure_harbor
 	
-	mark_previous_done
-	lines+=("Preparing Harbor ${HarborVersion}...")
-	display_all_lines
-	
-	"$update_status" "$HTML_PATH" -ur "You will be re-directed when the installation is complete. if not, please refresh the page every few seconds."
-	"$update_status" "$HTML_PATH" -sr
-	
 	echo "Preparing Harbor ${HarborVersion}..." | log
 	prepare_harbor
-	
-	mark_previous_done
-	lines+=("Finalizing Harbor ${HarborVersion} installation...")
-	display_all_lines
-	
-	"$update_status" "$HTML_PATH" -ur "You will be re-directed when the installation is complete. if not, please refresh the page every few seconds."
-	"$update_status" "$HTML_PATH" -sr
+
+	# Stop system nginx — Harbor runs its own on ports 80/443
+	echo "Stopping system nginx before Harbor starts..." | log
+	systemctl stop nginx
+	systemctl disable nginx
+	rm -f /etc/nginx/sites-enabled/installProgress.conf
 	
 	echo "Finalizing Harbor ${HarborVersion} installation..." | log
 	finalize_harbor_installation
+
+	configure_motd
 	
 	echo "Install script completed successfully!"
-	
-	descriptionAppend "Harbor Web UI: https://${CWM_DOMAIN}"
-	descriptionAppend "Harbor Username: admin"
-	descriptionAppend "Harbor Password: ${ADMINPASSWORD}"
-	
 	tag Script.success
 	exit 0
 }
 
 main
-
-
-
