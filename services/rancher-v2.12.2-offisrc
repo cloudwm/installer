@@ -10,6 +10,10 @@ COMPOSE_FILE="/opt/rancher/docker-compose.yaml"
 PASSWORD="${ADMINPASSWORD}"
 RANCHER_IMAGE="${RANCHER_IMAGE:-rancher/rancher:v2.12.2}"
 
+# nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+# Restart it so the install progress page is visible during setup
+systemctl start nginx 2>/dev/null
+
 install_prereqs() {
     export DEBIAN_FRONTEND=noninteractive
     apt update
@@ -40,11 +44,10 @@ install_docker() {
 }
 
 configure_rancher() {
-  echo "[INFO] Configuring Rancher with SSL certificates from start..." | log
-  mkdir -p /opt/rancher
+    echo "[INFO] Configuring Rancher with SSL certificates from start..." | log
+    mkdir -p /opt/rancher
 
-  # KEY CHANGE: Mount certificates from the first boot to avoid TLS swap restart
-  cat > "$COMPOSE_FILE" <<EOF
+    cat > "$COMPOSE_FILE" <<EOF
 services:
   rancher:
     image: ${RANCHER_IMAGE}
@@ -75,6 +78,12 @@ EOF
 }
 
 launch_rancher() {
+    # Stop system nginx — Rancher serves its own HTTPS on port 443
+    echo "[INFO] Stopping system nginx before Rancher starts..." | log
+    systemctl stop nginx
+    systemctl disable nginx
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
     echo "[INFO] Launching Rancher with real SSL certificates..." | log
     docker compose -f "$COMPOSE_FILE" up -d
     
@@ -98,60 +107,69 @@ launch_rancher() {
 }
 
 wait_for_webhook() {
-  echo "[INFO] Waiting for rancher-webhook to be fully ready..." | log
-  
-  for i in {1..60}; do
-    if docker exec rancher-server kubectl -n cattle-system get deploy rancher-webhook >/dev/null 2>&1; then
-      echo "[INFO] Webhook deployment found, waiting for rollout..." | log
-      docker exec rancher-server kubectl -n cattle-system rollout status deploy/rancher-webhook --timeout=300s && break
-    fi
-    sleep 5
-  done
-  
-  echo "[INFO] Webhook is ready." | log
+    echo "[INFO] Waiting for rancher-webhook to be fully ready..." | log
+    
+    for i in {1..60}; do
+        if docker exec rancher-server kubectl -n cattle-system get deploy rancher-webhook >/dev/null 2>&1; then
+            echo "[INFO] Webhook deployment found, waiting for rollout..." | log
+            docker exec rancher-server kubectl -n cattle-system rollout status deploy/rancher-webhook --timeout=300s && break
+        fi
+        sleep 5
+    done
+    
+    echo "[INFO] Webhook is ready." | log
 }
 
 show_summary() {
     echo "==================================================================" | log
-    echo "✅ Rancher installation complete." | log
-    echo "🌐 URL: https://${CWM_DOMAIN}" | log
-    echo "👤 Username: admin" | log
-    echo "🔑 Password: ${PASSWORD}" | log
+    echo "Rancher installation complete." | log
+    echo "URL: https://${CWM_DOMAIN}" | log
+    echo "Username: admin" | log
+    echo "Password: ${PASSWORD}" | log
     echo "==================================================================" | log
 }
 
 setup_motd() {
     echo "[INFO] Setting custom Rancher MOTD..." | log
 
-    if [ -d /etc/update-motd.d ]; then
-        rm -f /etc/update-motd.d/*
-    fi
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
 
-    cat > /etc/motd <<EOF
-==================================================================
- 🐄  Rancher Management Node
-==================================================================
+    MACHINE_IP=$(hostname -I | awk '{print $1}')
+    DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
 
-Access Rancher Web UI:
-  → URL: https://${CWM_DOMAIN}
-  → Username: admin
-  → Password: ${PASSWORD}
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🐄  Rancher Management Node – Installation Complete
+──────────────────────────────────────────────
 
-To view logs:
-  sudo docker logs rancher-server -f
+    Version: ${RANCHER_IMAGE}
+    Public URL: https://${CWM_DOMAIN}
+    Machine IP: ${MACHINE_IP}
+    Domain: ${CWM_DOMAIN}
 
-To stop/start Rancher:
-  sudo docker compose -f ${COMPOSE_FILE} down
-  sudo docker compose -f ${COMPOSE_FILE} up -d
+    Username: admin
+    Password: ${PASSWORD}
 
-Certificate files:
-  /etc/letsencrypt/live/${CWM_DOMAIN}/
+    Docker Status: ${DOCKER_STATUS}
 
-Data volume:
-  /var/lib/docker/volumes/rancher-data/_data
+    Compose File: ${COMPOSE_FILE}
+    Certificates: /etc/letsencrypt/live/${CWM_DOMAIN}/
+    Data Volume: /var/lib/docker/volumes/rancher-data/_data
 
-==================================================================
-EOF
+──────────────────────────────────────────────
+💡  Rancher management:
+    docker logs rancher-server -f
+    docker compose -f ${COMPOSE_FILE} down
+    docker compose -f ${COMPOSE_FILE} up -d
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed." | log
 }
 
 main() {
