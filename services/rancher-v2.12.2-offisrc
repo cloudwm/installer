@@ -47,19 +47,23 @@ install_docker() {
 
 prepare_certs() {
     echo "[INFO] Copying certificate files for Docker mount..." | log
+
+    # Wipe the entire cert dir first. If a previous failed docker compose run
+    # created these paths as empty directories (Docker's behaviour when bind-mount
+    # source doesn't exist), cp -L would silently copy files INSIDE them instead
+    # of replacing them. Starting clean avoids this.
+    rm -rf "$CERT_DIR"
     mkdir -p "$CERT_DIR"
 
-    # Letsencrypt files under /live/ are symlinks to /archive/.
-    # Docker bind mounts don't follow symlinks — they create empty directories
-    # instead, which causes Rancher to FATAL on startup.
-    # cp -L dereferences the symlinks and copies the actual file contents.
-    #
-    # Self-signed fallback (from nginx-letsencrypt-cert) only creates
-    # fullchain.pem and privkey.pem — no chain.pem. For self-signed,
-    # fullchain.pem is the entire chain so we use it as cacerts.pem.
+    # cp -L dereferences symlinks — letsencrypt files under /live/ are symlinks
+    # to /archive/. Docker bind mounts don't follow symlinks and create empty
+    # directories instead, which causes Rancher to FATAL on startup.
     cp -L "${LE_DIR}/fullchain.pem" "${CERT_DIR}/cert.pem"
     cp -L "${LE_DIR}/privkey.pem" "${CERT_DIR}/key.pem"
 
+    # certbot creates chain.pem, but the self-signed fallback only creates
+    # fullchain.pem and privkey.pem. Use chain.pem if it exists, otherwise
+    # fall back to fullchain.pem.
     if [ -f "${LE_DIR}/chain.pem" ]; then
         cp -L "${LE_DIR}/chain.pem" "${CERT_DIR}/cacerts.pem"
     else
@@ -67,7 +71,18 @@ prepare_certs() {
     fi
 
     chmod 644 "${CERT_DIR}"/*.pem
-    echo "[INFO] Certificates copied to ${CERT_DIR}" | log
+
+    # Verify they're actually files, not directories
+    for f in cert.pem key.pem cacerts.pem; do
+        if [ ! -f "${CERT_DIR}/${f}" ]; then
+            echo "[ERROR] ${CERT_DIR}/${f} is not a file. Cert copy failed." | log
+            ls -la "${CERT_DIR}/"
+            exit 1
+        fi
+    done
+
+    echo "[INFO] Certificates copied to ${CERT_DIR}:" | log
+    ls -la "${CERT_DIR}/" | log
 }
 
 configure_rancher() {
@@ -208,6 +223,12 @@ main() {
 
     echo "[INFO] Rancher installation complete." | log
     echo "[INFO] Access Rancher at https://${CWM_DOMAIN}" | log
+
+    descriptionAppend "Rancher Web UI: https://${CWM_DOMAIN}"
+    descriptionAppend "Rancher Username: admin"
+    descriptionAppend "Rancher Password: ${PASSWORD}"
+
+    tag Script.success
 }
 
 main "$@"
