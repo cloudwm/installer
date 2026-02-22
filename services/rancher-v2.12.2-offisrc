@@ -224,11 +224,6 @@ main() {
     echo "[INFO] Rancher installation complete." | log
     echo "[INFO] Access Rancher at https://${CWM_DOMAIN}" | log
 
-    descriptionAppend "Rancher Web UI: https://${CWM_DOMAIN}"
-    descriptionAppend "Rancher Username: admin"
-    descriptionAppend "Rancher Password: ${PASSWORD}"
-
-    tag Script.success
 }
 
 main "$@"
