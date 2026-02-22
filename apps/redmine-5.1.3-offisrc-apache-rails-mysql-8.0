@@ -16,7 +16,8 @@ apt-get install -y libmariadb-dev-compat apt-transport-https
 # Variables
 REPO_URL="https://www.redmine.org/releases/redmine-5.1.3.tar.gz"
 REPO_DIR="/opt/redmine"
-WEBAPP_CONF="/etc/apache2/sites-available"
+PUMA_SOCKET="/run/redmine/puma.sock"
+PUMA_PID="/run/redmine/puma.pid"
 
 # Secure MySQL and set up Redmine database
 echo "Creating redmine database..." | log
@@ -52,6 +53,9 @@ else
   exit 1
 fi
 
+# Add puma to Gemfile.local — not in Redmine 5.1.3's default Gemfile
+echo "gem 'puma'" > ${REPO_DIR}/Gemfile.local
+
 # Configuring permissions
 echo "Configuring permissions..." | log
 chown -R www-data:www-data /opt/redmine/
@@ -86,44 +90,180 @@ apt-get install -y imagemagick libmagickwand-dev
 convert -version
 apt-get install -y ghostscript
 
-echo "Writing apache configuration file..."
-cat <<_EOF_ > $WEBAPP_CONF/redmine.conf
-<VirtualHost *:80>
-    ServerName _
-    DocumentRoot ${REPO_DIR}/public
-    <Directory ${REPO_DIR}/public>
-        Allow from all
-        Options -MultiViews
-        Require all granted
-    </Directory>
-</VirtualHost>
+# Configure Puma as systemd service
+echo "Configuring Puma systemd service..." | log
 
-<IfModule mod_ssl.c>
-<VirtualHost *:443>
-    ServerName _
-    DocumentRoot ${REPO_DIR}/public
+mkdir -p /run/redmine
+chown www-data:www-data /run/redmine
 
-    SSLEngine on
-    SSLCertificateFile /etc/ssl/certs/apache-selfsigned.crt
-    SSLCertificateKeyFile /etc/ssl/private/apache-selfsigned.key
-
-    <Directory ${REPO_DIR}/public>
-        Allow from all
-        Options -MultiViews
-        Require all granted
-    </Directory>
-</VirtualHost>
-</IfModule>
+cat > /etc/tmpfiles.d/redmine.conf <<_EOF_
+d /run/redmine 0755 www-data www-data -
 _EOF_
 
-# Enable Redmine site, disable default site
-echo "Enabling redmine site & disabling defaults..."
-a2ensite redmine
-a2dissite installProgress
-systemctl reload apache2
+BUNDLE_BIN=$(which bundle)
 
-echo "Adding descriptions" | log
-descriptionAppend "Redmine default admin user: Admin"
-descriptionAppend "Redmine default admin password: admin"
+cat > /etc/systemd/system/redmine.service <<_EOF_
+[Unit]
+Description=Redmine (Puma)
+After=network.target mysql.service
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=${REPO_DIR}
+Environment=RAILS_ENV=production
+ExecStart=${BUNDLE_BIN} exec puma -b unix://${PUMA_SOCKET} --pidfile ${PUMA_PID} -e production
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=redmine
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+systemctl daemon-reload
+systemctl enable redmine
+systemctl start redmine
+
+# Wait for Puma socket
+echo "Waiting for Puma to start..." | log
+for i in {1..30}; do
+    [ -S "${PUMA_SOCKET}" ] && break
+    sleep 1
+done
+
+if [ ! -S "${PUMA_SOCKET}" ]; then
+    echo "ERROR: Puma socket not created after 30s" | log
+    journalctl -u redmine --no-pager -n 20
+    exit 1
+fi
+echo "Puma is running." | log
+
+# Configure nginx (replaces Apache)
+echo "Writing nginx configuration file..." | log
+
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+    # HTTPS mode — quoted heredoc so $host etc. stay literal
+    cat > /etc/nginx/sites-available/redmine.conf <<'NGINXEOF'
+server {
+    listen 80;
+    server_name _;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name _;
+
+NGINXEOF
+    # Append SSL cert paths (these need variable expansion)
+    cat >> /etc/nginx/sites-available/redmine.conf <<NGINXEOF
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+NGINXEOF
+    # Append the rest (no expansion needed)
+    cat >> /etc/nginx/sites-available/redmine.conf <<'NGINXEOF'
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass http://unix:/run/redmine/puma.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+}
+NGINXEOF
+else
+    # HTTP-only mode
+    cat > /etc/nginx/sites-available/redmine.conf <<'NGINXEOF'
+server {
+    listen 80;
+    server_name _;
+
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass http://unix:/run/redmine/puma.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+}
+NGINXEOF
+fi
+
+ln -sf /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/redmine.conf
+
+nginx -t
+systemctl reload nginx
+
+# Setup MOTD
+echo "Setting custom Redmine MOTD..." | log
+
+chmod -x /etc/update-motd.d/* 2>/dev/null || true
+rm -f /etc/motd 2>/dev/null
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+
+if [ -f "${LE_DIR}/fullchain.pem" ]; then
+    PROTO="https"
+else
+    PROTO="http"
+fi
+
+cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+📋  Redmine 5.1.3 – Installation Complete
+──────────────────────────────────────────────
+
+    Public URL: ${PROTO}://${CWM_DOMAIN}
+    Machine IP: ${MACHINE_IP}
+    Domain:     ${CWM_DOMAIN}
+
+    Admin User:     admin
+    Admin Password: admin
+    (change on first login)
+
+    Database:          redmine
+    Database User:     redmine
+    Database Password: ${ADMINPASSWORD}
+
+──────────────────────────────────────────────
+💡  Service management:
+    systemctl status redmine
+    systemctl restart redmine
+    journalctl -u redmine -f
+
+    systemctl status nginx
+    systemctl reload nginx
+
+    Redmine directory: ${REPO_DIR}
+    Puma socket:       ${PUMA_SOCKET}
+    Nginx config:      /etc/nginx/sites-available/redmine.conf
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+chmod 644 /etc/motd
 
 echo "Redmine installation is complete."
+
+tag Script.success
