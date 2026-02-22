@@ -6,40 +6,20 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-LOG_PATH="/var/log/anythingllm-setup.log"
-HTML_PATH="/var/www/html/index.html"
-
-MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
-
 COMPOSE_FILE="/opt/rancher/docker-compose.yaml"
+CERT_DIR="/opt/rancher/certs"
 PASSWORD="${ADMINPASSWORD}"
 RANCHER_IMAGE="${RANCHER_IMAGE:-rancher/rancher:v2.12.2}"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
-detect_network() {
-    PRIMARY_IF=$(ip route show default | awk '/default/ {print $5; exit}')
-    PRIMARY_IP=$(ip -4 addr show dev "$PRIMARY_IF" | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
-
-    if [ -z "$PRIMARY_IF" ] || [ -z "$PRIMARY_IP" ]; then
-        echo "[ERROR] Could not detect primary interface/IP." | log
-        exit 1
-    fi
-
-    RANCHER_FQDN="${PRIMARY_IP//./-}.cloud-xip.com"
-
-    echo "[INFO] Primary Interface: $PRIMARY_IF" | log
-    echo "[INFO] Primary IP: $PRIMARY_IP" | log
-    echo "[INFO] Rancher FQDN: $RANCHER_FQDN" | log
-
-    export PRIMARY_IF PRIMARY_IP RANCHER_FQDN
-}
+# nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+# Restart it so the install progress page is visible during setup
+systemctl start nginx 2>/dev/null
 
 install_prereqs() {
     export DEBIAN_FRONTEND=noninteractive
     apt update
-    apt install -y ca-certificates curl gnupg lsb-release jq certbot nginx
+    apt install -y ca-certificates curl gnupg lsb-release jq
 }
 
 install_docker() {
@@ -65,41 +45,36 @@ install_docker() {
     systemctl start docker
 }
 
-issue_certificates() {
-    echo "[INFO] Obtaining Let's Encrypt certificate for ${RANCHER_FQDN}..." | log
+prepare_certs() {
+    echo "[INFO] Copying certificate files for Docker mount..." | log
+    mkdir -p "$CERT_DIR"
 
-    systemctl stop nginx 2>/dev/null || true
-    systemctl disable nginx 2>/dev/null || true
-    docker stop rancher-server 2>/dev/null || true
-    docker rm rancher-server 2>/dev/null || true
+    # Letsencrypt files under /live/ are symlinks to /archive/.
+    # Docker bind mounts don't follow symlinks — they create empty directories
+    # instead, which causes Rancher to FATAL on startup.
+    # cp -L dereferences the symlinks and copies the actual file contents.
+    #
+    # Self-signed fallback (from nginx-letsencrypt-cert) only creates
+    # fullchain.pem and privkey.pem — no chain.pem. For self-signed,
+    # fullchain.pem is the entire chain so we use it as cacerts.pem.
+    cp -L "${LE_DIR}/fullchain.pem" "${CERT_DIR}/cert.pem"
+    cp -L "${LE_DIR}/privkey.pem" "${CERT_DIR}/key.pem"
 
-    certbot certonly --standalone \
-      --agree-tos \
-      --non-interactive \
-      -m "admin@${RANCHER_FQDN}" \
-      -d "${RANCHER_FQDN}"
-
-    if [ ! -f "/etc/letsencrypt/live/${RANCHER_FQDN}/fullchain.pem" ]; then
-        echo "[ERROR] Certificate issuance failed."
-        exit 1
+    if [ -f "${LE_DIR}/chain.pem" ]; then
+        cp -L "${LE_DIR}/chain.pem" "${CERT_DIR}/cacerts.pem"
+    else
+        cp -L "${LE_DIR}/fullchain.pem" "${CERT_DIR}/cacerts.pem"
     fi
 
-    echo "[INFO] Certificate successfully issued at /etc/letsencrypt/live/${RANCHER_FQDN}/" | log
-
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "Rancher will be available on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
-
-    systemctl stop nginx
-    systemctl disable nginx
+    chmod 644 "${CERT_DIR}"/*.pem
+    echo "[INFO] Certificates copied to ${CERT_DIR}" | log
 }
 
 configure_rancher() {
-  echo "[INFO] Configuring Rancher with SSL certificates from start..." | log
-  mkdir -p /opt/rancher
+    echo "[INFO] Configuring Rancher compose file..." | log
+    mkdir -p /opt/rancher
 
-  # KEY CHANGE: Mount certificates from the first boot to avoid TLS swap restart
-  cat > "$COMPOSE_FILE" <<EOF
+    cat > "$COMPOSE_FILE" <<EOF
 services:
   rancher:
     image: ${RANCHER_IMAGE}
@@ -107,125 +82,132 @@ services:
     restart: unless-stopped
     privileged: true
     ports:
+      - "80:80"
       - "443:443"
     environment:
-      CATTLE_SERVER_URL: "https://${RANCHER_FQDN}"
+      CATTLE_SERVER_URL: "https://${CWM_DOMAIN}"
       CATTLE_BOOTSTRAP_PASSWORD: "${PASSWORD}"
     volumes:
-      - /etc/letsencrypt/live/${RANCHER_FQDN}/fullchain.pem:/etc/rancher/ssl/cert.pem:ro
-      - /etc/letsencrypt/live/${RANCHER_FQDN}/privkey.pem:/etc/rancher/ssl/key.pem:ro
-      - /etc/letsencrypt/live/${RANCHER_FQDN}/chain.pem:/etc/rancher/ssl/cacerts.pem:ro
+      - ${CERT_DIR}/cert.pem:/etc/rancher/ssl/cert.pem:ro
+      - ${CERT_DIR}/key.pem:/etc/rancher/ssl/key.pem:ro
+      - ${CERT_DIR}/cacerts.pem:/etc/rancher/ssl/cacerts.pem:ro
       - rancher-data:/var/lib/rancher
-    networks:
-      - rancher-net
-
-networks:
-  rancher-net:
-    driver: bridge
 
 volumes:
   rancher-data:
+    name: rancher-data
     driver: local
 EOF
 }
 
 launch_rancher() {
-    echo "[INFO] Launching Rancher with real SSL certificates..." | log
+    # Stop system nginx — Rancher serves its own HTTPS on ports 80/443
+    echo "[INFO] Stopping system nginx before Rancher starts..." | log
+    systemctl stop nginx
+    systemctl disable nginx
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    echo "[INFO] Launching Rancher..." | log
     docker compose -f "$COMPOSE_FILE" up -d
-    
-    echo "[INFO] Waiting for Rancher to initialize (this may take 2-5 minutes)..." | log
+
+    echo "[INFO] Waiting for Rancher to initialize (this may take 5-10 minutes)..." | log
     WAITED=0
-    MAX_WAIT=300
-    
+    MAX_WAIT=600
+
     while [ $WAITED -lt $MAX_WAIT ]; do
-        if curl -sk "https://${RANCHER_FQDN}/ping" >/dev/null 2>&1; then
+        if ! docker ps --format '{{.Names}}' | grep -q '^rancher-server$'; then
+            echo "[WARN] Rancher container stopped unexpectedly, restarting..." | log
+            docker compose -f "$COMPOSE_FILE" up -d
+            sleep 10
+        fi
+
+        if curl -sk "https://127.0.0.1/ping" >/dev/null 2>&1; then
             echo "[INFO] Rancher is online." | log
             return 0
         fi
-        sleep 5
-        WAITED=$((WAITED + 5))
-        echo -n "."
+        sleep 10
+        WAITED=$((WAITED + 10))
+        echo "[INFO] Still waiting... (${WAITED}s/${MAX_WAIT}s)" | log
     done
-    
+
     echo "[ERROR] Rancher did not initialize in time. Checking logs..." | log
     docker logs rancher-server --tail 50
     exit 1
 }
 
 wait_for_webhook() {
-  echo "[INFO] Waiting for rancher-webhook to be fully ready..." | log
-  
-  for i in {1..60}; do
-    if docker exec rancher-server kubectl -n cattle-system get deploy rancher-webhook >/dev/null 2>&1; then
-      echo "[INFO] Webhook deployment found, waiting for rollout..." | log
-      docker exec rancher-server kubectl -n cattle-system rollout status deploy/rancher-webhook --timeout=300s && break
-    fi
-    sleep 5
-  done
-  
-  echo "[INFO] Webhook is ready." | log
-}
+    echo "[INFO] Waiting for rancher-webhook to be fully ready..." | log
 
-show_summary() {
-    echo "==================================================================" | log
-    echo "✅ Rancher installation complete." | log
-    echo "🌐 URL: https://${RANCHER_FQDN}" | log
-    echo "👤 Username: admin" | log
-    echo "🔑 Password: ${PASSWORD}" | log
-    echo "==================================================================" | log
+    for i in {1..60}; do
+        if docker exec rancher-server kubectl -n cattle-system get deploy rancher-webhook >/dev/null 2>&1; then
+            echo "[INFO] Webhook deployment found, waiting for rollout..." | log
+            docker exec rancher-server kubectl -n cattle-system rollout status deploy/rancher-webhook --timeout=300s && break
+        fi
+        sleep 5
+    done
+
+    echo "[INFO] Webhook is ready." | log
 }
 
 setup_motd() {
     echo "[INFO] Setting custom Rancher MOTD..." | log
 
-    if [ -d /etc/update-motd.d ]; then
-        rm -f /etc/update-motd.d/*
-    fi
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
 
-    cat > /etc/motd <<EOF
-==================================================================
- 🐄  Rancher Management Node
-==================================================================
+    MACHINE_IP=$(hostname -I | awk '{print $1}')
+    DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
 
-Access Rancher Web UI:
-  → URL: https://${RANCHER_FQDN}
-  → Username: admin
-  → Password: ${PASSWORD}
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🐄  Rancher Management Node – Installation Complete
+──────────────────────────────────────────────
 
-To view logs:
-  sudo docker logs rancher-server -f
+    Version: ${RANCHER_IMAGE}
+    Public URL: https://${CWM_DOMAIN}
+    Machine IP: ${MACHINE_IP}
+    Domain: ${CWM_DOMAIN}
 
-To stop/start Rancher:
-  sudo docker compose -f ${COMPOSE_FILE} down
-  sudo docker compose -f ${COMPOSE_FILE} up -d
+    Username: admin
+    Password: ${PASSWORD}
 
-Certificate files:
-  /etc/letsencrypt/live/${RANCHER_FQDN}/
+    Docker Status: ${DOCKER_STATUS}
 
-Data volume:
-  /var/lib/docker/volumes/rancher-data/_data
+    Compose File: ${COMPOSE_FILE}
+    Certificates: ${CERT_DIR}
+    Data Volume: rancher-data
 
-==================================================================
-EOF
+──────────────────────────────────────────────
+💡  Rancher management:
+    docker logs rancher-server -f
+    docker compose -f ${COMPOSE_FILE} down
+    docker compose -f ${COMPOSE_FILE} up -d
+
+    Clean restart (wipes internal k3s state):
+    docker compose -f ${COMPOSE_FILE} down
+    docker volume rm rancher-data
+    docker compose -f ${COMPOSE_FILE} up -d
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed." | log
 }
 
 main() {
-    detect_network
-    "$updateStatus" "$HTML_PATH" -ap "Installing Prerequisites..."
     install_prereqs
-    "$updateStatus" "$HTML_PATH" -ap "Installing Docker..."
     install_docker
-    "$updateStatus" "$HTML_PATH" -ap "Obtaining SSL certificates..."
-    issue_certificates
-    "$updateStatus" "$HTML_PATH" -ap "Configuring Rancher..."
+    prepare_certs
     configure_rancher
-    "$updateStatus" "$HTML_PATH" -ap "Launching Rancher (please wait 2-5 minutes)..."
     launch_rancher
-    "$updateStatus" "$HTML_PATH" -ap "Waiting for system to stabilize..."
     wait_for_webhook
-    show_summary
     setup_motd
-    "$updateStatus" "$HTML_PATH" -ap "Installation complete!"
+
+    echo "[INFO] Rancher installation complete." | log
+    echo "[INFO] Access Rancher at https://${CWM_DOMAIN}" | log
 }
 
 main "$@"
