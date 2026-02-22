@@ -3,29 +3,39 @@
 # Add this at the beginning of all scripts.
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-	
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
 
-# Update system and install required packages
 apt-get update
 apt-get install -y \
+    build-essential \
+    ruby ruby-dev \
+    zlib1g-dev \
+    libssl-dev \
+    libreadline-dev \
+    libyaml-dev \
+    libffi-dev \
+    libgdbm-dev \
+    libncurses5-dev \
     libmariadb-dev-compat \
-    apt-transport-https \
+    libmysqlclient-dev \
+    default-mysql-client \
+    curl \
+    git \
     nginx \
     imagemagick \
     libmagickwand-dev \
-    ghostscript
+    ghostscript \
+    apt-transport-https
 
-# Variables
 REPO_URL="https://www.redmine.org/releases/redmine-6.0.6.tar.gz"
 REPO_DIR="/opt/redmine"
 PUMA_SOCKET="/run/redmine/puma.sock"
 PUMA_PID="/run/redmine/puma.pid"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
-# Secure MySQL and set up Redmine database
 echo "Creating redmine database..." | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
 create database redmine character set utf8mb4 collate utf8mb4_bin;
@@ -34,40 +44,28 @@ grant all privileges on redmine.* to redmine@localhost;
 set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
 EOF
-
 echo "Database setup completed successfully." | log
 
-# Install Redmine
 echo "Creating redmine dir ${REPO_DIR}..." | log
 mkdir -p ${REPO_DIR}
 
-echo "Downloading from ${REPO_URL} to ${REPO_DIR}..." | log
+echo "Downloading from ${REPO_URL}..." | log
 curl -s ${REPO_URL} | tar xz -C ${REPO_DIR} --strip-components=1
 echo "Download Complete." | log
 
-echo "Patching config/boot.rb to load stdlib Logger..." | log
 BOOT_FILE="${REPO_DIR}/config/boot.rb"
 
 if [ -f "$BOOT_FILE" ]; then
-  grep -q "^require 'logger'" "$BOOT_FILE" || \
-    sed -i "1i require 'logger'" "$BOOT_FILE"
-  echo "  → require 'logger' added to $BOOT_FILE" | log
+    grep -q "^require 'logger'" "$BOOT_FILE" || \
+        sed -i "1i require 'logger'" "$BOOT_FILE"
 else
-  echo "  → ERROR: $BOOT_FILE not found, cannot patch Logger load" | log
-  exit 1
+    echo "ERROR: boot.rb not found." | log
+    exit 1
 fi
 
-# Add Puma gem
 echo "gem 'puma'" > ${REPO_DIR}/Gemfile.local
-
-# Configuring permissions
-echo "Configuring permissions..." | log
 chown -R www-data:www-data ${REPO_DIR}
 
-cd ${REPO_DIR}
-
-# Configure database connection
-echo "Configure database connection..." | log
 cat <<_EOF_ > ${REPO_DIR}/config/database.yml
 production:
   adapter: mysql2
@@ -81,19 +79,15 @@ _EOF_
 chown www-data:www-data ${REPO_DIR}/config/database.yml
 chmod 640 ${REPO_DIR}/config/database.yml
 
-# Install gems
+cd ${REPO_DIR}
 gem install bundler --no-document
-bundle config set --local without 'development test' | log
+bundle config set --local without 'development test'
 bundle install
 
-echo "Hardening Rails headers..." | log
-
 cat >> ${REPO_DIR}/config/environments/production.rb <<'RUBYEOF'
-
 config.action_dispatch.default_headers.delete('X-Powered-By')
 config.action_dispatch.default_headers.delete('X-Runtime')
 config.consider_all_requests_local = false
-
 RUBYEOF
 
 cat > ${REPO_DIR}/config/initializers/remove_server_header.rb <<'RUBYEOF'
@@ -106,13 +100,9 @@ module Rack
 end
 RUBYEOF
 
-# Prepare database
 bundle exec rake generate_secret_token
 RAILS_ENV=production bundle exec rake db:migrate
 RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
-
-# Configure Puma systemd service
-echo "Configuring Puma systemd service..." | log
 
 mkdir -p /run/redmine
 chown www-data:www-data /run/redmine
@@ -149,39 +139,33 @@ systemctl daemon-reload
 systemctl enable redmine
 systemctl start redmine
 
-# Wait for Puma socket
-echo "Waiting for Puma to start..." | log
 for i in {1..30}; do
     [ -S "${PUMA_SOCKET}" ] && break
     sleep 1
 done
 
 if [ ! -S "${PUMA_SOCKET}" ]; then
-    echo "ERROR: Puma socket not created after 30s" | log
+    echo "ERROR: Puma socket not created." | log
     journalctl -u redmine --no-pager -n 20
     exit 1
 fi
 
-# Hardened nginx configuration
-echo "Writing hardened nginx configuration..." | log
-
 rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-available/default
 
 if ! grep -q "server_tokens off;" /etc/nginx/nginx.conf; then
     sed -i '/http {/a \    server_tokens off;' /etc/nginx/nginx.conf
 fi
 
-LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-
 cat > /etc/nginx/sites-available/redmine.conf <<NGINXEOF
 server {
-    listen 80;
+    listen 80 default_server;
     server_name _;
     return 301 https://\$host\$request_uri;
 }
 
 server {
-    listen 443 ssl http2;
+    listen 443 ssl http2 default_server;
     server_name _;
 
     ssl_certificate     ${LE_DIR}/fullchain.pem;
@@ -189,6 +173,7 @@ server {
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
+
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:10m;
     ssl_session_tickets off;
@@ -201,7 +186,10 @@ server {
                  ECDHE-RSA-AES128-GCM-SHA256';
 
     add_header Strict-Transport-Security "max-age=63072000" always;
+
     server_tokens off;
+
+    client_max_body_size 100m;
 
     location / {
         proxy_pass http://unix:${PUMA_SOCKET};
@@ -218,11 +206,11 @@ NGINXEOF
 
 ln -sf /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/redmine.conf
 
-nginx -t
-systemctl reload nginx
+nginx -t || exit 1
+systemctl restart nginx
 
-echo "Adding descriptions" | log
 descriptionAppend "Redmine default admin user: admin"
 descriptionAppend "Redmine default admin password: admin"
 
 echo "Redmine installation is complete."
+tag Script.success
