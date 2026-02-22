@@ -9,9 +9,33 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 
-# Update system and install required packages
+# Update system and install required packages (Ubuntu 24.04)
 apt-get update
-apt-get install -y libmariadb-dev-compat apt-transport-https
+
+apt-get install -y \
+    build-essential \
+    ruby ruby-dev \
+    zlib1g-dev \
+    libssl-dev \
+    libreadline-dev \
+    libyaml-dev \
+    libffi-dev \
+    libgdbm-dev \
+    libncurses5-dev \
+    libmysqlclient-dev \
+    default-mysql-client \
+    curl \
+    git \
+    nginx \
+    nodejs \
+    npm \
+    imagemagick \
+    libmagickwand-dev \
+    ghostscript \
+    apt-transport-https
+
+# Enable corepack (Yarn for Rails assets)
+corepack enable 2>/dev/null || true
 
 # Variables
 REPO_URL="https://www.redmine.org/releases/redmine-6.0.6.tar.gz"
@@ -29,7 +53,6 @@ set global log_bin_trust_function_creators = 1;
 FLUSH PRIVILEGES;
 EOF
 
-# Continue with Redmine setup or other steps
 echo "Database setup completed successfully." | log
 
 # Install Redmine
@@ -37,14 +60,13 @@ echo "Creating redmine dir ${REPO_DIR}..." | log
 mkdir -p ${REPO_DIR}
 
 echo "Downloading from ${REPO_URL} to ${REPO_DIR}..." | log
-curl -s ${REPO_URL} | sudo tar xz -C ${REPO_DIR} --strip-components=1
+curl -s ${REPO_URL} | tar xz -C ${REPO_DIR} --strip-components=1
 echo "Download Complete." | log
 
 echo "Patching config/boot.rb to load stdlib Logger..." | log
 BOOT_FILE="${REPO_DIR}/config/boot.rb"
 
 if [ -f "$BOOT_FILE" ]; then
-  # Prepend require 'logger' if it's not already there
   grep -q "^require 'logger'" "$BOOT_FILE" || \
     sed -i "1i require 'logger'" "$BOOT_FILE"
   echo "  → require 'logger' added to $BOOT_FILE" | log
@@ -53,14 +75,15 @@ else
   exit 1
 fi
 
-# Add puma to Gemfile.local — not in Redmine 5.1.3's default Gemfile
+# Add puma to Gemfile.local
 echo "gem 'puma'" > ${REPO_DIR}/Gemfile.local
 
 # Configuring permissions
 echo "Configuring permissions..." | log
-chown -R www-data:www-data /opt/redmine/
+chown -R www-data:www-data ${REPO_DIR}
 
 cd ${REPO_DIR}
+
 # Configure database connection
 echo "Configure database connection..." | log
 cat <<_EOF_ > ${REPO_DIR}/config/database.yml
@@ -73,8 +96,9 @@ production:
   encoding: utf8mb4
 _EOF_
 
-# Install gems
-gem install bundler
+# Install bundler safely for system Ruby
+gem install bundler --no-document
+
 bundle config set --local without 'development test' | log
 bundle install
 
@@ -82,13 +106,6 @@ bundle install
 bundle exec rake generate_secret_token
 RAILS_ENV=production bundle exec rake db:migrate
 RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
-
-# Install ImageMagic for Redmine
-echo "Installing ImageMagic & ghostscript..." | log
-apt-get update
-apt-get install -y imagemagick libmagickwand-dev
-convert -version
-apt-get install -y ghostscript
 
 # Configure Puma as systemd service
 echo "Configuring Puma systemd service..." | log
@@ -142,15 +159,16 @@ if [ ! -S "${PUMA_SOCKET}" ]; then
 fi
 echo "Puma is running." | log
 
-# Configure nginx (replaces Apache)
+# Configure nginx
 echo "Writing nginx configuration file..." | log
 
 rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-enabled/installProgress.conf
 
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
 if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
-    # HTTPS mode — quoted heredoc so $host etc. stay literal
+
     cat > /etc/nginx/sites-available/redmine.conf <<'NGINXEOF'
 server {
     listen 80;
@@ -161,14 +179,13 @@ server {
 server {
     listen 443 ssl;
     server_name _;
-
 NGINXEOF
-    # Append SSL cert paths (these need variable expansion)
+
     cat >> /etc/nginx/sites-available/redmine.conf <<NGINXEOF
     ssl_certificate     ${LE_DIR}/fullchain.pem;
     ssl_certificate_key ${LE_DIR}/privkey.pem;
 NGINXEOF
-    # Append the rest (no expansion needed)
+
     cat >> /etc/nginx/sites-available/redmine.conf <<'NGINXEOF'
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
@@ -186,8 +203,9 @@ NGINXEOF
     }
 }
 NGINXEOF
+
 else
-    # HTTP-only mode
+
     cat > /etc/nginx/sites-available/redmine.conf <<'NGINXEOF'
 server {
     listen 80;
@@ -206,6 +224,7 @@ server {
     }
 }
 NGINXEOF
+
 fi
 
 ln -sf /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/redmine.conf
@@ -229,7 +248,7 @@ fi
 
 cat > /etc/motd <<EOM
 ──────────────────────────────────────────────
-📋  Redmine 5.1.3 – Installation Complete
+📋  Redmine 6.0.6 – Installation Complete
 ──────────────────────────────────────────────
 
     Public URL: ${PROTO}://${CWM_DOMAIN}
