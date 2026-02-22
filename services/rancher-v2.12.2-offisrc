@@ -7,8 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 COMPOSE_FILE="/opt/rancher/docker-compose.yaml"
+CERT_DIR="/opt/rancher/certs"
 PASSWORD="${ADMINPASSWORD}"
 RANCHER_IMAGE="${RANCHER_IMAGE:-rancher/rancher:v2.12.2}"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
 # nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
 # Restart it so the install progress page is visible during setup
@@ -17,7 +19,7 @@ systemctl start nginx 2>/dev/null
 install_prereqs() {
     export DEBIAN_FRONTEND=noninteractive
     apt update
-    apt install -y ca-certificates curl gnupg lsb-release jq certbot nginx
+    apt install -y ca-certificates curl gnupg lsb-release jq
 }
 
 install_docker() {
@@ -43,8 +45,48 @@ install_docker() {
     systemctl start docker
 }
 
+prepare_certs() {
+    echo "[INFO] Copying certificate files for Docker mount..." | log
+
+    # Wipe the entire cert dir first. If a previous failed docker compose run
+    # created these paths as empty directories (Docker's behaviour when bind-mount
+    # source doesn't exist), cp -L would silently copy files INSIDE them instead
+    # of replacing them. Starting clean avoids this.
+    rm -rf "$CERT_DIR"
+    mkdir -p "$CERT_DIR"
+
+    # cp -L dereferences symlinks — letsencrypt files under /live/ are symlinks
+    # to /archive/. Docker bind mounts don't follow symlinks and create empty
+    # directories instead, which causes Rancher to FATAL on startup.
+    cp -L "${LE_DIR}/fullchain.pem" "${CERT_DIR}/cert.pem"
+    cp -L "${LE_DIR}/privkey.pem" "${CERT_DIR}/key.pem"
+
+    # certbot creates chain.pem, but the self-signed fallback only creates
+    # fullchain.pem and privkey.pem. Use chain.pem if it exists, otherwise
+    # fall back to fullchain.pem.
+    if [ -f "${LE_DIR}/chain.pem" ]; then
+        cp -L "${LE_DIR}/chain.pem" "${CERT_DIR}/cacerts.pem"
+    else
+        cp -L "${LE_DIR}/fullchain.pem" "${CERT_DIR}/cacerts.pem"
+    fi
+
+    chmod 644 "${CERT_DIR}"/*.pem
+
+    # Verify they're actually files, not directories
+    for f in cert.pem key.pem cacerts.pem; do
+        if [ ! -f "${CERT_DIR}/${f}" ]; then
+            echo "[ERROR] ${CERT_DIR}/${f} is not a file. Cert copy failed." | log
+            ls -la "${CERT_DIR}/"
+            exit 1
+        fi
+    done
+
+    echo "[INFO] Certificates copied to ${CERT_DIR}:" | log
+    ls -la "${CERT_DIR}/" | log
+}
+
 configure_rancher() {
-    echo "[INFO] Configuring Rancher with SSL certificates from start..." | log
+    echo "[INFO] Configuring Rancher compose file..." | log
     mkdir -p /opt/rancher
 
     cat > "$COMPOSE_FILE" <<EOF
@@ -55,52 +97,54 @@ services:
     restart: unless-stopped
     privileged: true
     ports:
+      - "80:80"
       - "443:443"
     environment:
       CATTLE_SERVER_URL: "https://${CWM_DOMAIN}"
       CATTLE_BOOTSTRAP_PASSWORD: "${PASSWORD}"
     volumes:
-      - /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem:/etc/rancher/ssl/cert.pem:ro
-      - /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem:/etc/rancher/ssl/key.pem:ro
-      - /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem:/etc/rancher/ssl/cacerts.pem:ro
+      - ${CERT_DIR}/cert.pem:/etc/rancher/ssl/cert.pem:ro
+      - ${CERT_DIR}/key.pem:/etc/rancher/ssl/key.pem:ro
+      - ${CERT_DIR}/cacerts.pem:/etc/rancher/ssl/cacerts.pem:ro
       - rancher-data:/var/lib/rancher
-    networks:
-      - rancher-net
-
-networks:
-  rancher-net:
-    driver: bridge
 
 volumes:
   rancher-data:
+    name: rancher-data
     driver: local
 EOF
 }
 
 launch_rancher() {
-    # Stop system nginx — Rancher serves its own HTTPS on port 443
+    # Stop system nginx — Rancher serves its own HTTPS on ports 80/443
     echo "[INFO] Stopping system nginx before Rancher starts..." | log
     systemctl stop nginx
     systemctl disable nginx
     rm -f /etc/nginx/sites-enabled/installProgress.conf
 
-    echo "[INFO] Launching Rancher with real SSL certificates..." | log
+    echo "[INFO] Launching Rancher..." | log
     docker compose -f "$COMPOSE_FILE" up -d
-    
-    echo "[INFO] Waiting for Rancher to initialize (this may take 2-5 minutes)..." | log
+
+    echo "[INFO] Waiting for Rancher to initialize (this may take 5-10 minutes)..." | log
     WAITED=0
-    MAX_WAIT=300
-    
+    MAX_WAIT=600
+
     while [ $WAITED -lt $MAX_WAIT ]; do
-        if curl -sk "https://${CWM_DOMAIN}/ping" >/dev/null 2>&1; then
+        if ! docker ps --format '{{.Names}}' | grep -q '^rancher-server$'; then
+            echo "[WARN] Rancher container stopped unexpectedly, restarting..." | log
+            docker compose -f "$COMPOSE_FILE" up -d
+            sleep 10
+        fi
+
+        if curl -sk "https://127.0.0.1/ping" >/dev/null 2>&1; then
             echo "[INFO] Rancher is online." | log
             return 0
         fi
-        sleep 5
-        WAITED=$((WAITED + 5))
-        echo -n "."
+        sleep 10
+        WAITED=$((WAITED + 10))
+        echo "[INFO] Still waiting... (${WAITED}s/${MAX_WAIT}s)" | log
     done
-    
+
     echo "[ERROR] Rancher did not initialize in time. Checking logs..." | log
     docker logs rancher-server --tail 50
     exit 1
@@ -108,7 +152,7 @@ launch_rancher() {
 
 wait_for_webhook() {
     echo "[INFO] Waiting for rancher-webhook to be fully ready..." | log
-    
+
     for i in {1..60}; do
         if docker exec rancher-server kubectl -n cattle-system get deploy rancher-webhook >/dev/null 2>&1; then
             echo "[INFO] Webhook deployment found, waiting for rollout..." | log
@@ -116,17 +160,8 @@ wait_for_webhook() {
         fi
         sleep 5
     done
-    
-    echo "[INFO] Webhook is ready." | log
-}
 
-show_summary() {
-    echo "==================================================================" | log
-    echo "Rancher installation complete." | log
-    echo "URL: https://${CWM_DOMAIN}" | log
-    echo "Username: admin" | log
-    echo "Password: ${PASSWORD}" | log
-    echo "==================================================================" | log
+    echo "[INFO] Webhook is ready." | log
 }
 
 setup_motd() {
@@ -154,13 +189,18 @@ setup_motd() {
     Docker Status: ${DOCKER_STATUS}
 
     Compose File: ${COMPOSE_FILE}
-    Certificates: /etc/letsencrypt/live/${CWM_DOMAIN}/
-    Data Volume: /var/lib/docker/volumes/rancher-data/_data
+    Certificates: ${CERT_DIR}
+    Data Volume: rancher-data
 
 ──────────────────────────────────────────────
 💡  Rancher management:
     docker logs rancher-server -f
     docker compose -f ${COMPOSE_FILE} down
+    docker compose -f ${COMPOSE_FILE} up -d
+
+    Clean restart (wipes internal k3s state):
+    docker compose -f ${COMPOSE_FILE} down
+    docker volume rm rancher-data
     docker compose -f ${COMPOSE_FILE} up -d
 
 🧹  Remove this message:
@@ -175,11 +215,20 @@ EOM
 main() {
     install_prereqs
     install_docker
+    prepare_certs
     configure_rancher
     launch_rancher
     wait_for_webhook
-    show_summary
     setup_motd
+
+    echo "[INFO] Rancher installation complete." | log
+    echo "[INFO] Access Rancher at https://${CWM_DOMAIN}" | log
+
+    descriptionAppend "Rancher Web UI: https://${CWM_DOMAIN}"
+    descriptionAppend "Rancher Username: admin"
+    descriptionAppend "Rancher Password: ${PASSWORD}"
+
+    tag Script.success
 }
 
 main "$@"
