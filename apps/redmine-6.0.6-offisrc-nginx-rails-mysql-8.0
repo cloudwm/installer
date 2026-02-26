@@ -19,7 +19,6 @@ apt-get install -y \
     libffi-dev \
     libgdbm-dev \
     libncurses5-dev \
-    libmariadb-dev-compat \
     libmysqlclient-dev \
     default-mysql-client \
     curl \
@@ -50,7 +49,7 @@ echo "Creating redmine dir ${REPO_DIR}..." | log
 mkdir -p ${REPO_DIR}
 
 echo "Downloading from ${REPO_URL}..." | log
-curl -s ${REPO_URL} | tar xz -C ${REPO_DIR} --strip-components=1
+curl -sL ${REPO_URL} | tar xz -C ${REPO_DIR} --strip-components=1
 echo "Download Complete." | log
 
 BOOT_FILE="${REPO_DIR}/config/boot.rb"
@@ -64,7 +63,6 @@ else
 fi
 
 echo "gem 'puma'" > ${REPO_DIR}/Gemfile.local
-chown -R www-data:www-data ${REPO_DIR}
 
 cat <<_EOF_ > ${REPO_DIR}/config/database.yml
 production:
@@ -76,33 +74,18 @@ production:
   encoding: utf8mb4
 _EOF_
 
-chown www-data:www-data ${REPO_DIR}/config/database.yml
-chmod 640 ${REPO_DIR}/config/database.yml
-
 cd ${REPO_DIR}
 gem install bundler --no-document
 bundle config set --local without 'development test'
-bundle install
+bundle install || { echo "ERROR: bundle install failed" | log; exit 1; }
 
-cat >> ${REPO_DIR}/config/environments/production.rb <<'RUBYEOF'
-config.action_dispatch.default_headers.delete('X-Powered-By')
-config.action_dispatch.default_headers.delete('X-Runtime')
-config.consider_all_requests_local = false
-RUBYEOF
-
-cat > ${REPO_DIR}/config/initializers/remove_server_header.rb <<'RUBYEOF'
-module Rack
-  class Server
-    def server_header
-      ''
-    end
-  end
-end
-RUBYEOF
+chown -R www-data:www-data ${REPO_DIR}
 
 bundle exec rake generate_secret_token
-RAILS_ENV=production bundle exec rake db:migrate
+RAILS_ENV=production bundle exec rake db:migrate || { echo "ERROR: db:migrate failed" | log; exit 1; }
 RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
+
+chown -R www-data:www-data ${REPO_DIR}
 
 mkdir -p /run/redmine
 chown www-data:www-data /run/redmine
@@ -152,6 +135,7 @@ fi
 
 rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-available/default
+rm -f /etc/nginx/sites-enabled/installProgress.conf
 
 if ! grep -q "server_tokens off;" /etc/nginx/nginx.conf; then
     sed -i '/http {/a \    server_tokens off;' /etc/nginx/nginx.conf
@@ -178,12 +162,7 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_tickets off;
 
-    ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:
-                 TLS_CHACHA20_POLY1305_SHA256:
-                 ECDHE-ECDSA-AES256-GCM-SHA384:
-                 ECDHE-RSA-AES256-GCM-SHA384:
-                 ECDHE-ECDSA-AES128-GCM-SHA256:
-                 ECDHE-RSA-AES128-GCM-SHA256';
+    ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256';
 
     add_header Strict-Transport-Security "max-age=63072000" always;
 
