@@ -111,6 +111,7 @@ EOF
 
     systemctl daemon-reload
     systemctl enable superset.service
+    systemctl start superset.service
 
     echo "Superset will start automatically after boot." | log
 }
