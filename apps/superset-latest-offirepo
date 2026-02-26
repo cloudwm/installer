@@ -6,14 +6,14 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-HTML_PATH="/var/www/html/index.html"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
-MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
-echo "Machine IP: $MACHINE_IP" | log
-echo "Domain: $DOMAIN_NAME" | log
+# Read admin password from guest.conf (set by cloud-init)
+GUEST_CONF="/root/guest.conf"
+if [ -f "${GUEST_CONF}" ]; then
+    ADMINPASSWORD=$(grep -oP '(?<=^password=).+' "${GUEST_CONF}")
+fi
+ADMINPASSWORD="${ADMINPASSWORD:-admin}"
 
 # ==============================
 # Docker installation
@@ -21,7 +21,6 @@ echo "Domain: $DOMAIN_NAME" | log
 install_docker() {
     if command -v docker >/dev/null 2>&1; then
         echo "Docker is already installed. Skipping Docker installation." | log
-        "$updateStatus" "$HTML_PATH" -ap "Docker is already installed. Skipping Docker installation."
         return
     fi
 
@@ -37,7 +36,6 @@ install_docker() {
       > /etc/apt/sources.list.d/docker.list
 
     echo "Installing Docker engine & plugins..." | log
-    "$updateStatus" "$HTML_PATH" -ap "Installing Docker engine & plugins..."
     apt update
     apt install -y \
         docker-ce \
@@ -49,7 +47,6 @@ install_docker() {
     systemctl enable --now docker
 
     echo "Docker installation completed successfully." | log
-    "$updateStatus" "$HTML_PATH" -ap "Docker installation completed successfully."
 }
 
 # ==============================
@@ -119,66 +116,72 @@ EOF
 }
 
 # ==============================
-# Nginx reverse proxy
+# Nginx reverse proxy with SSL
 # ==============================
-switch_nginx_to_proxy() {
-    echo "Configuring nginx reverse proxy for Superset..." | log
+configure_nginx() {
+    echo "Configuring nginx reverse proxy for Superset with SSL..." | log
+
+    rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
 
     NGINX_CONF="/etc/nginx/sites-available/superset.conf"
 
-    cat > "$NGINX_CONF" <<EOF
+    # HTTP redirect — quoted heredoc keeps $host literal
+    cat > "$NGINX_CONF" <<'NGINXEOF'
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name _;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name _;
+
+NGINXEOF
+
+    # SSL cert paths — unquoted heredoc for variable expansion
+    cat >> "$NGINX_CONF" <<NGINXEOF
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+NGINXEOF
+
+    # Rest of config — quoted heredoc keeps $host etc. literal
+    cat >> "$NGINX_CONF" <<'NGINXEOF'
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    server_tokens off;
 
     location / {
         proxy_pass http://127.0.0.1:8088;
         proxy_http_version 1.1;
 
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
 
-        # WebSocket support
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        # Prevent timeouts / hanging
         proxy_connect_timeout 60s;
         proxy_send_timeout    120s;
         proxy_read_timeout    120s;
         proxy_buffering       off;
     }
 }
-EOF
+NGINXEOF
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/superset.conf
-    rm -f /etc/nginx/sites-enabled/default
-    nginx -t || return 1
-    systemctl reload nginx
+    nginx -t || exit 1
+    systemctl restart nginx
 
-    echo "nginx configured for Superset." | log
-}
-
-# ==============================
-# SSL
-# ==============================
-obtain_ssl() {
-    systemctl reload nginx
-
-    echo "Requesting Let's Encrypt certificate..." | log
-    certbot --nginx \
-        -d "$DOMAIN_NAME" \
-        --non-interactive \
-        --agree-tos \
-        -m "admin@${DOMAIN_NAME}" \
-        --redirect
-
-    echo "Superset available at https://${DOMAIN_NAME}" | log
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "Superset is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+    echo "nginx configured for Superset with SSL." | log
 }
 
 # ==============================
@@ -191,46 +194,51 @@ configure_motd() {
     rm -f /etc/motd 2>/dev/null
 
     MACHINE_IP="$(hostname -I | awk '{print $1}')"
-    DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
-    SUPERSET_LOCAL_URL="http://127.0.0.1:8088"
-    SUPERSET_PUBLIC_URL="https://${DOMAIN_NAME}"
     SUPERSET_DIR="/opt/superset"
     DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
-    NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+    if [ -f "${LE_DIR}/fullchain.pem" ]; then
+        PROTO="https"
+    else
+        PROTO="http"
+    fi
 
     cat > /etc/motd <<EOM
 ──────────────────────────────────────────────
-📊 Apache Superset – Installation Complete
+📊  Apache Superset – Installation Complete
 ──────────────────────────────────────────────
 
-           Local URL: ${SUPERSET_LOCAL_URL}
-          Public URL: ${SUPERSET_PUBLIC_URL}
-          Machine IP: ${MACHINE_IP}
-              Domain: ${DOMAIN_NAME}
+    Public URL: ${PROTO}://${CWM_DOMAIN}
+    Machine IP: ${MACHINE_IP}
+    Domain:     ${CWM_DOMAIN}
 
-       Docker Status: ${DOCKER_STATUS}
-        Nginx Status: ${NGINX_STATUS}
+    Admin User:     admin
+    Admin Password: ${ADMINPASSWORD}
 
-        Install Path: ${SUPERSET_DIR}
-        Compose File: ${SUPERSET_DIR}/docker-compose.yml
+    Docker Status: ${DOCKER_STATUS}
 
-        Default Login: admin / ${ADMINPASSWORD:-admin}
+    Install Path:  ${SUPERSET_DIR}
+    Compose File:  ${SUPERSET_DIR}/docker-compose.yml
+    Nginx Config:  /etc/nginx/sites-available/superset.conf
 
 ──────────────────────────────────────────────
-💡 Superset management:
-   cd ${SUPERSET_DIR}
-   docker compose ps
-   docker compose logs -f
-   docker compose down
-   docker compose up -d
+💡  Service management:
+    cd ${SUPERSET_DIR}
+    docker compose ps
+    docker compose logs -f
+    docker compose down
+    docker compose up -d
 
-🧹 Remove this message:
-   sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+    systemctl status nginx
+    systemctl reload nginx
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
 ──────────────────────────────────────────────
 EOM
 
     chmod 644 /etc/motd
-    echo "Custom MOTD installed at /etc/motd with Superset details." | log
+    echo "Custom MOTD installed." | log
 }
 
 # ==============================
@@ -238,12 +246,15 @@ EOM
 # ==============================
 main() {
     install_docker
-    "$updateStatus" "$HTML_PATH" -ap "Installing Superset (Might take some time)..."
     run_superset
-    "$updateStatus" "$HTML_PATH" -ap "Finishing Superset installation..."
-    switch_nginx_to_proxy
-    obtain_ssl
+    configure_nginx
     configure_motd
+
+    descriptionAppend "Superset Web UI: https://${CWM_DOMAIN}"
+    descriptionAppend "Superset Admin User: admin"
+    descriptionAppend "Superset Admin Password: ${ADMINPASSWORD}"
+
+    tag Script.success
 }
 
 main
