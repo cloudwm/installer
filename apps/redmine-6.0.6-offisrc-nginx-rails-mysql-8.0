@@ -232,7 +232,6 @@ cat > /etc/motd <<EOM
 
     Admin User:     admin
     Admin Password: ${REDMINE_ADMIN_PASS}
-    (change on first login)
 
     Database:          redmine
     Database User:     redmine
