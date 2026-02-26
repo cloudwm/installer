@@ -93,16 +93,18 @@ bundle exec rake generate_secret_token
 RAILS_ENV=production bundle exec rake db:migrate || { echo "ERROR: db:migrate failed" | log; exit 1; }
 RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
 
-# Set admin password from guest.conf
+# Set admin password from guest.conf via env var (avoids shell quoting issues)
 echo "Setting Redmine admin password..." | log
-RAILS_ENV=production bundle exec rails runner "
-  user = User.find_by_login('admin')
-  user.password = '${REDMINE_ADMIN_PASS}'
-  user.password_confirmation = '${REDMINE_ADMIN_PASS}'
+export REDMINE_NEW_PASS="${REDMINE_ADMIN_PASS}"
+RAILS_ENV=production bundle exec rails runner '
+  user = User.find_by_login("admin")
+  user.password = ENV["REDMINE_NEW_PASS"]
+  user.password_confirmation = ENV["REDMINE_NEW_PASS"]
   user.must_change_passwd = false
   user.save!
-  puts 'Admin password updated.'
-" || echo "WARNING: Could not set admin password" | log
+  puts "Admin password updated."
+' 2>&1 | log || echo "WARNING: Could not set admin password" | log
+unset REDMINE_NEW_PASS
 
 chown -R www-data:www-data ${REPO_DIR}
 
