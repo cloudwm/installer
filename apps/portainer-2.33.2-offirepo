@@ -6,14 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_FILE="${LE_DIR}/fullchain.pem"
-PK_FILE="${LE_DIR}/privkey.pem"
-
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx apache2-utils nginx jq
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools apache2-utils jq
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
@@ -27,28 +23,10 @@ sudo mkdir -p /opt/portainer/{certs,data}
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
-sudo systemctl stop nginx
 
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
-else
-    mkdir -p "${LE_DIR}"
-    chmod 755 /etc/letsencrypt/live
-    chmod 755 "${LE_DIR}"
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout "${PK_FILE}" \
-        -out    "${FC_FILE}" \
-        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
-        2>/dev/null
-    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
-fi
-
-cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
-cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
+# Copy certificates for Portainer
+sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
+sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
 
 
 echo "Creating Docker Compose file for Portainer (without initial password)" | log
@@ -65,9 +43,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
       - /opt/portainer/certs:/certs
-    environment:
-      - PORTAINER_SSLCERT=/certs/portainer.crt
-      - PORTAINER_SSLKEY=/certs/portainer.key
+    command:
+      - --sslcert 
+      - /certs/portainer.crt
+      - --sslkey
+      - /certs/portainer.key
 EOF
 
 echo "Generated docker-compose.yml:" | log
@@ -138,6 +118,7 @@ EOFCOMPOSE
     sleep 30
     ADMIN_CREATED=true
 fi
+
 
 echo "Adding descriptions" | log
 descriptionAppend "Portainer Web Interface: https://$CWM_DOMAIN:9443"

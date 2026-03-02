@@ -7,15 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-HTML_PATH="/var/www/html/index.html"
-
-MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
-echo "Machine IP: $MACHINE_IP" | log
-echo "Domain: $DOMAIN_NAME" | log
-
 setup_swap() {
     if swapon --show | grep -q '/'; then
         echo "Swap already enabled. Skipping." | log
@@ -103,7 +94,7 @@ run_appflowy() {
   EMAIL="$(grep '^email=' "$GUEST_CONF" | cut -d'=' -f2-)"
   ADMINPASSWORD="$(grep '^password=' "$GUEST_CONF" | cut -d'=' -f2-)"
 
-  sed -i "s|^FQDN=.*|FQDN=${DOMAIN_NAME}|" .env
+  sed -i "s|^FQDN=.*|FQDN=${CWM_DOMAIN}|" .env
   sed -i 's/^SCHEME=.*/SCHEME=https/' .env
   sed -i 's/^WS_SCHEME=.*/WS_SCHEME=wss/' .env
   sed -i 's/^NGINX_PORT=.*/NGINX_PORT=8080/' .env
@@ -192,6 +183,13 @@ run_appflowy() {
 switch_nginx_to_proxy() {
     echo "Configuring nginx reverse proxy for AppFlowy Cloud..." | log
 
+    # Restarting nginx to show the UI installer
+    systemctl start nginx 2>/dev/null
+
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
     NGINX_CONF="/etc/nginx/sites-available/appflowy.conf"
 
     cat > "$NGINX_CONF" <<'EOF'
@@ -201,10 +199,22 @@ map $http_upgrade $connection_upgrade {
 }
 EOF
 
-    cat >> "$NGINX_CONF" <<EOF
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat >> "$NGINX_CONF" <<EOF
+
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
 
     client_max_body_size 256m;
 
@@ -226,6 +236,35 @@ server {
     }
 }
 EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat >> "$NGINX_CONF" <<EOF
+
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+
+    client_max_body_size 256m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # WebSocket support (required for AppFlowy real-time collaboration)
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}
+EOF
+    fi
 
     # Remove default site if it exists
     rm -f /etc/nginx/sites-enabled/default
@@ -237,35 +276,15 @@ EOF
     echo "nginx configured for AppFlowy Cloud." | log
 }
 
-obtain_ssl() {
-    systemctl reload nginx
-
-    echo "Requesting Let's Encrypt certificate..." | log
-    certbot --nginx \
-        -d "$DOMAIN_NAME" \
-        --non-interactive \
-        --agree-tos \
-        -m "admin@${DOMAIN_NAME}" \
-        --redirect
-
-    echo "AppFlowy Cloud available at https://${DOMAIN_NAME}" | log
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "AppFlowy Cloud is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
-}
-
 configure_motd() {
   echo "🧾 Configuring system MOTD with AppFlowy info..." | log
 
   chmod -x /etc/update-motd.d/* 2>/dev/null || true
   rm -f /etc/motd 2>/dev/null
 
-  # runtime-derived values
-  MACHINE_IP="$(hostname -I | awk '{print $1}')"
-  DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
   APPFLOWY_LOCAL_URL="http://127.0.0.1:8080"
-  APPFLOWY_PUBLIC_URL="https://${DOMAIN_NAME}"
-  APPFLOWY_ADMIN_URL="https://${DOMAIN_NAME}/console"
+  APPFLOWY_PUBLIC_URL="https://${CWM_DOMAIN}"
+  APPFLOWY_ADMIN_URL="https://${CWM_DOMAIN}/console"
   APPFLOWY_DIR="/opt/appflowy"
   DOCKER_STATUS="$(systemctl is-active docker 2>/dev/null || echo unknown)"
   NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
@@ -279,8 +298,7 @@ configure_motd() {
                         you used to create the server.
 
           Public URL: ${APPFLOWY_PUBLIC_URL}
-          Machine IP: ${MACHINE_IP}
-              Domain: ${DOMAIN_NAME}
+              Domain: ${CWM_DOMAIN}
 
         Docker Status: ${DOCKER_STATUS}
          Nginx Status: ${NGINX_STATUS}
@@ -316,11 +334,8 @@ EOM
 main() {
     setup_swap
     install_docker
-    "$updateStatus" "$HTML_PATH" -ap "Installing AppFlowy Cloud..."
     run_appflowy
-    "$updateStatus" "$HTML_PATH" -ap "Finishing AppFlowy Cloud installation..."
     switch_nginx_to_proxy
-    obtain_ssl
     configure_motd
 }
 

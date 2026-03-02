@@ -39,9 +39,9 @@ function log() {
     while IFS= read -r line; do
         printf '[%s] %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$logScriptName" "$line"
     done | \
-        tee -a "$CWM_LOGDIR/$(date '+%Y-%m-%d').log" \
-             ${1:+"$CWM_ERRORFILE"} \
-             >/dev/ttyS0 >/dev/null
+            tee -a "$CWM_LOGDIR/$(date '+%Y-%m-%d').log" \
+                 ${1:+"$CWM_ERRORFILE"} \
+            > >(exec 2>/dev/null; cat >/dev/ttyS0 2>/dev/null || true)
 }
 
 function checkRootUser() {

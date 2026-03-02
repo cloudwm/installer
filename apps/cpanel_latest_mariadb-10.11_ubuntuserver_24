@@ -45,10 +45,7 @@ validate_environment() {
 }
 
 set_hostname() {
-    local ip=$(hostname -I | awk '{print $1}')
-    local ip_dashed=${ip//./-}
-    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
-
+    local fqdn="cpanel.${CWM_DOMAIN}"
     hostnamectl set-hostname "$fqdn"
     echo "Hostname set to: $fqdn" | log
 }
@@ -165,11 +162,9 @@ EOF
 }
 
 configure_ssl() {
-    local ip=$(hostname -I | awk '{print $1}')
-    local ip_dashed=${ip//./-}
-    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
-    local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
-    local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
+    local fqdn="cpanel.${CWM_DOMAIN}"
+    local whm_fqdn="whm.${iCWM_DOMAINd}"
+    local webmail_fqdn="webmail.${CWM_DOMAIN}"
     local acme_server="https://192.168.30.67/directory"
 
     echo "Configuring SSL with custom ACME server..." | log
@@ -312,10 +307,9 @@ format_duration() {
 print_summary() {
     local duration=$1
     local ip=$(hostname -I | awk '{print $1}')
-    local ip_dashed=${ip//./-}
-    local fqdn="cpanel.${ip_dashed}.cloud-xip.com"
-    local whm_fqdn="whm.${ip_dashed}.cloud-xip.com"
-    local webmail_fqdn="webmail.${ip_dashed}.cloud-xip.com"
+    local fqdn="cpanel.${CWM_DOMAIN}"
+    local whm_fqdn="whm.${CWM_DOMAIN}"
+    local webmail_fqdn="webmail.${CWM_DOMAIN}"
 
     cat > /etc/motd << EOF
 ================================================================================
@@ -372,7 +366,7 @@ main() {
     prepare_system
     install_cpanel
     configure_mariadb
-    configure_ssl
+    #configure_ssl
     disable_port_80
 
     local end_time=$(date +%s)

@@ -6,19 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-LOG_PATH="/var/log/anythingllm-setup.log"
-HTML_PATH="/var/www/html/index.html"
-
-MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
-echo "Machine IP: $MACHINE_IP" | log
-echo "Domain: $DOMAIN_NAME" | log
-
-# ==============================
-# Install prerequisites
-# ==============================
 echo "Installing prerequisites..." | log
 "$updateStatus" "$HTML_PATH" -ap "Installing prerequisites..."
 apt update
@@ -34,9 +21,6 @@ apt install -y \
     certbot \
     python3-certbot-nginx
 
-# ==============================
-# Docker installation
-# ==============================
 install_docker() {
     if command -v docker >/dev/null 2>&1; then
         echo "Docker is already installed. Skipping Docker installation." | log
@@ -73,9 +57,6 @@ install_docker() {
     echo "Verify with:  sudo docker run hello-world" | log
 }
 
-# ==============================
-# AnythingLLM container
-# ==============================
 install_anythingLLM() {
     echo "Creating base directory for AnythingLLM data..." | log
     STORAGE_LOCATION="$HOME/anythingllm"
@@ -120,16 +101,33 @@ wait_for_container() {
     return 1
 }
 
-# ==============================
-# Nginx reverse proxy
-# ==============================
 switch_nginx_to_proxy() {
     echo "Switching nginx from progress page to AnythingLLM reverse proxy..." | log
+
+    # Restarting nginx to show the UI installer
+    systemctl start nginx 2>/dev/null
+
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
     NGINX_CONF="/etc/nginx/sites-available/anythingllm.conf"
-    cat > "$NGINX_CONF" <<EOF
+
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
 
     location / {
         proxy_pass         http://127.0.0.1:3001;
@@ -141,38 +139,40 @@ server {
     }
 }
 EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+
+    location / {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+    fi
 
     ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/anythingllm.conf
     nginx -t
+
+    systemctl start nginx
+    systemctl enable nginx
     systemctl reload nginx
+    
     echo "nginx configuration switched to AnythingLLM." | log
 }
 
-# ==============================
-# SSL
-# ==============================
-obtain_ssl() {
-    echo "Reloading nginx before requesting certificate..." | log
-    systemctl reload nginx
-
-    echo "Requesting Let's Encrypt certificate..." | log
-    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
-
-    echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "AnythingLLM is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
-}
-
-# ==============================
-# Main
-# ==============================
 main() {
     install_docker
     install_anythingLLM
     wait_for_container
     switch_nginx_to_proxy
-    obtain_ssl
 }
 
 main

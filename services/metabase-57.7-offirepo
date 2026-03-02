@@ -6,14 +6,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_FILE="${LE_DIR}/fullchain.pem"
-PK_FILE="${LE_DIR}/privkey.pem"
 
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools certbot python3-certbot-nginx apache2-utils jq nginx
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools apache2-utils jq
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
@@ -36,32 +33,6 @@ sudo rm -rf ${appInstallDir}/data ${appInstallDir}/config
 sudo mkdir -p ${appInstallDir}/{config,data}
 sudo chown -R ${metabaseUser}:${metabaseGroup} ${appInstallDir}/{config,data}
 sudo chmod -R 750 ${appInstallDir}/{config,data}
-
-echo "🔒 Clearing port conflicts and obtaining Let's Encrypt SSL certificate..." | log
-# Kill any processes using ports 80/443
-sudo fuser -k 80/tcp 443/tcp 2>/dev/null || true
-sleep 2
-
-# Stop any existing nginx
-sudo systemctl stop nginx 2>/dev/null || true
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
-else
-    mkdir -p "${LE_DIR}"
-    chmod 755 /etc/letsencrypt/live
-    chmod 755 "${LE_DIR}"
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout "${PK_FILE}" \
-        -out    "${FC_FILE}" \
-        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
-        2>/dev/null
-    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
-fi
 
 echo "Starting Nginx service" | log
 sudo systemctl start nginx

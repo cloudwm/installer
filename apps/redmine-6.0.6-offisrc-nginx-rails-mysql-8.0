@@ -1,0 +1,266 @@
+#!/bin/bash
+
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+apt-get update
+apt-get install -y \
+    build-essential \
+    ruby ruby-dev \
+    zlib1g-dev \
+    libssl-dev \
+    libreadline-dev \
+    libyaml-dev \
+    libffi-dev \
+    libgdbm-dev \
+    libncurses5-dev \
+    libmysqlclient-dev \
+    default-mysql-client \
+    curl \
+    git \
+    nginx \
+    imagemagick \
+    libmagickwand-dev \
+    ghostscript \
+    apt-transport-https
+
+REPO_URL="https://www.redmine.org/releases/redmine-6.0.6.tar.gz"
+REPO_DIR="/opt/redmine"
+PUMA_SOCKET="/run/redmine/puma.sock"
+PUMA_PID="/run/redmine/puma.pid"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+# Read admin password from guest.conf (set by cloud-init)
+GUEST_CONF="/root/guest.conf"
+if [ -f "${GUEST_CONF}" ]; then
+    REDMINE_ADMIN_PASS=$(grep -oP '(?<=^password=).+' "${GUEST_CONF}")
+fi
+# Fallback if guest.conf missing or password not found
+REDMINE_ADMIN_PASS="${REDMINE_ADMIN_PASS:-admin}"
+
+echo "Creating redmine database..." | log
+mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
+create database redmine character set utf8mb4 collate utf8mb4_bin;
+create user redmine@localhost identified by '${ADMINPASSWORD}';
+grant all privileges on redmine.* to redmine@localhost;
+set global log_bin_trust_function_creators = 1;
+FLUSH PRIVILEGES;
+EOF
+echo "Database setup completed successfully." | log
+
+echo "Creating redmine dir ${REPO_DIR}..." | log
+mkdir -p ${REPO_DIR}
+
+echo "Downloading from ${REPO_URL}..." | log
+curl -sL ${REPO_URL} | tar xz -C ${REPO_DIR} --strip-components=1
+echo "Download Complete." | log
+
+BOOT_FILE="${REPO_DIR}/config/boot.rb"
+
+if [ -f "$BOOT_FILE" ]; then
+    grep -q "^require 'logger'" "$BOOT_FILE" || \
+        sed -i "1i require 'logger'" "$BOOT_FILE"
+else
+    echo "ERROR: boot.rb not found." | log
+    exit 1
+fi
+
+echo "gem 'puma'" > ${REPO_DIR}/Gemfile.local
+
+cat <<_EOF_ > ${REPO_DIR}/config/database.yml
+production:
+  adapter: mysql2
+  database: redmine
+  host: localhost
+  username: redmine
+  password: "${ADMINPASSWORD}"
+  encoding: utf8mb4
+_EOF_
+
+cd ${REPO_DIR}
+gem install bundler --no-document
+bundle config set --local without 'development test'
+bundle install || { echo "ERROR: bundle install failed" | log; exit 1; }
+
+chown -R www-data:www-data ${REPO_DIR}
+
+bundle exec rake generate_secret_token
+RAILS_ENV=production bundle exec rake db:migrate || { echo "ERROR: db:migrate failed" | log; exit 1; }
+RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
+
+# Set admin password from guest.conf via env var (avoids shell quoting issues)
+echo "Setting Redmine admin password..." | log
+export REDMINE_NEW_PASS="${REDMINE_ADMIN_PASS}"
+RAILS_ENV=production bundle exec rails runner '
+  user = User.find_by_login("admin")
+  user.password = ENV["REDMINE_NEW_PASS"]
+  user.password_confirmation = ENV["REDMINE_NEW_PASS"]
+  user.must_change_passwd = false
+  user.save!
+  puts "Admin password updated."
+' 2>&1 | log || echo "WARNING: Could not set admin password" | log
+unset REDMINE_NEW_PASS
+
+chown -R www-data:www-data ${REPO_DIR}
+
+mkdir -p /run/redmine
+chown www-data:www-data /run/redmine
+
+cat > /etc/tmpfiles.d/redmine.conf <<_EOF_
+d /run/redmine 0755 www-data www-data -
+_EOF_
+
+BUNDLE_BIN=$(which bundle)
+
+cat > /etc/systemd/system/redmine.service <<_EOF_
+[Unit]
+Description=Redmine (Puma)
+After=network.target mysql.service
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=${REPO_DIR}
+Environment=RAILS_ENV=production
+ExecStart=${BUNDLE_BIN} exec puma -b unix://${PUMA_SOCKET} --pidfile ${PUMA_PID} -e production
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=redmine
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+systemctl daemon-reload
+systemctl enable redmine
+systemctl start redmine
+
+for i in {1..30}; do
+    [ -S "${PUMA_SOCKET}" ] && break
+    sleep 1
+done
+
+if [ ! -S "${PUMA_SOCKET}" ]; then
+    echo "ERROR: Puma socket not created." | log
+    journalctl -u redmine --no-pager -n 20
+    exit 1
+fi
+
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-available/default
+rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+if ! grep -q "server_tokens off;" /etc/nginx/nginx.conf; then
+    sed -i '/http {/a \    server_tokens off;' /etc/nginx/nginx.conf
+fi
+
+cat > /etc/nginx/sites-available/redmine.conf <<NGINXEOF
+server {
+    listen 80 default_server;
+    server_name _;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2 default_server;
+    server_name _;
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+
+    ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256';
+
+    add_header Strict-Transport-Security "max-age=63072000" always;
+
+    server_tokens off;
+
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass http://unix:${PUMA_SOCKET};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_hide_header X-Powered-By;
+        proxy_hide_header X-Runtime;
+        proxy_hide_header Server;
+    }
+}
+NGINXEOF
+
+ln -sf /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/redmine.conf
+
+nginx -t || exit 1
+systemctl restart nginx
+
+# Setup MOTD
+echo "Setting custom Redmine MOTD..." | log
+
+chmod -x /etc/update-motd.d/* 2>/dev/null || true
+rm -f /etc/motd 2>/dev/null
+
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+
+if [ -f "${LE_DIR}/fullchain.pem" ]; then
+    PROTO="https"
+else
+    PROTO="http"
+fi
+
+cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+📋  Redmine 6.0.6 – Installation Complete
+──────────────────────────────────────────────
+
+    Public URL: ${PROTO}://${CWM_DOMAIN}
+    Machine IP: ${MACHINE_IP}
+    Domain:     ${CWM_DOMAIN}
+
+    Admin User:     admin
+    Admin Password: ${REDMINE_ADMIN_PASS}
+
+    Database:          redmine
+    Database User:     redmine
+    Database Password: ${ADMINPASSWORD}
+
+──────────────────────────────────────────────
+💡  Service management:
+    systemctl status redmine
+    systemctl restart redmine
+    journalctl -u redmine -f
+
+    systemctl status nginx
+    systemctl reload nginx
+
+    Redmine directory: ${REPO_DIR}
+    Puma socket:       ${PUMA_SOCKET}
+    Nginx config:      /etc/nginx/sites-available/redmine.conf
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+chmod 644 /etc/motd
+
+descriptionAppend "Redmine default admin user: admin"
+descriptionAppend "Redmine default admin password: ${REDMINE_ADMIN_PASS}"
+
+echo "Redmine installation is complete."
+tag Script.success

@@ -5,10 +5,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_FILE="${LE_DIR}/fullchain.pem"
-PK_FILE="${LE_DIR}/privkey.pem"
-
 echo "Installing Neo4j Community Edition with Nginx + SSL + Secure Bolt (bolt+s)" | log
 
 export DEBIAN_FRONTEND="noninteractive"
@@ -16,7 +12,7 @@ export DEBIAN_FRONTEND="noninteractive"
 # Install base dependencies
 echo "Installing base system dependencies..." | log
 sudo apt update || true
-sudo apt install -y nginx certbot python3-certbot-nginx curl ca-certificates apt-transport-https gnupg openjdk-21-jre-headless
+sudo apt install -y curl ca-certificates apt-transport-https gnupg openjdk-21-jre-headless
 
 # Fix broken packages (helps with transient mirror issues)
 sudo apt install -f -y
@@ -35,24 +31,6 @@ sudo apt install -y neo4j
 # Set initial password
 echo "Setting initial Neo4j password..." | log
 sudo neo4j-admin dbms set-initial-password "${ADMINPASSWORD}"
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
-else
-    mkdir -p "${LE_DIR}"
-    chmod 755 /etc/letsencrypt/live
-    chmod 755 "${LE_DIR}"
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout "${PK_FILE}" \
-        -out    "${FC_FILE}" \
-        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
-        2>/dev/null
-    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
-fi
 
 # Configure secure Bolt TLS with proper certificate chain
 echo "Configuring secure Bolt (bolt+s)..." | log

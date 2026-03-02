@@ -12,7 +12,7 @@ echo "Installing PocketBase (latest GitHub binary + Nginx + Let's Encrypt)" | lo
 export DEBIAN_FRONTEND="noninteractive"
 
 apt-get update
-installPackage curl unzip ca-certificates gnupg lsb-release openssl jq ufw nginx certbot python3-certbot-nginx
+installPackage curl unzip ca-certificates gnupg lsb-release openssl jq ufw
 
 APP_DIR="/opt/pocketbase"
 mkdir -p "$APP_DIR"
@@ -89,18 +89,6 @@ if systemctl is-active --quiet pocketbase; then
 else
     echo "❌ PocketBase service failed to start" | log
     waitOrStop 1 "Service verification failed"
-fi
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "✅ Let's Encrypt SSL certificate active for ${CWM_DOMAIN}" | log
-else
-    echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${CWM_DOMAIN}" | log
-    echo "🛑 Aborting installation — SSL is required." | log
-    waitOrStop 1 "Certbot failed"
 fi
 systemctl start nginx
 

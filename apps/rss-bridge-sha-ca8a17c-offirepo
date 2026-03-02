@@ -6,15 +6,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_FILE="${LE_DIR}/fullchain.pem"
-PK_FILE="${LE_DIR}/privkey.pem"
 
 echo "Installing RSS-Bridge with Docker + Nginx" | log
 
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
-sudo apt install -y apache2-utils nginx certbot python3-certbot-nginx  apt-transport-https ca-certificates curl gnupg lsb-release
+sudo apt install -y apache2-utils apt-transport-https ca-certificates curl gnupg lsb-release
 
 # Install Docker (if not already installed)
 if ! command -v docker &> /dev/null; then
@@ -55,26 +52,6 @@ networks:
   rss-net:
     driver: bridge
 EOF
-
-systemctl stop nginx
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
-else
-    mkdir -p "${LE_DIR}"
-    chmod 755 /etc/letsencrypt/live
-    chmod 755 "${LE_DIR}"
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout "${PK_FILE}" \
-        -out    "${FC_FILE}" \
-        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
-        2>/dev/null
-    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
-fi
 
 sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem ${appInstallDir}/config/https-cert.pem
 sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem ${appInstallDir}/config/https-key.pem

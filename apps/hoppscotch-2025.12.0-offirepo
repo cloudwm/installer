@@ -6,9 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-FC_FILE="${LE_DIR}/fullchain.pem"
-PK_FILE="${LE_DIR}/privkey.pem"
 version="2025.12.0"
 
 echo "Installing Hoppscotch API Testing Platform" | log
@@ -19,8 +16,7 @@ export DEBIAN_FRONTEND="noninteractive"
 echo "Installing prerequisites" | log
 sudo apt update
 apt update
-apt install -y nginx certbot python3-certbot-nginx \
-               apt-transport-https ca-certificates curl gnupg lsb-release
+apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
 
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..." | log
@@ -165,24 +161,6 @@ networks:
   hoppscotch-net:
     driver: bridge
 EOF
-
-echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
-    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
-else
-    mkdir -p "${LE_DIR}"
-    chmod 755 /etc/letsencrypt/live
-    chmod 755 "${LE_DIR}"
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout "${PK_FILE}" \
-        -out    "${FC_FILE}" \
-        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${CWM_DOMAIN}" \
-        2>/dev/null
-    echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
-fi
 
 # Copy SSL certificates
 sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem $appDir/config/https-cert.pem

@@ -1,50 +1,26 @@
 #!/bin/bash
 
-# --- setup and vars ---
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
 LOG_PATH="/var/log/ollama-setup.log"
-HTML_PATH="/var/www/html/index.html"
 MACHINE_IP=$(hostname -I | awk '{print $1}')
-DOMAIN_NAME="$(echo "$MACHINE_IP" | tr '.' '-')".cloud-xip.com
-echo "Machine IP: $MACHINE_IP" | log
-echo "Domain: $DOMAIN_NAME" | log
+
 [ -f "$LOG_PATH" ] || touch "$LOG_PATH"
 
-declare -a pre_display_list
-declare -A seen
+# nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+systemctl start nginx 2>/dev/null
 
 echo "Opening Ollama's default port: 11434..." | log
 ufw allow 11434/tcp
 
-# --- kick off installer in background ---
 echo "Installing Ollama..." | log
-"$updateStatus" "$HTML_PATH" -ap "Installing Ollama (Might take some time)..."
-curl -fsSL --http1.1 https://ollama.com/install.sh | sh | tee "$LOG_PATH" &
+curl -fsSL --http1.1 https://ollama.com/install.sh | sh | tee "$LOG_PATH"
 INSTALL_PID=$!
-
-# --- stream log to Web UI as it grows ---
-tail -f "$LOG_PATH" | while read -r line; do
-    [[ "$line" == *"==> "* ]] || continue
-    [[ "$line" == *"Pulling docker images"* ]] && line="Pulling docker images (Takes some time)..." || line="${line#*==> }"
-    if [[ -z "${seen[$line]}" ]]; then
-        seen[$line]=1
-        pre_display_list+=("$line")
-        "$updateStatus" "$HTML_PATH" -cp
-        for stage in "${pre_display_list[@]}"; do
-            cleaned=$(echo "$stage" | sed 's/\.*$//')
-            "$updateStatus" "$HTML_PATH" -ap "${cleaned}..."
-        done
-    fi
-done &
-
-wait $INSTALL_PID   # wait for installer to finish
+wait $INSTALL_PID
 
 # --- systemd tweak for external access ---
 SERVICE_FILE="/etc/systemd/system/ollama.service"
@@ -60,11 +36,31 @@ systemctl enable ollama.service
 systemctl start ollama.service
 
 # --- configure nginx reverse proxy for Ollama ---
-echo "Writing nginx reverse proxy config for Ollama..." | log
-cat <<EOF > /etc/nginx/sites-available/ollama.conf
+switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for Ollama..." | log
+
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+    rm -f /etc/nginx/sites-enabled/default
+
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+    NGINX_CONF="/etc/nginx/sites-available/ollama.conf"
+
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN_NAME};
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
 
     location / {
         proxy_pass         http://127.0.0.1:11434;
@@ -76,33 +72,93 @@ server {
     }
 }
 EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
 
-ln -sf /etc/nginx/sites-available/ollama.conf /etc/nginx/sites-enabled/ollama.conf
-rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
+    location / {
+        proxy_pass         http://127.0.0.1:11434;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+    fi
 
-# --- obtain SSL cert ---
-obtain_ssl() {
-    echo "Reloading nginx before requesting certificate..." | log
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/ollama.conf
+    nginx -t || return 1
     systemctl reload nginx
 
-    echo "Requesting Let's Encrypt certificate..." | log
-    apt install -y certbot python3-certbot-nginx
-    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos -m "admin@${DOMAIN_NAME}" --redirect
-
-    echo "Nginx reverse proxy and SSL configured for https://${DOMAIN_NAME}" | log
-    "$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "Ollama API is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+    echo "nginx configured for Ollama." | log
 }
-obtain_ssl
 
-# --- cleanup progress config if it existed ---
-echo "Cleaning nginx progress site (if any)..." | log
-rm -f /etc/nginx/sites-enabled/installProgress.conf
-rm -f /etc/nginx/sites-available/installProgress.conf
-systemctl enable nginx
-systemctl restart nginx
-echo "Nginx ready with Ollama reverse proxy." | log
+configure_motd() {
+    echo "Configuring system MOTD with Ollama info..." | log
+
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
+
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        SCHEME="https"
+    else
+        SCHEME="http"
+    fi
+
+    OLLAMA_VERSION="$(ollama --version 2>/dev/null || echo unknown)"
+    OLLAMA_STATUS="$(systemctl is-active ollama 2>/dev/null || echo unknown)"
+    NGINX_STATUS="$(systemctl is-active nginx 2>/dev/null || echo unknown)"
+
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🦙  Ollama – Installation Complete
+──────────────────────────────────────────────
+
+    Version: ${OLLAMA_VERSION}
+    API URL: ${SCHEME}://${CWM_DOMAIN}
+    Local API: http://127.0.0.1:11434
+    Machine IP: ${MACHINE_IP}
+    Domain: ${CWM_DOMAIN}
+
+    Ollama Service: ${OLLAMA_STATUS}
+    Nginx Status: ${NGINX_STATUS}
+
+    Service File: ${SERVICE_FILE}
+    Setup Log: ${LOG_PATH}
+
+──────────────────────────────────────────────
+💡  Ollama management:
+    ollama list                     # list downloaded models
+    ollama pull llama3              # download a model
+    ollama run llama3               # run a model interactively
+    ollama rm llama3                # remove a model
+
+    sudo systemctl status ollama
+    sudo systemctl restart ollama
+    sudo journalctl -u ollama
+
+🌐  API usage:
+    curl ${SCHEME}://${CWM_DOMAIN}/api/tags
+    curl ${SCHEME}://${CWM_DOMAIN}/api/generate -d '{
+      "model": "llama3", "prompt": "Hello"
+    }'
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed at /etc/motd with Ollama details." | log
+}
+
+switch_nginx_to_proxy
+configure_motd
 
 tag Script.success

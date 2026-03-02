@@ -11,20 +11,16 @@ RUNTIME_DIR="/etc/supabase"
 RUNTIME_ENV="$RUNTIME_DIR/runtime.env"
 mkdir -p "$RUNTIME_DIR"
 
-rootDir="$(rootDir)"
-updateStatus="$rootDir/include/updateInstallStatus.sh"
-HTML_PATH="/var/www/html/index.html"
-
 LOG_PATH="/var/log/supabase-install.log"
 INSTALL_DIR="$HOME/supabase-local"
 PROJECT_NAME="local-supabase-app"
 SUPABASE_VERSION="2.48.3"
-DOMAIN_NAME="$(hostname -I | awk '{print $1}' | tr '.' '-')".cloud-xip.com
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
 system_setup() {
     echo "🔧 Updating system and installing dependencies..." | log
     apt-get update -y
-    apt-get install -y curl wget git docker.io docker-compose jq nginx certbot python3-certbot-nginx
+    apt-get install -y curl wget git docker.io docker-compose jq nginx
     systemctl enable docker nginx
     systemctl start docker nginx
 }
@@ -84,8 +80,6 @@ setup_project() {
 
 start_supabase() {
     echo "▶️  Starting Supabase stack..." | log
-    "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase and pulling Docker images..."
-
     : > "$RUNTIME_ENV"   # clear previous values
 
     declare -A active_images
@@ -101,13 +95,11 @@ start_supabase() {
             version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
             imageName=$(echo "$imageName" | sed 's/[^a-zA-Z0-9._/-]//g')
             active_images["$imageName:$version"]=1
-            "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image: $imageName:$version..."
             continue
         fi
 
         if echo "$line" | grep -Eq '^Digest:[[:space:]]*sha256:[a-f0-9]{64}'; then
             for key in "${!active_images[@]}"; do
-                "$updateStatus" "$HTML_PATH" -ap "✅ Finished pulling: $key"
                 unset 'active_images[$key]'
             done
             continue
@@ -117,7 +109,6 @@ start_supabase() {
             version=$(echo "$line" | sed -E 's/.*Pulling image:[[:space:]]*([^[:space:]:]+).*/\1/')
             version=$(echo "$version" | sed 's/[^a-zA-Z0-9._-]//g')
             active_images["$version"]=1
-            "$updateStatus" "$HTML_PATH" -ap "🐋 Pulling image version: $version"
             continue
         fi
 
@@ -150,16 +141,47 @@ start_supabase() {
     done < <(supabase start 2>&1)
 	
     echo "✅ Supabase started successfully." | log
-    "$updateStatus" "$HTML_PATH" -ap "✅ Supabase stack started successfully."
 }
 
 configure_nginx() {
-    echo "🌀 Configuring Nginx reverse proxy..." | log
+    echo "🌀 Configuring Nginx reverse proxy with SSL..." | log
+
+    rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
     local CONF="/etc/nginx/sites-available/supabase.conf"
-    cat > "$CONF" <<'EOF'
+
+    # HTTP redirect block — quoted heredoc keeps $host etc. literal
+    cat > "$CONF" <<'NGINXEOF'
 server {
     listen 80;
-    server_name __DOMAIN_NAME__;
+    server_name _;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name _;
+
+NGINXEOF
+
+    # SSL cert paths — unquoted heredoc for variable expansion
+    cat >> "$CONF" <<NGINXEOF
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+NGINXEOF
+
+    # Rest of config — quoted heredoc keeps $host etc. literal
+    cat >> "$CONF" <<'NGINXEOF'
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    server_tokens off;
+    client_max_body_size 100M;
 
     # Studio UI
     location / {
@@ -188,33 +210,13 @@ server {
         proxy_read_timeout 600s;
         proxy_send_timeout 600s;
     }
-
-    client_max_body_size 100M;
 }
-EOF
-    sed -i "s|__DOMAIN_NAME__|${DOMAIN_NAME}|g" "$CONF"
+NGINXEOF
+
     ln -sf "$CONF" /etc/nginx/sites-enabled/supabase.conf
-    nginx -t
-    systemctl reload nginx
-	systemctl restart nginx
-    echo "✅ Nginx reverse proxy configured." | log
-}
-
-obtain_ssl() {
-    echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
-
-    if certbot --nginx -d "$DOMAIN_NAME" \
-        --non-interactive --agree-tos \
-        -m "admin@${DOMAIN_NAME}" --redirect -v; then
-
-        echo "✅ Let's Encrypt SSL certificate active at https://${DOMAIN_NAME}" | log
-        nginx -t && systemctl reload nginx
-
-    else
-        echo "❌ Failed to obtain Let's Encrypt SSL certificate for ${DOMAIN_NAME}" | log
-        echo "🛑 Aborting installation — SSL is required." | log
-        exit 1
-    fi
+    nginx -t || exit 1
+    systemctl restart nginx
+    echo "✅ Nginx reverse proxy configured with SSL." | log
 }
 
 post_install_configuration() {
@@ -227,11 +229,11 @@ post_install_configuration() {
     fi
 
     # Patch Studio API URL
-    sed -i -E 's|^[[:space:]]*api_url[[:space:]]*=.*|api_url = "https://'"${DOMAIN_NAME}"'"|g' "$CONFIG_FILE"
+    sed -i -E 's|^[[:space:]]*api_url[[:space:]]*=.*|api_url = "https://'"${CWM_DOMAIN}"'"|g' "$CONFIG_FILE"
 
     # Patch Auth site_url + redirect URLs
-    sed -i -E 's|^[[:space:]]*site_url[[:space:]]*=.*|site_url = "https://'"${DOMAIN_NAME}"'"|g' "$CONFIG_FILE"
-    sed -i -E 's|^\s*additional_redirect_urls\s*=.*|additional_redirect_urls = ["https://'"${DOMAIN_NAME}"'"]|g' "$CONFIG_FILE"
+    sed -i -E 's|^[[:space:]]*site_url[[:space:]]*=.*|site_url = "https://'"${CWM_DOMAIN}"'"|g' "$CONFIG_FILE"
+    sed -i -E 's|^\s*additional_redirect_urls\s*=.*|additional_redirect_urls = ["https://'"${CWM_DOMAIN}"'"]|g' "$CONFIG_FILE"
 
     # Set Supabase Studio theme to 'system'
     if grep -q "^\[studio\]" "$CONFIG_FILE"; then
@@ -252,8 +254,8 @@ post_install_configuration() {
 verify_connection() {
     echo "🧠 Verifying Supabase Studio availability (HTTPS)..." | log
     for i in {1..10}; do
-        if curl -kfsS "https://${DOMAIN_NAME}/" >/dev/null 2>&1; then
-            echo "✅ Supabase Studio reachable at https://${DOMAIN_NAME}" | log
+        if curl -kfsS "https://${CWM_DOMAIN}/" >/dev/null 2>&1; then
+            echo "✅ Supabase Studio reachable at https://${CWM_DOMAIN}" | log
             return
         fi
         echo "⏳ Waiting for Supabase Studio... (attempt $i/10)" | log
@@ -277,29 +279,43 @@ _kv_upsert() {
 }
 
 configure_motd() {
-  echo "🧾 Configuring system MOTD with Supabase info..." | log
-  chmod -x /etc/update-motd.d/* 2>/dev/null || true
-  rm -f /etc/motd 2>/dev/null
+    echo "🧾 Configuring system MOTD with Supabase info..." | log
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
 
-  # read persisted values (fallbacks if missing)
-  [ -f "$RUNTIME_ENV" ] && set -a && . "$RUNTIME_ENV" && set +a
+    # read persisted values (fallbacks if missing)
+    [ -f "$RUNTIME_ENV" ] && set -a && . "$RUNTIME_ENV" && set +a
 
-  : "${API_URL:=http://127.0.0.1:54321}"
-  : "${GRAPHQL_URL:=${API_URL%/}/graphql/v1}"
-  : "${DB_URL:=postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
-  : "${STUDIO_URL:=http://127.0.0.1:54323}"
-  : "${MAILPIT_URL:=http://127.0.0.1:54324}"
-  : "${PUBLISHABLE_KEY:=<unknown>}"
-  : "${SECRET_KEY:=<unknown>}"
-  : "${S3_ACCESS_KEY:=<unknown>}"
-  : "${S3_SECRET_KEY:=<unknown>}"
-  : "${S3_REGION:=local}"
+    : "${API_URL:=http://127.0.0.1:54321}"
+    : "${GRAPHQL_URL:=${API_URL%/}/graphql/v1}"
+    : "${DB_URL:=postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
+    : "${STUDIO_URL:=http://127.0.0.1:54323}"
+    : "${MAILPIT_URL:=http://127.0.0.1:54324}"
+    : "${PUBLISHABLE_KEY:=<unknown>}"
+    : "${SECRET_KEY:=<unknown>}"
+    : "${S3_ACCESS_KEY:=<unknown>}"
+    : "${S3_SECRET_KEY:=<unknown>}"
+    : "${S3_REGION:=local}"
 
-  cat > /etc/motd <<EOM
+    MACHINE_IP=$(hostname -I | awk '{print $1}')
+
+    if [ -f "${LE_DIR}/fullchain.pem" ]; then
+        PROTO="https"
+    else
+        PROTO="http"
+    fi
+
+    cat > /etc/motd <<EOM
 ──────────────────────────────────────────────
-🚀 Started Supabase Local Development Setup
+🚀  Supabase – Installation Complete
 ──────────────────────────────────────────────
 
+    Public URL: ${PROTO}://${CWM_DOMAIN}
+    Machine IP: ${MACHINE_IP}
+    Domain:     ${CWM_DOMAIN}
+
+──────────────────────────────────────────────
+🔑  Service Endpoints (internal):
          API URL: ${API_URL}
      GraphQL URL: ${GRAPHQL_URL}
   S3 Storage URL: ${API_URL%/}/storage/v1/s3
@@ -307,25 +323,32 @@ configure_motd() {
     Database URL: ${DB_URL}
       Studio URL: ${STUDIO_URL}
      Mailpit URL: ${MAILPIT_URL}
- Publishable key: ${PUBLISHABLE_KEY}
-      Secret key: ${SECRET_KEY}
-   S3 Access Key: ${S3_ACCESS_KEY}
-   S3 Secret Key: ${S3_SECRET_KEY}
-       S3 Region: ${S3_REGION}
+
+🔐  Keys:
+    Publishable key: ${PUBLISHABLE_KEY}
+    Secret key:      ${SECRET_KEY}
+    S3 Access Key:   ${S3_ACCESS_KEY}
+    S3 Secret Key:   ${S3_SECRET_KEY}
+    S3 Region:       ${S3_REGION}
 
 ──────────────────────────────────────────────
-💡 To manage Supabase:
-   cd ${INSTALL_DIR}/${PROJECT_NAME}
-   supabase stop     # Stop all services
-   supabase start    # Start again
-   
-🧹 To remove this message:
-   sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+💡  Service management:
+    cd ${INSTALL_DIR}/${PROJECT_NAME}
+    supabase stop     # Stop all services
+    supabase start    # Start again
+
+    systemctl status nginx
+    systemctl reload nginx
+
+    Nginx config: /etc/nginx/sites-available/supabase.conf
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
 ──────────────────────────────────────────────
 EOM
 
-  chmod 644 /etc/motd
-  echo "✅ Custom MOTD installed at /etc/motd with live values." | log
+    chmod 644 /etc/motd
+    echo "✅ Custom MOTD installed." | log
 }
 
 enable_autostart_service() {
@@ -358,7 +381,6 @@ EOF
 
     if systemctl enable supabase-autostart >/dev/null 2>&1; then
         echo "✅ Supabase auto-start service enabled at boot." | log
-		
     else
         echo "⚠️ Failed to enable Supabase auto-start service." | log
     fi
@@ -367,34 +389,22 @@ EOF
 }
 
 main() {
-	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing prerequisites..."
     system_setup
-	"$updateStatus" "$HTML_PATH" -ap "🧩 Installing Supabase CLI..."
     install_supabase_cli
-    "$updateStatus" "$HTML_PATH" -ap "🧩 Setting up project..."
 	setup_project
-    "$updateStatus" "$HTML_PATH" -ap "🧩 Starting Supabase..."
 	start_supabase
-    "$updateStatus" "$HTML_PATH" -ap "🧩 Performing post installation configurations..."
 	post_install_configuration
-	
 	enable_autostart_service
+	configure_nginx
+    verify_connection
 	configure_motd
 	
-	"$updateStatus" "$HTML_PATH" -ap "🧩 Configuring web access..."
-	configure_nginx
-    obtain_ssl
-	"$updateStatus" "$HTML_PATH" -ap "🧩 Verifying connection..."
-    verify_connection
-	
     echo "🎉 Supabase is ready and secured!" | log
-    echo "🌐 URL: https://${DOMAIN_NAME}" | log
+    echo "🌐 URL: https://${CWM_DOMAIN}" | log
     echo "🛑 Stop: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase stop" | log
     echo "🔄 Restart: cd ${INSTALL_DIR}/${PROJECT_NAME} && supabase start" | log
 	
-	"$updateStatus" "$HTML_PATH" -sr
-    "$updateStatus" "$HTML_PATH" -ur "Supabase is running on https://${DOMAIN_NAME}"
-    "$updateStatus" "$HTML_PATH" -tr "https://${DOMAIN_NAME}"
+    tag Script.success
 }
 
 main "$@"
