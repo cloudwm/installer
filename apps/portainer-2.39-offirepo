@@ -6,7 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-version="2.39"
+version="2.39.0"
 
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
