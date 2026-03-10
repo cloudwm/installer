@@ -33,7 +33,7 @@ echo "Creating Docker Compose file for Portainer (without initial password)" | l
 cat << 'EOF' > /opt/portainer/docker-compose.yml
 services:
   portainer:
-    image: portainer/portainer-ce:lts
+    image: portainer/portainer-ee:lts
     container_name: portainer
     restart: always
     ports:
