@@ -32,7 +32,7 @@ sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/porta
 
 
 echo "Creating Docker Compose file for Portainer (without initial password)" | log
-cat << 'EOF' > /opt/portainer/docker-compose.yml
+cat << EOF > /opt/portainer/docker-compose.yml
 services:
   portainer:
     image: portainer/portainer-ce:${version}
