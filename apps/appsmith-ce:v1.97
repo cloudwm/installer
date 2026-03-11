@@ -39,6 +39,7 @@ EOF
 
 docker compose up -d
 
+echo "Create and apply nginx config" | log
 
 tee /etc/nginx/sites-available/appsmith > /dev/null <<EOF
 server {
@@ -81,6 +82,7 @@ systemctl reload nginx
 sudo systemctl enable nginx
 systemctl restart nginx
 
+echo "Adding descriptions" | log
 descriptionAppend "URL: https://${CWM_DOMAIN}"
 descriptionAppend "Admin login: The administrator account registration is completed after the installation process."
 descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"

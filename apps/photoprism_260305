@@ -63,7 +63,8 @@ systemctl daemon-reload
 systemctl enable --now photoprism
 
 
-echo "Create Nginx file" | log
+echo "Create and apply Nginx file" | log
+
 tee /etc/nginx/sites-available/photoprism > /dev/null <<EOF
 server {
     listen 80;
@@ -105,6 +106,8 @@ systemctl reload nginx
 sudo systemctl enable nginx
 systemctl restart nginx
 
+
+echo "Adding descriptions" | log
 descriptionAppend "Photoprism Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Photoprism Username: admin"
 descriptionAppend "Photoprism Password: ${ADMINPASSWORD}"

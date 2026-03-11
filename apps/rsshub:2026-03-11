@@ -70,7 +70,7 @@ volumes:
     redis-data:
 EOF
 
-echo "Create nginx config file" | log
+echo "Create and apply nginx config file" | log
 
 tee /etc/nginx/sites-available/rsshub > /dev/null <<EOF
 server {
@@ -117,6 +117,7 @@ echo "Run docker-compoose file" | log
 
 docker compose up -d
 
+echo "Adding descriptions" | log
 descriptionAppend "URL: https://${CWM_DOMAIN}"
 descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"
 
