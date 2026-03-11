@@ -59,5 +59,6 @@ WantedBy=multi-user.target
 EOF
 
 echo "Run photoprism service" | log
+ufw allow 2342
 systemctl daemon-reload
 systemctl enable --now photoprism
