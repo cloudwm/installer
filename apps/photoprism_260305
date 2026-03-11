@@ -59,11 +59,51 @@ WantedBy=multi-user.target
 EOF
 
 echo "Run photoprism service" | log
-ufw allow 2342
 systemctl daemon-reload
 systemctl enable --now photoprism
 
-descriptionAppend "Photoprism Web UI: https://${CWM_DOMAIN}:2342"
+
+cat <<EOF > /etc/nginx/sites-available/photoprism
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass http://127.0.0.1:2342;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+EOF
+ln -s /etc/nginx/sites-available/photoprism /etc/nginx/sites-enabled/photoprism
+rm -f /etc/nginx/sites-enabled/default
+systemctl reload nginx
+sudo systemctl enable nginx
+systemctl restart nginx
+
+descriptionAppend "Photoprism Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Photoprism Username: admin"
 descriptionAppend "Photoprism Password: ${ADMINPASSWORD}"
 	
