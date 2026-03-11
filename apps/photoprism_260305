@@ -62,3 +62,8 @@ echo "Run photoprism service" | log
 ufw allow 2342
 systemctl daemon-reload
 systemctl enable --now photoprism
+
+descriptionAppend "Photoprism Web UI: https://${CWM_DOMAIN}:2342"
+descriptionAppend "Photoprism Username: admin"
+descriptionAppend "Photoprism Password: ${ADMINPASSWORD}"
+	
