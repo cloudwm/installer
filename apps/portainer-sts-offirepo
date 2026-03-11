@@ -33,7 +33,7 @@ echo "Creating Docker Compose file for Portainer (without initial password)" | l
 cat << 'EOF' > /opt/portainer/docker-compose.yml
 services:
   portainer:
-    image: portainer/portainer-ce:2.33.2
+    image: portainer/portainer-ee:sts
     container_name: portainer
     restart: always
     ports:
@@ -136,3 +136,4 @@ descriptionAppend "Portainer certificates location: /opt/portainer/certs"
 tagScript success
 
 exit 0
+
