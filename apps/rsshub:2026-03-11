@@ -1,0 +1,118 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Check if we have docker and docker-compose" | log
+
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo usermod -aG docker $USER
+    sleep 5
+fi
+
+echo "Create docker-compose.yaml file" | log
+
+cat <<EOF > docker-compose.yaml
+services:
+    rsshub:
+        image: ghcr.io/diygod/rsshub:2026-03-11 # or ghcr.io/diygod/rsshub
+        restart: always
+        ports:
+            - '127.0.0.1:1200:1200'
+        environment:
+            NODE_ENV: production
+            CACHE_TYPE: redis
+            REDIS_URL: 'redis://redis:6379/'
+            PUPPETEER_WS_ENDPOINT: 'ws://browserless:3000'
+        healthcheck:
+            test: ['CMD', 'curl', '-f', 'http://localhost:1200/healthz']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+        depends_on:
+            - redis
+            - browserless # marked
+
+    browserless: # marked
+        image: browserless/chrome # marked
+        restart: always # marked
+        ulimits: # marked
+            core: # marked
+                hard: 0 # marked
+                soft: 0 # marked
+        healthcheck: # marked
+            test: ['CMD', 'curl', '-f', 'http://localhost:3000/pressure'] # marked
+            interval: 30s # marked
+            timeout: 10s # marked
+            retries: 3 # marked
+
+    redis:
+        image: redis:alpine
+        restart: always
+        volumes:
+            - redis-data:/data
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 5s
+
+volumes:
+    redis-data:
+EOF
+
+echo "Create nginx config file" | log
+
+tee /etc/nginx/sites-available/rsshub > /dev/null <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass http://127.0.0.1:1200;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+EOF
+
+ln -s /etc/nginx/sites-available/rsshub /etc/nginx/sites-enabled/rsshub
+rm -f /etc/nginx/sites-enabled/default
+systemctl reload nginx
+sudo systemctl enable nginx
+systemctl restart nginx
+
+echo "Run docker-compoose file" | log
+
+docker compose up -d

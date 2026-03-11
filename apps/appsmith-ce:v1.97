@@ -83,6 +83,6 @@ systemctl restart nginx
 
 descriptionAppend "URL: https://${CWM_DOMAIN}"
 descriptionAppend "Admin login: The administrator account registration is completed after the installation process."
-descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
+descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"
 
 
