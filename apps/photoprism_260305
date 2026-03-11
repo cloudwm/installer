@@ -63,7 +63,7 @@ systemctl daemon-reload
 systemctl enable --now photoprism
 
 
-
+echo "Create Nginx file" | log
 tee /etc/nginx/sites-available/photoprism > /dev/null <<EOF
 server {
     listen 80;
