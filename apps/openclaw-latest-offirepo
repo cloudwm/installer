@@ -6,12 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 rootDir=$(rootDir)
-
-
 echo "Installing OpenClaw AI Personal Assistant with Nginx HTTPS reverse proxy" | log
-
 export DEBIAN_FRONTEND="noninteractive"
-
 apt-get update
 installPackage curl git ca-certificates gnupg lsb-release build-essential jq openssl ufw
 
@@ -30,7 +26,7 @@ export PATH="/usr/local/bin:/root/.npm-global/bin:$PATH"
 hash -r
 openclaw --version || waitOrStop 1 "openclaw binary not found after install - PATH issue"
 
-sleep 10  # give npm postinstall hooks a moment
+sleep 10 # give npm postinstall hooks a moment
 
 echo "Running minimal onboarding + installing gateway service" | log
 
@@ -39,9 +35,16 @@ export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 mkdir -p "$XDG_RUNTIME_DIR"
 chown $(whoami):$(whoami) "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
-
 loginctl enable-linger $(whoami) || true
+
+# Verify lingering (critical for reboot persistence)
 sleep 2
+if loginctl show-user $(whoami) | grep -q "Linger=yes"; then
+    echo "Lingering enabled ✓ - gateway should survive reboot" | log
+else
+    echo "WARNING: Lingering NOT enabled! Gateway will stop after reboot/logout." | log
+    echo "Try: sudo loginctl enable-linger $(whoami)  then reboot and check." | log
+fi
 
 # Start D-Bus session if needed
 if ! pgrep -u $(whoami) dbus-daemon > /dev/null; then
@@ -59,10 +62,9 @@ export LOGNAME=root
 # Try onboarding with full environment
 openclaw onboard --non-interactive --accept-risk --mode local --install-daemon > /tmp/openclaw-onboard.log 2>&1
 ONBOARD_EXIT=$?
-
 if [ $ONBOARD_EXIT -ne 0 ]; then
     echo "Onboarding failed, attempting manual daemon installation..." | log
-    
+   
     mkdir -p ~/.openclaw
     cat << 'EOFCONFIG' > ~/.openclaw/config.json
 {
@@ -74,14 +76,14 @@ if [ $ONBOARD_EXIT -ne 0 ]; then
   }
 }
 EOFCONFIG
-    
+   
     openclaw daemon install --mode local || waitOrStop 1 "Onboarding / daemon setup failed"
 fi
 
 GATEWAY_TOKEN=$(openssl rand -hex 64)
-
-echo "Configuring gateway for loopback + Nginx proxy" | log
+echo "Configuring gateway for loopback + Nginx proxy + Control UI allowed origins" | log
 mkdir -p ~/.openclaw
+
 cat << EOF > ~/.openclaw/openclaw.json
 {
   "gateway": {
@@ -92,11 +94,19 @@ cat << EOF > ~/.openclaw/openclaw.json
       "mode": "token",
       "token": "${GATEWAY_TOKEN}"
     },
-    "trustedProxies": ["127.0.0.1"]
+    "trustedProxies": ["127.0.0.1"],
+    "controlUi": {
+      "allowedOrigins": [
+        "https://${CWM_DOMAIN}",
+        "https://${CWM_DOMAIN}/"
+      ]
+    }
   }
 }
 EOF
+
 chmod 600 ~/.openclaw/openclaw.json
+sleep 2  # give filesystem a moment
 
 systemctl --user daemon-reload
 
@@ -112,11 +122,11 @@ if [ -z "$SERVICE_NAME" ]; then
     waitOrStop 1 "Gateway service not found"
 fi
 
-# Start the gateway service
+# Enable + start (enable makes it start on boot with lingering)
 systemctl --user stop "$SERVICE_NAME" 2>/dev/null || true
 sleep 2
-systemctl --user start "$SERVICE_NAME"
-waitOrStop 0 "Failed to start OpenClaw gateway"
+systemctl --user enable --now "$SERVICE_NAME"
+waitOrStop 0 "Failed to enable/start OpenClaw gateway"
 
 sleep 3
 systemctl --user is-active --quiet "$SERVICE_NAME" || waitOrStop 1 "Gateway service not running"
@@ -151,7 +161,7 @@ rm -f /etc/nginx/sites-enabled/default 2>/dev/null
 nginx -t && systemctl restart nginx
 waitOrStop 0 "Nginx configuration or restart failed"
 
-# Descriptions with pairing info (unchanged from your request)
+# Descriptions with pairing info (unchanged)
 descriptionAppend " "
 descriptionAppend "🦞 OpenClaw AI Personal Assistant installed!"
 descriptionAppend " "
@@ -178,10 +188,10 @@ descriptionAppend "1. Open the dashboard link above"
 descriptionAppend "2. In the Chat or Overview tab, look for a pairing code (e.g. ABCDEF-123456) or QR code"
 descriptionAppend " (it may appear automatically or after clicking 'Connect'/'Reconnect')"
 descriptionAppend "3. On the server terminal, run:"
-descriptionAppend "   openclaw pairing list main"
+descriptionAppend " openclaw pairing list main"
 descriptionAppend " → You should see the pending code and browser info"
 descriptionAppend "4. Approve it:"
-descriptionAppend "   openclaw pairing approve main YOUR-CODE-HERE"
+descriptionAppend " openclaw pairing approve main YOUR-CODE-HERE"
 descriptionAppend " (replace YOUR-CODE-HERE with the actual code)"
 descriptionAppend "5. Refresh the browser page → status should turn green/connected"
 descriptionAppend " "
@@ -202,7 +212,12 @@ descriptionAppend " • Complete pairing as described above"
 descriptionAppend " • Configure model API keys: openclaw configure --section models"
 descriptionAppend " • Hatch your bot: openclaw tui"
 descriptionAppend " • Add channels: openclaw configure --section channels.telegram"
-descriptionAppend " • Service status: systemctl --user status openclaw-gateway"
-descriptionAppend " • Logs: journalctl --user -u openclaw-gateway -f"
+descriptionAppend " • Service status: systemctl --user status ${SERVICE_NAME}"
+descriptionAppend " • Logs: journalctl --user -u ${SERVICE_NAME} -f"
+descriptionAppend " "
+descriptionAppend "Important after reboot:"
+descriptionAppend " • Run: systemctl --user status ${SERVICE_NAME}"
+descriptionAppend " • If inactive → check lingering: loginctl show-user $(whoami) | grep Linger"
+descriptionAppend " • Should say Linger=yes"
 
 tagScript success
