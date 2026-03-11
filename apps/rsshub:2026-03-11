@@ -116,3 +116,7 @@ systemctl restart nginx
 echo "Run docker-compoose file" | log
 
 docker compose up -d
+
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"
+
