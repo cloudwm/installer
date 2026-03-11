@@ -1,0 +1,63 @@
+#!/bin/bash
+
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+apt update
+apt dist-upgrade -y
+apt install -y ffmpeg exiftool darktable libpng-dev libjpeg-dev libtiff-dev libvips imagemagick
+apt install -y mariadb-server
+
+echo "Download and extract photoprism" | log
+wget https://dl.photoprism.app/pkg/linux/photoprism_260305-fad9d5395-linux-amd64.tar.gz
+mkdir /opt/photoprism
+tar xzf photoprism_260305-fad9d5395-linux-amd64.tar.gz -C /opt/photoprism/
+rm photoprism_260305-fad9d5395-linux-amd64.tar.gz
+
+echo "Add user photoprism to ubuntu" | log
+useradd --system photoprism
+mkdir /var/lib/photoprism
+chown -R photoprism:photoprism /var/lib/photoprism /opt/photoprism
+cd /var/lib/photoprism
+
+echo "Create .env file" | log
+cat <<EOF > .env
+PHOTOPRISM_AUTH_MODE="password"
+PHOTOPRISM_ADMIN_PASSWORD="${ADMINPASSWORD}"
+
+# PhotoPrism storage directories
+PHOTOPRISM_STORAGE_PATH="/var/lib/photoprism"
+PHOTOPRISM_ORIGINALS_PATH="/var/lib/photoprism/photos/Originals"
+PHOTOPRISM_IMPORT_PATH="/var/lib/photoprism/photos/Import"
+
+EOF
+chown photoprism:photoprism .env
+chmod 640 .env
+
+
+echo "Create photoprism service file" | log
+cat <<EOF > /etc/systemd/system/photoprism.service
+[Unit]
+Description=PhotoPrism service
+After=network.target
+
+[Service]
+Type=forking
+User=photoprism
+Group=photoprism
+WorkingDirectory=/opt/photoprism
+EnvironmentFile=/var/lib/photoprism/.env
+ExecStart=/opt/photoprism/bin/photoprism up -d
+ExecStop=/opt/photoprism/bin/photoprism down
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Run photoprism service" | log
+systemctl daemon-reload
+systemctl enable --now photoprism
