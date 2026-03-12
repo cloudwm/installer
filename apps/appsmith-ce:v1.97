@@ -84,7 +84,24 @@ EOF
 
 docker compose up -d
 
+all_healthy=true
 
+for c in $(docker ps -q); do
+  name=$(docker inspect --format='{{.Name}}' "$c" | sed 's#^/##')
+  health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$c")
+
+  echo "$name: $health"
+
+  if [[ "$health" != "healthy" ]]; then
+    all_healthy=false
+  fi
+done
+
+if [[ "$all_healthy" == "true" ]]; then
+  echo "service started" | log
+else
+  echo "service not ready" | log
+fi
 
 
 echo "Adding descriptions" | log
