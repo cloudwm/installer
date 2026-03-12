@@ -84,24 +84,41 @@ EOF
 
 docker compose up -d
 
-all_healthy=true
+#!/bin/bash
 
-for c in $(docker ps -q); do
-  name=$(docker inspect --format='{{.Name}}' "$c" | sed 's#^/##')
-  health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$c")
+MAX_RETRIES=3
+SLEEP_TIME=15
 
-  echo "$name: $health"
+for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
+  echo "Attempt $attempt/$MAX_RETRIES"
 
-  if [[ "$health" != "healthy" ]]; then
-    all_healthy=false
+  all_healthy=true
+
+  for c in $(docker ps -q); do
+    name=$(docker inspect --format='{{.Name}}' "$c" | sed 's#^/##')
+    health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$c")
+
+    echo "$name: $health"
+
+    if [[ "$health" != "healthy" ]]; then
+      all_healthy=false
+    fi
+  done
+
+  if [[ "$all_healthy" == "true" ]]; then
+    echo "service started" | log
+    exit 0
   fi
+
+  if [[ $attempt -lt $MAX_RETRIES ]]; then
+    echo "Some containers not healthy. Retrying in $SLEEP_TIME seconds..."
+    sleep $SLEEP_TIME
+  fi
+
 done
 
-if [[ "$all_healthy" == "true" ]]; then
-  echo "service started" | log
-else
-  echo "service not ready" | log
-fi
+echo "not ready" | log
+exit 1
 
 
 echo "Adding descriptions" | log
