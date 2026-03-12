@@ -1,6 +1,6 @@
 #!/bin/bash
 MAX_RETRIES=3
-SLEEP_TIME=20
+SLEEP_TIME=40
 
 
 if [ -f "include/startup.sh" ]; then
@@ -124,5 +124,4 @@ for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
   fi
 done
 
-echo "Service not ready" | log
-exit 1
+waitOrStop 0 "Service not ready"
