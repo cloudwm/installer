@@ -1,7 +1,7 @@
 #!/bin/bash
-MAX_RETRIES=3
-SLEEP_TIME=40
-
+MAX_RETRIES=5
+SLEEP_TIME=30
+appDir="/opt/installer"
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -88,14 +88,7 @@ EOF
 docker compose up -d
 
 
-echo "Adding descriptions" | log
-descriptionAppend "URL: https://${CWM_DOMAIN}"
-descriptionAppend "Admin login: The administrator account registration is completed after the installation process."
-descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"
-
-
-
-
+success=false
 
 for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
   echo "Attempt $attempt/$MAX_RETRIES"
@@ -115,7 +108,8 @@ for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
 
   if [[ "$all_healthy" == "true" ]]; then
     echo "Service started" | log
-    exit 0
+    success=true
+    break
   fi
 
   if [[ $attempt -lt $MAX_RETRIES ]]; then
@@ -124,4 +118,14 @@ for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
   fi
 done
 
-waitOrStop 0 "Service not ready"
+if [[ "$success" != "true" ]]; then
+  waitOrStop 0 "Service not ready"
+fi
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Succesfully installed."
+descriptionAppend "Configuration files: ${appDir} "
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Admin login: The administrator account registration is completed after the installation process."
+
