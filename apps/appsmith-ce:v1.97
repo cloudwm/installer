@@ -1,4 +1,7 @@
 #!/bin/bash
+MAX_RETRIES=3
+SLEEP_TIME=20
+
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -84,42 +87,6 @@ EOF
 
 docker compose up -d
 
-#!/bin/bash
-
-MAX_RETRIES=3
-SLEEP_TIME=15
-
-for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
-  echo "Attempt $attempt/$MAX_RETRIES"
-
-  all_healthy=true
-
-  for c in $(docker ps -q); do
-    name=$(docker inspect --format='{{.Name}}' "$c" | sed 's#^/##')
-    health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$c")
-
-    echo "$name: $health"
-
-    if [[ "$health" != "healthy" ]]; then
-      all_healthy=false
-    fi
-  done
-
-  if [[ "$all_healthy" == "true" ]]; then
-    echo "service started" | log
-    exit 0
-  fi
-
-  if [[ $attempt -lt $MAX_RETRIES ]]; then
-    echo "Some containers not healthy. Retrying in $SLEEP_TIME seconds..."
-    sleep $SLEEP_TIME
-  fi
-
-done
-
-echo "not ready" | log
-exit 1
-
 
 echo "Adding descriptions" | log
 descriptionAppend "URL: https://${CWM_DOMAIN}"
@@ -127,3 +94,35 @@ descriptionAppend "Admin login: The administrator account registration is comple
 descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"
 
 
+
+
+
+for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
+  echo "Attempt $attempt/$MAX_RETRIES"
+
+  all_healthy=true
+
+  while IFS= read -r line; do
+    name=$(echo "$line" | awk '{print $1}')
+    health=$(echo "$line" | sed -n 's/.*(\(.*\)).*/\1/p')
+
+    echo "$name: ${health:-no-healthcheck}"
+
+    if [[ "$health" != "healthy" ]]; then
+      all_healthy=false
+    fi
+  done < <(docker ps --format '{{.Names}} {{.Status}}')
+
+  if [[ "$all_healthy" == "true" ]]; then
+    echo "Service started" | log
+    exit 0
+  fi
+
+  if [[ $attempt -lt $MAX_RETRIES ]]; then
+    echo "Some containers not healthy. Retrying in $SLEEP_TIME seconds..."
+    sleep "$SLEEP_TIME"
+  fi
+done
+
+echo "Service not ready" | log
+exit 1
