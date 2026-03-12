@@ -18,6 +18,49 @@ if ! command -v docker &> /dev/null; then
     sleep 5
 fi
 
+echo "Create and apply nginx config file" | log
+
+tee /etc/nginx/sites-available/rsshub > /dev/null <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass http://127.0.0.1:1200;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+EOF
+
+ln -s /etc/nginx/sites-available/rsshub /etc/nginx/sites-enabled/rsshub
+rm -f /etc/nginx/sites-enabled/default
+systemctl reload nginx
+systemctl enable nginx
+systemctl restart nginx
+
 echo "Create docker-compose.yaml file" | log
 
 cat <<EOF > docker-compose.yaml
@@ -70,48 +113,7 @@ volumes:
     redis-data:
 EOF
 
-echo "Create and apply nginx config file" | log
 
-tee /etc/nginx/sites-available/rsshub > /dev/null <<EOF
-server {
-    listen 80;
-    server_name ${CWM_DOMAIN};
-
-    return 301 https://\$host\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name ${CWM_DOMAIN};
-
-    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
-
-    client_max_body_size 500M;
-
-    location / {
-        proxy_pass http://127.0.0.1:1200;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Port \$server_port;
-
-        proxy_read_timeout 300s;
-        proxy_connect_timeout 300s;
-        proxy_send_timeout 300s;
-    }
-}
-EOF
-
-ln -s /etc/nginx/sites-available/rsshub /etc/nginx/sites-enabled/rsshub
-rm -f /etc/nginx/sites-enabled/default
-systemctl reload nginx
-systemctl enable nginx
-systemctl restart nginx
 
 echo "Run docker-compoose file" | log
 
