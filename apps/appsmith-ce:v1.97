@@ -2,6 +2,8 @@
 MAX_RETRIES=5
 SLEEP_TIME=30
 appDir="/opt/installer"
+success=false
+
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -88,7 +90,6 @@ EOF
 docker compose up -d
 
 
-success=false
 
 for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
   echo "Attempt $attempt/$MAX_RETRIES"
@@ -113,7 +114,7 @@ for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
   fi
 
   if [[ $attempt -lt $MAX_RETRIES ]]; then
-    echo "Some containers not healthy. Retrying in $SLEEP_TIME seconds..."
+    echo "Some containers not healthy. Retrying in $SLEEP_TIME seconds..." | log
     sleep "$SLEEP_TIME"
   fi
 done

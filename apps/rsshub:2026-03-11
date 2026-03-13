@@ -119,6 +119,40 @@ echo "Run docker-compoose file" | log
 
 docker compose up -d
 
+
+for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
+  echo "Attempt $attempt/$MAX_RETRIES"
+
+  all_healthy=true
+
+  while IFS= read -r line; do
+    name=$(echo "$line" | awk '{print $1}')
+    health=$(echo "$line" | sed -n 's/.*(\(.*\)).*/\1/p')
+
+    echo "$name: ${health:-no-healthcheck}"
+
+    if [[ "$health" != "healthy" ]]; then
+      all_healthy=false
+    fi
+  done < <(docker ps --format '{{.Names}} {{.Status}}')
+
+  if [[ "$all_healthy" == "true" ]]; then
+    echo "Service started" | log
+    success=true
+    break
+  fi
+
+  if [[ $attempt -lt $MAX_RETRIES ]]; then
+    echo "Some containers not healthy. Retrying in $SLEEP_TIME seconds..." | log
+    sleep "$SLEEP_TIME"
+  fi
+done
+
+if [[ "$success" != "true" ]]; then
+  waitOrStop 0 "Service not ready"
+fi
+
+
 echo "Adding descriptions" | log
 descriptionAppend "URL: https://${CWM_DOMAIN}"
 descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"
