@@ -125,8 +125,10 @@ fi
 
 
 echo "Adding descriptions" | log
+
 descriptionAppend "Succesfully installed."
+descriptionAppend "Service: AppSmith"
 descriptionAppend "Configuration files: ${appDir} "
 descriptionAppend "URL: https://${CWM_DOMAIN}"
 descriptionAppend "Admin login: The administrator account registration is completed after the installation process."
-
+descriptionAppend "Nginx config file /etc/nginx/sites-enabled/appsmith"

@@ -109,7 +109,9 @@ systemctl enable --now photoprism
 
 
 echo "Adding descriptions" | log
+descriptionAppend "Succesfully installed."
+descriptionAppend "Service: PhotoPrism"
 descriptionAppend "Photoprism Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Photoprism Username: admin"
 descriptionAppend "Photoprism Password: ${ADMINPASSWORD}"
-	
+descriptionAppend "Nginx config file /etc/nginx/sites-enabled/photoprism"

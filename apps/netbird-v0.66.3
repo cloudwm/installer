@@ -77,12 +77,13 @@ fi
 
 
 echo "Adding descriptions" | log
+descriptionAppend "Succesfully installed."
+descriptionAppend "Service: NetBird"
 descriptionAppend "URL: https://${CWM_DOMAIN}"
 descriptionAppend "Admin login: The administrator account registration is completed after the installation process in URL:https://${CWM_DOMAIN}."
 descriptionAppend "Docker Compose: ${appDir}/docker-compose.yml"
 descriptionAppend "Config file: ${appDir}/config.yaml"
 descriptionAppend "Dashboard file: ${appDir}/dashboard.env"
-
 descriptionAppend "Nginx config file /etc/nginx/sites-enabled/nginx-netbird.conf"
 
 

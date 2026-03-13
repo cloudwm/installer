@@ -1,4 +1,8 @@
 #!/bin/bash
+MAX_RETRIES=5
+SLEEP_TIME=30
+appDir="/opt/installer"
+success=false
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -154,6 +158,10 @@ fi
 
 
 echo "Adding descriptions" | log
-descriptionAppend "URL: https://${CWM_DOMAIN}"
-descriptionAppend "Docker Compose: /opt/installer/docker-compose.yml"
-
+descriptionAppend "Succesfully installed."
+descriptionAppend "Service: RSSHub"
+descriptionAppend "URL: https://${CWM_DOMAIN}/rsshub"
+descriptionAppend "Docker Compose: ${appDir}/docker-compose.yml"
+descriptionAppend "Healthcheck: http://localhost:1200/healthz"
+descriptionAppend "Redis Cache: redis://redis:6379"
+descriptionAppend "Nginx config file /etc/nginx/sites-enabled/rsshub"
