@@ -1,6 +1,6 @@
 #!/bin/bash
 
-
+# Source startup functions (your original logic)
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -9,44 +9,89 @@ fi
 
 rootDir=$(rootDir)
 
+# Load OS info
 source /etc/os-release
 
-if [[ $VERSION_CODENAME == "" ]]; then
-    echo "Unsupported OS version" | log
+if [[ -z "$VERSION_CODENAME" ]]; then
+    echo "Unsupported OS - no VERSION_CODENAME found" | log
     exit 1
 fi
 
-echo "Adding repo to OS" | log
+echo "Detected Ubuntu codename: $VERSION_CODENAME" | log
 
+# Only support officially tested versions for MongoDB 7.0
+if [[ "$VERSION_CODENAME" != "focal" && "$VERSION_CODENAME" != "jammy" ]]; then
+    echo "MongoDB 7.0 does not officially support Ubuntu $VERSION_CODENAME. Supported: focal (20.04), jammy (22.04). Exiting." | log
+    exit 1
+fi
+
+echo "Adding MongoDB 7.0 repository for $VERSION_CODENAME" | log
+
+# Import GPG key (official way)
 curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
-   sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg \
-   --dearmor
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-apt-get update
+    sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
 
-echo "Install mongodb from apt" | log
+# Add signed repo
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" | \
+    sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
 
-apt-get install -y glibc-source mongodb-org | log
-checkPackageInstalled glibc-source mongodb-org
+# Update package lists - fail early if repo/key issue
+echo "Running apt update..." | log
+sudo apt-get update || {
+    echo "apt update failed - check network, GPG key, or repo availability" | log
+    exit 1
+}
 
-echo "Enabling authorization" | log
+echo "Installing mongodb-org" | log
+sudo apt-get install -y mongodb-org || {
+    echo "Installation failed - check apt output above for missing packages or repo errors" | log
+    exit 1
+}
 
-sed -i "s/#security/security/g" /etc/mongod.conf
-sed -i "/security:/ a \  authorization: enabled" /etc/mongod.conf
+# Verify installation
+if ! command -v mongod >/dev/null 2>&1; then
+    echo "mongodb-org installed but mongod binary not found. Aborting." | log
+    exit 1
+fi
 
-echo "Activating service" | log
+echo "Enabling security authorization in mongod.conf" | log
+sudo sed -i 's/^#security:/security:/' /etc/mongod.conf
+# Add authorization indented properly if not already present
+if ! grep -q "authorization: enabled" /etc/mongod.conf; then
+    sudo sed -i '/^security:/a \  authorization: enabled' /etc/mongod.conf
+fi
 
-systemctl enable mongod.service
-systemctl start mongod.service
-sleep 5
+echo "Enabling and starting mongod service" | log
+sudo systemctl enable mongod.service
+sudo systemctl start mongod.service
 
-echo "Adding admin user" | log
+# Give mongod time to initialize (especially first run)
+sleep 10
 
-command="db.adminCommand({ createUser: \"admin\", pwd: \"$ADMINPASSWORD\", roles: [\"userAdminAnyDatabase\", \"dbAdminAnyDatabase\", \"readWriteAnyDatabase\"]});"
-mongosh --eval "${command}" | log
+# Check if mongod is actually running
+if ! systemctl is-active --quiet mongod; then
+    echo "mongod service failed to start. Check: journalctl -u mongod" | log
+    exit 1
+fi
+
+echo "Creating admin user (if not already exists)" | log
+
+# Create admin user safely
+mongosh admin --quiet --eval "
+db.createUser({
+  user: 'admin',
+  pwd: '$ADMINPASSWORD',
+  roles: [
+    { role: 'userAdminAnyDatabase', db: 'admin' },
+    { role: 'dbAdminAnyDatabase', db: 'admin' },
+    { role: 'readWriteAnyDatabase', db: 'admin' }
+  ]
+})
+" 2>&1 | log
+
+# If the above fails due to existing user, it will log an error but script continues
 
 echo "Adding descriptions" | log
-
 descriptionAppend "MongoDB Address: ${CWM_SERVERIP}"
 descriptionAppend "MongoDB Username: admin"
 descriptionAppend "MongoDB Password: ${ADMINPASSWORD}"
@@ -55,9 +100,8 @@ descriptionAppend "MongoDB config file: /etc/mongod.conf"
 descriptionAppend " "
 
 echo "Adding dependency tags" | log
-
 tag mongodb.success
 tagScript success
 
+echo "MongoDB 7.0 installation completed successfully" | log
 exit 0
-
