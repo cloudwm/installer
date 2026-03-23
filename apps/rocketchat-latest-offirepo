@@ -6,7 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist nginx.success
 checkTagExist mongodb.success
 checkTagExist nodejs.success
 
