@@ -76,7 +76,7 @@ sed -i "s/CRT/fullchain.pem/g" /etc/nginx/sites-available/rocketchat.conf
 ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
-systemctl reload nginx
+systemctl start nginx
 waitOrStop 0 "Reload nginx service failed"
 
 echo "Optimizing Mongo" | log
