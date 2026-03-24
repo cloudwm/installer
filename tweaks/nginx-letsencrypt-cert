@@ -14,6 +14,7 @@ apt-get update
 installPackage certbot python3-certbot-nginx openssl nginx
 
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
+systemctl enable nginx
 systemctl stop nginx
 if certbot certonly --standalone -d "${CWM_DOMAIN}" \
     --non-interactive --agree-tos \
