@@ -114,15 +114,15 @@ systemctl enable --now photoprism
 HTTP_CODE=$(curl -L -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$URL")
 
 if [ "$HTTP_CODE" -eq 200 ]; then
-    echo "PhotoPrism is ready" | log
+    echo "PhotoPrism service is ready" | log
 else
-    waitOrStop 0 "Service not ready"
+    waitOrStop 0 "PhotoPrism service not ready"
 f
 
 if systemctl is-active --quiet nginx; then
-    echo "nginx service is ready" | log
+    echo "Nginx service is ready" | log
 else
-    waitOrStop 0 "nginx service not ready"
+    waitOrStop 0 "Nginx service not ready"
 fi
 
 echo "Adding descriptions" | log

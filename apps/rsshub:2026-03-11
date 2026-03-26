@@ -156,6 +156,11 @@ if [[ "$success" != "true" ]]; then
   waitOrStop 0 "Service not ready"
 fi
 
+if systemctl is-active --quiet nginx; then
+    echo "Nginx service is ready" | log
+else
+    waitOrStop 0 "Nginx service not ready"
+fi
 
 echo "Adding descriptions" | log
 descriptionAppend "Succesfully installed."
