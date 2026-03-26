@@ -1,11 +1,15 @@
 #!/bin/bash
 
+URL="http://localhost:2342"
+TIMEOUT=30
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
+
+
 
 apt update
 apt dist-upgrade -y
@@ -107,6 +111,19 @@ systemctl enable --now photoprism
 
 
 
+HTTP_CODE=$(curl -L -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$URL")
+
+if [ "$HTTP_CODE" -eq 200 ]; then
+    echo "PhotoPrism is ready" | log
+else
+    waitOrStop 0 "Service not ready"
+f
+
+if systemctl is-active --quiet nginx; then
+    echo "nginx service is ready" | log
+else
+    waitOrStop 0 "nginx service not ready"
+fi
 
 echo "Adding descriptions" | log
 descriptionAppend "Succesfully installed."
