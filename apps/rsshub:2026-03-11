@@ -22,7 +22,7 @@ if ! command -v docker &> /dev/null; then
     sleep 5
 fi
 
-echo "Create and apply nginx config file" | log
+echo "Create nginx config file" | log
 
 tee /etc/nginx/sites-available/rsshub > /dev/null <<EOF
 server {
@@ -59,14 +59,16 @@ server {
 }
 EOF
 
+echo "Create Nginx service" | log
 ln -s /etc/nginx/sites-available/rsshub /etc/nginx/sites-enabled/rsshub
 rm -f /etc/nginx/sites-enabled/default
 systemctl reload nginx
 systemctl enable nginx
 systemctl restart nginx
+waitOrStop 0 "Nginx service not ready"
+
 
 echo "Create docker-compose.yaml file" | log
-
 cat <<EOF > docker-compose.yaml
 services:
     rsshub:
@@ -120,9 +122,8 @@ EOF
 
 
 echo "Run docker-compoose file" | log
-
 docker compose up -d
-
+waitOrStop 0 "Service not ready"
 
 for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
   echo "Attempt $attempt/$MAX_RETRIES"

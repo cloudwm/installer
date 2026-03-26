@@ -23,7 +23,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 
-echo "Create and apply nginx config" | log
+echo "Create nginx config" | log
 
 tee /etc/nginx/sites-available/appsmith > /dev/null <<EOF
 server {
@@ -60,12 +60,13 @@ server {
 }
 EOF
 
+echo "Create Nginx service" | log
 ln -s /etc/nginx/sites-available/appsmith /etc/nginx/sites-enabled/appsmith
 rm -f /etc/nginx/sites-enabled/default
 systemctl reload nginx
 systemctl enable nginx
 systemctl restart nginx
-
+waitOrStop 0 "Nginx service not ready"
 
 echo "Create and run Docker Compose" | log
 
@@ -86,48 +87,11 @@ services:
 EOF
 
 
-
+echo "Run docker compsoe command" | log
 docker compose up -d
+waitOrStop 0 "Service not ready"
 
 
-
-for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
-  echo "Attempt $attempt/$MAX_RETRIES"
-
-  all_healthy=true
-
-  while IFS= read -r line; do
-    name=$(echo "$line" | awk '{print $1}')
-    health=$(echo "$line" | sed -n 's/.*(\(.*\)).*/\1/p')
-
-    echo "$name: ${health:-no-healthcheck}"
-
-    if [[ "$health" != "healthy" ]]; then
-      all_healthy=false
-    fi
-  done < <(docker ps --format '{{.Names}} {{.Status}}')
-
-  if [[ "$all_healthy" == "true" ]]; then
-    echo "Service started" | log
-    success=true
-    break
-  fi
-
-  if [[ $attempt -lt $MAX_RETRIES ]]; then
-    echo "Some containers not healthy. Retrying in $SLEEP_TIME seconds..." | log
-    sleep "$SLEEP_TIME"
-  fi
-done
-
-if [[ "$success" != "true" ]]; then
-  waitOrStop 0 "Service not ready"
-fi
-
-if systemctl is-active --quiet nginx; then
-    echo "Nginx service is ready" | log
-else
-    waitOrStop 0 "Nginx service not ready"
-fi
 
 echo "Adding descriptions" | log
 

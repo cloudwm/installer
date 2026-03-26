@@ -1,7 +1,5 @@
 #!/bin/bash
 
-URL="http://localhost:2342"
-TIMEOUT=30
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -16,7 +14,7 @@ apt dist-upgrade -y
 apt install -y ffmpeg exiftool darktable libpng-dev libjpeg-dev libtiff-dev libvips imagemagick
 apt install -y mariadb-server
 
-echo "Create and apply Nginx file" | log
+echo "Create Nginx file" | log
 
 tee /etc/nginx/sites-available/photoprism > /dev/null <<EOF
 server {
@@ -53,11 +51,14 @@ server {
 }
 EOF
 
+echo "Start Nginx service" | log 
 ln -s /etc/nginx/sites-available/photoprism /etc/nginx/sites-enabled/photoprism
 rm -f /etc/nginx/sites-enabled/default
 systemctl reload nginx
 systemctl enable nginx
 systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
 echo "Download and extract photoprism" | log
 wget https://dl.photoprism.app/pkg/linux/photoprism_260305-fad9d5395-linux-amd64.tar.gz
 mkdir /opt/photoprism
@@ -107,23 +108,10 @@ EOF
 echo "Run photoprism service" | log
 systemctl daemon-reload
 systemctl enable --now photoprism
+waitOrStop 0 "PhotoPrism service not ready"
 
 
 
-
-HTTP_CODE=$(curl -L -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$URL")
-
-if [ "$HTTP_CODE" -eq 200 ]; then
-    echo "PhotoPrism service is ready" | log
-else
-    waitOrStop 0 "PhotoPrism service not ready"
-f
-
-if systemctl is-active --quiet nginx; then
-    echo "Nginx service is ready" | log
-else
-    waitOrStop 0 "Nginx service not ready"
-fi
 
 echo "Adding descriptions" | log
 descriptionAppend "Succesfully installed."
