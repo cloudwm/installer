@@ -12,9 +12,9 @@ waitOrStop 0 "Failed to install dependencies"
 echo "Downloading GitLab" | log
 curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
 waitOrStop 0 "File not downloaded from official source"
-bash script.deb.sh
-sleep 30
+bash script.deb.sh | log
 waitOrStop 0 "Failed to install GitLab"
+ls /etc/apt/sources.list.d/ | log
 
 echo "Installing GitLab from apt" | log
 apt update
