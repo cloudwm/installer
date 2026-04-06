@@ -16,25 +16,11 @@ installPackage certbot python3-certbot-nginx openssl nginx
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
 systemctl enable nginx
 systemctl stop nginx
-
-MAX_RETRIES=3
-CERT_OBTAINED=false
-
-for attempt in $(seq 1 $MAX_RETRIES); do
-    echo "Let's Encrypt certificate attempt ${attempt}/${MAX_RETRIES}..." | log
-    if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-        --non-interactive --agree-tos \
-        -m "admin@${CWM_DOMAIN}" -v; then
-        echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
-        CERT_OBTAINED=true
-        break
-    fi
-    echo "Attempt ${attempt} failed." | log
-    [ $attempt -lt $MAX_RETRIES ] && sleep 5
-done
-
-if [ "$CERT_OBTAINED" = false ]; then
-    echo "All ${MAX_RETRIES} attempts failed. Falling back to self-signed certificate..." | log
+if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+    --non-interactive --agree-tos \
+    -m "admin@${CWM_DOMAIN}" -v; then
+    echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
+else
     mkdir -p "${LE_DIR}"
     chmod 755 /etc/letsencrypt/live
     chmod 755 "${LE_DIR}"
@@ -45,3 +31,4 @@ if [ "$CERT_OBTAINED" = false ]; then
         2>/dev/null
     echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
 fi
+
