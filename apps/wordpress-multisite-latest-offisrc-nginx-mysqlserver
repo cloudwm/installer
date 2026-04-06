@@ -23,7 +23,7 @@ WPID=`shuf -i 100000-999999 -n 1`
 
 echo "Setting nginx config" | log
 cp $rootDir/tweaks/extras/wordpress-nginx/wordpress.conf /etc/nginx/sites-available/
-sed -i "s|DOMAIN|\${CWM_DOMAIN}|g" /etc/nginx/sites-available/wordpress.conf
+ sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/wordpress.conf
 # Symlink wordpress vhost
 ln -s /etc/nginx/sites-available/wordpress.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
