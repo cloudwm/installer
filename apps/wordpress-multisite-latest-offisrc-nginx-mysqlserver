@@ -23,7 +23,7 @@ WPID=`shuf -i 100000-999999 -n 1`
 
 echo "Setting nginx config" | log
 cp $rootDir/tweaks/extras/wordpress-nginx/wordpress.conf /etc/nginx/sites-available/
- sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/wordpress.conf
+sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/wordpress.conf
 # Symlink wordpress vhost
 ln -s /etc/nginx/sites-available/wordpress.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
@@ -46,7 +46,7 @@ wp core download --path=${WP_PATH} --locale=en_US --allow-root | log
 waitOrStop 0 "Application failed to download"
 wp config create --dbname=wordpress_${WPID} --dbuser=wp_${WPID} --dbpass=${ADMINPASSWORD} --locale=en_US --path=${WP_PATH} --allow-root | log
 waitOrStop 0 "Failed to create database"
-wp core multisite-install --url=https://${CWM_DISPLAYED_ADDRESS} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
+wp core multisite-install --url=https://${CWM_DOMAIN} --title="Welcome to the WordPress" --admin_user="admin" --admin_password="${ADMINPASSWORD}" --admin_email="${ADMINEMAIL}" --path=${WP_PATH} --allow-root | log
 waitOrStop 0 "Failed to install application"
 
 echo "Fixing app permissions" | log
@@ -60,7 +60,7 @@ echo "Misc. cleanups" | log
 rm $WP_PATH/index.nginx-debian.html
 
 echo "Adding descriptions" | log
-descriptionAppend "Wordpress Admin Web UI: https://${CWM_DISPLAYED_ADDRESS}/wp-login.php"
+descriptionAppend "Wordpress Admin Web UI: https://${CWM_DOMAIN}/wp-login.php"
 descriptionAppend "Wordpress Username: admin"
 descriptionAppend "Wordpress Password: ${ADMINPASSWORD}"
 descriptionAppend " "
