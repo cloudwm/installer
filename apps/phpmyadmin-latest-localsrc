@@ -6,9 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist php.success
-checkTagExist httpd.success
-
 rootDir=$(rootDir)
 myadminPath=/var/www/html/phpmyadmin
 
