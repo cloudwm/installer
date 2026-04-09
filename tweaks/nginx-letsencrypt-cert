@@ -31,3 +31,4 @@ else
         2>/dev/null
     echo "Self signed certificate has been issued for server ${CWM_DOMAIN}" | log
 fi
+
