@@ -6,7 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-LOG_PATH="/var/log/ollama-setup.log"
+MODEL="gemma4:26b"
+LOG_PATH="/var/log/gemma4-setup.log"
 MACHINE_IP=$(hostname -I | awk '{print $1}')
 
 [ -f "$LOG_PATH" ] || touch "$LOG_PATH"
@@ -17,7 +18,7 @@ systemctl start nginx 2>/dev/null
 echo "Opening Ollama's default port: 11434..." | log
 ufw allow 11434/tcp
 
-echo "Installing Ollama..." | log
+echo "Installing Ollama (runtime for Gemma 4)..." | log
 curl -fsSL --http1.1 https://ollama.com/install.sh | sh | tee "$LOG_PATH"
 INSTALL_PID=$!
 wait $INSTALL_PID
@@ -35,16 +36,20 @@ systemctl daemon-reload
 systemctl enable ollama.service
 systemctl start ollama.service
 
+echo "Pulling model: ${MODEL}..." | log
+ollama pull "$MODEL"
+echo "Model ${MODEL} pulled successfully." | log
+
 # --- configure nginx reverse proxy for Ollama ---
 switch_nginx_to_proxy() {
-    echo "Configuring nginx reverse proxy for Ollama..." | log
+    echo "Configuring nginx reverse proxy for Gemma 4 (Ollama)..." | log
 
     # Remove the install progress site so it doesn't conflict
     rm -f /etc/nginx/sites-enabled/installProgress.conf
     rm -f /etc/nginx/sites-enabled/default
 
     LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-    NGINX_CONF="/etc/nginx/sites-available/ollama.conf"
+    NGINX_CONF="/etc/nginx/sites-available/gemma4.conf"
 
     if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
         echo "SSL certificates found, configuring HTTPS..." | log
@@ -91,15 +96,15 @@ server {
 EOF
     fi
 
-    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/ollama.conf
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/gemma4.conf
     nginx -t || return 1
     systemctl reload nginx
 
-    echo "nginx configured for Ollama." | log
+    echo "nginx configured for Gemma 4." | log
 }
 
 configure_motd() {
-    echo "Configuring system MOTD with Ollama info..." | log
+    echo "Configuring system MOTD with Gemma 4 info..." | log
 
     chmod -x /etc/update-motd.d/* 2>/dev/null || true
     rm -f /etc/motd 2>/dev/null
@@ -117,10 +122,10 @@ configure_motd() {
 
     cat > /etc/motd <<EOM
 ──────────────────────────────────────────────
-🦙  Ollama – Installation Complete
+🤖  Gemma 4 – Installation Complete
 ──────────────────────────────────────────────
 
-    Version: ${OLLAMA_VERSION}
+    Model: ${MODEL} (via Ollama ${OLLAMA_VERSION})
     API URL: ${SCHEME}://${CWM_DOMAIN}
     Local API: http://127.0.0.1:11434
     Machine IP: ${MACHINE_IP}
@@ -133,11 +138,11 @@ configure_motd() {
     Setup Log: ${LOG_PATH}
 
 ──────────────────────────────────────────────
-💡  Ollama management:
+💡  Gemma 4 management (via Ollama):
     ollama list                     # list downloaded models
-    ollama pull llama3              # download a model
-    ollama run llama3               # run a model interactively
-    ollama rm llama3                # remove a model
+    ollama pull ${MODEL}          # re-download model
+    ollama run ${MODEL}           # run model interactively
+    ollama rm ${MODEL}            # remove the model
 
     sudo systemctl status ollama
     sudo systemctl restart ollama
@@ -146,7 +151,7 @@ configure_motd() {
 🌐  API usage:
     curl ${SCHEME}://${CWM_DOMAIN}/api/tags
     curl ${SCHEME}://${CWM_DOMAIN}/api/generate -d '{
-      "model": "llama3", "prompt": "Hello"
+      "model": "${MODEL}", "prompt": "Hello"
     }'
 
 🧹  Remove this message:
@@ -155,7 +160,7 @@ configure_motd() {
 EOM
 
     chmod 644 /etc/motd
-    echo "Custom MOTD installed at /etc/motd with Ollama details." | log
+    echo "Custom MOTD installed at /etc/motd with Gemma 4 details." | log
 }
 
 switch_nginx_to_proxy
