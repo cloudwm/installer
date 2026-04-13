@@ -6,8 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-MAX_RETRIES=3
-SLEEP_TIME=30
+MAX_RETRIES=1
+SLEEP_TIME=5
 appDir="/opt/installer"
 success=false
 
@@ -104,8 +104,8 @@ for ((i=1; i<=MAX_RETRIES; i++)); do
     break
   fi
 
-  echo "Appsmith is not running yet (attempt $i/$MAX_RETRIES)"
-  sleep "$SLEEP_TIME" | log
+  echo "Appsmith is not running yet (attempt $i/$MAX_RETRIES)" | log
+  sleep "$SLEEP_TIME" 
 done
 
 if [ "$success" != true ]; then
