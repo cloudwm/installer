@@ -5,13 +5,37 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
+
+if [ -z "${CWM_DOMAIN}" ]; then
+    PRIMARY_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+    [ -z "${PRIMARY_IP}" ] && PRIMARY_IP=$(hostname -I | awk '{print $1}')
+    export CWM_DOMAIN="${PRIMARY_IP//./-}.dev-cloud-xip.com"
+    echo "CWM_DOMAIN was empty; derived ${CWM_DOMAIN} from ${PRIMARY_IP}" | log
+fi
+
 echo "Installing dependencies" | log
 installPackage ca-certificates tzdata perl
 waitOrStop 0 "Failed to install dependencies"
 
 echo "Refreshing CA trust store" | log
-apt-get install --reinstall -y ca-certificates | log
-update-ca-certificates --fresh | log
+apt-get install --reinstall -y ca-certificates >/dev/null 2>&1
+update-ca-certificates --fresh >/dev/null 2>&1
+
+CERT_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+if [ -f "${CERT_DIR}/fullchain.pem" ]; then
+    CERT_CN=$(openssl x509 -in "${CERT_DIR}/fullchain.pem" -noout -subject 2>/dev/null | sed -n 's/.*CN *= *//p')
+    if [ -z "${CERT_CN}" ]; then
+        echo "Tweak-issued cert has empty CN; regenerating self-signed with CN=IL" | log
+        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout "${CERT_DIR}/privkey.pem" \
+            -out    "${CERT_DIR}/fullchain.pem" \
+            -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=IL" \
+            2>/dev/null
+    fi
+fi
 
 echo "Downloading GitLab" | log
 curl -fsSL -o script.deb.sh https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
