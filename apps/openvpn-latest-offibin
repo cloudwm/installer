@@ -42,16 +42,16 @@ bash sacli --user openvpn --new_pass ${ADMINPASSWORD} SetLocalPassword
 
 echo "Configuring certifications" | log
 service openvpnas stop
-ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/fullchain.pem /usr/local/openvpn_as/etc/web-ssl/server.crt
-ln -s -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/privkey.pem /usr/local/openvpn_as/etc/web-ssl/server.key
+ln -s -f /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /usr/local/openvpn_as/etc/web-ssl/server.crt
+ln -s -f /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem /usr/local/openvpn_as/etc/web-ssl/server.key
 service openvpnas start
 
 echo "Adding descriptions" | log
-descriptionAppend "OpenVPN Management Web UI: https://${CWM_DISPLAYED_ADDRESS}:943/admin"
+descriptionAppend "OpenVPN Management Web UI: https://${CWM_DOMAIN}:943/admin"
 descriptionAppend "OpenVPN Username: openvpn"
 descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
-descriptionAppend "OpenVPN Client Web UI: https://${CWM_DISPLAYED_ADDRESS}:943/"
+descriptionAppend "OpenVPN Client Web UI: https://${CWM_DOMAIN}:943/"
 descriptionAppend " "
 descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
 descriptionAppend "OpenVPN Command-line tools: /usr/local/openvpn_as/scripts"
