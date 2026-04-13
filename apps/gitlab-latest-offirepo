@@ -1,35 +1,50 @@
 #!/bin/bash
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-export DEBIAN_FRONTEND=noninteractive
-export NEEDRESTART_MODE=a
-export NEEDRESTART_SUSPEND=1
+setup_environment() {
+    export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export NEEDRESTART_SUSPEND=1
+    set +H  # disable history expansion so '!' in passwords is safe
 
-LOG_FILE="${CWM_LOGDIR:-/var/log}/gitlab-install.log"
-mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
-: >"${LOG_FILE}"
+    LOG_FILE="${CWM_LOGDIR:-/var/log}/gitlab-install.log"
+    mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+    : >"${LOG_FILE}"
 
-if [ -z "${CWM_DOMAIN}" ]; then
-    PRIMARY_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
-    [ -z "${PRIMARY_IP}" ] && PRIMARY_IP=$(hostname -I | awk '{print $1}')
-    export CWM_DOMAIN="${PRIMARY_IP//./-}.dev-cloud-xip.com"
-    echo "CWM_DOMAIN was empty; derived ${CWM_DOMAIN} from ${PRIMARY_IP}" | log
-fi
+    GUEST_CONF="/root/guest.conf"
+}
 
-echo "Installing dependencies" | log
-installPackage ca-certificates tzdata perl
-waitOrStop 0 "Failed to install dependencies"
+resolve_domain() {
+    if [ -z "${CWM_DOMAIN}" ]; then
+        PRIMARY_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+        [ -z "${PRIMARY_IP}" ] && PRIMARY_IP=$(hostname -I | awk '{print $1}')
+        export CWM_DOMAIN="${PRIMARY_IP//./-}.dev-cloud-xip.com"
+        echo "CWM_DOMAIN was empty; derived ${CWM_DOMAIN} from ${PRIMARY_IP}" | log
+    fi
+}
 
-echo "Refreshing CA trust store" | log
-apt-get install --reinstall -y ca-certificates >/dev/null 2>&1
-update-ca-certificates --fresh >/dev/null 2>&1
+install_dependencies() {
+    echo "Installing dependencies" | log
+    installPackage ca-certificates tzdata perl
+    waitOrStop 0 "Failed to install dependencies"
+}
 
-CERT_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-if [ -f "${CERT_DIR}/fullchain.pem" ]; then
+refresh_ca_trust() {
+    echo "Refreshing CA trust store" | log
+    apt-get install --reinstall -y ca-certificates >/dev/null 2>&1
+    update-ca-certificates --fresh >/dev/null 2>&1
+}
+
+ensure_cert_cn() {
+    local CERT_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+    [ -f "${CERT_DIR}/fullchain.pem" ] || return 0
+
+    local CERT_CN
     CERT_CN=$(openssl x509 -in "${CERT_DIR}/fullchain.pem" -noout -subject 2>/dev/null | sed -n 's/.*CN *= *//p')
     if [ -z "${CERT_CN}" ]; then
         echo "Tweak-issued cert has empty CN; regenerating self-signed with CN=IL" | log
@@ -39,25 +54,32 @@ if [ -f "${CERT_DIR}/fullchain.pem" ]; then
             -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=IL" \
             2>/dev/null
     fi
-fi
+}
 
-echo "Downloading GitLab" | log
-curl -fsSL -o script.deb.sh https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
-waitOrStop 0 "File not downloaded from official source"
-bash script.deb.sh >>"${LOG_FILE}" 2>&1
-waitOrStop 0 "Failed to install GitLab"
-ls /etc/apt/sources.list.d/ >>"${LOG_FILE}" 2>&1
+add_gitlab_repo() {
+    echo "Downloading GitLab" | log
+    curl -fsSL -o script.deb.sh https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
+    waitOrStop 0 "File not downloaded from official source"
+    bash script.deb.sh >>"${LOG_FILE}" 2>&1
+    waitOrStop 0 "Failed to install GitLab"
+    ls /etc/apt/sources.list.d/ >>"${LOG_FILE}" 2>&1
+}
 
-echo "Freeing ports 80/443 for GitLab's bundled nginx" | log
-systemctl disable --now nginx 2>/dev/null || true
+free_web_ports() {
+    echo "Freeing ports 80/443 for GitLab's bundled nginx" | log
+    systemctl disable --now nginx 2>/dev/null || true
+}
 
-echo "Installing GitLab from apt" | log
-apt update >>"${LOG_FILE}" 2>&1
-EXTERNAL_URL="http://${CWM_DOMAIN}" installPackage gitlab-ce
-waitOrStop 0 "Failed to install gitlab-ce"
+install_gitlab_package() {
+    echo "Installing GitLab from apt" | log
+    apt update >>"${LOG_FILE}" 2>&1
+    EXTERNAL_URL="http://${CWM_DOMAIN}" installPackage gitlab-ce
+    waitOrStop 0 "Failed to install gitlab-ce"
+}
 
-echo "Wiring GitLab to pre-issued certificates from nginx-letsencrypt-cert tweak" | log
-cat >> /etc/gitlab/gitlab.rb << EOF
+configure_gitlab_ssl() {
+    echo "Wiring GitLab to pre-issued certificates from nginx-letsencrypt-cert tweak" | log
+    cat >> /etc/gitlab/gitlab.rb << EOF
 
 # SSL — certificates provisioned by tweaks/nginx-letsencrypt-cert
 external_url "https://${CWM_DOMAIN}"
@@ -66,17 +88,20 @@ nginx['redirect_http_to_https'] = true
 nginx['ssl_certificate']     = "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
 nginx['ssl_certificate_key'] = "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
 EOF
+}
 
-echo "Reconfiguring GitLab with SSL" | log
-gitlab-ctl reconfigure
-waitOrStop 0 "Failed to reconfigure GitLab"
+reconfigure_gitlab() {
+    echo "Reconfiguring GitLab with SSL" | log
+    gitlab-ctl reconfigure
+    waitOrStop 0 "Failed to reconfigure GitLab"
+}
 
-set +H  # disable history expansion so '!' in passwords is safe
+load_guest_credentials() {
+    ADMIN_EMAIL=""
+    ADMIN_PASSWORD=""
+    [ -f "${GUEST_CONF}" ] || return 0
 
-GUEST_CONF="/root/guest.conf"
-ADMIN_EMAIL=""
-ADMIN_PASSWORD=""
-if [ -f "${GUEST_CONF}" ]; then
+    local line
     while IFS= read -r line || [ -n "${line}" ]; do
         line="${line%$'\r'}"
         case "${line}" in
@@ -84,9 +109,11 @@ if [ -f "${GUEST_CONF}" ]; then
             email=*)    ADMIN_EMAIL="${line#email=}" ;;
         esac
     done < "${GUEST_CONF}"
-fi
+}
 
-if [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ]; then
+apply_admin_credentials() {
+    [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ] || return 0
+
     echo "Applying admin credentials from ${GUEST_CONF}" | log
     export GL_ADMIN_EMAIL="${ADMIN_EMAIL}"
     export GL_ADMIN_PASSWORD="${ADMIN_PASSWORD}"
@@ -100,24 +127,50 @@ u.password = password
 u.password_confirmation = password
 u.save!
 RUBY
-    rc=$?
+    local rc=$?
     unset GL_ADMIN_EMAIL GL_ADMIN_PASSWORD
     [ $rc -eq 0 ] || { echo "ExitCode $rc (expecting 0). Failed to set admin credentials" | log 1; exit 1; }
-fi
+}
 
-descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
-descriptionAppend " "
-descriptionAppend "Default admin account has been configured with following details:"
-descriptionAppend "Username: root"
-if [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ]; then
-    descriptionAppend "Email: ${ADMIN_EMAIL}"
-    descriptionAppend "Password: ${ADMIN_PASSWORD}"
-else
-    gitpass=$(grep Password: /etc/gitlab/initial_root_password)
-    descriptionAppend "${gitpass}"
-    descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
-fi
-descriptionAppend " "
+write_description() {
+    descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
+    descriptionAppend " "
+    descriptionAppend "Default admin account has been configured with following details:"
+    descriptionAppend "Username: root"
+    if [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ]; then
+        descriptionAppend "Email: ${ADMIN_EMAIL}"
+        descriptionAppend "Password: ${ADMIN_PASSWORD}"
+    else
+        local gitpass
+        gitpass=$(grep Password: /etc/gitlab/initial_root_password)
+        descriptionAppend "${gitpass}"
+        descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
+    fi
+    descriptionAppend " "
+}
 
-tagScript success
-exit 0
+main() {
+    setup_environment
+    resolve_domain
+
+    install_dependencies
+    refresh_ca_trust
+    ensure_cert_cn
+
+    add_gitlab_repo
+    free_web_ports
+    install_gitlab_package
+
+    configure_gitlab_ssl
+    reconfigure_gitlab
+
+    load_guest_credentials
+    apply_admin_credentials
+
+    write_description
+
+    tagScript success
+    exit 0
+}
+
+main "$@"
