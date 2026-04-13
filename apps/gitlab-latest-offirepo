@@ -10,10 +10,11 @@ installPackage ca-certificates tzdata perl
 waitOrStop 0 "Failed to install dependencies"
 
 echo "Refreshing CA trust store" | log
+apt-get install --reinstall -y ca-certificates | log
 update-ca-certificates --fresh | log
 
 echo "Downloading GitLab" | log
-curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
+curl -fsSL -o script.deb.sh https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
 waitOrStop 0 "File not downloaded from official source"
 bash script.deb.sh | log
 waitOrStop 0 "Failed to install GitLab"
