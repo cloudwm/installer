@@ -71,13 +71,40 @@ echo "Reconfiguring GitLab with SSL" | log
 gitlab-ctl reconfigure
 waitOrStop 0 "Failed to reconfigure GitLab"
 
-gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
+GUEST_CONF="/root/guest.conf"
+ADMIN_EMAIL=""
+ADMIN_PASSWORD=""
+if [ -f "${GUEST_CONF}" ]; then
+    ADMIN_EMAIL=$(sed -n 's/^email=//p'    "${GUEST_CONF}" | head -n1)
+    ADMIN_PASSWORD=$(sed -n 's/^password=//p' "${GUEST_CONF}" | head -n1)
+fi
+
+if [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ]; then
+    echo "Applying admin credentials from ${GUEST_CONF}" | log
+    gitlab-rails runner - <<'RUBY' "${ADMIN_EMAIL}" "${ADMIN_PASSWORD}" >>"${LOG_FILE}" 2>&1
+email, password = ARGV[0], ARGV[1]
+u = User.find_by(username: 'root')
+u.email = email
+u.skip_reconfirmation!
+u.password = password
+u.password_confirmation = password
+u.save!
+RUBY
+    waitOrStop 0 "Failed to set admin credentials"
+fi
+
 descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
 descriptionAppend " "
 descriptionAppend "Default admin account has been configured with following details:"
 descriptionAppend "Username: root"
-descriptionAppend "${gitpass}"
-descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
+if [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ]; then
+    descriptionAppend "Email: ${ADMIN_EMAIL}"
+    descriptionAppend "Password: ${ADMIN_PASSWORD}"
+else
+    gitpass=$(grep Password: /etc/gitlab/initial_root_password)
+    descriptionAppend "${gitpass}"
+    descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
+fi
 descriptionAppend " "
 
 tagScript success
