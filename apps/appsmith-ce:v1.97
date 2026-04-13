@@ -94,16 +94,14 @@ services:
       start_period: 120s
 EOF
 
-health_status=$(docker inspect --format='{{.State.Health.Status}}' appsmith)
-[ "$health_status" = "healthy" ]
-waitOrStop 0 "Appsmith did not become healthy after $MAX_RETRIES attempts"
 
 echo "Run docker compsoe command" | log
 docker compose up -d
 waitOrStop 0 "Service not ready"
 
-#docker inspect --format='{{.State.Health.Status}}' appsmith 2>/dev/null | grep -qx 'healthy' || { echo "Appsmith is not healthy"; exit 1; }
-#waitOrStop 0 "Appsmith did not become healthy after $MAX_RETRIES attempts"
+health_status=$(docker inspect --format='{{.State.Health.Status}}' appsmith)
+[ "$health_status" = "healthy" ]
+waitOrStop 0 "Appsmith did not become healthy after $MAX_RETRIES attempts"
 
 
 echo "Adding descriptions" | log
