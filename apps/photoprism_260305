@@ -7,7 +7,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-
+MAX_RETRIES=3
+SLEEP_TIME=5
+success=false
 
 apt update
 apt dist-upgrade -y
@@ -110,6 +112,21 @@ systemctl daemon-reload
 systemctl enable --now photoprism
 waitOrStop 0 "PhotoPrism service not ready"
 
+
+
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    curl -fsS http://127.0.0.1/ > /dev/null
+    if [ $? -eq 0 ]; then
+        success=true
+        break
+    fi
+
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0
 
 
 
