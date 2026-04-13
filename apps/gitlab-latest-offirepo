@@ -1,52 +1,176 @@
 #!/bin/bash
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Installing dependencies" | log
-installPackage ca-certificates tzdata perl
-waitOrStop 0 "Failed to install dependencies"
+setup_environment() {
+    export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export NEEDRESTART_SUSPEND=1
+    set +H  # disable history expansion so '!' in passwords is safe
 
-echo "Downloading GitLab" | log
-curlDownload https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
-waitOrStop 0 "File not downloaded from official source"
-bash script.deb.sh | log
-waitOrStop 0 "Failed to install GitLab"
-ls /etc/apt/sources.list.d/ | log
+    LOG_FILE="${CWM_LOGDIR:-/var/log}/gitlab-install.log"
+    mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+    : >"${LOG_FILE}"
 
-echo "Installing GitLab from apt" | log
-apt update
-EXTERNAL_URL="https://${CWM_DOMAIN}" installPackage gitlab-ce
-waitOrStop 0 "Failed to install gitlab-ce"
+    GUEST_CONF="/root/guest.conf"
+}
 
-echo "Configuring Let's Encrypt for SSL" | log
-cat >> /etc/gitlab/gitlab.rb << EOF
+resolve_domain() {
+    if [ -z "${CWM_DOMAIN}" ]; then
+        PRIMARY_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+        [ -z "${PRIMARY_IP}" ] && PRIMARY_IP=$(hostname -I | awk '{print $1}')
+        export CWM_DOMAIN="${PRIMARY_IP//./-}.dev-cloud-xip.com"
+        echo "CWM_DOMAIN was empty; derived ${CWM_DOMAIN} from ${PRIMARY_IP}" | log
+    fi
+}
 
-# Enable Let's Encrypt
-letsencrypt['enable'] = true
-letsencrypt['contact_emails'] = ['admin@${CWM_DOMAIN}']
-letsencrypt['auto_renew'] = true
+install_dependencies() {
+    echo "Installing dependencies" | log
+    installPackage ca-certificates tzdata perl
+    waitOrStop 0 "Failed to install dependencies"
+}
 
-# Redirect HTTP to HTTPS
+refresh_ca_trust() {
+    echo "Refreshing CA trust store" | log
+    apt-get install --reinstall -y ca-certificates >/dev/null 2>&1
+    update-ca-certificates --fresh >/dev/null 2>&1
+}
+
+ensure_cert_cn() {
+    local CERT_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+    [ -f "${CERT_DIR}/fullchain.pem" ] || return 0
+
+    local CERT_CN
+    CERT_CN=$(openssl x509 -in "${CERT_DIR}/fullchain.pem" -noout -subject 2>/dev/null | sed -n 's/.*CN *= *//p')
+    if [ -z "${CERT_CN}" ]; then
+        echo "Tweak-issued cert has empty CN; regenerating self-signed with CN=IL" | log
+        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout "${CERT_DIR}/privkey.pem" \
+            -out    "${CERT_DIR}/fullchain.pem" \
+            -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=IL" \
+            2>/dev/null
+    fi
+}
+
+add_gitlab_repo() {
+    echo "Downloading GitLab" | log
+    curl -fsSL -o script.deb.sh https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
+    waitOrStop 0 "File not downloaded from official source"
+    bash script.deb.sh >>"${LOG_FILE}" 2>&1
+    waitOrStop 0 "Failed to install GitLab"
+    ls /etc/apt/sources.list.d/ >>"${LOG_FILE}" 2>&1
+}
+
+free_web_ports() {
+    echo "Freeing ports 80/443 for GitLab's bundled nginx" | log
+    systemctl disable --now nginx 2>/dev/null || true
+}
+
+install_gitlab_package() {
+    echo "Installing GitLab from apt" | log
+    apt update >>"${LOG_FILE}" 2>&1
+    EXTERNAL_URL="http://${CWM_DOMAIN}" installPackage gitlab-ce
+    waitOrStop 0 "Failed to install gitlab-ce"
+}
+
+configure_gitlab_ssl() {
+    echo "Wiring GitLab to pre-issued certificates from nginx-letsencrypt-cert tweak" | log
+    cat >> /etc/gitlab/gitlab.rb << EOF
+
+# SSL — certificates provisioned by tweaks/nginx-letsencrypt-cert
+external_url "https://${CWM_DOMAIN}"
+letsencrypt['enable'] = false
 nginx['redirect_http_to_https'] = true
+nginx['ssl_certificate']     = "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+nginx['ssl_certificate_key'] = "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
 EOF
+}
 
-echo "Reconfiguring GitLab with SSL" | log
-gitlab-ctl reconfigure
-waitOrStop 0 "Failed to reconfigure GitLab"
+reconfigure_gitlab() {
+    echo "Reconfiguring GitLab with SSL" | log
+    gitlab-ctl reconfigure
+    waitOrStop 0 "Failed to reconfigure GitLab"
+}
 
-sleep 60  # Wait for Let's Encrypt to generate certificates
+load_guest_credentials() {
+    ADMIN_EMAIL=""
+    ADMIN_PASSWORD=""
+    [ -f "${GUEST_CONF}" ] || return 0
 
-gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
-descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
-descriptionAppend " "
-descriptionAppend "Default admin account has been configured with following details:"
-descriptionAppend "Username: root"
-descriptionAppend "${gitpass}"
-descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
-descriptionAppend " "
+    local line
+    while IFS= read -r line || [ -n "${line}" ]; do
+        line="${line%$'\r'}"
+        case "${line}" in
+            password=*) ADMIN_PASSWORD="${line#password=}" ;;
+            email=*)    ADMIN_EMAIL="${line#email=}" ;;
+        esac
+    done < "${GUEST_CONF}"
+}
 
-tagScript success
-exit 0
+apply_admin_credentials() {
+    [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ] || return 0
+
+    echo "Applying admin credentials from ${GUEST_CONF}" | log
+    export GL_ADMIN_EMAIL="${ADMIN_EMAIL}"
+    export GL_ADMIN_PASSWORD="${ADMIN_PASSWORD}"
+    gitlab-rails runner - >>"${LOG_FILE}" 2>&1 <<'RUBY'
+email    = ENV['GL_ADMIN_EMAIL']
+password = ENV['GL_ADMIN_PASSWORD']
+u = User.find_by(username: 'root')
+u.email = email
+u.skip_reconfirmation!
+u.password = password
+u.password_confirmation = password
+u.save!
+RUBY
+    local rc=$?
+    unset GL_ADMIN_EMAIL GL_ADMIN_PASSWORD
+    [ $rc -eq 0 ] || { echo "ExitCode $rc (expecting 0). Failed to set admin credentials" | log 1; exit 1; }
+}
+
+write_description() {
+    descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
+    descriptionAppend " "
+    descriptionAppend "Default admin account has been configured with following details:"
+    descriptionAppend "Username: root"
+    if [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ]; then
+        descriptionAppend "Email: ${ADMIN_EMAIL}"
+        descriptionAppend "Password: ${ADMIN_PASSWORD}"
+    else
+        local gitpass
+        gitpass=$(grep Password: /etc/gitlab/initial_root_password)
+        descriptionAppend "${gitpass}"
+        descriptionAppend "This password will be cleaned up in first reconfigure run after 24 hours."
+    fi
+    descriptionAppend " "
+}
+
+main() {
+    setup_environment
+    resolve_domain
+
+    install_dependencies
+    refresh_ca_trust
+    ensure_cert_cn
+
+    add_gitlab_repo
+    free_web_ports
+    install_gitlab_package
+
+    configure_gitlab_ssl
+    reconfigure_gitlab
+
+    load_guest_credentials
+    apply_admin_credentials
+
+    write_description
+
+    tagScript success
+    exit 0
+}
+
+main "$@"
