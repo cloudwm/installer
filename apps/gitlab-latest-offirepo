@@ -71,18 +71,28 @@ echo "Reconfiguring GitLab with SSL" | log
 gitlab-ctl reconfigure
 waitOrStop 0 "Failed to reconfigure GitLab"
 
+set +H  # disable history expansion so '!' in passwords is safe
+
 GUEST_CONF="/root/guest.conf"
 ADMIN_EMAIL=""
 ADMIN_PASSWORD=""
 if [ -f "${GUEST_CONF}" ]; then
-    ADMIN_EMAIL=$(sed -n 's/^email=//p'    "${GUEST_CONF}" | head -n1)
-    ADMIN_PASSWORD=$(sed -n 's/^password=//p' "${GUEST_CONF}" | head -n1)
+    while IFS= read -r line || [ -n "${line}" ]; do
+        line="${line%$'\r'}"
+        case "${line}" in
+            password=*) ADMIN_PASSWORD="${line#password=}" ;;
+            email=*)    ADMIN_EMAIL="${line#email=}" ;;
+        esac
+    done < "${GUEST_CONF}"
 fi
 
 if [ -n "${ADMIN_EMAIL}" ] && [ -n "${ADMIN_PASSWORD}" ]; then
     echo "Applying admin credentials from ${GUEST_CONF}" | log
-    gitlab-rails runner - <<'RUBY' "${ADMIN_EMAIL}" "${ADMIN_PASSWORD}" >>"${LOG_FILE}" 2>&1
-email, password = ARGV[0], ARGV[1]
+    export GL_ADMIN_EMAIL="${ADMIN_EMAIL}"
+    export GL_ADMIN_PASSWORD="${ADMIN_PASSWORD}"
+    gitlab-rails runner - >>"${LOG_FILE}" 2>&1 <<'RUBY'
+email    = ENV['GL_ADMIN_EMAIL']
+password = ENV['GL_ADMIN_PASSWORD']
 u = User.find_by(username: 'root')
 u.email = email
 u.skip_reconfirmation!
@@ -90,7 +100,9 @@ u.password = password
 u.password_confirmation = password
 u.save!
 RUBY
-    waitOrStop 0 "Failed to set admin credentials"
+    rc=$?
+    unset GL_ADMIN_EMAIL GL_ADMIN_PASSWORD
+    [ $rc -eq 0 ] || { echo "ExitCode $rc (expecting 0). Failed to set admin credentials" | log 1; exit 1; }
 fi
 
 descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
