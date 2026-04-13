@@ -9,6 +9,10 @@ export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 export NEEDRESTART_SUSPEND=1
 
+LOG_FILE="${CWM_LOGDIR:-/var/log}/gitlab-install.log"
+mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+: >"${LOG_FILE}"
+
 if [ -z "${CWM_DOMAIN}" ]; then
     PRIMARY_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
     [ -z "${PRIMARY_IP}" ] && PRIMARY_IP=$(hostname -I | awk '{print $1}')
@@ -40,15 +44,15 @@ fi
 echo "Downloading GitLab" | log
 curl -fsSL -o script.deb.sh https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
 waitOrStop 0 "File not downloaded from official source"
-bash script.deb.sh | log
+bash script.deb.sh >>"${LOG_FILE}" 2>&1
 waitOrStop 0 "Failed to install GitLab"
-ls /etc/apt/sources.list.d/ | log
+ls /etc/apt/sources.list.d/ >>"${LOG_FILE}" 2>&1
 
 echo "Freeing ports 80/443 for GitLab's bundled nginx" | log
 systemctl disable --now nginx 2>/dev/null || true
 
 echo "Installing GitLab from apt" | log
-apt update
+apt update >>"${LOG_FILE}" 2>&1
 EXTERNAL_URL="http://${CWM_DOMAIN}" installPackage gitlab-ce
 waitOrStop 0 "Failed to install gitlab-ce"
 
