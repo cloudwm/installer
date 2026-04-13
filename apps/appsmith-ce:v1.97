@@ -109,7 +109,7 @@ for ((i=1; i<=MAX_RETRIES; i++)); do
 done
 
 if [ "$success" != true ]; then
-  waitOrStop "Appsmith container is not running after $MAX_RETRIES attempts"
+  waitOrStop 0 "Appsmith container is not running after $MAX_RETRIES attempts"
 fi
 
 echo "Adding descriptions" | log
