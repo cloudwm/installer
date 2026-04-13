@@ -1,15 +1,17 @@
 #!/bin/bash
-MAX_RETRIES=1
-SLEEP_TIME=5
-appDir="/opt/installer"
-success=false
-
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
+
+MAX_RETRIES=3
+SLEEP_TIME=30
+appDir="/opt/installer"
+success=false
+
+
 
 echo "Installing Docker and Docker Compose" | log
 if ! command -v docker &> /dev/null; then
