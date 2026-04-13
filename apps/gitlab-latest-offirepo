@@ -16,28 +16,28 @@ bash script.deb.sh | log
 waitOrStop 0 "Failed to install GitLab"
 ls /etc/apt/sources.list.d/ | log
 
+echo "Freeing ports 80/443 for GitLab's bundled nginx" | log
+systemctl disable --now nginx 2>/dev/null || true
+
 echo "Installing GitLab from apt" | log
 apt update
-EXTERNAL_URL="https://${CWM_DOMAIN}" installPackage gitlab-ce
+EXTERNAL_URL="http://${CWM_DOMAIN}" installPackage gitlab-ce
 waitOrStop 0 "Failed to install gitlab-ce"
 
-echo "Configuring Let's Encrypt for SSL" | log
+echo "Wiring GitLab to pre-issued certificates from nginx-letsencrypt-cert tweak" | log
 cat >> /etc/gitlab/gitlab.rb << EOF
 
-# Enable Let's Encrypt
-letsencrypt['enable'] = true
-letsencrypt['contact_emails'] = ['admin@${CWM_DOMAIN}']
-letsencrypt['auto_renew'] = true
-
-# Redirect HTTP to HTTPS
+# SSL — certificates provisioned by tweaks/nginx-letsencrypt-cert
+external_url "https://${CWM_DOMAIN}"
+letsencrypt['enable'] = false
 nginx['redirect_http_to_https'] = true
+nginx['ssl_certificate']     = "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+nginx['ssl_certificate_key'] = "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
 EOF
 
 echo "Reconfiguring GitLab with SSL" | log
 gitlab-ctl reconfigure
 waitOrStop 0 "Failed to reconfigure GitLab"
-
-sleep 60  # Wait for Let's Encrypt to generate certificates
 
 gitpass=$(cat /etc/gitlab/initial_root_password | grep Password:)
 descriptionAppend "GitLab UI: https://${CWM_DOMAIN}"
