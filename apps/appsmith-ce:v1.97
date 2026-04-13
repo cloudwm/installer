@@ -6,10 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-MAX_RETRIES=0
-SLEEP_TIME=5
 appDir="/opt/installer"
-success=false
+MAX_RETRIES=3
+SLEEP_TIME=30
 
 
 
@@ -99,9 +98,21 @@ echo "Run docker compsoe command" | log
 docker compose up -d
 waitOrStop 0 "Service not ready"
 
-health_status=$(docker inspect --format='{{.State.Health.Status}}' appsmith)
-[ "$health_status" = "healthy" ]
-waitOrStop 0 "Appsmith did not become healthy after $MAX_RETRIES attempts"
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    health_status=$(docker inspect --format='{{.State.Health.Status}}' appsmith)
+
+    if [ "$health_status" = "healthy" ]; then
+        success=true
+        break
+    fi
+
+    echo "Appsmith is not healthy yet (status: $health_status) (attempt $i/$MAX_RETRIES)" | log
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0
 
 
 echo "Adding descriptions" | log
