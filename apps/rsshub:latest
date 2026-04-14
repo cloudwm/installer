@@ -119,6 +119,9 @@ volumes:
     redis-data:
 EOF
 
+echo "Run docker compsoe command" | log
+docker compose up -d
+waitOrStop 0 "Service not ready"
 
 
 for ((i=1; i<=MAX_RETRIES; i++)); do
