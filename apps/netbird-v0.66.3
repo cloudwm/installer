@@ -1,0 +1,125 @@
+#!/bin/bash
+MAX_RETRIES=5
+SLEEP_TIME=30
+appDir="/opt/installer"
+success=false
+NETBIRD_DASHBOARD_VERSION="v2.36.0"
+NETBIRD_SERVER_VERSION="0.66.3"
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+echo "Check if we have Docker" | log
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose" | log
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    usermod -aG docker $USER
+    sleep 5
+fi
+
+echo "Build Netbird files with domain" | log
+
+export NETBIRD_DOMAIN="${CWM_DOMAIN}"
+
+curl -fsSL -o getting-started.sh "https://github.com/netbirdio/netbird/releases/download/v${NETBIRD_SERVER_VERSION}/getting-started.sh" \
+  && chmod +x getting-started.sh \
+  && sed -i 's# < /dev/tty##g' getting-started.sh \
+  && printf "2\nyes\n" | ./getting-started.sh
+
+echo "Change path to certificate in nginx-netbird.conf" | log
+
+sed -i "s|ssl_certificate /path/to/your/fullchain.pem;|ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;|g" nginx-netbird.conf
+sed -i "s|ssl_certificate_key /path/to/your/privkey.pem;|ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;|g" nginx-netbird.conf
+
+
+echo "Copy nginx-netbird.conf to nginx path and restart nginx" | log
+cp ./nginx-netbird.conf /etc/nginx/sites-enabled/nginx-netbird.conf
+systemctl restart nginx
+waitOrStop 0 "Nginx service not ready"
+
+echo "Add healthcheck to docker file" | log
+python3 - <<'PY'
+from pathlib import Path
+
+p = Path("docker-compose.yml")
+text = p.read_text()
+
+text = text.replace(
+"""    env_file:
+      - ./dashboard.env
+""",
+"""    env_file:
+      - ./dashboard.env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/80'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+"""
+)
+
+text = text.replace(
+"""    command: ["--config", "/etc/netbird/config.yaml"]
+""",
+"""    command: ["--config", "/etc/netbird/config.yaml"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/80'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+"""
+)
+
+p.write_text(text)
+PY
+
+echo "Pinning NetBird image versions in docker-compose.yml: dashboard=${NETBIRD_DASHBOARD_VERSION}, server=${NETBIRD_SERVER_VERSION}" | log
+sed -i \
+  -e "s|image: netbirdio/dashboard:.*|image: netbirdio/dashboard:${NETBIRD_DASHBOARD_VERSION}|" \
+  -e "s|image: netbirdio/netbird-server:.*|image: netbirdio/netbird-server:${NETBIRD_SERVER_VERSION}|" \
+  docker-compose.yml
+
+echo "Run the service with docker compose" | log
+docker compose up -d
+waitOrStop 0 "Service not ready"
+
+echo "Waiting for NetBird containers to become healthy" | log
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    dashboard_status=$(docker inspect --format='{{.State.Health.Status}}' netbird-dashboard 2>/dev/null || echo "not-found")
+    server_status=$(docker inspect --format='{{.State.Health.Status}}' netbird-server 2>/dev/null || echo "not-found")
+
+    if [ "$dashboard_status" = "healthy" ] && [ "$server_status" = "healthy" ]; then
+        success=true
+        break
+    fi
+
+    echo "NetBird health status: dashboard=$dashboard_status, server=$server_status (attempt $i/$MAX_RETRIES)" | log
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0 "NetBird health check failed" 
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Succesfully installed."
+descriptionAppend "Service: NetBird"
+descriptionAppend "URL: https://${CWM_DOMAIN}"
+descriptionAppend "Admin login: The administrator account registration is completed after the installation process in URL:https://${CWM_DOMAIN}."
+descriptionAppend "Docker Compose: ${appDir}/docker-compose.yml"
+descriptionAppend "Config file: ${appDir}/config.yaml"
+descriptionAppend "Dashboard file: ${appDir}/dashboard.env"
+descriptionAppend "Nginx config file /etc/nginx/sites-enabled/nginx-netbird.conf"
+
+
+
