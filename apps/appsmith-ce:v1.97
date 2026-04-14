@@ -7,7 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 appDir="/opt/installer"
-MAX_RETRIES=0
+MAX_RETRIES=5
 SLEEP_TIME=30
 
 
