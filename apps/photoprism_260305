@@ -10,6 +10,7 @@ fi
 MAX_RETRIES=3
 SLEEP_TIME=5
 success=false
+PHOTOPRISM_VERSION="260305-fad9d5395-linux-amd64"
 
 apt update
 apt dist-upgrade -y
@@ -61,17 +62,18 @@ systemctl enable nginx
 systemctl restart nginx
 waitOrStop 0 "Failed to restart Nginx"
 
-echo "Download and extract photoprism" | log
-wget https://dl.photoprism.app/pkg/linux/photoprism_260305-fad9d5395-linux-amd64.tar.gz
-mkdir /opt/photoprism
-tar xzf photoprism_260305-fad9d5395-linux-amd64.tar.gz -C /opt/photoprism/
-rm photoprism_260305-fad9d5395-linux-amd64.tar.gz
 
+echo "Download and extract PhotoPrism version ${PHOTOPRISM_VERSION}" | log
+wget "https://dl.photoprism.app/pkg/linux/photoprism_${PHOTOPRISM_VERSION}.tar.gz"
+mkdir -p /opt/photoprism
+tar xzf "photoprism_${PHOTOPRISM_VERSION}.tar.gz" -C /opt/photoprism/
+rm -f "photoprism_${PHOTOPRISM_VERSION}.tar.gz"
 echo "Add user photoprism to ubuntu" | log
 useradd --system photoprism
 mkdir /var/lib/photoprism
 chown -R photoprism:photoprism /var/lib/photoprism /opt/photoprism
 cd /var/lib/photoprism
+
 
 echo "Create .env file" | log
 cat <<EOF > .env

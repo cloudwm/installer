@@ -6,6 +6,7 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+APPSMITH_VERSION=v1.97
 appDir="/opt/installer"
 MAX_RETRIES=5
 SLEEP_TIME=30
@@ -77,7 +78,7 @@ version: "3"
 
 services:
   appsmith:
-    image: index.docker.io/appsmith/appsmith-ce:v1.97
+    image: index.docker.io/appsmith/appsmith-ce:${APPSMITH_VERSION}
     container_name: appsmith
     ports:
       - "127.0.0.1:8080:80"
@@ -92,7 +93,6 @@ services:
       retries: 5
       start_period: 120s
 EOF
-
 
 echo "Run docker compsoe command" | log
 docker compose up -d

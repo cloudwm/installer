@@ -3,6 +3,8 @@ MAX_RETRIES=5
 SLEEP_TIME=30
 appDir="/opt/installer"
 success=false
+NETBIRD_DASHBOARD_VERSION="v2.36.0"
+NETBIRD_SERVER_VERSION="0.66.3"
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -25,8 +27,11 @@ fi
 echo "Build Netbird files with domain" | log
 
 export NETBIRD_DOMAIN="${CWM_DOMAIN}"
-curl -fsSL -o getting-started.sh https://github.com/netbirdio/netbird/releases/download/v0.66.3/getting-started.sh && chmod +x getting-started.sh && sed -i 's# < /dev/tty##g' getting-started.sh && printf "2\nyes\n" | ./getting-started.sh
 
+curl -fsSL -o getting-started.sh "https://github.com/netbirdio/netbird/releases/download/v${NETBIRD_SERVER_VERSION}/getting-started.sh" \
+  && chmod +x getting-started.sh \
+  && sed -i 's# < /dev/tty##g' getting-started.sh \
+  && printf "2\nyes\n" | ./getting-started.sh
 
 echo "Change path to certificate in nginx-netbird.conf" | log
 
@@ -76,12 +81,12 @@ text = text.replace(
 
 p.write_text(text)
 PY
-echo "Pinning NetBird image versions in docker-compose.yml" | log
-sed -i \
-  -e 's|image: netbirdio/dashboard:latest|image: netbirdio/dashboard:v2.36.0|' \
-  -e 's|image: netbirdio/netbird-server:latest|image: netbirdio/netbird-server:0.66.3|' \
-  docker-compose.yml
 
+echo "Pinning NetBird image versions in docker-compose.yml: dashboard=${NETBIRD_DASHBOARD_VERSION}, server=${NETBIRD_SERVER_VERSION}" | log
+sed -i \
+  -e "s|image: netbirdio/dashboard:.*|image: netbirdio/dashboard:${NETBIRD_DASHBOARD_VERSION}|" \
+  -e "s|image: netbirdio/netbird-server:.*|image: netbirdio/netbird-server:${NETBIRD_SERVER_VERSION}|" \
+  docker-compose.yml
 
 echo "Run the service with docker compose" | log
 docker compose up -d
