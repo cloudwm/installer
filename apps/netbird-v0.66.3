@@ -40,6 +40,43 @@ systemctl restart nginx
 waitOrStop 0 "Nginx service not ready"
 
 
+python3 - <<'PY'
+from pathlib import Path
+
+p = Path("docker-compose.yml")
+text = p.read_text()
+
+text = text.replace(
+"""    env_file:
+      - ./dashboard.env
+""",
+"""    env_file:
+      - ./dashboard.env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/80'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+"""
+)
+
+text = text.replace(
+"""    command: ["--config", "/etc/netbird/config.yaml"]
+""",
+"""    command: ["--config", "/etc/netbird/config.yaml"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/80'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+"""
+)
+
+p.write_text(text)
+PY
+
 echo "Run the service with docker compose" | log
 docker compose up -d
 waitOrStop 0 "Service not ready"
