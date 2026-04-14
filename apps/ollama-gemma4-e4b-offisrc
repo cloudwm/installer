@@ -1,0 +1,221 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+MODEL="gemma4:e4b"
+LOG_PATH="/var/log/gemma4-setup.log"
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+
+# --- ensure HOME and OLLAMA vars are set (missing in firstboot/cloud-init) ---
+export HOME="${HOME:-/root}"
+export OLLAMA_HOST="0.0.0.0:11434"
+export OLLAMA_MODELS="/usr/share/ollama/.ollama/models"   # shared path used by ollama systemd service
+
+[ -f "$LOG_PATH" ] || touch "$LOG_PATH"
+
+echo "HOME=${HOME}" | log
+echo "OLLAMA_MODELS=${OLLAMA_MODELS}" | log
+echo "Running as: $(whoami)" | log
+
+# nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+systemctl start nginx 2>/dev/null
+
+echo "Opening Ollama's default port: 11434..." | log
+ufw allow 11434/tcp
+
+echo "Installing Ollama (runtime for Gemma 4)..." | log
+curl -fsSL --http1.1 https://ollama.com/install.sh | sh | tee "$LOG_PATH"
+
+# --- systemd tweak for external access + shared model path ---
+SERVICE_FILE="/etc/systemd/system/ollama.service"
+if [ -f "$SERVICE_FILE" ]; then
+    if ! grep -q '^Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"; then
+        sed -i '/^\[Service\]/a Environment=OLLAMA_HOST=0.0.0.0:11434' "$SERVICE_FILE"
+        echo "Added OLLAMA_HOST to $SERVICE_FILE." | log
+    fi
+    if ! grep -q '^Environment=OLLAMA_MODELS=' "$SERVICE_FILE"; then
+        sed -i '/^\[Service\]/a Environment=OLLAMA_MODELS=/usr/share/ollama/.ollama/models' "$SERVICE_FILE"
+        echo "Added OLLAMA_MODELS to $SERVICE_FILE." | log
+    fi
+fi
+
+# --- ensure the shared model directory exists and is writable ---
+mkdir -p "${OLLAMA_MODELS}"
+chown -R ollama:ollama /usr/share/ollama/.ollama 2>/dev/null || true
+chmod -R 755 /usr/share/ollama/.ollama
+
+# --- enable ollama service for future reboots ---
+systemctl daemon-reload 2>/dev/null || true
+systemctl enable ollama.service 2>/dev/null || true
+
+# --- kill any existing ollama serve that may be stuck ---
+pkill -f "ollama serve" 2>/dev/null || true
+sleep 2
+
+# --- start ollama serve directly for the model pull ---
+echo "Starting ollama serve in background..." | log
+HOME="${HOME}" OLLAMA_HOST="${OLLAMA_HOST}" OLLAMA_MODELS="${OLLAMA_MODELS}" ollama serve >> "$LOG_PATH" 2>&1 &
+OLLAMA_PID=$!
+echo "ollama serve PID: ${OLLAMA_PID}" | log
+
+# --- wait for Ollama API to be ready ---
+echo "Waiting for Ollama API to become ready..." | log
+for i in $(seq 1 30); do
+    if curl -sf http://127.0.0.1:11434/ > /dev/null 2>&1; then
+        echo "Ollama API is ready after ${i} attempts." | log
+        break
+    fi
+    echo "Attempt $i/30: not ready yet, waiting 2s..." | log
+    sleep 2
+done
+
+if ! curl -sf http://127.0.0.1:11434/ > /dev/null 2>&1; then
+    echo "ERROR: Ollama API did not become ready in time." | log
+    exit 1
+fi
+
+# --- pull the model into the shared directory ---
+echo "Pulling model: ${MODEL}..." | log
+HOME="${HOME}" OLLAMA_HOST="${OLLAMA_HOST}" OLLAMA_MODELS="${OLLAMA_MODELS}" ollama pull "${MODEL}" >> "$LOG_PATH" 2>&1
+PULL_EXIT=$?
+echo "ollama pull exit code: ${PULL_EXIT}" | log
+
+if [ "${PULL_EXIT}" -ne 0 ]; then
+    echo "ERROR: ollama pull failed with exit code ${PULL_EXIT}" | log
+    exit "${PULL_EXIT}"
+fi
+
+echo "Model ${MODEL} pulled successfully." | log
+echo "Installed models: $(OLLAMA_MODELS=${OLLAMA_MODELS} ollama list 2>&1)" | log
+
+# --- stop the temporary ollama serve ---
+echo "Stopping temporary ollama serve (PID: ${OLLAMA_PID})..." | log
+kill "${OLLAMA_PID}" 2>/dev/null || true
+sleep 2
+
+# --- configure nginx reverse proxy ---
+switch_nginx_to_proxy() {
+    echo "Configuring nginx reverse proxy for Gemma 4 (Ollama)..." | log
+
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+    rm -f /etc/nginx/sites-enabled/default
+
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+    NGINX_CONF="/etc/nginx/sites-available/gemma4.conf"
+
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    location / {
+        proxy_pass         http://127.0.0.1:11434;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+
+    location / {
+        proxy_pass         http://127.0.0.1:11434;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+    fi
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/gemma4.conf
+    nginx -t || return 1
+    systemctl reload nginx 2>/dev/null || nginx -s reload
+
+    echo "nginx configured for Gemma 4." | log
+}
+
+configure_motd() {
+    echo "Configuring system MOTD with Gemma 4 info..." | log
+
+    chmod -x /etc/update-motd.d/* 2>/dev/null || true
+    rm -f /etc/motd 2>/dev/null
+
+    LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        SCHEME="https"
+    else
+        SCHEME="http"
+    fi
+
+    OLLAMA_VERSION="$(ollama --version 2>/dev/null || echo unknown)"
+
+    cat > /etc/motd <<EOM
+──────────────────────────────────────────────
+🤖  Gemma 4 – Installation Complete
+──────────────────────────────────────────────
+
+    Model: ${MODEL} (via Ollama ${OLLAMA_VERSION})
+    API URL: ${SCHEME}://${CWM_DOMAIN}
+    Local API: http://127.0.0.1:11434
+    Machine IP: ${MACHINE_IP}
+    Domain: ${CWM_DOMAIN}
+
+    Models stored in: ${OLLAMA_MODELS}
+    Service File: ${SERVICE_FILE}
+    Setup Log: ${LOG_PATH}
+
+──────────────────────────────────────────────
+💡  Ollama management:
+    ollama list                     # list downloaded models
+    ollama pull ${MODEL}            # re-download model
+    ollama run ${MODEL}             # run model interactively
+    ollama rm ${MODEL}              # remove the model
+
+    sudo systemctl status ollama
+    sudo systemctl restart ollama
+    sudo journalctl -u ollama
+
+🌐  API usage:
+    curl ${SCHEME}://${CWM_DOMAIN}/api/tags
+    curl ${SCHEME}://${CWM_DOMAIN}/api/generate -d '{
+      "model": "${MODEL}", "prompt": "Hello"
+    }'
+
+🧹  Remove this message:
+    sudo rm -f /etc/motd && sudo chmod +x /etc/update-motd.d/*
+──────────────────────────────────────────────
+EOM
+
+    chmod 644 /etc/motd
+    echo "Custom MOTD installed." | log
+}
+
+switch_nginx_to_proxy
+configure_motd
+
+tag Script.success

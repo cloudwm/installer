@@ -7,10 +7,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist nginx.success
 checkTagExist php.success
 checkTagExist mysqld.success
-checkTagExist nginx-enable-php-ssl.success
 
 appPath=/var/www/html
 appVersion=5.0.1
@@ -28,6 +26,9 @@ mv moodle $appPath
 rm -f moodle-$appVersion.tgz
 chown -R www-data:www-data $appPath/moodle/
 chmod -R 755 $appPath/moodle/
+mkdir /var/www/html/moodledata
+chown -R www-data:www-data /var/www/html/moodledata
+chmod -R 770 /var/www/html/moodledata
 
 echo "Setting database and db user " | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -54,6 +55,7 @@ fi
 
 echo "Creating nginx configurations" | log
 cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
+sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/moodle.conf
 ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
@@ -62,7 +64,7 @@ waitOrStop 0 "Restart nginx service failed"
 
 echo "Adding descriptions" | log
 
-descriptionAppend "Moodle Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Moodle Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Moodle Username: admin"
 descriptionAppend "Moodle Password: ${ADMINPASSWORD}"
 descriptionAppend " "
@@ -74,4 +76,3 @@ descriptionAppend " "
 tagScript success
 
 exit 0
-
