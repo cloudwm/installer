@@ -39,7 +39,7 @@ cp ./nginx-netbird.conf /etc/nginx/sites-enabled/nginx-netbird.conf
 systemctl restart nginx
 waitOrStop 0 "Nginx service not ready"
 
-
+echo "Add healthcheck to docker file" | log
 python3 - <<'PY'
 from pathlib import Path
 
@@ -76,10 +76,34 @@ text = text.replace(
 
 p.write_text(text)
 PY
+echo "Pinning NetBird image versions in docker-compose.yml" | log
+sed -i \
+  -e 's|image: netbirdio/dashboard:latest|image: netbirdio/dashboard:v2.36.0|' \
+  -e 's|image: netbirdio/netbird-server:latest|image: netbirdio/netbird-server:0.66.3|' \
+  docker-compose.yml
+
 
 echo "Run the service with docker compose" | log
 docker compose up -d
 waitOrStop 0 "Service not ready"
+
+echo "Waiting for NetBird containers to become healthy" | log
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    dashboard_status=$(docker inspect --format='{{.State.Health.Status}}' netbird-dashboard 2>/dev/null || echo "not-found")
+    server_status=$(docker inspect --format='{{.State.Health.Status}}' netbird-server 2>/dev/null || echo "not-found")
+
+    if [ "$dashboard_status" = "healthy" ] && [ "$server_status" = "healthy" ]; then
+        success=true
+        break
+    fi
+
+    echo "NetBird health status: dashboard=$dashboard_status, server=$server_status (attempt $i/$MAX_RETRIES)" | log
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0 "NetBird health check failed" 
 
 
 echo "Adding descriptions" | log
