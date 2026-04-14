@@ -72,7 +72,7 @@ echo "Create docker-compose.yaml file" | log
 cat <<EOF > docker-compose.yaml
 services:
     rsshub:
-        image: ghcr.io/diygod/rsshub:2026-03-11 # or ghcr.io/diygod/rsshub
+        image: ghcr.io/diygod/rsshub # or ghcr.io/diygod/rsshub
         restart: always
         ports:
             - '127.0.0.1:1200:1200'
