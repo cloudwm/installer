@@ -121,23 +121,17 @@ EOF
 
 
 
-echo "Run docker-compoose file" | log
-docker compose up -d
-waitOrStop 0 "Service not ready"
-
-
 for ((i=1; i<=MAX_RETRIES; i++)); do
-    health_status=$(docker inspect --format='{{.State.Health.Status}}' rsshub)
+    health_status=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q rsshub)" 2>/dev/null || echo "not-found")
 
     if [ "$health_status" = "healthy" ]; then
         success=true
         break
     fi
 
-    echo "Appsmith is not healthy yet (status: $health_status) (attempt $i/$MAX_RETRIES)" | log
+    echo "RSSHub is not healthy yet (status: $health_status) (attempt $i/$MAX_RETRIES)" | log
     sleep "$SLEEP_TIME"
 done
-
 [ "$success" = true ]
 waitOrStop 0
 
