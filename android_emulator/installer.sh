@@ -7,24 +7,18 @@ fi
 
 echo "Installing Android Farm - Android Emulator Management Platform" | log
 
-export DEBIAN_FRONTEND="noninteractive"
-
-appInstallDir="/opt/android-farm"
+appDir="/opt/android-emulator"
+installerDir="/opt/installer/android_emulator"
 
 # ── Install Docker ────────────────────────────────────────────────────────────
 
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker and Docker Compose" | log
-    sudo apt-get update
-    sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+    apk update
+    apk add docker docker-compose docker-cli-compose curl openssl jq
 
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-    sudo systemctl enable docker
-    sudo systemctl start docker
-    sudo usermod -aG docker $USER
+    rc-update add docker default
+    service docker start
     sleep 5
 fi
 
@@ -32,10 +26,10 @@ fi
 
 echo "Configuring KVM for hardware-accelerated emulation" | log
 
-sudo apt-get install -y qemu-kvm
-sudo modprobe kvm
-sudo modprobe kvm_intel 2>/dev/null || sudo modprobe kvm_amd 2>/dev/null || true
-sudo chmod 666 /dev/kvm 2>/dev/null || true
+apk add qemu-system-x86_64
+modprobe kvm
+modprobe kvm_intel 2>/dev/null || modprobe kvm_amd 2>/dev/null || true
+chmod 666 /dev/kvm 2>/dev/null || true
 
 if [ ! -e /dev/kvm ]; then
     echo "WARNING: /dev/kvm not found. Ensure virtualization is enabled in BIOS/VM settings." | log
@@ -46,90 +40,92 @@ fi
 echo "Configuring swap space" | log
 
 if [ ! -f /swapfile ]; then
-    sudo fallocate -l 4G /swapfile
-    sudo chmod 600 /swapfile
-    sudo mkswap /swapfile
-    sudo swapon /swapfile
-    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    dd if=/dev/zero of=/swapfile bs=1M count=4096
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
 # ── Deploy application ───────────────────────────────────────────────────────
 
-echo "Deploying Android Farm to ${appInstallDir}" | log
+echo "Deploying Android Farm to ${appDir}" | log
 
-sudo mkdir -p ${appInstallDir}
-sudo mkdir -p ${appInstallDir}/emulators
-sudo mkdir -p ${appInstallDir}/manager/templates
+cp -a ${installerDir} ${appDir}
+mkdir -p ${appDir}/emulators
+chmod +x ${appDir}/android-farm.sh
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-sudo cp ${SCRIPT_DIR}/docker-compose.yml ${appInstallDir}/
-sudo cp ${SCRIPT_DIR}/Dockerfile.manager ${appInstallDir}/
-sudo cp ${SCRIPT_DIR}/nginx.conf ${appInstallDir}/
-sudo cp ${SCRIPT_DIR}/android-farm.sh ${appInstallDir}/
-sudo cp -r ${SCRIPT_DIR}/manager/ ${appInstallDir}/manager/
-sudo cp ${SCRIPT_DIR}/.env ${appInstallDir}/.env
-
-sudo chmod +x ${appInstallDir}/android-farm.sh
-
-# ── Replace placeholders ─────────────────────────────────────────────────────
+# ── Generate .env with runtime values ────────────────────────────────────────
 
 echo "Configuring application settings" | log
 
 FARM_SECRET_KEY=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-32)
+ADMIN_PASSWORD="${ADMINPASSWORD:-admin}"
+SERVER_IP="${CWM_SERVERIP:-$(hostname -I | awk '{print $1}')}"
 
-sudo sed -i "s|__PUBLIC_IP__|${CWM_SERVERIP}|g" ${appInstallDir}/.env
-sudo sed -i "s|__ADMIN_PASSWORD__|${ADMINPASSWORD}|g" ${appInstallDir}/.env
-sudo sed -i "s|__SECRET_KEY__|${FARM_SECRET_KEY}|g" ${appInstallDir}/.env
-
-sudo chown -R root:root ${appInstallDir}
+cat > ${appDir}/.env << EOF
+PUBLIC_IP=${SERVER_IP}
+AUTH_PASS=${ADMIN_PASSWORD}
+SECRET_KEY=${FARM_SECRET_KEY}
+EOF
 
 # ── Build and start ──────────────────────────────────────────────────────────
 
 echo "Building and starting Android Farm services" | log
 
-cd ${appInstallDir}
-sudo docker compose build --no-cache
+cd ${appDir}
+docker compose build --no-cache
 waitOrStop 0 "Failed to build Android Farm"
 
-sudo docker compose up -d
+docker compose up -d
 waitOrStop 0 "Failed to start Android Farm"
 
 echo "Waiting for services to initialize..." | log
 sleep 15
 
-# Verify the manager is responding
 if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/login | grep -q "200"; then
     echo "Manager is running" | log
 else
     echo "Warning: Manager may still be starting up" | log
 fi
 
-# ── Set up systemd service for boot persistence ─────────────────────────────
+# ── Set up OpenRC service for boot persistence ───────────────────────────────
 
 echo "Configuring auto-start on boot" | log
 
-cat << 'EOF' | sudo tee /etc/systemd/system/android-farm.service > /dev/null
-[Unit]
-Description=Android Farm (Docker Compose)
-Requires=docker.service
-After=docker.service
+cat << 'EOF' > /etc/init.d/android-farm
+#!/sbin/openrc-run
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/opt/android-farm
-ExecStart=/usr/bin/docker compose -f docker-compose.yml up -d --remove-orphans
-ExecStartPost=/bin/sh -c 'sleep 5 && [ -f docker-compose.emulators.yml ] && /usr/bin/docker compose -f docker-compose.emulators.yml up -d || true'
-ExecStop=/bin/sh -c '/usr/bin/docker compose -f docker-compose.emulators.yml down 2>/dev/null; /usr/bin/docker compose -f docker-compose.yml down'
-Restart=no
+name="android-farm"
+description="Android Farm Docker Compose stack"
 
-[Install]
-WantedBy=multi-user.target
+depend() {
+    need docker
+    after docker
+}
+
+start() {
+    ebegin "Starting Android Farm"
+    cd /opt/android-emulator
+    docker compose -f docker-compose.yml up -d --remove-orphans
+    sleep 5
+    if [ -f docker-compose.emulators.yml ]; then
+        docker compose -f docker-compose.emulators.yml up -d
+    fi
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping Android Farm"
+    cd /opt/android-emulator
+    docker compose -f docker-compose.emulators.yml down 2>/dev/null
+    docker compose -f docker-compose.yml down
+    eend $?
+}
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable android-farm.service
+chmod +x /etc/init.d/android-farm
+rc-update add android-farm default
 
 # ── Final output ─────────────────────────────────────────────────────────────
 
@@ -139,7 +135,7 @@ descriptionAppend "Android Farm - Emulator Management Platform"
 descriptionAppend " "
 descriptionAppend "Web Panel: http://${SERVER_IP}"
 descriptionAppend "Username: admin"
-descriptionAppend "Password: ${ADMINPASSWORD}"
+descriptionAppend "Password: ${ADMIN_PASSWORD}"
 descriptionAppend " "
 descriptionAppend "Features:"
 descriptionAppend "  - Create/manage Android emulators (Android 9-14)"

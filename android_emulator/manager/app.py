@@ -17,8 +17,8 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-env")
 
-EMULATOR_DATA = os.environ.get("EMULATOR_DATA", "/opt/android-farm/emulators")
-FARM_DIR = os.environ.get("FARM_DIR", "/opt/android-farm")
+EMULATOR_DATA = os.environ.get("EMULATOR_DATA", "/opt/android-emulator/emulators")
+FARM_DIR = os.environ.get("FARM_DIR", "/opt/android-emulator")
 PUBLIC_IP = os.environ.get("PUBLIC_IP", "0.0.0.0")
 UPLOAD_DIR = "/app/uploads"
 AUTH_USER = os.environ.get("AUTH_USER", "admin")
@@ -233,7 +233,7 @@ def generate_compose():
     lines.append("networks:")
     lines.append("  farm-network:")
     lines.append("    external: true")
-    lines.append("    name: android-farm_farm-network")
+    lines.append("    name: android-emulator_farm-network")
     lines.append("")
 
     with open(compose_path, "w") as f:
@@ -730,7 +730,7 @@ def api_system():
     except Exception:
         cpus = 0
 
-    disk_out, _, _ = run_cmd("df -h /opt/android-farm | awk 'NR==2{print $2,$3,$4,$5}'")
+    disk_out, _, _ = run_cmd("df -h /opt/android-emulator | awk 'NR==2{print $2,$3,$4,$5}'")
     disk_parts = disk_out.split() if disk_out else ["0", "0", "0", "0%"]
 
     # Count running emulators

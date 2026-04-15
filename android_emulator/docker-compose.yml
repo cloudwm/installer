@@ -9,11 +9,11 @@ services:
       - PUBLIC_IP=${PUBLIC_IP}
       - AUTH_PASS=${AUTH_PASS}
       - SECRET_KEY=${SECRET_KEY}
-      - EMULATOR_DATA=/opt/android-farm/emulators
-      - FARM_DIR=/opt/android-farm
+      - EMULATOR_DATA=/opt/android-emulator/emulators
+      - FARM_DIR=/opt/android-emulator
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/android-farm:/opt/android-farm
+      - /opt/android-emulator:/opt/android-emulator
       - /proc:/host_proc:ro
       - uploads:/app/uploads
     networks:

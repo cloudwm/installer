@@ -340,9 +340,9 @@ EOF
     cat >> "$COMPOSE_EMULATORS" <<'FOOTER'
 
 networks:
-  stf-network:
+  farm-network:
     external: true
-    name: android-farm_stf-network
+    name: android-emulator_farm-network
 FOOTER
 }
 
