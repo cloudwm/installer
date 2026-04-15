@@ -146,20 +146,19 @@ rc-update add android-farm default
 
 # ── Final output ─────────────────────────────────────────────────────────────
 
-echo "Adding descriptions" | log
+echo "Writing login banner" | log
 
-descriptionAppend "Android Farm - Emulator Management Platform"
-descriptionAppend " "
-descriptionAppend "Web Panel: http://${SERVER_IP}"
-descriptionAppend "Username: admin"
-descriptionAppend "Password: ${ADMIN_PASSWORD}"
-descriptionAppend " "
-descriptionAppend "Features:"
-descriptionAppend "  - Create/manage Android emulators (Android 9-14)"
-descriptionAppend "  - noVNC remote screen access"
-descriptionAppend "  - ADB shell, APK install, file push"
-descriptionAppend "  - Live health monitoring and metrics"
-descriptionAppend "  - Persistent across reboots"
+cat > /etc/motd << MOTD
+==========================================
+  Android Farm - Emulator Management
+==========================================
 
-tagScript success
+  Web Panel: http://${SERVER_IP}
+  Username:  admin
+  Password:  ${ADMIN_PASSWORD}
+
+==========================================
+MOTD
+
+echo "Installation complete" | log
 exit 0
