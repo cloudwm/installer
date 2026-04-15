@@ -263,7 +263,9 @@ async function loadEmulators() {
                     <div><div class="prop-label">noVNC</div><div class="prop-val">:${e.novnc_port}</div></div>
                 </div></div>
                 <div class="emu-card-actions">
-                    ${e.status==="running"?`
+                    ${[...pendingActions].some(k=>k.startsWith(e.name+":")) ? `
+                        <button class="btn btn-sm btn-outline" disabled><span class="spinner" style="width:10px;height:10px;border-width:1.5px;"></span> Working...</button>
+                    ` : e.status==="running"?`
                         <button class="btn btn-sm btn-primary" onclick="openPanel('${e.name}',${e.novnc_port})">Open</button>
                         <button class="btn btn-sm btn-outline" onclick="openEditModal('${e.name}','${e.version}','${e.resolution}','${e.device||"Samsung Galaxy S10"}')">Edit</button>
                         <button class="btn btn-sm btn-outline" onclick="restartEmulator('${e.name}')">Restart</button>
@@ -410,9 +412,18 @@ async function saveEdit() {
     } catch(e){}
     btn.disabled=false;btn.textContent="Save & Restart";
 }
-async function startEmulator(n) { try{const d=await api(`/api/emulators/${n}/start`,{method:"POST"});toast(d.message,"info");}catch(e){} }
-async function stopEmulator(n) { try{const d=await api(`/api/emulators/${n}/stop`,{method:"POST"});toast(d.message,"info");}catch(e){} }
-async function restartEmulator(n) { try{const d=await api(`/api/emulators/${n}/restart`,{method:"POST"});toast(d.message,"info");}catch(e){} }
+let pendingActions = new Set();
+async function emuAction(n, action, fn) {
+    const key = `${n}:${action}`;
+    if (pendingActions.has(key)) return;
+    pendingActions.add(key);
+    loadEmulators();
+    try { const d = await fn(); toast(d.message, "info"); } catch(e) {}
+    setTimeout(() => { pendingActions.delete(key); loadEmulators(); }, 3000);
+}
+async function startEmulator(n) { emuAction(n, "start", () => api(`/api/emulators/${n}/start`,{method:"POST"})); }
+async function stopEmulator(n) { emuAction(n, "stop", () => api(`/api/emulators/${n}/stop`,{method:"POST"})); }
+async function restartEmulator(n) { emuAction(n, "restart", () => api(`/api/emulators/${n}/restart`,{method:"POST"})); }
 
 // ── Panel
 function openPanel(name, vncPort) {
