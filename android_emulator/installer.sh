@@ -17,8 +17,11 @@ if ! command -v docker &> /dev/null; then
     apk update
     apk add docker docker-compose docker-cli-compose curl openssl jq
 
+    rc-update add cgroups boot
+    rc-service cgroups start
+
     rc-update add docker default
-    service docker start
+    rc-service docker start
 
     echo "Waiting for Docker daemon to be ready..." | log
     for i in $(seq 1 30); do
