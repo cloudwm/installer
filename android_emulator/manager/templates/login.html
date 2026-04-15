@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android Farm - Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0b0d11; color: #e6e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-box { background: #14171f; border: 1px solid #2a2e3e; border-radius: 14px; padding: 36px 32px; width: 380px; max-width: 95vw; }
+        .login-box h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .login-box h1 svg { width: 24px; height: 24px; }
+        .login-box .sub { font-size: 13px; color: #7c819a; margin-bottom: 24px; }
+        .fg { margin-bottom: 16px; }
+        .fg label { display: block; font-size: 11px; font-weight: 700; color: #7c819a; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .fg input { width: 100%; padding: 10px 14px; background: #0b0d11; border: 1px solid #2a2e3e; border-radius: 8px; color: #e6e8f0; font-size: 14px; font-family: inherit; }
+        .fg input:focus { outline: none; border-color: #6366f1; }
+        .btn { width: 100%; padding: 10px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .btn:hover { background: #818cf8; }
+        .error { background: rgba(239,68,68,0.12); color: #ef4444; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h1>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01" stroke-width="3" stroke-linecap="round"/></svg>
+            Android Farm
+        </h1>
+        <p class="sub">Sign in to manage your emulators</p>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="POST" action="/login">
+            <div class="fg"><label>Username</label><input type="text" name="username" autofocus required></div>
+            <div class="fg"><label>Password</label><input type="password" name="password" required></div>
+            <button type="submit" class="btn">Sign In</button>
+        </form>
+    </div>
+</body>
+</html>

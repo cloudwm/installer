@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android Farm</title>
+    <style>
+        :root { --bg:#0b0d11;--surface:#14171f;--surface2:#1c2030;--surface3:#242838;--border:#2a2e3e;--border-hover:#3d4260;--text:#e6e8f0;--text-dim:#7c819a;--accent:#6366f1;--accent-hover:#818cf8;--green:#22c55e;--green-dim:rgba(34,197,94,0.12);--red:#ef4444;--red-dim:rgba(239,68,68,0.12);--yellow:#eab308;--yellow-dim:rgba(234,179,8,0.12);--blue:#3b82f6;--radius:12px;--radius-sm:8px; }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+        .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+        .topbar-brand{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+        .topbar-brand svg{width:22px;height:22px}
+        .topbar-actions{display:flex;gap:8px;align-items:center}
+        .container{max-width:1400px;margin:0 auto;padding:20px}
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px}
+        .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+        .stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-dim);margin-bottom:4px}
+        .stat-val{font-size:20px;font-weight:700}
+        .stat-sub{font-size:11px;color:var(--text-dim);margin-top:2px}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-sm);border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap}
+        .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-hover)}
+        .btn-success{background:var(--green);color:#fff}
+        .btn-danger{background:var(--red);color:#fff}
+        .btn-outline{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-outline:hover{border-color:var(--text-dim);color:var(--text)}
+        .btn-ghost{background:transparent;color:var(--text-dim);border:none;padding:6px 10px}.btn-ghost:hover{color:var(--text);background:var(--surface2)}
+        .btn-sm{padding:4px 10px;font-size:11px}
+        .btn:disabled{opacity:.4;cursor:not-allowed}
+        .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+        .section-header h2{font-size:15px;font-weight:700}
+        .emu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-bottom:24px}
+        .emu-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .2s}
+        .emu-card:hover{border-color:var(--border-hover)}
+        .emu-card-head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+        .emu-card-head h3{font-size:14px;font-weight:700}
+        .badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+        .badge-ready{background:var(--green-dim);color:var(--green)}.badge-booting{background:var(--yellow-dim);color:var(--yellow)}.badge-starting{background:rgba(99,102,241,.12);color:var(--accent)}.badge-stopped{background:var(--red-dim);color:var(--red)}
+        .emu-thumb{width:100%;height:160px;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+        .emu-thumb img{height:100%;object-fit:contain}
+        .emu-thumb .thumb-placeholder{color:var(--text-dim);font-size:11px}
+        .emu-card-body{padding:14px 16px}
+        .props{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+        .prop-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px}
+        .prop-val{font-size:12px;font-weight:600;margin-top:1px}
+        .emu-card-actions{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
+        .panel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100}.panel-overlay.open{display:block}
+        .panel{position:fixed;top:0;right:-1100px;width:min(1100px,98vw);height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:101;transition:right .3s ease;display:flex;flex-direction:column}.panel.open{right:0}
+        .panel-header{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface)}
+        .panel-header h2{font-size:16px;font-weight:700}
+        .panel-body{flex:1;overflow:hidden;display:flex;flex-direction:column}
+        .vnc-container{width:100%;background:#000;position:relative;flex:4;min-height:0}
+        .vnc-container iframe{width:100%;height:100%;border:none}
+        .vnc-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px}
+        .panel-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+        .panel-tab{padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+        .panel-tab:hover{color:var(--text)}.panel-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+        .panel-tools{flex:1;min-height:0;overflow-y:auto}
+        .tab-content{display:none;padding:10px 16px}.tab-content.active{display:block}
+        .shell-output{background:#0a0c10;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:11px;min-height:60px;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--green);margin-bottom:6px}
+        .shell-input-row{display:flex;gap:8px}
+        .shell-input{flex:1;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'JetBrains Mono','Fira Code',monospace;font-size:11px}
+        .shell-input:focus{outline:none;border-color:var(--accent)}
+        .log-output{background:#0a0c10;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font-family:monospace;font-size:10px;max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text-dim)}
+        .upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:12px}
+        .upload-zone:hover{border-color:var(--accent)}.upload-zone p{color:var(--text-dim);font-size:12px}.upload-zone .hint{font-size:11px;color:var(--text-dim);margin-top:4px}
+        .app-list{max-height:200px;overflow-y:auto}
+        .app-item{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px;font-family:monospace}.app-item:last-child{border-bottom:none}
+        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .info-item{background:var(--surface);border-radius:var(--radius-sm);padding:8px 12px}
+        .info-item .info-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px}
+        .info-item .info-val{font-size:12px;font-weight:600;margin-top:2px}
+        .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:200;justify-content:center;align-items:center}.modal-backdrop.open{display:flex}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:460px;max-width:95vw}
+        .modal-header{padding:18px 22px 0;display:flex;align-items:center;justify-content:space-between}
+        .modal-header h2{font-size:16px;font-weight:700}
+        .modal-close{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer}
+        .modal-body{padding:18px 22px}
+        .modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+        .fg{margin-bottom:14px}
+        .fg label{display:block;font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
+        .fg input,.fg select{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-family:inherit}
+        .fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
+        .fg select option{background:var(--surface)}
+        .toast-container{position:fixed;top:60px;right:20px;z-index:300;display:flex;flex-direction:column;gap:6px}
+        .toast{padding:10px 18px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;animation:toastIn .25s ease;max-width:350px}
+        .toast-success{background:var(--green);color:#fff}.toast-error{background:var(--red);color:#fff}.toast-info{background:var(--blue);color:#fff}
+        @keyframes toastIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+        #activityBar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:8px 24px;z-index:50}
+        .empty{text-align:center;padding:48px 24px;background:var(--surface);border:1px dashed var(--border);border-radius:var(--radius)}.empty p{color:var(--text-dim);margin:8px 0 16px;font-size:13px}
+        .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .5s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .screenshot-img{max-width:100%;border-radius:var(--radius-sm);margin-top:8px}
+        .chart-area{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:20px}
+        .chart-area h3{font-size:13px;font-weight:700;margin-bottom:10px}
+        canvas{width:100%!important;height:120px!important}
+        .warn-box{background:var(--yellow-dim);color:var(--yellow);padding:8px 14px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:12px}
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-brand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01" stroke-width="3" stroke-linecap="round"/></svg>
+            Android Farm
+        </div>
+        <div class="topbar-actions">
+            <button class="btn btn-ghost" onclick="refreshAll()">Refresh</button>
+            <button class="btn btn-primary" onclick="openCreateModal()">+ New Emulator</button>
+            <a href="/logout" class="btn btn-ghost" style="color:var(--red)">Logout</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="stats-row" id="statsBar"></div>
+        <div class="chart-area"><h3>System Metrics (1h)</h3><canvas id="metricsChart"></canvas></div>
+        <div class="section-header"><h2>Emulators</h2></div>
+        <div id="emulatorList"></div>
+    </div>
+
+    <!-- Create Modal -->
+    <div class="modal-backdrop" id="createModal"><div class="modal">
+        <div class="modal-header"><h2>New Emulator</h2><button class="modal-close" onclick="closeCreateModal()">&times;</button></div>
+        <div class="modal-body" id="createBody">
+            <div id="createWarn"></div>
+            <div class="fg"><label>Name</label><input type="text" id="emuName" placeholder="my-device" autocomplete="off"></div>
+            <div class="fg"><label>Android Version</label><select id="emuVersion"></select></div>
+            <div class="fg"><label>Screen Resolution</label><select id="emuResolution"></select></div>
+            <div class="fg"><label>Device Skin</label><select id="emuDevice"></select></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeCreateModal()">Cancel</button><button class="btn btn-primary" id="createBtn" onclick="createEmulator()">Create</button></div>
+    </div></div>
+
+    <!-- Edit Modal -->
+    <div class="modal-backdrop" id="editModal"><div class="modal">
+        <div class="modal-header"><h2>Edit Emulator</h2><button class="modal-close" onclick="closeEditModal()">&times;</button></div>
+        <div class="modal-body">
+            <div class="fg"><label>Android Version</label><select id="editVersion"></select></div>
+            <div class="fg"><label>Screen Resolution</label><select id="editResolution"></select></div>
+            <div class="fg"><label>Device Skin</label><select id="editDevice"></select></div>
+            <p style="font-size:11px;color:var(--text-dim);margin-top:8px;">Changes require a restart to take effect.</p>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeEditModal()">Cancel</button><button class="btn btn-primary" id="editBtn" onclick="saveEdit()">Save &amp; Restart</button></div>
+    </div></div>
+
+    <!-- Delete Modal -->
+    <div class="modal-backdrop" id="deleteModal"><div class="modal">
+        <div class="modal-header"><h2>Delete Emulator</h2><button class="modal-close" onclick="closeDeleteModal()">&times;</button></div>
+        <div class="modal-body"><p>Are you sure you want to delete <strong id="deleteEmuName"></strong>?</p></div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button><button class="btn btn-danger" id="deleteBtn" onclick="confirmDelete()">Delete</button></div>
+    </div></div>
+
+    <!-- Device Panel -->
+    <div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+    <div class="panel" id="devicePanel">
+        <div class="panel-header">
+            <h2 id="panelTitle">Device</h2>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <a id="panelVncLink" href="#" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;">Pop-out</a>
+                <button class="btn btn-ghost" onclick="closePanel()" style="font-size:18px;">&times;</button>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="vnc-container" id="vncContainer"><div class="vnc-placeholder">Select a running emulator</div></div>
+            <div class="panel-tabs">
+                <div class="panel-tab active" data-tab="tab-shell" onclick="switchTab(this)">Shell</div>
+                <div class="panel-tab" data-tab="tab-clipboard" onclick="switchTab(this)">Clipboard</div>
+                <div class="panel-tab" data-tab="tab-apps" onclick="switchTab(this)">Apps</div>
+                <div class="panel-tab" data-tab="tab-files" onclick="switchTab(this)">Files</div>
+                <div class="panel-tab" data-tab="tab-logs" onclick="switchTab(this)">Logs</div>
+                <div class="panel-tab" data-tab="tab-info" onclick="switchTab(this)">Info</div>
+            </div>
+            <div class="panel-tools">
+                <div class="tab-content active" id="tab-shell">
+                    <div class="shell-output" id="shellOutput">$ _</div>
+                    <div class="shell-input-row">
+                        <input class="shell-input" id="shellInput" placeholder="adb shell command..." onkeydown="if(event.key==='Enter')runShell()">
+                        <button class="btn btn-primary btn-sm" onclick="runShell()">Run</button>
+                        <button class="btn btn-outline btn-sm" onclick="document.getElementById('shellOutput').textContent='$ _'">Clear</button>
+                    </div>
+                </div>
+                <div class="tab-content" id="tab-clipboard">
+                    <div style="margin-bottom:10px;"><label style="display:block;font-size:10px;font-weight:700;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;">Send to clipboard</label><div style="display:flex;gap:6px;"><input type="text" id="clipboardInput" class="shell-input" placeholder="Text to send..." onkeydown="if(event.key==='Enter')setClipboard()"><button class="btn btn-primary btn-sm" onclick="setClipboard()">Send</button></div></div>
+                    <div style="margin-bottom:10px;"><label style="display:block;font-size:10px;font-weight:700;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;">Read clipboard</label><div style="display:flex;gap:6px;align-items:center;"><div id="clipboardContent" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:11px;min-height:30px;color:var(--text-dim);">Click "Read"</div><button class="btn btn-outline btn-sm" onclick="getClipboard()">Read</button><button class="btn btn-outline btn-sm" onclick="copyClipboardToLocal()">Copy</button></div></div>
+                    <div style="border-top:1px solid var(--border);padding-top:10px;"><label style="display:block;font-size:10px;font-weight:700;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;">Type into focused field</label><div style="display:flex;gap:6px;"><input type="text" id="typeTextInput" class="shell-input" placeholder="Text to type..." onkeydown="if(event.key==='Enter')typeText()"><button class="btn btn-primary btn-sm" onclick="typeText()">Type</button></div></div>
+                </div>
+                <div class="tab-content" id="tab-apps">
+                    <div style="display:flex;gap:6px;margin-bottom:8px;"><button class="btn btn-primary btn-sm" onclick="document.getElementById('apkFileInput').click()">Install APK</button><button class="btn btn-outline btn-sm" onclick="loadApps()">Refresh</button><input type="file" id="apkFileInput" accept=".apk" style="display:none" onchange="installApk(this)"></div>
+                    <div class="app-list" id="appList"><p style="color:var(--text-dim);font-size:11px;">Click "Refresh" to load apps.</p></div>
+                </div>
+                <div class="tab-content" id="tab-files">
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"><p>Click to upload a file to /sdcard/</p><div class="hint">or drag & drop</div><input type="file" id="fileInput" style="display:none" onchange="pushFile(this)"></div>
+                    <div style="display:flex;gap:6px;margin-bottom:8px;"><button class="btn btn-outline btn-sm" onclick="takeScreenshot()">Screenshot</button><button class="btn btn-outline btn-sm" onclick="downloadScreenshot()">Download</button></div>
+                    <div id="screenshotArea"></div>
+                </div>
+                <div class="tab-content" id="tab-logs">
+                    <div style="display:flex;gap:6px;margin-bottom:8px;"><button class="btn btn-outline btn-sm" onclick="loadLogs()">Refresh Logs</button><button class="btn btn-outline btn-sm" onclick="loadLogs(500)">Last 500</button></div>
+                    <div class="log-output" id="logOutput">Click "Refresh Logs" to load container logs.</div>
+                </div>
+                <div class="tab-content" id="tab-info">
+                    <div class="info-grid" id="infoGrid"><p style="color:var(--text-dim);font-size:11px;">Loading...</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="activityBar"></div>
+    <div class="toast-container" id="toasts"></div>
+
+<script>
+const PUBLIC_IP = "{{ public_ip }}";
+let pendingDeleteName = null, pendingEditName = null;
+let knownFinished = new Set();
+let currentPanelDevice = null, currentPanelVncPort = null;
+let sysInfo = null;
+
+function toast(msg, type="info") { const c=document.getElementById("toasts"),el=document.createElement("div");el.className=`toast toast-${type}`;el.textContent=msg;c.appendChild(el);setTimeout(()=>el.remove(),5000); }
+
+async function api(url, opts={}) {
+    try {
+        const defaults = {};
+        if (!(opts.body instanceof FormData)) defaults.headers = {"Content-Type":"application/json"};
+        const resp = await fetch(url, {...defaults, ...opts});
+        if (resp.status === 401) { window.location = "/login"; return; }
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || "Request failed");
+        return data;
+    } catch(e) { toast(e.message, "error"); throw e; }
+}
+
+const API_MAP = {"9.0":28,"10.0":29,"11.0":30,"12.0":32,"13.0":33,"14.0":34};
+function getApi(v) { return API_MAP[v] || "?"; }
+
+function healthBadge(e) {
+    if (e.health === "ready") return `<span class="badge badge-ready">Ready</span>`;
+    if (e.health === "booting") return `<span class="badge badge-booting"><span class="spinner" style="width:8px;height:8px;border-width:1.5px;margin-right:3px;vertical-align:middle;"></span>Booting</span>`;
+    if (e.health === "starting") return `<span class="badge badge-starting"><span class="spinner" style="width:8px;height:8px;border-width:1.5px;margin-right:3px;vertical-align:middle;"></span>Starting</span>`;
+    return `<span class="badge badge-stopped">Stopped</span>`;
+}
+
+// ── Task polling
+async function pollTasks() {
+    try {
+        const list = await fetch("/api/tasks").then(r=>r.json());
+        const bar = document.getElementById("activityBar");
+        const running = list.filter(t=>t.status==="running");
+        list.forEach(t => { if (t.status!=="running"&&!knownFinished.has(t.id)) { knownFinished.add(t.id); toast(t.message,t.status==="done"?"success":"error"); loadEmulators();loadSystem(); } });
+        if (running.length>0) { bar.style.display="flex";bar.style.gap="16px";bar.style.alignItems="center";bar.style.flexWrap="wrap"; bar.innerHTML=running.map(t=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span class="spinner"></span><strong>${t.name}</strong>: ${t.message} <span style="color:var(--text-dim);font-size:10px;">(${Math.round(Date.now()/1000-t.started)}s)</span></div>`).join(""); } else { bar.style.display="none"; }
+    } catch(e) {}
+}
+
+// ── Emulator list with thumbnails
+async function loadEmulators() {
+    const el = document.getElementById("emulatorList");
+    try {
+        const emus = await api("/api/emulators");
+        if (!emus.length) { el.innerHTML = `<div class="empty"><h3>No emulators yet</h3><p>Create your first Android emulator to get started.</p><button class="btn btn-primary" onclick="openCreateModal()">+ New Emulator</button></div>`; return; }
+        el.innerHTML = `<div class="emu-grid">${emus.map(e => `
+            <div class="emu-card">
+                <div class="emu-card-head"><h3>${e.name}</h3>${healthBadge(e)}</div>
+                <div class="emu-thumb" id="thumb-${e.name}">${e.health==="ready"?`<div class="thumb-placeholder"><span class="spinner"></span></div>`:`<div class="thumb-placeholder">${e.health==="stopped"?"Stopped":e.health==="starting"?"Container starting...":"Android booting..."}</div>`}</div>
+                <div class="emu-card-body"><div class="props">
+                    <div><div class="prop-label">Android</div><div class="prop-val">${e.version} (API ${getApi(e.version)})</div></div>
+                    <div><div class="prop-label">Resolution</div><div class="prop-val">${e.resolution}</div></div>
+                    <div><div class="prop-label">Device</div><div class="prop-val">${e.device||"Galaxy S10"}</div></div>
+                    <div><div class="prop-label">noVNC</div><div class="prop-val">:${e.novnc_port}</div></div>
+                </div></div>
+                <div class="emu-card-actions">
+                    ${e.status==="running"?`
+                        <button class="btn btn-sm btn-primary" onclick="openPanel('${e.name}',${e.novnc_port})">Open</button>
+                        <button class="btn btn-sm btn-outline" onclick="openEditModal('${e.name}','${e.version}','${e.resolution}','${e.device||"Samsung Galaxy S10"}')">Edit</button>
+                        <button class="btn btn-sm btn-outline" onclick="restartEmulator('${e.name}')">Restart</button>
+                        <button class="btn btn-sm btn-outline" onclick="stopEmulator('${e.name}')">Stop</button>
+                    `:`
+                        <button class="btn btn-sm btn-success" onclick="startEmulator('${e.name}')">Start</button>
+                        <button class="btn btn-sm btn-outline" onclick="openEditModal('${e.name}','${e.version}','${e.resolution}','${e.device||"Samsung Galaxy S10"}')">Edit</button>
+                    `}
+                    <button class="btn btn-sm btn-danger" onclick="openDeleteModal('${e.name}')">Delete</button>
+                </div>
+            </div>
+        `).join("")}</div>`;
+        // Load thumbnails for ready emulators
+        emus.filter(e=>e.health==="ready").forEach(e => loadThumbnail(e.name));
+    } catch(e) { el.innerHTML = `<div class="empty"><p>Failed to load emulators.</p></div>`; }
+}
+
+async function loadThumbnail(name) {
+    try {
+        const r = await fetch(`/api/emulators/${name}/thumbnail`);
+        const d = await r.json();
+        const el = document.getElementById(`thumb-${name}`);
+        if (el && d.ok) el.innerHTML = `<img src="data:image/png;base64,${d.image}" alt="screen">`;
+    } catch(e) {}
+}
+
+// ── System Stats
+async function loadSystem() {
+    try {
+        const s = await api("/api/system"); sysInfo = s;
+        document.getElementById("statsBar").innerHTML = `
+            <div class="stat"><div class="stat-label">Memory</div><div class="stat-val">${s.memory.used} / ${s.memory.total} MB</div><div class="stat-sub">${s.memory.free} MB free</div></div>
+            <div class="stat"><div class="stat-label">Swap</div><div class="stat-val">${s.swap.used} / ${s.swap.total} MB</div><div class="stat-sub">${s.swap.free} MB free</div></div>
+            <div class="stat"><div class="stat-label">Disk</div><div class="stat-val">${s.disk.used} / ${s.disk.total}</div><div class="stat-sub">${s.disk.free} free (${s.disk.percent})</div></div>
+            <div class="stat"><div class="stat-label">CPUs</div><div class="stat-val">${s.cpus}</div><div class="stat-sub">IP: ${s.public_ip}</div></div>
+            <div class="stat"><div class="stat-label">Emulators</div><div class="stat-val">${s.running_emulators} running</div><div class="stat-sub">${s.emu_ram_mb} MB each</div></div>
+        `;
+    } catch(e) {}
+}
+
+// ── Metrics chart (simple canvas)
+let chartData = [];
+async function loadMetrics() {
+    try {
+        chartData = await api("/api/metrics");
+        drawChart();
+    } catch(e) {}
+}
+
+function drawChart() {
+    const canvas = document.getElementById("metricsChart");
+    if (!canvas || !chartData.length) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.parentElement.clientWidth - 32;
+    const H = 120;
+    canvas.width = W; canvas.height = H;
+    ctx.clearRect(0, 0, W, H);
+
+    const maxMem = chartData[0]?.mem_total || 8000;
+    const len = chartData.length;
+    const step = W / Math.max(len - 1, 1);
+
+    // Mem line
+    ctx.beginPath(); ctx.strokeStyle = "#6366f1"; ctx.lineWidth = 1.5;
+    chartData.forEach((d, i) => { const x = i * step, y = H - (d.mem_used / maxMem) * H; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    ctx.stroke();
+
+    // CPU line
+    ctx.beginPath(); ctx.strokeStyle = "#22c55e"; ctx.lineWidth = 1.5;
+    chartData.forEach((d, i) => { const x = i * step, y = H - (d.cpu / 100) * H; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    ctx.stroke();
+
+    // Legend
+    ctx.font = "10px sans-serif";
+    ctx.fillStyle = "#6366f1"; ctx.fillText("Memory", 4, 12);
+    ctx.fillStyle = "#22c55e"; ctx.fillText("CPU %", 60, 12);
+    ctx.fillStyle = "#7c819a";
+    if (chartData.length > 1) {
+        const first = new Date(chartData[0].t * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        const last = new Date(chartData[chartData.length-1].t * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        ctx.fillText(first, 4, H - 2);
+        ctx.fillText(last, W - 40, H - 2);
+    }
+}
+
+// ── Form Options
+async function loadFormOptions() {
+    const [versions, resolutions, devices] = await Promise.all([api("/api/versions"), api("/api/resolutions"), api("/api/devices")]);
+    const vOpts = versions.map(v=>`<option value="${v.version}" ${v.version==="11.0"?"selected":""}>Android ${v.version} (API ${v.api})</option>`).join("");
+    const rOpts = resolutions.map(r=>`<option value="${r.resolution}" ${r.resolution==="1080x1920"?"selected":""}>${r.label}</option>`).join("");
+    const dOpts = devices.map(d=>`<option value="${d.name}" ${d.name==="Samsung Galaxy S10"?"selected":""}>${d.type}: ${d.name}</option>`).join("");
+    document.getElementById("emuVersion").innerHTML = vOpts;
+    document.getElementById("emuResolution").innerHTML = rOpts;
+    document.getElementById("emuDevice").innerHTML = dOpts;
+    document.getElementById("editVersion").innerHTML = vOpts;
+    document.getElementById("editResolution").innerHTML = rOpts;
+    document.getElementById("editDevice").innerHTML = dOpts;
+}
+
+// ── Modals
+function openCreateModal() {
+    document.getElementById("createModal").classList.add("open");
+    document.getElementById("emuName").focus();
+    if (sysInfo && parseInt(sysInfo.memory.free) < sysInfo.emu_ram_mb) {
+        document.getElementById("createWarn").innerHTML = `<div class="warn-box">Low RAM: ${sysInfo.memory.free} MB free. Each emulator needs ~${sysInfo.emu_ram_mb} MB.</div>`;
+    } else {
+        document.getElementById("createWarn").innerHTML = "";
+    }
+}
+function closeCreateModal() { document.getElementById("createModal").classList.remove("open"); document.getElementById("emuName").value=""; }
+function openDeleteModal(n) { pendingDeleteName=n; document.getElementById("deleteEmuName").textContent=n; document.getElementById("deleteModal").classList.add("open"); }
+function closeDeleteModal() { document.getElementById("deleteModal").classList.remove("open"); pendingDeleteName=null; }
+function openEditModal(name, ver, res, dev) {
+    pendingEditName = name;
+    document.getElementById("editVersion").value = ver;
+    document.getElementById("editResolution").value = res;
+    document.getElementById("editDevice").value = dev;
+    document.getElementById("editModal").classList.add("open");
+}
+function closeEditModal() { document.getElementById("editModal").classList.remove("open"); pendingEditName=null; }
+
+// ── CRUD
+async function createEmulator() {
+    const btn=document.getElementById("createBtn"),name=document.getElementById("emuName").value.trim();
+    if(!name){toast("Name is required","error");return;}
+    btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+    try { await api("/api/emulators",{method:"POST",body:JSON.stringify({name,version:document.getElementById("emuVersion").value,resolution:document.getElementById("emuResolution").value,device:document.getElementById("emuDevice").value})}); toast(`'${name}' created. Press Start to launch.`,"success"); closeCreateModal(); loadEmulators(); } catch(e){}
+    btn.disabled=false;btn.textContent="Create";
+}
+async function confirmDelete() {
+    if(!pendingDeleteName)return;
+    const btn=document.getElementById("deleteBtn");btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+    try{await api(`/api/emulators/${pendingDeleteName}`,{method:"DELETE"});toast(`Deleting '${pendingDeleteName}'...`,"info");closeDeleteModal();}catch(e){}
+    btn.disabled=false;btn.textContent="Delete";
+}
+async function saveEdit() {
+    if(!pendingEditName)return;
+    const btn=document.getElementById("editBtn");btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+    try {
+        const r = await api(`/api/emulators/${pendingEditName}`,{method:"PUT",body:JSON.stringify({version:document.getElementById("editVersion").value,resolution:document.getElementById("editResolution").value,device:document.getElementById("editDevice").value})});
+        toast(r.message,"success");
+        if(r.needs_restart) { await api(`/api/emulators/${pendingEditName}/restart`,{method:"POST"}); toast("Restarting...","info"); }
+        closeEditModal(); loadEmulators();
+    } catch(e){}
+    btn.disabled=false;btn.textContent="Save & Restart";
+}
+async function startEmulator(n) { try{const d=await api(`/api/emulators/${n}/start`,{method:"POST"});toast(d.message,"info");}catch(e){} }
+async function stopEmulator(n) { try{const d=await api(`/api/emulators/${n}/stop`,{method:"POST"});toast(d.message,"info");}catch(e){} }
+async function restartEmulator(n) { try{const d=await api(`/api/emulators/${n}/restart`,{method:"POST"});toast(d.message,"info");}catch(e){} }
+
+// ── Panel
+function openPanel(name, vncPort) {
+    currentPanelDevice=name;currentPanelVncPort=vncPort;
+    document.getElementById("panelTitle").textContent=name;
+    document.getElementById("panelVncLink").href=`http://${PUBLIC_IP}:${vncPort}`;
+    document.getElementById("panelOverlay").classList.add("open");
+    document.getElementById("devicePanel").classList.add("open");
+    document.getElementById("vncContainer").innerHTML=`<iframe src="http://${PUBLIC_IP}:${vncPort}/?autoconnect=true&resize=scale" allow="clipboard-read;clipboard-write"></iframe>`;
+    document.getElementById("shellOutput").textContent="$ _";
+    document.getElementById("logOutput").textContent='Click "Refresh Logs" to load.';
+    switchTab(document.querySelector('[data-tab="tab-shell"]'));
+    loadDeviceInfo();
+}
+function closePanel() { document.getElementById("panelOverlay").classList.remove("open");document.getElementById("devicePanel").classList.remove("open");document.getElementById("vncContainer").innerHTML=`<div class="vnc-placeholder">Select a running emulator</div>`;currentPanelDevice=null; }
+function switchTab(el) { document.querySelectorAll(".panel-tab").forEach(t=>t.classList.remove("active"));document.querySelectorAll(".tab-content").forEach(t=>t.classList.remove("active"));el.classList.add("active");document.getElementById(el.dataset.tab).classList.add("active"); }
+
+// ── Shell
+async function runShell() { if(!currentPanelDevice)return;const input=document.getElementById("shellInput"),cmd=input.value.trim();if(!cmd)return;const out=document.getElementById("shellOutput");out.textContent+=`\n$ ${cmd}\n`;input.value="";try{const r=await api(`/api/emulators/${currentPanelDevice}/shell`,{method:"POST",body:JSON.stringify({command:cmd})});if(r.stdout)out.textContent+=r.stdout+"\n";if(r.stderr)out.textContent+=r.stderr+"\n";}catch(e){out.textContent+="Error: "+e.message+"\n";}out.scrollTop=out.scrollHeight; }
+
+// ── Logs
+async function loadLogs(n=100) { if(!currentPanelDevice)return;const el=document.getElementById("logOutput");el.textContent="Loading...";try{const r=await api(`/api/emulators/${currentPanelDevice}/logs?lines=${n}`);el.textContent=r.logs||"(empty)";el.scrollTop=el.scrollHeight;}catch(e){el.textContent="Failed to load logs.";} }
+
+// ── Apps
+async function loadApps() { if(!currentPanelDevice)return;const el=document.getElementById("appList");el.innerHTML='<span class="spinner"></span>';try{const r=await api(`/api/emulators/${currentPanelDevice}/apps`);if(!r.packages.length){el.innerHTML='<p style="color:var(--text-dim);font-size:11px;">No apps.</p>';return;}el.innerHTML=r.packages.map(p=>`<div class="app-item"><span>${p}</span><button class="btn btn-sm btn-danger" onclick="uninstallApp('${p}')">Uninstall</button></div>`).join("");}catch(e){} }
+async function uninstallApp(pkg) { if(!currentPanelDevice)return;try{await api(`/api/emulators/${currentPanelDevice}/uninstall`,{method:"POST",body:JSON.stringify({package:pkg})});toast(`Uninstalled ${pkg}`,"success");loadApps();}catch(e){} }
+async function installApk(input) { if(!currentPanelDevice||!input.files[0])return;const fd=new FormData();fd.append("file",input.files[0]);try{const r=await api(`/api/emulators/${currentPanelDevice}/install-apk`,{method:"POST",body:fd,headers:undefined});toast(r.message,"info");}catch(e){}input.value=""; }
+
+// ── Files
+async function pushFile(input) { if(!currentPanelDevice||!input.files[0])return;const fd=new FormData();fd.append("file",input.files[0]);try{const r=await api(`/api/emulators/${currentPanelDevice}/push-file`,{method:"POST",body:fd,headers:undefined});toast(r.message,"info");}catch(e){}input.value=""; }
+async function takeScreenshot() { if(!currentPanelDevice)return;const a=document.getElementById("screenshotArea");a.innerHTML='<span class="spinner"></span>';try{const r=await api(`/api/emulators/${currentPanelDevice}/screenshot`);a.innerHTML=`<img class="screenshot-img" src="data:image/png;base64,${r.image}">`;}catch(e){a.innerHTML='<p style="color:var(--red);font-size:11px;">Failed.</p>';} }
+async function downloadScreenshot() { if(!currentPanelDevice)return;toast("Capturing...","info");try{const r=await api(`/api/emulators/${currentPanelDevice}/screenshot`);const a=document.createElement("a");a.href=`data:image/png;base64,${r.image}`;a.download=`${currentPanelDevice}-${Date.now()}.png`;a.click();toast("Downloaded","success");}catch(e){} }
+
+// ── Clipboard
+async function setClipboard() { if(!currentPanelDevice)return;const t=document.getElementById("clipboardInput").value;if(!t){toast("Enter text","error");return;}try{await api(`/api/emulators/${currentPanelDevice}/clipboard`,{method:"POST",body:JSON.stringify({text:t})});toast("Clipboard set","success");}catch(e){} }
+async function getClipboard() { if(!currentPanelDevice)return;const el=document.getElementById("clipboardContent");el.textContent="Reading...";try{const r=await api(`/api/emulators/${currentPanelDevice}/clipboard`);el.textContent=r.text||"(empty)";el.style.color="var(--text)";}catch(e){el.textContent="Failed";el.style.color="var(--red)";} }
+function copyClipboardToLocal() { const t=document.getElementById("clipboardContent").textContent;if(!t||t==="(empty)"||t.startsWith("Click")||t==="Failed"){toast("Nothing to copy","error");return;}navigator.clipboard.writeText(t).then(()=>toast("Copied","success")).catch(()=>toast("Copy failed","error")); }
+async function typeText() { if(!currentPanelDevice)return;const t=document.getElementById("typeTextInput").value;if(!t){toast("Enter text","error");return;}try{const enc=t.replace(/ /g,"%s");await api(`/api/emulators/${currentPanelDevice}/shell`,{method:"POST",body:JSON.stringify({command:`input text '${enc}'`})});toast("Typed","success");}catch(e){} }
+
+// ── Info
+async function loadDeviceInfo() { if(!currentPanelDevice)return;const el=document.getElementById("infoGrid");try{const r=await api(`/api/emulators/${currentPanelDevice}/info`);const p=r.properties;const items=[["Android",p["ro.build.version.release"]||"?"],["SDK",p["ro.build.version.sdk"]||"?"],["Model",p["ro.product.model"]||"?"],["Brand",p["ro.product.brand"]||"?"],["Build",p["ro.build.display.id"]||"?"],["Hardware",p["ro.hardware"]||"?"],["Timezone",p["persist.sys.timezone"]||"?"],["Carrier",p["gsm.operator.alpha"]||"None"]];el.innerHTML=items.map(([l,v])=>`<div class="info-item"><div class="info-label">${l}</div><div class="info-val">${v}</div></div>`).join("");}catch(e){el.innerHTML='<p style="color:var(--text-dim);font-size:11px;">Not ready.</p>';} }
+
+// ── Drag & drop
+const uz=document.getElementById("uploadZone");
+uz.addEventListener("dragover",e=>{e.preventDefault();uz.style.borderColor="var(--accent)";});
+uz.addEventListener("dragleave",()=>uz.style.borderColor="var(--border)");
+uz.addEventListener("drop",e=>{e.preventDefault();uz.style.borderColor="var(--border)";if(e.dataTransfer.files.length&&currentPanelDevice){const fd=new FormData();fd.append("file",e.dataTransfer.files[0]);api(`/api/emulators/${currentPanelDevice}/push-file`,{method:"POST",body:fd,headers:undefined}).then(r=>toast(r.message,"info")).catch(()=>{});}});
+
+// ── Init
+function refreshAll() { loadEmulators();loadSystem();pollTasks();loadMetrics();toast("Refreshed","info"); }
+setInterval(pollTasks, 3000);
+setInterval(() => { loadEmulators(); loadSystem(); }, 10000);
+setInterval(loadMetrics, 30000);
+loadFormOptions(); loadEmulators(); loadSystem(); pollTasks(); loadMetrics();
+</script>
+</body>
+</html>
