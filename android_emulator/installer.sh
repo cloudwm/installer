@@ -10,8 +10,6 @@ echo "Installing Android Farm - Android Emulator Management Platform" | log
 appDir="/opt/android-emulator"
 installerDir="/opt/installer/android_emulator"
 
-# ── Install Docker ────────────────────────────────────────────────────────────
-
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker and Docker Compose" | log
     apk update
@@ -21,8 +19,6 @@ if ! command -v docker &> /dev/null; then
     service docker start
     sleep 5
 fi
-
-# ── Enable KVM ────────────────────────────────────────────────────────────────
 
 echo "Configuring KVM for hardware-accelerated emulation" | log
 
@@ -35,27 +31,11 @@ if [ ! -e /dev/kvm ]; then
     echo "WARNING: /dev/kvm not found. Ensure virtualization is enabled in BIOS/VM settings." | log
 fi
 
-# ── Set up swap (emulators need ~2GB RAM each) ───────────────────────────────
-
-echo "Configuring swap space" | log
-
-if [ ! -f /swapfile ]; then
-    dd if=/dev/zero of=/swapfile bs=1M count=4096
-    chmod 600 /swapfile
-    mkswap /swapfile
-    swapon /swapfile
-    echo '/swapfile none swap sw 0 0' >> /etc/fstab
-fi
-
-# ── Deploy application ───────────────────────────────────────────────────────
-
 echo "Deploying Android Farm to ${appDir}" | log
 
 cp -a ${installerDir} ${appDir}
 mkdir -p ${appDir}/emulators
 chmod +x ${appDir}/android-farm.sh
-
-# ── Generate .env with runtime values ────────────────────────────────────────
 
 echo "Configuring application settings" | log
 
@@ -68,8 +48,6 @@ PUBLIC_IP=${SERVER_IP}
 AUTH_PASS=${ADMIN_PASSWORD}
 SECRET_KEY=${FARM_SECRET_KEY}
 EOF
-
-# ── Build and start ──────────────────────────────────────────────────────────
 
 echo "Building and starting Android Farm services" | log
 
@@ -88,8 +66,6 @@ if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/login | grep -q 
 else
     echo "Warning: Manager may still be starting up" | log
 fi
-
-# ── Set up OpenRC service for boot persistence ───────────────────────────────
 
 echo "Configuring auto-start on boot" | log
 
@@ -126,8 +102,6 @@ EOF
 
 chmod +x /etc/init.d/android-farm
 rc-update add android-farm default
-
-# ── Final output ─────────────────────────────────────────────────────────────
 
 echo "Adding descriptions" | log
 

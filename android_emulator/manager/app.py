@@ -198,6 +198,10 @@ def generate_compose():
     else:
         for emu in emulators:
             device = emu.get("device", "Samsung Galaxy S10")
+            res_parts = emu["resolution"].split("x")
+            emu_w, emu_h = int(res_parts[0]), int(res_parts[1])
+            screen_w = emu_w + 200
+            screen_h = emu_h + 500
             lines.append(f"  android-{emu['name']}:")
             lines.append(f"    image: {emu['image']}")
             lines.append(f"    container_name: android-{emu['name']}")
@@ -211,6 +215,9 @@ def generate_compose():
             lines.append("      - WEB_LOG=true")
             lines.append(f"      - EMULATOR_SCREEN_RESOLUTION={emu['resolution']}")
             lines.append(f"      - EMULATOR_DPI={emu['dpi']}")
+            lines.append(f"      - SCREEN_WIDTH={screen_w}")
+            lines.append(f"      - SCREEN_HEIGHT={screen_h}")
+            lines.append(f"      - SCREEN_DEPTH=24")
             lines.append("      - DATAPARTITION=2g")
             lines.append("      - ADB_INSECURE=1")
             lines.append(
@@ -221,6 +228,7 @@ def generate_compose():
             lines.append(f"      - \"{emu['adb_port']}:5555\"")
             lines.append("    volumes:")
             lines.append(f"      - android-data-{emu['name']}:/root/.android")
+            lines.append(f"      - {FARM_DIR}/set-black-bg.conf:/etc/supervisor/conf.d/set-black-bg.conf:ro")
             lines.append("    networks:")
             lines.append("      - farm-network")
             lines.append("")
