@@ -52,18 +52,6 @@ if [ ! -e /dev/kvm ]; then
     echo "WARNING: /dev/kvm not found. Ensure virtualization is enabled in BIOS/VM settings." | log
 fi
 
-# ── Set up swap (emulators need ~2GB RAM each) ───────────────────────────────
-
-echo "Configuring swap space" | log
-
-if [ ! -f /swapfile ]; then
-    dd if=/dev/zero of=/swapfile bs=1M count=4096
-    chmod 600 /swapfile
-    mkswap /swapfile
-    swapon /swapfile
-    echo '/swapfile none swap sw 0 0' >> /etc/fstab
-fi
-
 # ── Deploy application ───────────────────────────────────────────────────────
 
 echo "Deploying Android Farm to ${appDir}" | log
