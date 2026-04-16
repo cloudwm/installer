@@ -52,7 +52,7 @@ sudo -u www-data php occ db:add-missing-indices
 echo "Configuring nginx" | log
 # Copy Virtual Host
 cp $rootDir/tweaks/extras/nextcloud-nginx/nextcloud.conf /etc/nginx/sites-available/
-sed -i 's/DOMAIN/${CWM_DOMAIN}/g' /etc/nginx/sites-available/nextcloud.conf
+sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/nextcloud.conf
 # Symlink nextcloud vhost
 ln -s /etc/nginx/sites-available/nextcloud.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
