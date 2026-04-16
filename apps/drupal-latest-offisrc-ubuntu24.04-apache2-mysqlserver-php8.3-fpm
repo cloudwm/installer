@@ -180,7 +180,12 @@ EOF
 	chmod 644 /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
 	chmod 640 /etc/letsencrypt/live/${DOMAIN}/privkey.pem
 	echo "Testing apache2 config..." | log
-	apache2ctl configtest 2>&1 | log || { echo "apache2 configtest failed. Exiting." | log 1; exit 1; }
+	if ! apache2ctl configtest >/tmp/apache2-configtest.log 2>&1; then
+		cat /tmp/apache2-configtest.log | log 1
+		echo "apache2 configtest failed. Exiting." | log 1
+		exit 1
+	fi
+	cat /tmp/apache2-configtest.log | log
 	systemctl enable --now apache2
 	systemctl restart apache2 || { echo "apache2 failed to restart. See journalctl -u apache2." | log 1; exit 1; }
 	echo "Apache configured and running." | log
