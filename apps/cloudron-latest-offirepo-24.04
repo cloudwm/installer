@@ -1,12 +1,11 @@
 #!/bin/bash
 
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+    
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
 
 updateAndFinalize() {
     local rootDir="$1"
@@ -93,9 +92,6 @@ echo Y | bash cloudron-setup | while IFS= read -r line; do
             # Clean and append dots to the output
             cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
             final_stage="${cleaned_stage}..."
-            
-            # Update the installation landing page
-         #   "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
         done
     fi
 done
