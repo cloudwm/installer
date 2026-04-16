@@ -2,6 +2,7 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
+    
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
@@ -10,8 +11,6 @@ APPSMITH_VERSION=v1.97
 appDir="/opt/installer"
 MAX_RETRIES=5
 SLEEP_TIME=30
-
-
 
 echo "Installing Docker and Docker Compose" | log
 if ! command -v docker &> /dev/null; then

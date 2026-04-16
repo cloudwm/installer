@@ -6,13 +6,15 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist php.success
 checkTagExist nginx.success
-checkTagExist nginx-enable-php-ssl.success
 
 ubuntu_version=$(lsb_release -rs)
 appPath=/var/www/html/django
 rootDir=$(rootDir)
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+# nginx was stopped by nginx-letsencrypt-cert (certbot standalone mode)
+systemctl start nginx 2>/dev/null
 
 echo "Creating Django Database" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -82,9 +84,6 @@ fi
 
 sed -i "s/ALLOWED_HOSTS \= \[]/ALLOWED_HOSTS \= \['${CWM_DOMAIN}']/g" $appPath/djangoproject/settings.py
 
-echo "Adding WebUI port to ufw" | log
-ufw allow 8000
-
 echo "Creating Django service" | log
 cat << EOF > /etc/systemd/system/django.service
 [Unit]
@@ -95,7 +94,7 @@ StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=django
 User=root
-ExecStart=$appPath/django_env/bin/python3 $appPath/manage.py runserver ${CWM_DOMAIN}:8000
+ExecStart=$appPath/django_env/bin/python3 $appPath/manage.py runserver 127.0.0.1:8000
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -106,13 +105,58 @@ systemctl enable django.service
 systemctl start django.service
 waitOrStop 0 "Failed to start Django service"
 
+echo "Configuring nginx HTTPS reverse proxy for Django" | log
+rm -f /etc/nginx/sites-enabled/default
+cat << EOF > /etc/nginx/sites-available/django
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    root /var/www/html;
+    index index.php index.html;
+
+    location ~ \.php\$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+
+    location / {
+        try_files \$uri @django;
+    }
+
+    location @django {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/django /etc/nginx/sites-enabled/django
+nginx -t
+waitOrStop 0 "nginx config test failed"
+systemctl reload nginx
+waitOrStop 0 "Failed to reload nginx"
+
 echo "Adding descriptions" | log
 descriptionAppend "Django Debug mode is on."
 descriptionAppend "Make sure to add your website CSS and index files"
 descriptionAppend "Django root directory: $appPath"
 descriptionAppend "Django settings file: $appPath/djangoproject/settings.py"
-descriptionAppend "Django WebUI: http://${CWM_DOMAIN}:8000"
-descriptionAppend "Django Admin UI: http://${CWM_DOMAIN}:8000/admin"
+descriptionAppend "Django WebUI: https://${CWM_DOMAIN}"
+descriptionAppend "Django Admin UI: https://${CWM_DOMAIN}/admin"
 descriptionAppend "Django user: root"
 descriptionAppend "Django password: ${ADMINPASSWORD}"
 descriptionAppend " "
