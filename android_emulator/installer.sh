@@ -66,12 +66,10 @@ with open('${appDir}/black-bg.png', 'wb') as f:
 echo "Configuring application settings" | log
 
 FARM_SECRET_KEY=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-32)
-ADMIN_PASSWORD="${ADMINPASSWORD:-admin}"
-SERVER_IP="${CWM_SERVERIP:-$(hostname -I | awk '{print $1}')}"
 
 cat > ${appDir}/.env << EOF
-PUBLIC_IP=${SERVER_IP}
-AUTH_PASS=${ADMIN_PASSWORD}
+PUBLIC_IP=${CWM_SERVERIP}
+AUTH_PASS=${ADMINPASSWORD}
 SECRET_KEY=${FARM_SECRET_KEY}
 EOF
 
@@ -134,9 +132,9 @@ echo "Writing login banner" | log
 cat > /etc/motd << MOTD
   Android Farm - Emulator Management
 
-  Web Panel: http://${SERVER_IP}
+  Web Panel: http://${CWM_SERVERIP}
   Username:  admin
-  Password:  ${ADMIN_PASSWORD}
+  Password:  ${ADMINPASSWORD}
 MOTD
 
 echo "Installation complete" | log
