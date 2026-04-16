@@ -38,10 +38,10 @@ install_php() {
     apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-mysql php8.3-gd php8.3-xml php8.3-mbstring php8.3-curl php8.3-zip libapache2-mod-php8.3 || { echo "Failed to install PHP or required extensions. Exiting." | log; exit 1; }
 
     echo "Enabling php8.3-fpm service..." | log
-    sudo systemctl enable --now php8.3-fpm || { echo "Failed to enable php8.3-fpm. Exiting." | log; exit 1; }
+    systemctl enable --now php8.3-fpm || { echo "Failed to enable php8.3-fpm. Exiting." | log; exit 1; }
 
     echo "Restarting php8.3-fpm service..." | log
-    sudo systemctl restart php8.3-fpm || { echo "Failed to start php8.3-fpm. Exiting." | log; exit 1; }
+    systemctl restart php8.3-fpm || { echo "Failed to start php8.3-fpm. Exiting." | log; exit 1; }
 
     echo "Validating PHP installation..." | log
     PHP_VERSION=$(php -v | grep "^PHP 8.3")
@@ -77,13 +77,13 @@ install_drupal() {
 
     echo "Creating Drupal project directory..." | log
     if [ ! -d "$DRUPAL_DIR" ]; then
-        sudo mkdir -p "$DRUPAL_DIR"
+        mkdir -p "$DRUPAL_DIR"
     fi
 
     if ! id -u "$TEMP_USER" >/dev/null 2>&1; then
-        sudo useradd -m "$TEMP_USER"
+        useradd -m "$TEMP_USER"
     fi
-    sudo chown -R "$TEMP_USER:$TEMP_USER" "$DRUPAL_DIR"
+    chown -R "$TEMP_USER:$TEMP_USER" "$DRUPAL_DIR"
 
     echo "Installing Drupal using Composer as $TEMP_USER..." | log
     sudo -u "$TEMP_USER" COMPOSER_NO_INTERACTION=1 bash -c "composer create-project --no-interaction drupal/recommended-project '$DRUPAL_DIR'" </dev/null || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
@@ -98,9 +98,9 @@ install_drupal() {
     sudo -u "$TEMP_USER" COMPOSER_NO_INTERACTION=1 bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" </dev/null || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
     echo "Adjusting file permissions..." | log
-    sudo chown -Rf www-data:www-data "$DRUPAL_DIR"
+    chown -Rf www-data:www-data "$DRUPAL_DIR"
 
-    sudo userdel -r "$TEMP_USER"
+    userdel -r "$TEMP_USER"
 
     echo "Drupal installation and permission setup completed successfully." | log
 }
@@ -115,15 +115,15 @@ check_certs() {
 
 config_apache() {
 	echo "Configuring Apache Virtual Host..." | log
-	bash -c "cat > /etc/apache2/sites-available/drupal.conf <<EOF
+	cat > /etc/apache2/sites-available/drupal.conf <<EOF
 <VirtualHost *:80>
 	ServerAdmin ${EMAIL_ADDR}
 	DocumentRoot ${DRUPAL_DIR}/web
 	ServerName ${DOMAIN}
 	#ServerAlias www.${DOMAIN}
 
-	ErrorLog ${APACHE_LOG_DIR}/error.log
-	CustomLog ${APACHE_LOG_DIR}/access.log combined
+	ErrorLog \${APACHE_LOG_DIR}/error.log
+	CustomLog \${APACHE_LOG_DIR}/access.log combined
 
 	<Directory ${DRUPAL_DIR}/web>
 		Options FollowSymlinks
@@ -136,14 +136,13 @@ config_apache() {
 		RewriteBase /
 		RewriteCond %{REQUEST_FILENAME} !-f
 		RewriteCond %{REQUEST_FILENAME} !-d
-		RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+		RewriteRule ^(.*)\$ index.php?q=\$1 [L,QSA]
 	</Directory>
-	
-	# Redirect all HTTP traffic to HTTPS
-    RewriteEngine On
-    RewriteCond %{HTTPS} !=on
-    RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R=301,L]
 
+	# Redirect all HTTP traffic to HTTPS
+	RewriteEngine On
+	RewriteCond %{HTTPS} !=on
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R=301,L]
 </VirtualHost>
 
 <VirtualHost *:443>
@@ -152,8 +151,8 @@ config_apache() {
     ServerName ${DOMAIN}
     #ServerAlias www.${DOMAIN}
 
-    ErrorLog ${APACHE_LOG_DIR}/error.log
-    CustomLog ${APACHE_LOG_DIR}/access.log combined
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
 
     SSLEngine on
     SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
@@ -170,17 +169,21 @@ config_apache() {
         RewriteBase /
         RewriteCond %{REQUEST_FILENAME} !-f
         RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+        RewriteRule ^(.*)\$ index.php?q=\$1 [L,QSA]
     </Directory>
 </VirtualHost>
-# EOF"
+EOF
 
-	if ! systemctl is-active --quiet apache2; then sudo systemctl start apache2; fi
-	a2enmod rewrite
+	a2enmod rewrite ssl
 	a2ensite drupal.conf
 	a2dissite 000-default.conf
-	systemctl reload apache2
-	systemctl restart apache2
+	chmod 644 /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+	chmod 640 /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+	echo "Testing apache2 config..." | log
+	apache2ctl configtest 2>&1 | log || { echo "apache2 configtest failed. Exiting." | log 1; exit 1; }
+	systemctl enable --now apache2
+	systemctl restart apache2 || { echo "apache2 failed to restart. See journalctl -u apache2." | log 1; exit 1; }
+	echo "Apache configured and running." | log
 }
 
 create_db() {
