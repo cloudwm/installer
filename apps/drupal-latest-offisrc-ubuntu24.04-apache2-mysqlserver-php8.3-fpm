@@ -9,6 +9,10 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 
+export DEBIAN_FRONTEND=noninteractive
+export COMPOSER_ALLOW_SUPERUSER=1
+export COMPOSER_NO_INTERACTION=1
+
 DRUPAL_DIR="/opt/drupal-site"
 DB_NAME="drupal_db"
 DB_USER="drupal_user"
@@ -60,12 +64,12 @@ install_composer() {
     php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
 
     echo "Running Composer setup..." | log
-    yes | COMPOSER_ALLOW_SUPERUSER=1 sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    php composer-setup.php --install-dir=/usr/local/bin --filename=composer </dev/null || { echo "Composer setup failed. Exiting." | log; exit 1; }
 
     echo "Cleaning up Composer setup files..." | log
-    yes | sudo php -r "unlink('composer-setup.php');"
+    rm -f /tmp/composer-setup.php
 
-    echo "Composer Version: $(sudo composer --version)" | log
+    echo "Composer Version: $(composer --version)" | log
 }
 
 install_drupal() {
@@ -82,7 +86,7 @@ install_drupal() {
     sudo chown -R "$TEMP_USER:$TEMP_USER" "$DRUPAL_DIR"
 
     echo "Installing Drupal using Composer as $TEMP_USER..." | log
-    sudo -u "$TEMP_USER" bash -c "composer create-project --no-interaction drupal/recommended-project '$DRUPAL_DIR'" || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
+    sudo -u "$TEMP_USER" COMPOSER_NO_INTERACTION=1 bash -c "composer create-project --no-interaction drupal/recommended-project '$DRUPAL_DIR'" </dev/null || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
 
     echo "Validating Drupal installation..." | log
     if [ ! -d "$DRUPAL_DIR/web/core" ]; then
@@ -91,7 +95,7 @@ install_drupal() {
     fi
 
     echo "Installing additional dependencies..." | log
-    sudo -u "$TEMP_USER" bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
+    sudo -u "$TEMP_USER" COMPOSER_NO_INTERACTION=1 bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" </dev/null || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
     echo "Adjusting file permissions..." | log
     sudo chown -Rf www-data:www-data "$DRUPAL_DIR"
