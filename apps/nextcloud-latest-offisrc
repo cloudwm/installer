@@ -53,6 +53,7 @@ echo "Configuring nginx" | log
 # Copy Virtual Host
 cp $rootDir/tweaks/extras/nextcloud-nginx/nextcloud.conf /etc/nginx/sites-available/
 sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/nextcloud.conf
+php /var/www/html/occ config:system:set trusted_domains 1 --value="${CWM_DOMAIN}"
 # Symlink nextcloud vhost
 ln -s /etc/nginx/sites-available/nextcloud.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
