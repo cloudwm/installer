@@ -91,7 +91,7 @@ systemctl restart php$phpVersion-fpm.service
 waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Nextcloud Web UI: https://${CWM_DISPLAYED_ADDRESS}/"
+descriptionAppend "Nextcloud Web UI: https://${CWM_DOMAIN}/"
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
 descriptionAppend " "
