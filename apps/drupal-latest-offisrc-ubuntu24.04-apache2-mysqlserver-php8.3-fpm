@@ -9,16 +9,12 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 
-CERT_DIR="/opt/certs"
 DRUPAL_DIR="/opt/drupal-site"
 DB_NAME="drupal_db"
 DB_USER="drupal_user"
 DB_PASS="${ADMINPASSWORD}"
 DOMAIN="${CWM_DOMAIN}"
-IP_ADDR="$(awk '{for (i=1;i<=NF;i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {sub(/.*=/, "", $i); print $i}}' ~/guest.conf)"
 EMAIL_ADDR="$(awk -F= '/email=/{print $2}' ~/guest.conf)"
-LE_FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
-LE_PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
 
 
 dependencies() {
@@ -102,56 +98,12 @@ install_drupal() {
     echo "Drupal installation and permission setup completed successfully." | log
 }
 
-generate_certs() {
-    if [[ ! -d $CERT_DIR ]]; then
-        mkdir -p $CERT_DIR
-        echo "Created Cert directory: ${CERT_DIR}" | log
+check_certs() {
+    if [[ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" \
+       || ! -f "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" ]]; then
+        echo "Expected certs from apache-letsencrypt-cert tweak not found at /etc/letsencrypt/live/${DOMAIN}/. Exiting." | log 1
+        exit 1
     fi
-
-    if ! command -v certbot &> /dev/null; then
-        echo "Certbot not found. Installing Certbot..." | log
-        sudo apt-get update
-        sudo apt-get install -y certbot
-    fi
-
-    echo "Obtaining Let's Encrypt certificate for ${DOMAIN}..." | log
-    if systemctl is-active --quiet nginx; then
-        sudo systemctl stop nginx
-        NGINX_STOPPED=true
-    fi
-	
-    if systemctl is-active --quiet apache2; then
-        sudo systemctl stop apache2
-        APACHE_STOPPED=true
-    fi
-
-    sudo certbot certonly --standalone -d "${DOMAIN}" \
-        --non-interactive --agree-tos --email "${EMAIL_ADDR}"
-	
-	# Future testing
-	#sudo certbot --apache -d ${DOMAIN} -d www.${DOMAIN} --email ${EMAIL_ADDR} --agree-tos --non-interactive
-	
-    if [ "$NGINX_STOPPED" = true ]; then
-        sudo systemctl start nginx
-    fi
-	
-    if [ "$APACHE_STOPPED" = true ]; then
-        sudo systemctl start apache2
-    fi
-	
-    CERTBOT_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
-    sudo chown $(whoami):$(whoami) "${CERTBOT_LIVE_DIR}"
-	
-	echo "Creating SAN file..." | log
-    cat > "$CERT_DIR/v3.ext" <<-EOF
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = ${DOMAIN}
-IP.1 = ${IP_ADDR}
-EOF
-    
-	echo "Certificate generation complete!" | log
 }
 
 config_apache() {
@@ -236,78 +188,14 @@ MYSQL_SCRIPT
 
 }
 
-
 main () {
-	update_status="$rootDir/include/updateInstallStatus.sh"
-	HTML_PATH="/var/www/html/index.html"
-
-	lines=()
-	done_lines=()
-	
-	mark_previous_done() {
-		for (( i=0; i<${#lines[@]}; i++ )); do
-			if [[ ! " ${done_lines[@]} " =~ " ${lines[$i]} " ]]; then
-				lines[$i]="${lines[$i]} [DONE]"
-				done_lines+=("${lines[$i]}")
-			fi
-		done
-	}
-
-	display_all_lines() {
-		"$update_status" "$HTML_PATH" -cp
-		for line in "${lines[@]}"; do
-			"$update_status" "$HTML_PATH" -ap "$line"
-		done
-	}
-	
-	lines+=("Getting Ready...")
-	"$update_status" "$HTML_PATH" -cp
-	display_all_lines
-	
-	mark_previous_done
-	lines+=("Installing dependencies...") 
-	display_all_lines
 	dependencies
-	
-	mark_previous_done
-	lines+=("Installing MySQL 8.0...") 
-	display_all_lines
 	services/mysqlserver-8.0-osrepo
-	
-	"$update_status" "$HTML_PATH" -ur "The system will restart soon, finish the Drupal setup by visiting https://$DOMAIN in your web browser when the system is back online."
-	"$update_status" "$HTML_PATH" -sr
-	
-	"$update_status" "$HTML_PATH" -uc "Database name: ${DB_NAME}\nDatabase user: ${DB_USER}\nDatabase user Password: ${DB_PASS}"
-	"$update_status" "$HTML_PATH" -sc
-	
-	mark_previous_done
-	lines+=("Installing PHP 8.3...")
-	display_all_lines
 	install_php
-	
-	mark_previous_done
-	lines+=("Installing Composer...")
-	display_all_lines
 	install_composer
-	
-	mark_previous_done
-	lines+=("Installing Drupal...")
-	display_all_lines
 	install_drupal
-	
-	mark_previous_done
-	lines+=("Generating certificates...")
-	display_all_lines
-	generate_certs
-	
-	mark_previous_done
-	lines+=("Creating Drupal database...")
-	display_all_lines
+	check_certs
 	create_db
-	
-	mark_previous_done
-	lines+=("Configuring Apache...")
-	display_all_lines
 	config_apache
 	
 	descriptionAppend "Drupal Results:"
