@@ -1,3 +1,8 @@
 .DS_Store
+
+# Claude
 .claude/
 CLAUDE.md
+
+# Temp Backup
+backup_unused_services
