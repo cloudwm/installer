@@ -6,7 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist ssl-ready.success
 rootDir=$(rootDir)
 certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
 certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
