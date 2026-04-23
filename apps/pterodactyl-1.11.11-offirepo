@@ -265,7 +265,8 @@ else
     if [ "$PANEL_CHECK" = "200" ] || [ "$PANEL_CHECK" = "302" ]; then
         echo "✅ Panel is now responding (HTTP $PANEL_CHECK)" | log
     else
-        echo "❌ Panel is not responding. Check logs: sudo docker logs pterodactyl_panel" | log
+        echo "❌ Panel is not responding, exiting... | log
+	exit 1
     fi
 fi
 
