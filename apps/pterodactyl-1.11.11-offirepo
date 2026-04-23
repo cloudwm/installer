@@ -32,7 +32,7 @@ sudo docker pull mariadb:10.11
 sudo docker pull redis:alpine
 sudo docker pull ghcr.io/pterodactyl/panel:v1.11.11
 sudo docker pull ghcr.io/pterodactyl/wings:latest
-sudo docker pull nginx:alpine
+
 
 # Create directories
 echo "Creating directories" | log
@@ -159,7 +159,7 @@ cat << 'EOF' > /var/www/pterodactyl/nginx.conf
 server {
     listen 80;
     listen [::]:80;
-    server_name ${CWM_DOMAIN};
+    server_name CWM_DOMAIN_PLACEHOLDER;
 
     location /.well-known/acme-challenge/ {
         root /var/www/html;
@@ -173,10 +173,10 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name ${CWM_DOMAIN};
+    server_name CWM_DOMAIN_PLACEHOLDER;
 
-    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/CWM_DOMAIN_PLACEHOLDER/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/CWM_DOMAIN_PLACEHOLDER/privkey.pem;
 
     ssl_session_cache shared:SSL:10m;
     ssl_protocols TLSv1.2 TLSv1.3;
