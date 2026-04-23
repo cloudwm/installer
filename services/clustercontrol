@@ -4,7 +4,7 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-rootDir=$(rootDir)
+
 sslConf="/etc/apache2/sites-available/s9s-ssl.conf"
 
 echo "Get ansible Role" | log
@@ -15,7 +15,6 @@ apt update
 
 echo "Create ansible playbook" | log
 cd /root
-touch cc.playbook
 cat <<EOF > cc.playbook
 - hosts: localhost
   roles:
@@ -38,6 +37,29 @@ echo "Running playbook" | log
 ansible-playbook cc.playbook | log
 waitOrStop 0 "Failed to run ansible playbook"
 
+#### SSL ####
+echo "Installing certbot" | log
+installPackage python3-certbot-apache
+waitOrStop 0 "Failed apt install: python3-certbot-apache"
+
+systemctl stop apache2.service
+execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
+if [[ $? == 1 ]]; then
+    export certbot_failed=1
+    echo "Generating self-signed certificate" | log
+    mkdir -p /etc/letsencrypt/live/${CWM_DOMAIN}
+    openssl req -x509 -sha256 -newkey rsa:2048 \
+        -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
+        -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
+        -days 1024 -nodes -subj '/CN=localhost'
+    waitOrStop 0 "Certificate creation failed"
+    curl -v -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
+        http://45-93-93-142.cloud-xip.com
+else
+    export certbot_failed=0
+fi
+
 echo "Creating s9s SSL vhost config" | log
 cat <<EOF > $sslConf
 <VirtualHost *:80>
@@ -59,8 +81,8 @@ cat <<EOF > $sslConf
     </Directory>
 
     SSLEngine On
-    SSLCertificateFile      /etc/ssl/certs/placeholder.crt
-    SSLCertificateKeyFile   /etc/ssl/private/placeholder.key
+    SSLCertificateFile    /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
 
     SSLProtocol             all -SSLv3 -TLSv1 -TLSv1.1
     SSLCipherSuite          ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
@@ -70,59 +92,23 @@ cat <<EOF > $sslConf
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set X-Content-Type-Options "nosniff"
 
-    <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php7.4-fpm.sock|fcgi://localhost"
-    </FilesMatch>
-
     ErrorLog  \${APACHE_LOG_DIR}/clustercontrol_error.log
     CustomLog \${APACHE_LOG_DIR}/clustercontrol_access.log combined
 </VirtualHost>
 EOF
 waitOrStop 0 "Failed to create s9s SSL vhost config"
 
-echo "Enabling required Apache modules and vhost" | log
-a2enmod ssl rewrite headers proxy proxy_fcgi
+echo "Enabling Apache modules and vhost" | log
+a2enmod ssl rewrite headers
 a2ensite s9s-ssl
 waitOrStop 0 "Failed to enable s9s SSL vhost"
-
-#### SSL ####
-echo "Installing certbot for apache" | log
-installPackage python3-certbot-apache
-waitOrStop 0 "Failed apt install: python-certbot-apache"
-
-## applying ssl for cc web app ##
-systemctl stop apache2.service
-execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-if [[ $? == 1 ]]; then
-    export certbot_failed=1
-    echo "Generating self-signed certificate" | log
-    mkdir -p /etc/letsencrypt/live/${CWM_DOMAIN}
-    openssl req -x509 -sha256 -newkey rsa:2048 \
-        -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
-        -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
-        -days 1024 -nodes -subj '/CN=localhost'
-    waitOrStop 0 "Certificate creation failed"
-    curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
-        http://45-93-93-142.cloud-xip.com
-else
-    export certbot_failed=0
-fi
 
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 systemctl start apache2.service
 waitOrStop 0 "Failed to start Apache service"
+#### SSL END ####
 
 tag global-domain-set.success
-
-echo "Reconfigure SSL in Vhost" | log
-sed -i "s|^[ \t]*SSLCertificateFile.*|    SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" $sslConf
-sed -i "s|^[ \t]*SSLCertificateKeyFile.*|    SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" $sslConf
-waitOrStop 0 "Failed Reconfigure SSL in Vhost"
-
-systemctl restart apache2.service
-waitOrStop 0 "Failed restart apache2.service"
-#### SSL END ####
 
 ## Remove Ansible ##
 apt-get remove -y ansible
@@ -139,7 +125,7 @@ echo "Adding descriptions" | log
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
 descriptionAppend "MySQL user password: ${ADMINPASSWORD}"
 descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
-descriptionAppend "clustercontrol webpage config: /var/www/clustercontrol/bootstrap.php"
+descriptionAppend "clustercontrol webpage config: /var/www/html/clustercontrol/bootstrap.php"
 descriptionAppend "rpc-key: ${random_rpc}"
 descriptionAppend " "
 
