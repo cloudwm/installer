@@ -5,8 +5,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-sslConf="/etc/apache2/sites-available/s9s-ssl.conf"
-
 echo "Get ansible Role" | log
 ansible-galaxy install severalnines.clustercontrol | log
 waitOrStop 0 "Failed Get ansible Role"
@@ -51,81 +49,80 @@ if [[ $? == 1 ]]; then
     openssl req -x509 -sha256 -newkey rsa:2048 \
         -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
         -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
-        -days 1024 -nodes -subj '/CN=localhost'
+        -days 1024 -nodes \
+        -subj "/CN=${CWM_DOMAIN}" \
+        -addext "subjectAltName=DNS:${CWM_DOMAIN}"
     waitOrStop 0 "Certificate creation failed"
-    curl -v -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+    curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
         -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
         http://45-93-93-142.cloud-xip.com
 else
     export certbot_failed=0
 fi
-
-echo "Creating s9s SSL vhost config" | log
-cat <<EOF > $sslConf
-<VirtualHost *:80>
-    ServerName ${CWM_DOMAIN}
-    RewriteEngine On
-    RewriteCond %{HTTPS} off
-    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName ${CWM_DOMAIN}
-
-    DocumentRoot /var/www/html/clustercontrol
-
-    <Directory /var/www/html/clustercontrol>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    SSLEngine On
-    SSLCertificateFile    /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
-
-    SSLProtocol             all -SSLv3 -TLSv1 -TLSv1.1
-    SSLCipherSuite          ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
-    SSLHonorCipherOrder     Off
-
-    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set X-Content-Type-Options "nosniff"
-
-    ErrorLog  \${APACHE_LOG_DIR}/clustercontrol_error.log
-    CustomLog \${APACHE_LOG_DIR}/clustercontrol_access.log combined
-</VirtualHost>
-EOF
-waitOrStop 0 "Failed to create s9s SSL vhost config"
-
-echo "Enabling Apache modules and vhost" | log
-a2enmod ssl rewrite headers
-a2ensite s9s-ssl
-waitOrStop 0 "Failed to enable s9s SSL vhost"
-
-export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
-systemctl start apache2.service
-waitOrStop 0 "Failed to start Apache service"
 #### SSL END ####
 
+export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 tag global-domain-set.success
+
+# Stop and disable Apache - ccmgr handles web serving on ports 80/443
+echo "Stopping Apache - ccmgr will handle web serving" | log
+systemctl stop apache2.service
+systemctl disable apache2.service
+
+# Configure ccmgr with correct cert paths
+echo "Configuring ccmgr" | log
+sed -i "s|tls_cert:.*|tls_cert: /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /usr/share/ccmgr/ccmgr.yaml
+sed -i "s|tls_key:.*|tls_key: /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /usr/share/ccmgr/ccmgr.yaml
+waitOrStop 0 "Failed to configure ccmgr"
+
+# Create ccmgr systemd service
+echo "Creating ccmgr service" | log
+cat <<EOF > /lib/systemd/system/ccmgr.service
+[Unit]
+Description=ClusterControl Manager
+After=network.target cmon.service
+Requires=cmon.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ccmgr
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable ccmgr
+systemctl start ccmgr
+waitOrStop 0 "Failed to start ccmgr"
+
+# Wait for ccmgr to be ready
+sleep 5
+
+# Create admin user
+echo "Creating admin user" | log
+curl -sk -X POST https://localhost/proxy/auth/register \
+    -H "Content-Type: application/json" \
+    -d "{\"user_name\":\"admin\",\"password\":\"${ADMINPASSWORD}\",\"email\":\"${ADMINEMAIL}\"}"
+waitOrStop 0 "Failed to create admin user"
 
 ## Remove Ansible ##
 apt-get remove -y ansible
 
-## Create new rpc-key and modify relevant files ##
+## Create new rpc-key ##
 random_rpc=$(date +%s | sha256sum | base64 | head -c 32 ; echo)
 sed -i '/^rpc_key=/d' /etc/cmon.cnf
 echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
-sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
-echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
-/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh
 
 echo "Adding descriptions" | log
-descriptionAppend "cmon config files location: /etc/cmon.cnf"
-descriptionAppend "MySQL user password: ${ADMINPASSWORD}"
-descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
-descriptionAppend "clustercontrol webpage config: /var/www/html/clustercontrol/bootstrap.php"
+descriptionAppend "ClusterControl web page: https://${CWM_DOMAIN}/"
+descriptionAppend "ClusterControl admin user: admin"
+descriptionAppend "ClusterControl admin password: ${ADMINPASSWORD}"
+descriptionAppend "cmon config: /etc/cmon.cnf"
+descriptionAppend "ccmgr config: /usr/share/ccmgr/ccmgr.yaml"
+descriptionAppend "MySQL password: ${ADMINPASSWORD}"
 descriptionAppend "rpc-key: ${random_rpc}"
 descriptionAppend " "
 
