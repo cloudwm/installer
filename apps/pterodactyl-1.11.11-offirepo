@@ -195,10 +195,9 @@ EOF
 # Replace placeholder with actual domain
 sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DOMAIN}|g" /etc/nginx/sites-available/pterodactyl
 
-echo "Create nginx config" | log
-rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/pterodactyl
-nginx -t && systemctl reload nginx
+nginx -t
+systemctl restart nginx
 waitOrStop 0 "Failed to start nginx services"
 
 
