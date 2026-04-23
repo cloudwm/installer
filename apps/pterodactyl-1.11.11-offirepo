@@ -159,7 +159,7 @@ cat << 'EOF' > /var/www/pterodactyl/nginx.conf
 server {
     listen 80;
     listen [::]:80;
-    server_name 192-168-33-40.dev-cloud-xip.com;
+    server_name ${CWM_DOMAIN};
 
     location /.well-known/acme-challenge/ {
         root /var/www/html;
@@ -205,6 +205,8 @@ server {
 }
 
 EOF
+# Replace placeholder with actual domain
+sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DOMAIN}|g" /var/www/pterodactyl/nginx.conf
 
 echo "Create nginx config" | log
 rm -f /etc/nginx/sites-enabled/default
@@ -213,8 +215,6 @@ ln -sf /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/pterodact
 nginx -t && systemctl reload nginx
 waitOrStop 0 "Failed to start nginx services"
 
-# Replace placeholder with actual domain
-sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DOMAIN}|g" /var/www/pterodactyl/nginx.conf
 
 # Start Docker Compose services
 echo "Starting Docker Compose services" | log
