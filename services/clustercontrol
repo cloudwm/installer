@@ -1,25 +1,15 @@
 #!/bin/bash
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-
-
-
 rootDir=$(rootDir)
 sslConf="/etc/apache2/sites-available/s9s-ssl.conf"
 
 echo "Get ansible Role" | log
 ansible-galaxy install severalnines.clustercontrol | log
 waitOrStop 0 "Failed Get ansible Role"
-
-echo "install MariaDB" | log
-installPackage mariadb-server | log
-waitOrStop 0 "Failed install MariaDB - server"
-installPackage mariadb-client | log
-waitOrStop 0 "Failed install MariaDB - client"
 
 apt update
 
@@ -33,66 +23,109 @@ cat <<EOF > cc.playbook
 EOF
 
 ubuntu_version=$(lsb_release -rs)
-
 if [[ "$ubuntu_version" == "24.04" ]]; then
-	sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
-	sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
-	apt -y install software-properties-common
-	add-apt-repository ppa:ondrej/php
-	apt-get update
-	apt -y install php7.4 php7.4-mysql php7.4-curl	
-	a2dismod php8.3
-	a2enmod php7.4
+    sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
+    sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
+    apt -y install software-properties-common
+    add-apt-repository ppa:ondrej/php
+    apt-get update
+    apt -y install php7.4 php7.4-mysql php7.4-curl
+    a2dismod php8.3
+    a2enmod php7.4
 fi
 
-echo "runing playbook" | log
+echo "Running playbook" | log
 ansible-playbook cc.playbook | log
+waitOrStop 0 "Failed to run ansible playbook"
+
+echo "Creating s9s SSL vhost config" | log
+cat <<EOF > $sslConf
+<VirtualHost *:80>
+    ServerName ${CWM_DOMAIN}
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName ${CWM_DOMAIN}
+
+    DocumentRoot /var/www/html/clustercontrol
+
+    <Directory /var/www/html/clustercontrol>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    SSLEngine On
+    SSLCertificateFile      /etc/ssl/certs/placeholder.crt
+    SSLCertificateKeyFile   /etc/ssl/private/placeholder.key
+
+    SSLProtocol             all -SSLv3 -TLSv1 -TLSv1.1
+    SSLCipherSuite          ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
+    SSLHonorCipherOrder     Off
+
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php7.4-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    ErrorLog  \${APACHE_LOG_DIR}/clustercontrol_error.log
+    CustomLog \${APACHE_LOG_DIR}/clustercontrol_access.log combined
+</VirtualHost>
+EOF
+waitOrStop 0 "Failed to create s9s SSL vhost config"
+
+echo "Enabling required Apache modules and vhost" | log
+a2enmod ssl rewrite headers proxy proxy_fcgi
+a2ensite s9s-ssl
+waitOrStop 0 "Failed to enable s9s SSL vhost"
 
 #### SSL ####
 echo "Installing certbot for apache" | log
 installPackage python3-certbot-apache
 waitOrStop 0 "Failed apt install: python-certbot-apache"
 
-
 ## applying ssl for cc web app ##
 systemctl stop apache2.service
 execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-
-if [[ $? == 1 ]]
-then
-export certbot_failed=1
-echo "Generating self-signed certificate" | log
-#waitOrStop 0 "Failed certbot certificate generation"
-mkdir /etc/letsencrypt/live
-mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
-
-# Sending log to log server - 45-93-93-142.cloud-xip.com
-curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
-
+if [[ $? == 1 ]]; then
+    export certbot_failed=1
+    echo "Generating self-signed certificate" | log
+    mkdir -p /etc/letsencrypt/live/${CWM_DOMAIN}
+    openssl req -x509 -sha256 -newkey rsa:2048 \
+        -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
+        -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
+        -days 1024 -nodes -subj '/CN=localhost'
+    waitOrStop 0 "Certificate creation failed"
+    curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
+        http://45-93-93-142.cloud-xip.com
 else
-export certbot_failed=0
+    export certbot_failed=0
 fi
 
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 systemctl start apache2.service
 waitOrStop 0 "Failed to start Apache service"
+
 tag global-domain-set.success
 
 echo "Reconfigure SSL in Vhost" | log
-sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" $sslConf
-sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" $sslConf
-
+sed -i "s|^[ \t]*SSLCertificateFile.*|    SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" $sslConf
+sed -i "s|^[ \t]*SSLCertificateKeyFile.*|    SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" $sslConf
 waitOrStop 0 "Failed Reconfigure SSL in Vhost"
+
 systemctl restart apache2.service
 waitOrStop 0 "Failed restart apache2.service"
-
 #### SSL END ####
 
 ## Remove Ansible ##
 apt-get remove -y ansible
-
 
 ## Create new rpc-key and modify relevant files ##
 random_rpc=$(date +%s | sha256sum | base64 | head -c 32 ; echo)
@@ -104,16 +137,13 @@ echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/boo
 
 echo "Adding descriptions" | log
 descriptionAppend "cmon config files location: /etc/cmon.cnf"
-descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
+descriptionAppend "MySQL user password: ${ADMINPASSWORD}"
 descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
 descriptionAppend "clustercontrol webpage config: /var/www/clustercontrol/bootstrap.php"
 descriptionAppend "rpc-key: ${random_rpc}"
 descriptionAppend " "
 
-
-
 tag ssl-ready.success
-tagScript success
 tag apache2.success
 tag certbot-apache2.success
 tagScript success
