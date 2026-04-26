@@ -97,18 +97,18 @@ if [ ! -z "$error_code" ]; then
   termination_flag=1
 fi
 
-#if [[ ${error_code} -eq 102 ]]
-#then
-# false - returns non-zero status
-#false
-#waitOrStop 0 "Failed Node ${i} deploy: generated name already taken"
-#fi
-#if [[ ${error_code} -eq 117 ]]
-#then
-# false - returns non-zero status
-#false
-#waitOrStop 0 "Failed Node ${i} deploy: choosen vlan doesnt exist"
-#fi
+if [[ ${error_code} -eq 102 ]]
+then
+false - returns non-zero status
+false
+waitOrStop 0 "Failed Node ${i} deploy: generated name already taken"
+fi
+if [[ ${error_code} -eq 117 ]]
+then
+false - returns non-zero status
+false
+waitOrStop 0 "Failed Node ${i} deploy: choosen vlan doesnt exist"
+fi
 
 # If api request was successful grab the command ID:
 # Sleep to wait for command appear in CWM
@@ -135,7 +135,7 @@ if [ "$termination_flag" -eq 0 ]; then
 
 echo "Get ansible Role" | log
 ansible-galaxy install severalnines.clustercontrol | log
-#waitOrStop 0 "Failed Get ansible Role"
+waitOrStop 0 "Failed Get ansible Role"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Failed: termination_flag=1 Get ansible Role" | log
@@ -143,13 +143,13 @@ fi
 
 echo "install MariaDB" | log
 installPackage mariadb-server | log
-#waitOrStop 0 "Failed install MariaDB - server"
+waitOrStop 0 "Failed install MariaDB - server"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Failed install MariaDB - server termination_flag=1" | log
 fi
 installPackage mariadb-client | log
-#waitOrStop 0 "Failed install MariaDB - client"
+waitOrStop 0 "Failed install MariaDB - client"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Failed install MariaDB - client termination_flag=1" | log
@@ -176,7 +176,7 @@ ansible-playbook cc.playbook | log
 #### SSL ####
 echo "Installing certbot for apache" | log
 installPackage python3-certbot-apache
-#waitOrStop 0 "Failed apt install: python-certbot-apache"
+waitOrStop 0 "Failed apt install: python-certbot-apache"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Failed apt install: python-certbot-apache termination_flag=1" | log
@@ -191,11 +191,11 @@ if [[ $? == 1 ]]
 then
 export certbot_failed=1
 echo "Generating self-signed certificate" | log
-#waitOrStop 0 "Failed certbot certificate generation"
+waitOrStop 0 "Failed certbot certificate generation"
 mkdir /etc/letsencrypt/live
 mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
 openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-#waitOrStop 0 "Certificate creation failed"
+waitOrStop 0 "Certificate creation failed"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Certificate creation failed termination_flag=1" | log
@@ -212,7 +212,7 @@ fi
 
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 systemctl start apache2.service
-#waitOrStop 0 "Failed to start Apache service"
+waitOrStop 0 "Failed to start Apache service"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Failed to start Apache service termination_flag=1" | log
@@ -225,13 +225,13 @@ echo "Reconfigure SSL in Vhost" | log
 sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" /etc/apache2/sites-available/s9s-ssl.conf
 
-#waitOrStop 0 "Failed Reconfigure SSL in Vhost"
+waitOrStop 0 "Failed Reconfigure SSL in Vhost"
 if [ $? -ne 0 ]; then
   termination_flag=1  
   echo "Failed Reconfigure SSL in Vhost termination_flag=1" | log
 fi
 systemctl restart apache2.service
-#waitOrStop 0 "Failed restart apache2.service"
+waitOrStop 0 "Failed restart apache2.service"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Failed restart apache2.service termination_flag=1" | log
@@ -284,7 +284,7 @@ echo "Testing for time out of node deployment" | log
 if [[ ip_while_counter -eq 100 ]]
 then
 false
-#waitOrStop 0 "Failed: time out while waiting node deployment"
+waitOrStop 0 "Failed: time out while waiting node deployment"
 if [ $? -ne 0 ]; then
   termination_flag=1
   echo "Failed: time out while waiting node deployment termination_flag=1" | log
