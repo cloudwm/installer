@@ -166,6 +166,13 @@ curl -k -i -c "$COOKIE" -b "$COOKIE" \
   --data-binary @"$UPDATE_JSON"
 
 waitOrStop 0 "Failed to create admin user"
+systemctl restart cmon
+waitOrStop 0 "Failed to restart cmon"
+sleep 5
+
+systemctl restart ccmgr
+waitOrStop 0 "Failed to restart ccmgr"
+sleep 5
 
 ## Remove Ansible ##
 apt-get remove -y ansible
