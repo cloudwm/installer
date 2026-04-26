@@ -102,6 +102,21 @@ if [[ $? == 1 ]]; then
 else
     export certbot_failed=0
 fi
+
+
+mkdir -p "/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+openssl req -x509 -sha256 -newkey rsa:2048 \
+  -keyout "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem" \
+  -out "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
+  -days 1024 -nodes \
+  -subj "/CN=${DOMAIN}" \
+  -addext "subjectAltName=DNS:${CWM_DOMAIN}"
+
+chown -R root:root "/etc/letsencrypt/live/${CWM_DOMAIN}"
+chmod 755 "/etc/letsencrypt/live/${CWM_DOMAIN}"
+chmod 644 "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+chmod 600 "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
 #### SSL END ####
 
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
