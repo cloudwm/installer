@@ -55,7 +55,7 @@ if [[ $? == 1 ]]; then
     waitOrStop 0 "Certificate creation failed"
     curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
         -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
-        http://45-93-93-142.cloud-xip.com
+        ${CWM_DOMAIN}
 else
     export certbot_failed=0
 fi
