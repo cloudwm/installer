@@ -166,14 +166,14 @@ done
 waitOrStop 0 "ccmgr service is not running"
 
 
-# Create admin user
 echo "Creating admin user" | log
 
 COOKIE=${COOKIE:-/tmp/cmon-cookie.txt}
 AUTH_JSON=${AUTH_JSON:-/tmp/cmon-auth.json}
 UPDATE_JSON=${UPDATE_JSON:-/tmp/cmon-update-user.json}
+UPDATE_RESPONSE=${UPDATE_RESPONSE:-/tmp/cmon-update-response.json}
 
-ADMINUSER=${ADMINUSER:-clusteradmin}
+ADMINUSER="admin"
 
 [ -n "$ADMINEMAIL" ]
 waitOrStop 0 "ADMINEMAIL is empty"
@@ -181,7 +181,7 @@ waitOrStop 0 "ADMINEMAIL is empty"
 [ -n "$ADMINPASSWORD" ]
 waitOrStop 0 "ADMINPASSWORD is empty"
 
-rm -f "$COOKIE" "$AUTH_JSON" "$UPDATE_JSON"
+rm -f "$COOKIE" "$AUTH_JSON" "$UPDATE_JSON" "$UPDATE_RESPONSE"
 
 echo "Authenticating with initial ccsetup user" | log
 
@@ -195,6 +195,10 @@ curl -k -s -c "$COOKIE" -b "$COOKIE" \
   }' | tee "$AUTH_JSON" | jq
 
 auth_status=$(jq -r '.request_status // empty' "$AUTH_JSON")
+auth_error=$(jq -r '.error_string // empty' "$AUTH_JSON")
+
+echo "Auth status: $auth_status" | log
+echo "Auth error: $auth_error" | log
 
 [ "$auth_status" = "Ok" ]
 waitOrStop 0 "Failed to authenticate with ccsetup/admin"
@@ -202,15 +206,16 @@ waitOrStop 0 "Failed to authenticate with ccsetup/admin"
 echo "Building update user JSON" | log
 
 jq -n \
-  --arg admin_password "$ADMINPASSWORD" \
-  --arg admin_email "$ADMINEMAIL" \
+  --arg admin_password "${ADMINPASSWORD}" \
+  --arg admin_user "$ADMINUSER" \
+  --arg admin_email "${ADMINEMAIL}" \
   '{
     operation: "updateUser",
     new_password: $admin_password,
     user: {
       class_name: "CmonUser",
       user_id: 4,
-      user_name: admin,
+      user_name: $admin_user,
       email_address: $admin_email,
       first_name: "Cluster",
       last_name: "Admin",
@@ -234,17 +239,24 @@ jq -n \
     }
   }' > "$UPDATE_JSON"
 
+cat "$UPDATE_JSON" | jq
+
 echo "Updating initial admin user" | log
 
 curl -k -s -c "$COOKIE" -b "$COOKIE" \
   -X POST "https://127.0.0.1:9501/v2/users" \
   -H "Content-Type: application/json" \
-  --data-binary @"$UPDATE_JSON" | tee /tmp/cmon-update-response.json | jq
+  --data-binary @"$UPDATE_JSON" | tee "$UPDATE_RESPONSE" | jq
 
-update_status=$(jq -r '.request_status // empty' /tmp/cmon-update-response.json)
+update_status=$(jq -r '.request_status // empty' "$UPDATE_RESPONSE")
+update_error=$(jq -r '.error_string // empty' "$UPDATE_RESPONSE")
+
+echo "Update status: $update_status" | log
+echo "Update error: $update_error" | log
 
 [ "$update_status" = "Ok" ]
 waitOrStop 0 "Failed to update admin user"
+
 
 echo "Restarting ClusterControl services" | log
 
