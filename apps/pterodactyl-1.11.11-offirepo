@@ -1,8 +1,13 @@
+MAX_RETRIES=5
+SLEEP_TIME=30
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
+
+
 
 echo "Installing Pterodactyl Panel 1.0-develop with Wings using Docker on Ubuntu" | log
 
@@ -196,9 +201,31 @@ EOF
 sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DOMAIN}|g" /etc/nginx/sites-available/pterodactyl
 
 ln -sf /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/pterodactyl
-nginx -t
-systemctl restart nginx
-waitOrStop 0 "Failed to start nginx services"
+
+success=false
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    nginx_test_output=$(nginx -t 2>&1)
+    nginx_test_status=$?
+
+    if [ "$nginx_test_status" -eq 0 ]; then
+        success=true
+        break
+    fi
+
+    echo "Nginx config test failed (attempt $i/$MAX_RETRIES)" | log
+    echo "$nginx_test_output" | log
+
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0 "Nginx configuration check failed"
+
+echo "Reloading Nginx" | log
+
+systemctl reload nginx
+waitOrStop 0 "Nginx reload failed"
 
 
 # Start Docker Compose services
