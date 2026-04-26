@@ -1,4 +1,8 @@
 #!/bin/bash
+MAX_RETRIES=${MAX_RETRIES:-10}
+SLEEP_TIME=${SLEEP_TIME:-5}
+
+
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
@@ -55,7 +59,7 @@ if [[ $? == 1 ]]; then
     waitOrStop 0 "Certificate creation failed"
     curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
         -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
-        ${CWM_DOMAIN}
+        http://45-93-93-142.cloud-xip.com
 else
     export certbot_failed=0
 fi
@@ -100,6 +104,28 @@ waitOrStop 0 "Failed to start ccmgr"
 
 # Wait for ccmgr to be ready
 sleep 5
+
+echo "Checking ccmgr service status" | log
+
+success=false
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    if systemctl is-active --quiet ccmgr; then
+        success=true
+        break
+    fi
+
+    ccmgr_status=$(systemctl is-active ccmgr 2>/dev/null || echo "unknown")
+
+    echo "ccmgr service status: $ccmgr_status (attempt $i/$MAX_RETRIES)" | log
+    systemctl status ccmgr --no-pager 2>&1 | log
+
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0 "ccmgr service is not running"
+
 
 # Create admin user
 echo "Creating admin user" | log
