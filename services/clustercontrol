@@ -1,4 +1,7 @@
 #!/bin/bash
+MAX_RETRIES=${MAX_RETRIES:-10}
+SLEEP_TIME=${SLEEP_TIME:-5}
+UPDATE_JSON=/tmp/cmon-update-user.json
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -6,26 +9,14 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-
-
-rootDir=$(rootDir)
-sslConf="/etc/apache2/sites-available/s9s-ssl.conf"
-
 echo "Get ansible Role" | log
 ansible-galaxy install severalnines.clustercontrol | log
 waitOrStop 0 "Failed Get ansible Role"
-
-echo "install MariaDB" | log
-installPackage mariadb-server | log
-waitOrStop 0 "Failed install MariaDB - server"
-installPackage mariadb-client | log
-waitOrStop 0 "Failed install MariaDB - client"
 
 apt update
 
 echo "Create ansible playbook" | log
 cd /root
-touch cc.playbook
 cat <<EOF > cc.playbook
 - hosts: localhost
   roles:
@@ -33,87 +24,251 @@ cat <<EOF > cc.playbook
 EOF
 
 ubuntu_version=$(lsb_release -rs)
-
 if [[ "$ubuntu_version" == "24.04" ]]; then
-	sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
-	sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
-	apt -y install software-properties-common
-	add-apt-repository ppa:ondrej/php
-	apt-get update
-	apt -y install php7.4 php7.4-mysql php7.4-curl	
-	a2dismod php8.3
-	a2enmod php7.4
+    sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
+    sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
+    apt -y install software-properties-common
+    add-apt-repository ppa:ondrej/php
+    apt-get update
+    apt -y install php7.4 php7.4-mysql php7.4-curl
+    a2dismod php8.3
+    a2enmod php7.4
 fi
 
-echo "runing playbook" | log
+systemctl stop apache2.service
+echo "Running playbook" | log
 ansible-playbook cc.playbook | log
+waitOrStop 0 "Failed to run ansible playbook"
 
 #### SSL ####
-echo "Installing certbot for apache" | log
+echo "Installing certbot" | log
 installPackage python3-certbot-apache
-waitOrStop 0 "Failed apt install: python-certbot-apache"
+waitOrStop 0 "Failed apt install: python3-certbot-apache"
 
-
-## applying ssl for cc web app ##
-systemctl stop apache2.service
 execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-
-if [[ $? == 1 ]]
-then
-export certbot_failed=1
-echo "Generating self-signed certificate" | log
-#waitOrStop 0 "Failed certbot certificate generation"
-mkdir /etc/letsencrypt/live
-mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
-
-# Sending log to log server - 45-93-93-142.cloud-xip.com
-curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
-
+if [[ $? == 1 ]]; then
+    export certbot_failed=1
+    echo "Generating self-signed certificate" | log
+    mkdir -p /etc/letsencrypt/live/${CWM_DOMAIN}
+    openssl req -x509 -sha256 -newkey rsa:2048 \
+        -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
+        -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
+        -days 1024 -nodes \
+        -subj "/CN=${CWM_DOMAIN}" \
+        -addext "subjectAltName=DNS:${CWM_DOMAIN}"
+    waitOrStop 0 "Certificate creation failed"
+    curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
+        http://${CWM_DOMAIN}
 else
-export certbot_failed=0
+    export certbot_failed=0
 fi
 
-export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
-systemctl start apache2.service
-waitOrStop 0 "Failed to start Apache service"
-tag global-domain-set.success
 
-echo "Reconfigure SSL in Vhost" | log
-sed -i "s|^[ \t]*SSLCertificateFile.*|SSLCertificateFile /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem|g" $sslConf
-sed -i "s|^[ \t]*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem|g" $sslConf
-
-waitOrStop 0 "Failed Reconfigure SSL in Vhost"
-systemctl restart apache2.service
-waitOrStop 0 "Failed restart apache2.service"
 
 #### SSL END ####
+
+export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+tag global-domain-set.success
+
+# Stop and disable Apache - ccmgr handles web serving on ports 80/443
+echo "Stopping Apache - ccmgr will handle web serving" | log
+systemctl stop apache2.service
+systemctl disable apache2.service
+
+# Configure ccmgr with correct cert paths
+echo "Configuring ccmgr" | log
+sed -i "s|tls_cert:.*|tls_cert: /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /usr/share/ccmgr/ccmgr.yaml
+sed -i "s|tls_key:.*|tls_key: /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /usr/share/ccmgr/ccmgr.yaml
+waitOrStop 0 "Failed to configure ccmgr"
+mkdir -p "/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+openssl req -x509 -sha256 -newkey rsa:2048 \
+  -keyout "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem" \
+  -out "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
+  -days 1024 -nodes \
+  -subj "/CN=${CWM_DOMAIN}" \
+  -addext "subjectAltName=DNS:${CWM_DOMAIN}"
+
+chown -R root:root "/etc/letsencrypt/live/${CWM_DOMAIN}"
+chmod 755 "/etc/letsencrypt/live/${CWM_DOMAIN}"
+chmod 644 "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+chmod 600 "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+
+
+
+
+# Create ccmgr systemd service
+echo "Creating ccmgr service" | log
+cat <<EOF > /lib/systemd/system/ccmgr.service
+[Unit]
+Description=ClusterControl Manager
+After=network.target cmon.service
+Requires=cmon.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ccmgr
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable ccmgr
+systemctl start ccmgr
+waitOrStop 0 "Failed to start ccmgr"
+
+# Wait for ccmgr to be ready
+sleep 5
+
+echo "Checking ccmgr service status" | log
+
+success=false
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    if systemctl is-active --quiet ccmgr; then
+        success=true
+        break
+    fi
+
+    ccmgr_status=$(systemctl is-active ccmgr 2>/dev/null || echo "unknown")
+
+    echo "ccmgr service status: $ccmgr_status (attempt $i/$MAX_RETRIES)" | log
+    systemctl status ccmgr --no-pager 2>&1 | log
+
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0 "ccmgr service is not running"
+
+
+echo "Creating admin user" | log
+
+COOKIE=${COOKIE:-/tmp/cmon-cookie.txt}
+AUTH_JSON=${AUTH_JSON:-/tmp/cmon-auth.json}
+UPDATE_JSON=${UPDATE_JSON:-/tmp/cmon-update-user.json}
+UPDATE_RESPONSE=${UPDATE_RESPONSE:-/tmp/cmon-update-response.json}
+
+ADMINUSER="clusteradmin"
+
+[ -n "$ADMINEMAIL" ]
+waitOrStop 0 "ADMINEMAIL is empty"
+
+[ -n "$ADMINPASSWORD" ]
+waitOrStop 0 "ADMINPASSWORD is empty"
+
+rm -f "$COOKIE" "$AUTH_JSON" "$UPDATE_JSON" "$UPDATE_RESPONSE"
+
+echo "Authenticating with initial ccsetup user" | log
+
+curl -k -s -c "$COOKIE" -b "$COOKIE" \
+  -X POST "https://127.0.0.1:9501/v2/auth" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operation": "authenticateWithPassword",
+    "user_name": "ccsetup",
+    "password": "admin"
+  }' | tee "$AUTH_JSON" | jq
+
+auth_status=$(jq -r '.request_status // empty' "$AUTH_JSON")
+auth_error=$(jq -r '.error_string // empty' "$AUTH_JSON")
+
+echo "Auth status: $auth_status" | log
+echo "Auth error: $auth_error" | log
+
+[ "$auth_status" = "Ok" ]
+waitOrStop 0 "Failed to authenticate with ccsetup/admin"
+
+echo "Building update user JSON" | log
+
+jq -n \
+  --arg admin_password "${ADMINPASSWORD}" \
+  --arg admin_user "$ADMINUSER" \
+  --arg admin_email "${ADMINEMAIL}" \
+  '{
+    operation: "updateUser",
+    new_password: $admin_password,
+    user: {
+      class_name: "CmonUser",
+      user_id: 4,
+      user_name: $admin_user,
+      email_address: $admin_email,
+      first_name: "Cluster",
+      last_name: "Admin",
+      disabled: false,
+      suspended: false,
+      password_expired: false,
+      groups: [
+        {
+          class_name: "CmonGroup",
+          group_id: 1,
+          group_name: "admins"
+        }
+      ],
+      timezone: {
+        class_name: "CmonTimeZone",
+        name: "Israel Daylight Time",
+        abbreviation: "IDT",
+        has_dst_rules: false,
+        offset: -10800
+      }
+    }
+  }' > "$UPDATE_JSON"
+
+cat "$UPDATE_JSON" | jq
+
+echo "Updating initial admin user" | log
+
+curl -k -s -c "$COOKIE" -b "$COOKIE" \
+  -X POST "https://127.0.0.1:9501/v2/users" \
+  -H "Content-Type: application/json" \
+  --data-binary @"$UPDATE_JSON" | tee "$UPDATE_RESPONSE" | jq
+
+update_status=$(jq -r '.request_status // empty' "$UPDATE_RESPONSE")
+update_error=$(jq -r '.error_string // empty' "$UPDATE_RESPONSE")
+
+echo "Update status: $update_status" | log
+echo "Update error: $update_error" | log
+
+[ "$update_status" = "Ok" ]
+waitOrStop 0 "Failed to update admin user"
+
+
+echo "Restarting ClusterControl services" | log
+
+systemctl restart cmon
+waitOrStop 0 "Failed to restart cmon"
+
+sleep 5
+
+systemctl restart ccmgr
+waitOrStop 0 "Failed to restart ccmgr"
+
+echo "Admin user created successfully" | log
 
 ## Remove Ansible ##
 apt-get remove -y ansible
 
-
-## Create new rpc-key and modify relevant files ##
+## Create new rpc-key ##
 random_rpc=$(date +%s | sha256sum | base64 | head -c 32 ; echo)
 sed -i '/^rpc_key=/d' /etc/cmon.cnf
 echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
-sed -i "s|define('RPC_TOKEN'|//define('RPC_TOKEN'|g" /var/www/html/clustercontrol/bootstrap.php
-echo "define('RPC_TOKEN', '${random_rpc}');" >> /var/www/html/clustercontrol/bootstrap.php
-/var/www/html/clustercontrol/app/tools/reset-ccrpc.sh
 
 echo "Adding descriptions" | log
-descriptionAppend "cmon config files location: /etc/cmon.cnf"
-descriptionAppend "mariaDB user password: ${ADMINPASSWORD}"
-descriptionAppend "clustercontrol web page: ${CWM_DOMAIN}/clustercontrol"
-descriptionAppend "clustercontrol webpage config: /var/www/clustercontrol/bootstrap.php"
+descriptionAppend "ClusterControl web page: https://${CWM_DOMAIN}/"
+descriptionAppend "ClusterControl admin user: clusteradmin"
+descriptionAppend "ClusterControl admin password: ${ADMINPASSWORD}"
+descriptionAppend "cmon config: /etc/cmon.cnf"
+descriptionAppend "ccmgr config: /usr/share/ccmgr/ccmgr.yaml"
+descriptionAppend "MySQL password: ${ADMINPASSWORD}"
 descriptionAppend "rpc-key: ${random_rpc}"
 descriptionAppend " "
 
-
-
 tag ssl-ready.success
-tagScript success
 tag apache2.success
 tag certbot-apache2.success
 tagScript success
