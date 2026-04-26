@@ -104,19 +104,7 @@ else
 fi
 
 
-mkdir -p "/etc/letsencrypt/live/${CWM_DOMAIN}"
 
-openssl req -x509 -sha256 -newkey rsa:2048 \
-  -keyout "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem" \
-  -out "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
-  -days 1024 -nodes \
-  -subj "/CN=${DOMAIN}" \
-  -addext "subjectAltName=DNS:${CWM_DOMAIN}"
-
-chown -R root:root "/etc/letsencrypt/live/${CWM_DOMAIN}"
-chmod 755 "/etc/letsencrypt/live/${CWM_DOMAIN}"
-chmod 644 "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
-chmod 600 "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
 #### SSL END ####
 
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
@@ -132,6 +120,22 @@ echo "Configuring ccmgr" | log
 sed -i "s|tls_cert:.*|tls_cert: /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /usr/share/ccmgr/ccmgr.yaml
 sed -i "s|tls_key:.*|tls_key: /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /usr/share/ccmgr/ccmgr.yaml
 waitOrStop 0 "Failed to configure ccmgr"
+mkdir -p "/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+openssl req -x509 -sha256 -newkey rsa:2048 \
+  -keyout "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem" \
+  -out "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
+  -days 1024 -nodes \
+  -subj "/CN=${DOMAIN}" \
+  -addext "subjectAltName=DNS:${CWM_DOMAIN}"
+
+chown -R root:root "/etc/letsencrypt/live/${CWM_DOMAIN}"
+chmod 755 "/etc/letsencrypt/live/${CWM_DOMAIN}"
+chmod 644 "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+chmod 600 "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+
+
+
 
 # Create ccmgr systemd service
 echo "Creating ccmgr service" | log
