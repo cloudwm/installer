@@ -1,48 +1,8 @@
 #!/bin/bash
 MAX_RETRIES=${MAX_RETRIES:-10}
 SLEEP_TIME=${SLEEP_TIME:-5}
-
-
-
-
-
------------
 UPDATE_JSON=/tmp/cmon-update-user.json
 
-cat > "$UPDATE_JSON" <<'EOF'
-{
-  "operation": "updateUser",
-  "new_password": "StrongPassword123!",
-  "user": {
-    "class_name": "CmonUser",
-    "user_id": 4,
-    "user_name": "admin2",
-    "email_address": "hayk@omc.co.il",
-    "first_name": "Admin",
-    "last_name": "User",
-    "groups": [
-      {
-        "class_name": "CmonGroup",
-        "group_id": 1,
-        "group_name": "admins"
-      }
-    ],
-    "timezone": {
-      "class_name": "CmonTimeZone",
-      "name": "Israel Daylight Time",
-      "abbreviation": "IDT",
-      "has_dst_rules": false,
-      "offset": -10800
-    }
-  }
-}
-EOF
-
-curl -k -i -c "$COOKIE" -b "$COOKIE" \
-  -X POST "https://127.0.0.1:9501/v2/users" \
-  -H "Content-Type: application/json" \
-  --data-binary @"$UPDATE_JSON"
------------
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
