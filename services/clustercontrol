@@ -74,6 +74,7 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
     a2enmod php7.4
 fi
 
+systemctl stop apache2.service
 echo "Running playbook" | log
 ansible-playbook cc.playbook | log
 waitOrStop 0 "Failed to run ansible playbook"
@@ -83,7 +84,6 @@ echo "Installing certbot" | log
 installPackage python3-certbot-apache
 waitOrStop 0 "Failed apt install: python3-certbot-apache"
 
-systemctl stop apache2.service
 execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
 if [[ $? == 1 ]]; then
     export certbot_failed=1
