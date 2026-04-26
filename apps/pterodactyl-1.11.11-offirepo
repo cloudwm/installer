@@ -199,18 +199,15 @@ sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DOMAIN}|g" /etc/nginx/sites-available/pte
 
 ln -sf /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/pterodactyl
 
-nginx -t
-systemctl restart nginx
-waitOrStop 0 "Failed to start nginx services"
+echo "Testing NGINX configuration" | log
 
-[ "$success" = true ]
+nginx -t
 waitOrStop 0 "Nginx configuration check failed"
 
-echo "Reloading Nginx" | log
+echo "Restarting NGINX" | log
 
-systemctl reload nginx
-waitOrStop 0 "Nginx reload failed"
-
+systemctl restart nginx
+waitOrStop 0 "Failed to restart nginx service"
 
 # Start Docker Compose services
 echo "Starting Docker Compose services" | log
