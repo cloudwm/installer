@@ -173,7 +173,7 @@ AUTH_JSON=${AUTH_JSON:-/tmp/cmon-auth.json}
 UPDATE_JSON=${UPDATE_JSON:-/tmp/cmon-update-user.json}
 UPDATE_RESPONSE=${UPDATE_RESPONSE:-/tmp/cmon-update-response.json}
 
-ADMINUSER="admin"
+ADMINUSER="clusteradmin"
 
 [ -n "$ADMINEMAIL" ]
 waitOrStop 0 "ADMINEMAIL is empty"
@@ -280,7 +280,7 @@ echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
 
 echo "Adding descriptions" | log
 descriptionAppend "ClusterControl web page: https://${CWM_DOMAIN}/"
-descriptionAppend "ClusterControl admin user: admin"
+descriptionAppend "ClusterControl admin user: clusteradmin"
 descriptionAppend "ClusterControl admin password: ${ADMINPASSWORD}"
 descriptionAppend "cmon config: /etc/cmon.cnf"
 descriptionAppend "ccmgr config: /usr/share/ccmgr/ccmgr.yaml"
