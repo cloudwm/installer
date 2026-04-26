@@ -2,7 +2,45 @@
 MAX_RETRIES=${MAX_RETRIES:-10}
 SLEEP_TIME=${SLEEP_TIME:-5}
 UPDATE_JSON=/tmp/cmon-update-user.json
+-----------------------------
 
+cat > "$UPDATE_JSON" <<'EOF'
+{
+  "operation": "updateUser",
+  "new_password": "StrongPassword123!",
+  "user": {
+    "class_name": "CmonUser",
+    "user_id": 4,
+    "user_name": "clusteradmin",
+    "email_address": "hayk@omc.co.il",
+    "first_name": "Cluster",
+    "last_name": "Admin",
+    "disabled": false,
+    "suspended": false,
+    "password_expired": false,
+    "groups": [
+      {
+        "class_name": "CmonGroup",
+        "group_id": 1,
+        "group_name": "admins"
+      }
+    ],
+    "timezone": {
+      "class_name": "CmonTimeZone",
+      "name": "Israel Daylight Time",
+      "abbreviation": "IDT",
+      "has_dst_rules": false,
+      "offset": -10800
+    }
+  }
+}
+EOF
+
+curl -k -s -c "$COOKIE" -b "$COOKIE" \
+  -X POST "https://127.0.0.1:9501/v2/users" \
+  -H "Content-Type: application/json" \
+  --data-binary @"$UPDATE_JSON" | jq
+-----------------------------
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
@@ -131,48 +169,94 @@ waitOrStop 0 "ccmgr service is not running"
 # Create admin user
 echo "Creating admin user" | log
 
-cat > "$UPDATE_JSON" <<'EOF'
-{
-  "operation": "updateUser",
-  "new_password": "${ADMINPASSWORD}",
-  "user": {
-    "class_name": "CmonUser",
-    "user_id": 4,
-    "user_name": "admin",
-    "email_address": "${ADMINEMAIL}",
-    "first_name": "Admin",
-    "last_name": "User",
-    "groups": [
-      {
-        "class_name": "CmonGroup",
-        "group_id": 1,
-        "group_name": "admins"
-      }
-    ],
-    "timezone": {
-      "class_name": "CmonTimeZone",
-      "name": "Israel Daylight Time",
-      "abbreviation": "IDT",
-      "has_dst_rules": false,
-      "offset": -10800
-    }
-  }
-}
-EOF
+COOKIE=${COOKIE:-/tmp/cmon-cookie.txt}
+AUTH_JSON=${AUTH_JSON:-/tmp/cmon-auth.json}
+UPDATE_JSON=${UPDATE_JSON:-/tmp/cmon-update-user.json}
 
-curl -k -i -c "$COOKIE" -b "$COOKIE" \
+ADMINUSER=${ADMINUSER:-clusteradmin}
+
+[ -n "$ADMINEMAIL" ]
+waitOrStop 0 "ADMINEMAIL is empty"
+
+[ -n "$ADMINPASSWORD" ]
+waitOrStop 0 "ADMINPASSWORD is empty"
+
+rm -f "$COOKIE" "$AUTH_JSON" "$UPDATE_JSON"
+
+echo "Authenticating with initial ccsetup user" | log
+
+curl -k -s -c "$COOKIE" -b "$COOKIE" \
+  -X POST "https://127.0.0.1:9501/v2/auth" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operation": "authenticateWithPassword",
+    "user_name": "ccsetup",
+    "password": "admin"
+  }' | tee "$AUTH_JSON" | jq
+
+auth_status=$(jq -r '.request_status // empty' "$AUTH_JSON")
+
+[ "$auth_status" = "Ok" ]
+waitOrStop 0 "Failed to authenticate with ccsetup/admin"
+
+echo "Building update user JSON" | log
+
+jq -n \
+  --arg admin_password "$ADMINPASSWORD" \
+  --arg admin_email "$ADMINEMAIL" \
+  '{
+    operation: "updateUser",
+    new_password: $admin_password,
+    user: {
+      class_name: "CmonUser",
+      user_id: 4,
+      user_name: admin,
+      email_address: $admin_email,
+      first_name: "Cluster",
+      last_name: "Admin",
+      disabled: false,
+      suspended: false,
+      password_expired: false,
+      groups: [
+        {
+          class_name: "CmonGroup",
+          group_id: 1,
+          group_name: "admins"
+        }
+      ],
+      timezone: {
+        class_name: "CmonTimeZone",
+        name: "Israel Daylight Time",
+        abbreviation: "IDT",
+        has_dst_rules: false,
+        offset: -10800
+      }
+    }
+  }' > "$UPDATE_JSON"
+
+echo "Updating initial admin user" | log
+
+curl -k -s -c "$COOKIE" -b "$COOKIE" \
   -X POST "https://127.0.0.1:9501/v2/users" \
   -H "Content-Type: application/json" \
-  --data-binary @"$UPDATE_JSON"
+  --data-binary @"$UPDATE_JSON" | tee /tmp/cmon-update-response.json | jq
 
-waitOrStop 0 "Failed to create admin user"
+update_status=$(jq -r '.request_status // empty' /tmp/cmon-update-response.json)
+
+[ "$update_status" = "Ok" ]
+waitOrStop 0 "Failed to update admin user"
+
+echo "Restarting ClusterControl services" | log
+
 systemctl restart cmon
 waitOrStop 0 "Failed to restart cmon"
+
 sleep 5
 
 systemctl restart ccmgr
 waitOrStop 0 "Failed to restart ccmgr"
-sleep 5
+
+echo "Admin user created successfully" | log
 
 ## Remove Ansible ##
 apt-get remove -y ansible
