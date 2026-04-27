@@ -10,46 +10,46 @@ RUFLO_VERSION="3.5.80"
 echo "Installing dependencies" | log
 apt update
 apt install -y curl ca-certificates gnupg
-waitOrStop $? "Failed to install basic dependencies"
+waitOrStop 0 "Failed to install basic dependencies"
 
 echo "Configuring Node.js 20 repository" | log
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-waitOrStop $? "Failed to configure Node.js 20 repository"
+waitOrStop 0 "Failed to configure Node.js 20 repository"
 
 echo "Installing Node.js and npm" | log
 apt install -y nodejs npm
-waitOrStop $? "Failed to install Node.js and npm"
+waitOrStop 0 "Failed to install Node.js and npm"
 
 echo "Checking Node.js installation" | log
 node --version
-waitOrStop $? "Node.js command is not working"
+waitOrStop 0 "Node.js command is not working"
 
 echo "Checking npm installation" | log
 npm --version
-waitOrStop $? "npm command is not working"
+waitOrStop 0 "npm command is not working"
 
 echo "Checking npx installation" | log
 npx --version
-waitOrStop $? "npx command is not working"
+waitOrStop 0 "npx command is not working"
 
 echo "Installing Ruflo ${RUFLO_VERSION}" | log
 curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=v${RUFLO_VERSION}
-waitOrStop $? "Ruflo was not installed"
+waitOrStop 0 "Ruflo was not installed"
 
 echo "Creating Ruflo wrapper command" | log
 cat >/usr/local/bin/ruflo <<EOF
 #!/usr/bin/env bash
 exec npx -y ruflo@${RUFLO_VERSION} "\$@"
 EOF
-waitOrStop $? "Failed to create Ruflo wrapper command"
+waitOrStop 0 "Failed to create Ruflo wrapper command"
 
 echo "Setting Ruflo wrapper permissions" | log
 chmod +x /usr/local/bin/ruflo
-waitOrStop $? "Failed to set Ruflo wrapper permissions"
+waitOrStop 0 "Failed to set Ruflo wrapper permissions"
 
 echo "Refreshing shell command cache" | log
 hash -r
 
 echo "Checking Ruflo version" | log
 /usr/local/bin/ruflo --version
-waitOrStop $? "Ruflo command is not working"
+waitOrStop 0 "Ruflo command is not working"
