@@ -33,7 +33,7 @@ echo "Pre-pulling Docker images" | log
 sudo docker pull mariadb:10.11
 sudo docker pull redis:alpine
 sudo docker pull ghcr.io/pterodactyl/panel:v1.11.11
-sudo docker pull ghcr.io/pterodactyl/wings:latest
+sudo docker pull ghcr.io/pterodactyl/wings:v1.11.11
 
 
 # Create directories
@@ -127,7 +127,7 @@ services:
 
 
   wings:
-    image: ghcr.io/pterodactyl/wings:latest
+    image: ghcr.io/pterodactyl/wings:v1.11.11
     container_name: pterodactyl_wings
     restart: unless-stopped
     privileged: true
