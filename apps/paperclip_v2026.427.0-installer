@@ -11,10 +11,20 @@ PAPERCLIP_HOME="/root"
 PAPERCLIP_WORKDIR="/opt/paperclip"
 PAPERCLIP_PORT="3100"
 
+echo "Removing unsupported Nginx PPA if exists" | log
+add-apt-repository -r -y ppa:nginx/stable 2>/dev/null || true
+rm -f /etc/apt/sources.list.d/*nginx*.list
+rm -f /etc/apt/sources.list.d/*nginx*.sources
+
+echo "Updating apt package index" | log
+apt update
 
 echo "Configuring Node.js 20 repository" | log
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 waitOrStop 0 "Failed to configure Node.js 20 repository"
+
+echo "Installing Nginx" | log
+apt install -y nginx
 
 echo "Installing Node.js" | log
 apt install -y nodejs
