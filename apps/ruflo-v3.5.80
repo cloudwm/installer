@@ -5,17 +5,28 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-
+echo "Installing dependencies" | log
 apt install -y curl ca-certificates gnupg
+
+echo "Configuring Node.js 20 repository" | log
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+
+echo "Installing Node.js" | log
 apt install -y nodejs
+
+echo "Installing Ruflo" | log
 curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=v3.5.80
+waitOrStop 0 "Ruflo was not installed"
 
-
+echo "Creating Ruflo wrapper command" | log
 cat >/usr/local/bin/ruflo <<'EOF'
 #!/usr/bin/env bash
 exec npx -y ruflo@latest "$@"
 EOF
 
+echo "Setting Ruflo wrapper permissions" | log
 chmod +x /usr/local/bin/ruflo
+
+echo "Checking Ruflo version" | log
 ruflo --version
+waitOrStop 0 "Ruflo command is not working"
