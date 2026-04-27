@@ -1,0 +1,21 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+
+apt install -y curl ca-certificates gnupg
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=v3.5.80
+
+
+cat >/usr/local/bin/ruflo <<'EOF'
+#!/usr/bin/env bash
+exec npx -y ruflo@latest "$@"
+EOF
+
+chmod +x /usr/local/bin/ruflo
+ruflo --version
