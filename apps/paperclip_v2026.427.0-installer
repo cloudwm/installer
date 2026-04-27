@@ -11,13 +11,6 @@ PAPERCLIP_HOME="/root"
 PAPERCLIP_WORKDIR="/opt/paperclip"
 PAPERCLIP_PORT="3100"
 
-echo "Updating apt package index" | log
-apt update
-waitOrStop 0 "Failed to update apt package index"
-
-echo "Installing dependencies" | log
-apt install -y curl ca-certificates gnupg nginx
-waitOrStop 0 "Failed to install dependencies"
 
 echo "Configuring Node.js 20 repository" | log
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
