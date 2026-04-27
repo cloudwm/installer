@@ -1,0 +1,160 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+PAPERCLIP_VERSION="v2026.427.0"
+PAPERCLIP_USER="root"
+PAPERCLIP_HOME="/root"
+PAPERCLIP_WORKDIR="/opt/paperclip"
+PAPERCLIP_PORT="3100"
+
+echo "Updating apt package index" | log
+apt update
+waitOrStop 0 "Failed to update apt package index"
+
+echo "Installing dependencies" | log
+apt install -y curl ca-certificates gnupg nginx
+waitOrStop 0 "Failed to install dependencies"
+
+echo "Configuring Node.js 20 repository" | log
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+waitOrStop 0 "Failed to configure Node.js 20 repository"
+
+echo "Installing Node.js" | log
+apt install -y nodejs
+waitOrStop 0 "Failed to install Node.js"
+
+echo "Upgrading npm to version 11.13.0" | log
+npm install -g npm@11.13.0
+waitOrStop 0 "Failed to upgrade npm"
+
+echo "Creating Paperclip working directory" | log
+mkdir -p "${PAPERCLIP_WORKDIR}"
+waitOrStop 0 "Failed to create Paperclip working directory"
+
+echo "Running Paperclip onboarding" | log
+cd "${PAPERCLIP_WORKDIR}"
+HOME="${PAPERCLIP_HOME}" npx -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes
+waitOrStop 0 "Paperclip onboarding failed"
+
+echo "Creating Paperclip systemd service" | log
+cat >/etc/systemd/system/paperclip.service <<EOF
+[Unit]
+Description=Paperclip AI Orchestration Platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${PAPERCLIP_USER}
+WorkingDirectory=${PAPERCLIP_WORKDIR}
+Environment=HOME=${PAPERCLIP_HOME}
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npx -y paperclipai@${PAPERCLIP_VERSION} run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+waitOrStop 0 "Failed to create Paperclip systemd service"
+
+echo "Reloading systemd daemon" | log
+systemctl daemon-reload
+waitOrStop 0 "Failed to reload systemd daemon"
+
+echo "Enabling Paperclip service on boot" | log
+systemctl enable paperclip.service
+waitOrStop 0 "Failed to enable Paperclip service"
+
+echo "Starting Paperclip service" | log
+systemctl restart paperclip.service
+waitOrStop 0 "Failed to start Paperclip service"
+
+echo "Checking Paperclip service status" | log
+systemctl is-active --quiet paperclip.service
+waitOrStop 0 "Paperclip service is not running"
+
+echo "Creating Nginx configuration for Paperclip" | log
+cat >/etc/nginx/sites-available/paperclip <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name ${CWM_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass http://127.0.0.1:${PAPERCLIP_PORT};
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port 443;
+
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+EOF
+waitOrStop 0 "Failed to create Nginx configuration for Paperclip"
+
+echo "Enabling Paperclip Nginx site" | log
+ln -sf /etc/nginx/sites-available/paperclip /etc/nginx/sites-enabled/paperclip
+waitOrStop 0 "Failed to enable Paperclip Nginx site"
+
+echo "Removing default Nginx site if exists" | log
+rm -f /etc/nginx/sites-enabled/default
+
+echo "Testing Nginx configuration" | log
+nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+
+echo "Enabling Nginx service on boot" | log
+systemctl enable nginx
+waitOrStop 0 "Failed to enable Nginx service"
+
+echo "Restarting Nginx service" | log
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx service"
+
+echo "Checking Nginx service status" | log
+systemctl is-active --quiet nginx
+waitOrStop 0 "Nginx service is not running"
+
+echo "Paperclip installation completed successfully" | log
