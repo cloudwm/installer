@@ -96,7 +96,7 @@ echo "Running Paperclip onboarding as paperclip user" | log
 cd "${PAPERCLIP_WORKDIR}"
 waitOrStop 0 "Failed to enter Paperclip working directory"
 
-timeout 300s sudo -u "${PAPERCLIP_USER}" env \
+timeout 180s sudo -u "${PAPERCLIP_USER}" env \
   HOME="${PAPERCLIP_HOME}" \
   npm_config_cache="${PAPERCLIP_HOME}/.npm" \
   npm_config_loglevel=error \
