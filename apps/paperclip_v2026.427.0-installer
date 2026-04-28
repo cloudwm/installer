@@ -18,21 +18,18 @@ rm -f /etc/apt/sources.list.d/*nginx*.sources
 
 echo "Updating apt package index" | log
 apt update
+mkdir -p "${PAPERCLIP_WORKDIR}"
 
 echo "Configuring Node.js 20 repository" | log
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
 waitOrStop 0 "Failed to configure Node.js 20 repository"
 
-echo "Installing Nginx" | log
-apt install -y nginx
 
 echo "Installing Node.js" | log
 apt install -y nodejs
 waitOrStop 0 "Failed to install Node.js"
 
-echo "Upgrading npm to version 11.13.0" | log
-npm install -g npm@11.13.0
-waitOrStop 0 "Failed to upgrade npm"
 
 echo "Creating Paperclip working directory" | log
 mkdir -p "${PAPERCLIP_WORKDIR}"
