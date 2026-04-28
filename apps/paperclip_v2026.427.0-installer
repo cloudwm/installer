@@ -21,6 +21,11 @@ apt update
 mkdir -p "${PAPERCLIP_WORKDIR}"
 
 echo "Configuring Node.js 20 repository" | log
+rm -rf /usr/lib/node_modules/npm
+rm -rf /usr/lib/node_modules/.npm-*
+rm -f /usr/bin/npm /usr/bin/npx
+rm -f /usr/bin/.npm-* /usr/bin/.npx-*
+rm -rf /root/.npm/_cacache
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt install -y nodejs
 waitOrStop 0 "Failed to configure Node.js 20 repository"
@@ -35,10 +40,6 @@ echo "Creating Paperclip working directory" | log
 mkdir -p "${PAPERCLIP_WORKDIR}"
 waitOrStop 0 "Failed to create Paperclip working directory"
 
-echo "Running Paperclip onboarding" | log
-cd "${PAPERCLIP_WORKDIR}"
-HOME="${PAPERCLIP_HOME}" npx -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes
-waitOrStop 0 "Paperclip onboarding failed"
 
 echo "Creating Paperclip systemd service" | log
 cat >/etc/systemd/system/paperclip.service <<EOF
