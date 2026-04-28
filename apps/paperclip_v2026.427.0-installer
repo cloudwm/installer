@@ -95,8 +95,6 @@ echo "Running Paperclip onboarding as paperclip user" | log
 cd "${PAPERCLIP_WORKDIR}"
 waitOrStop 0 "Failed to enter Paperclip working directory"
 
-sudo -u "${PAPERCLIP_USER}" -H env HOME="${PAPERCLIP_HOME}" "${NPX_PATH}" -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes
-waitOrStop 0 "Paperclip onboarding failed"
 
 echo "Fixing Paperclip directory ownership" | log
 chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
