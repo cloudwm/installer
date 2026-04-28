@@ -20,6 +20,11 @@ GRANT all privileges on caddydb.* to caddyuser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
+echo "Removing nginx installed by letsencrypt tweak" | log
+systemctl disable --now nginx 2>/dev/null
+apt-get purge -y nginx nginx-common 2>&1 | log
+apt-get autoremove -y 2>&1 | log
+
 echo "Adding caddy to source list" | log
 echo "deb [trusted=yes] https://apt.fury.io/caddy/ /" | tee -a /etc/apt/sources.list.d/caddy-fury.list
 apt update | log
@@ -29,6 +34,14 @@ installPackage caddy | log
 waitOrStop 0 "Failed apt install: Caddy"
 mkdir -p $appPath
 chown -R caddy:caddy /var/log/caddy
+
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
+chmod 755 /etc/letsencrypt/live "${LE_DIR}"
+chmod 644 "${FC_FILE}"
+chmod 640 "${PK_FILE}"
+chown root:caddy "${PK_FILE}"
 
 echo "Creating the Caddy configuration file" | log
 cat /dev/null > /etc/caddy/Caddyfile
@@ -46,7 +59,7 @@ ${CWM_DOMAIN} {
     encode gzip zstd
     php_fastcgi unix//run/php/php7.4-fpm.sock
 
-    tls ${ADMINEMAIL} {
+    tls ${FC_FILE} ${PK_FILE} {
         protocols tls1.2 tls1.3
     }
 }
