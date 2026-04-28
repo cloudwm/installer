@@ -6,10 +6,9 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 PAPERCLIP_VERSION="v2026.427.0"
-PAPERCLIP_USER="root"
-PAPERCLIP_HOME="/root"
+PAPERCLIP_USER="paperclip"
+PAPERCLIP_HOME="/opt/paperclip"
 PAPERCLIP_WORKDIR="/opt/paperclip"
-PAPERCLIP_PORT="3100"
 
 echo "Removing unsupported Nginx PPA if exists" | log
 add-apt-repository -r -y ppa:nginx/stable 2>/dev/null || true
@@ -18,9 +17,21 @@ rm -f /etc/apt/sources.list.d/*nginx*.sources
 
 echo "Updating apt package index" | log
 apt update
-useradd --system --create-home --home-dir /opt/paperclip --shell /usr/sbin/nologin paperclip || true
+waitOrStop 0 "Failed to update apt package index"
+
+echo "Installing required dependencies" | log
+apt install -y curl ca-certificates gnupg sudo nginx
+waitOrStop 0 "Failed to install required dependencies"
+
+echo "Creating Paperclip system user" | log
+useradd --system --create-home --home-dir "${PAPERCLIP_HOME}" --shell /usr/sbin/nologin "${PAPERCLIP_USER}" || true
+
+echo "Creating Paperclip working directory" | log
 mkdir -p "${PAPERCLIP_WORKDIR}"
-chown -R paperclip:paperclip /opt/paperclip
+waitOrStop 0 "Failed to create Paperclip working directory"
+
+chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
+waitOrStop 0 "Failed to set Paperclip directory ownership"
 
 echo "Removing old Node.js and npm packages" | log
 apt remove -y nodejs npm || true
@@ -41,39 +52,58 @@ rm -f /etc/apt/keyrings/nodesource.gpg
 
 echo "Installing NodeSource signing key" | log
 mkdir -p /etc/apt/keyrings
+waitOrStop 0 "Failed to create apt keyrings directory"
+
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
   | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+waitOrStop 0 "Failed to install NodeSource signing key"
 
 echo "Configuring Node.js 22 repository" | log
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
   > /etc/apt/sources.list.d/nodesource.list
+waitOrStop 0 "Failed to configure Node.js 22 repository"
 
 echo "Updating apt package index after NodeSource setup" | log
 apt update
+waitOrStop 0 "Failed to update apt package index after NodeSource setup"
 
 echo "Installing Node.js 22" | log
 apt install -y nodejs
+waitOrStop 0 "Failed to install Node.js 22"
 
 echo "Checking Node.js version" | log
 node -v
+waitOrStop 0 "Node.js command is not working"
 
 echo "Checking npm version" | log
 npm -v
+waitOrStop 0 "npm command is not working"
 
 echo "Checking npx version" | log
 npx -v
+waitOrStop 0 "npx command is not working"
 
 echo "Resolving npx path" | log
 NPX_PATH="$(command -v npx)"
+if [ -z "${NPX_PATH}" ]; then
+    echo "npx was not found" | log
+    waitOrStop 1 "npx was not found"
+fi
 echo "Using npx from ${NPX_PATH}" | log
 
-echo "Creating Paperclip working directory" | log
-mkdir -p "${PAPERCLIP_WORKDIR}"
-waitOrStop 0 "Failed to create Paperclip working directory"
+echo "Running Paperclip onboarding as paperclip user" | log
+cd "${PAPERCLIP_WORKDIR}"
+waitOrStop 0 "Failed to enter Paperclip working directory"
 
+sudo -u "${PAPERCLIP_USER}" -H env HOME="${PAPERCLIP_HOME}" "${NPX_PATH}" -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes
+waitOrStop 0 "Paperclip onboarding failed"
+
+echo "Fixing Paperclip directory ownership" | log
+chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
+waitOrStop 0 "Failed to fix Paperclip directory ownership"
 
 echo "Creating Paperclip systemd service" | log
-cat >/etc/systemd/system/paperclip.service <<'EOF'
+cat >/etc/systemd/system/paperclip.service <<EOF
 [Unit]
 Description=Paperclip AI Orchestration Platform
 After=network-online.target
@@ -81,12 +111,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=paperclip
-Group=paperclip
-WorkingDirectory=/opt/paperclip
-Environment=HOME=/opt/paperclip
+User=${PAPERCLIP_USER}
+Group=${PAPERCLIP_USER}
+WorkingDirectory=${PAPERCLIP_WORKDIR}
+Environment=HOME=${PAPERCLIP_HOME}
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/npx -y paperclipai@v2026.427.0 run
+ExecStart=${NPX_PATH} -y paperclipai@${PAPERCLIP_VERSION} run
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -112,6 +142,7 @@ waitOrStop 0 "Failed to start Paperclip service"
 echo "Checking Paperclip service status" | log
 systemctl is-active --quiet paperclip.service
 waitOrStop 0 "Paperclip service is not running"
+
 
 echo "Creating Nginx configuration for Paperclip" | log
 cat >/etc/nginx/sites-available/paperclip <<EOF
