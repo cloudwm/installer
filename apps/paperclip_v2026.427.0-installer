@@ -99,7 +99,8 @@ waitOrStop $? "Failed to enter Paperclip working directory"
 sudo -u "${PAPERCLIP_USER}" env \
   HOME="${PAPERCLIP_HOME}" \
   npm_config_cache="${PAPERCLIP_HOME}/.npm" \
-  "${NPX_PATH}" -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes
+  "${NPX_PATH}" -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes \
+  > /tmp/paperclip-onboard.log 2>&1
 waitOrStop $? "Paperclip onboarding failed"
 
 echo "Fixing Paperclip directory ownership" | log
