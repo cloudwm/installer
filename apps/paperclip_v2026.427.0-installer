@@ -128,52 +128,6 @@ sudo -u "${PAPERCLIP_USER}" env \
   > /tmp/paperclip-allowed-hostname.log 2>&1
 waitOrStop 0 "Failed to allow Paperclip hostname. Check /tmp/paperclip-allowed-hostname.log"
 
-
-echo "Creating Paperclip systemd service" | log
-cat >/etc/systemd/system/paperclip.service <<EOF
-[Unit]
-Description=Paperclip AI Orchestration Platform
-After=network-online.target
-Wants=network-online.target
-
-
-[Service]
-Type=simple
-User=paperclip
-Group=paperclip
-WorkingDirectory=/opt/paperclip
-Environment=HOME=/opt/paperclip
-Environment=NODE_ENV=production
-Environment=npm_config_cache=/opt/paperclip/.npm
-ExecStart=/usr/bin/npx -y paperclipai@v2026.427.0 run
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-
-[Install]
-WantedBy=multi-user.target
-EOF
-waitOrStop 0 "Failed to create Paperclip systemd service"
-
-echo "Reloading systemd daemon" | log
-systemctl daemon-reload
-waitOrStop 0 "Failed to reload systemd daemon"
-
-echo "Enabling Paperclip service on boot" | log
-systemctl enable paperclip.service
-waitOrStop 0 "Failed to enable Paperclip service"
-
-echo "Starting Paperclip service" | log
-systemctl restart paperclip.service
-waitOrStop 0 "Failed to start Paperclip service"
-
-echo "Checking Paperclip service status" | log
-systemctl is-active --quiet paperclip.service
-waitOrStop 0 "Paperclip service is not running"
-
-
 echo "Creating Nginx configuration for Paperclip" | log
 cat >/etc/nginx/sites-available/paperclip <<EOF
 server {
@@ -240,6 +194,59 @@ rm -f /etc/nginx/sites-enabled/default
 echo "Testing Nginx configuration" | log
 nginx -t
 waitOrStop 0 "Nginx configuration test failed"
+
+
+echo "Creating Paperclip systemd service" | log
+cat >/etc/systemd/system/paperclip.service <<EOF
+[Unit]
+Description=Paperclip AI Orchestration Platform
+After=network-online.target
+Wants=network-online.target
+
+
+[Service]
+Type=simple
+User=paperclip
+Group=paperclip
+WorkingDirectory=/opt/paperclip
+Environment=HOME=/opt/paperclip
+Environment=NODE_ENV=production
+Environment=npm_config_cache=/opt/paperclip/.npm
+ExecStart=/usr/bin/npx -y paperclipai@v2026.427.0 run
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+
+[Install]
+WantedBy=multi-user.target
+EOF
+waitOrStop 0 "Failed to create Paperclip systemd service"
+
+echo "install codex and claude"
+npm install -g @anthropic-ai/claude-code
+waitOrStop 0 "Failed to install claude"
+
+npm install -g @openai/codex
+waitOrStop 0 "Failed to install codex"
+
+
+echo "Reloading systemd daemon" | log
+systemctl daemon-reload
+waitOrStop 0 "Failed to reload systemd daemon"
+
+echo "Enabling Paperclip service on boot" | log
+systemctl enable paperclip.service
+waitOrStop 0 "Failed to enable Paperclip service"
+
+echo "Starting Paperclip service" | log
+systemctl restart paperclip.service
+waitOrStop 0 "Failed to start Paperclip service"
+
+echo "Checking Paperclip service status" | log
+systemctl is-active --quiet paperclip.service
+waitOrStop 0 "Paperclip service is not running"
 
 echo "Enabling Nginx service on boot" | log
 systemctl enable nginx
