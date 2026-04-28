@@ -254,3 +254,21 @@ systemctl is-active --quiet nginx
 waitOrStop 0 "Nginx service is not running"
 
 echo "Paperclip installation completed successfully" | log
+
+descriptionAppend "Successfully installed."
+descriptionAppend "Service: Paperclip"
+descriptionAppend "Version: ${PAPERCLIP_VERSION}"
+descriptionAppend "Configuration directory: ${PAPERCLIP_HOME}/.paperclip"
+descriptionAppend "Working directory: ${PAPERCLIP_WORKDIR}"
+descriptionAppend "System user: ${PAPERCLIP_USER}"
+descriptionAppend "Local URL: http://127.0.0.1:${PAPERCLIP_PORT}"
+descriptionAppend "Public URL: https://${CWM_DOMAIN}"
+descriptionAppend "Health check: http://127.0.0.1:${PAPERCLIP_PORT}/api/health"
+descriptionAppend "Nginx config file: /etc/nginx/sites-enabled/paperclip"
+descriptionAppend "Systemd service: paperclip.service"
+descriptionAppend "Logs: journalctl -u paperclip -f"
+descriptionAppend "Paperclip config file: ${PAPERCLIP_HOME}/.paperclip/instances/default/config.json"
+descriptionAppend "Paperclip data directory: ${PAPERCLIP_HOME}/.paperclip/instances/default/data"
+descriptionAppend "Embedded PostgreSQL directory: ${PAPERCLIP_HOME}/.paperclip/instances/default/db"
+descriptionAppend "Embedded PostgreSQL port: 54329"
+descriptionAppend "Allowed hostname: ${CWM_DOMAIN}"

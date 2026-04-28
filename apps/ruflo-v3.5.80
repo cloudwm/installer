@@ -53,3 +53,18 @@ hash -r
 echo "Checking Ruflo version" | log
 /usr/local/bin/ruflo --version
 waitOrStop 0 "Ruflo command is not working"
+
+descriptionAppend "Successfully installed."
+descriptionAppend "Service: Ruflo"
+descriptionAppend "Version: ${RUFLO_VERSION}"
+descriptionAppend "Command: /usr/local/bin/ruflo"
+descriptionAppend "Wrapper command: /usr/local/bin/ruflo"
+descriptionAppend "Runtime: Node.js / npx"
+descriptionAppend "Check version: ruflo --version"
+descriptionAppend "Help command: ruflo --help"
+descriptionAppend "Start command: ruflo start"
+descriptionAppend "Status command: ruflo status"
+descriptionAppend "MCP command: ruflo mcp start"
+descriptionAppend "Configuration: Ruflo configuration is created when running ruflo init/start in the target project directory."
+descriptionAppend "Notes: Ruflo is installed as a CLI wrapper that runs npx -y ruflo@${RUFLO_VERSION}."
+descriptionAppend "Logs: Check the terminal output or the process logs depending on how Ruflo is started."
