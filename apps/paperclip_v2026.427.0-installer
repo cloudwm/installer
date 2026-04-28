@@ -120,6 +120,15 @@ echo "Fixing Paperclip directory ownership" | log
 chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
 waitOrStop 0 "Failed to fix Paperclip directory ownership"
 
+echo "Allowing Paperclip hostname" | log
+sudo -u "${PAPERCLIP_USER}" env \
+  HOME="${PAPERCLIP_HOME}" \
+  npm_config_cache="${PAPERCLIP_HOME}/.npm" \
+  bash -lc "cd ${PAPERCLIP_WORKDIR} && ${NPX_PATH} -y paperclipai@${PAPERCLIP_VERSION} allowed-hostname ${CWM_DOMAIN}" \
+  > /tmp/paperclip-allowed-hostname.log 2>&1
+waitOrStop 0 "Failed to allow Paperclip hostname. Check /tmp/paperclip-allowed-hostname.log"
+
+
 echo "Creating Paperclip systemd service" | log
 cat >/etc/systemd/system/paperclip.service <<EOF
 [Unit]
