@@ -6,23 +6,20 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Creating temporary swapfile" | log
-#increase vm swappiness to allow swap to dominate process
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
+checkTagExist ubuntu-updateos.success
+
+rootDir=$(rootDir)
+
+echo "Creating temporary swapfile for ClickHouse install" | log
+createSwapFile swapfile 2048
+waitOrStop 0 "Failed to create swapfile"
 sleep 5
 
 echo "Adding ClickHouse Repository" | log
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 8919F6BD2B48D754
-echo "deb https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-apt update
-
-
-echo "Adding ClickHouse port to UFW" | log
-ufw allow 9000
-ufw allow 8123
+echo "deb https://packages.clickhouse.com/deb stable main" | tee /etc/apt/sources.list.d/clickhouse.list
+apt-get update
+waitOrStop 0 "Failed to update apt index after adding ClickHouse repo"
 
 echo "Installing ClickHouse from apt" | log
 export DEBIAN_FRONTEND="noninteractive"
@@ -34,21 +31,54 @@ rm -rf /etc/clickhouse-server/users.xml
 cp $rootDir/tweaks/extras/clickhouse/users.xml /etc/clickhouse-server/users.xml
 sed -i "s/ADMINPASS/${ADMINPASSWORD}/g" /etc/clickhouse-server/users.xml
 
-echo "Starting and Enabling ClickHouse service" | log
+echo "Starting and enabling ClickHouse service" | log
+systemctl enable clickhouse-server
 systemctl start clickhouse-server
 waitOrStop 0 "Failed to start ClickHouse service"
-systemctl enable clickhouse-server
 sleep 2
 
+echo "Setting NGINX VirtualHost configuration" | log
+cat << EOF > /etc/nginx/sites-available/clickhouse.conf
+server {
+        listen 443 ssl http2;
+
+        root /var/www/html;
+        index index.html index.htm index.nginx-debian.html;
+
+        server_name ${CWM_DOMAIN};
+	ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+	location / {
+		proxy_pass http://localhost:8123;
+		proxy_http_version 1.1;
+		proxy_set_header Host \$host;
+		proxy_set_header X-Real-IP \$remote_addr;
+		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto \$scheme;
+		proxy_read_timeout 300s;
+		proxy_send_timeout 300s;
+        }
+}
+EOF
+ln -sf /etc/nginx/sites-available/clickhouse.conf /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+systemctl start nginx
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
 echo "Adding descriptions" | log
-descriptionAppend "ClickHouse Address: 127.0.0.1"
-descriptionAppend "ClickHouse Port: 9000"
+descriptionAppend "ClickHouse Web UI: https://${CWM_DOMAIN}/play"
+descriptionAppend "ClickHouse HTTP endpoint: https://${CWM_DOMAIN}"
+descriptionAppend "ClickHouse Native port (local only): 127.0.0.1:9000"
+descriptionAppend "ClickHouse User: default"
 descriptionAppend "ClickHouse Password: ${ADMINPASSWORD}"
 descriptionAppend "ClickHouse Configuration files: /etc/clickhouse-server/"
 descriptionAppend " "
 descriptionAppend "To enter ClickHouse CLI: clickhouse-client --password"
 descriptionAppend " "
 
+tag clickhouse.success
 tagScript success
 
 exit 0
