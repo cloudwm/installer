@@ -1,0 +1,71 @@
+#!/bin/bash
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+RUFLO_VERSION="3.5.80"
+
+echo "Installing dependencies" | log
+apt update
+apt install -y curl ca-certificates gnupg
+waitOrStop 0 "Failed to install basic dependencies"
+
+echo "Configuring Node.js 20 repository" | log
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+waitOrStop 0 "Failed to configure Node.js 20 repository"
+
+echo "Installing Node.js and npm" | log
+apt update
+apt install -y nodejs
+waitOrStop 0 "Failed to install Node.js and npm"
+
+echo "Checking Node.js installation" | log
+node --version
+waitOrStop 0 "Node.js command is not working"
+
+echo "Checking npm installation" | log
+npm --version
+waitOrStop 0 "npm command is not working"
+
+echo "Checking npx installation" | log
+npx --version
+waitOrStop 0 "npx command is not working"
+
+echo "Installing Ruflo ${RUFLO_VERSION}" | log
+curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=v${RUFLO_VERSION}
+waitOrStop 0 "Ruflo was not installed"
+
+echo "Creating Ruflo wrapper command" | log
+cat >/usr/local/bin/ruflo <<EOF
+#!/usr/bin/env bash
+exec npx -y ruflo@${RUFLO_VERSION} "\$@"
+EOF
+waitOrStop 0 "Failed to create Ruflo wrapper command"
+
+echo "Setting Ruflo wrapper permissions" | log
+chmod +x /usr/local/bin/ruflo
+waitOrStop 0 "Failed to set Ruflo wrapper permissions"
+
+echo "Refreshing shell command cache" | log
+hash -r
+
+echo "Checking Ruflo version" | log
+/usr/local/bin/ruflo --version
+waitOrStop 0 "Ruflo command is not working"
+
+descriptionAppend "Successfully installed."
+descriptionAppend "Service: Ruflo"
+descriptionAppend "Version: ${RUFLO_VERSION}"
+descriptionAppend "Command: /usr/local/bin/ruflo"
+descriptionAppend "Wrapper command: /usr/local/bin/ruflo"
+descriptionAppend "Runtime: Node.js / npx"
+descriptionAppend "Check version: ruflo --version"
+descriptionAppend "Help command: ruflo --help"
+descriptionAppend "Start command: ruflo start"
+descriptionAppend "Status command: ruflo status"
+descriptionAppend "MCP command: ruflo mcp start"
+descriptionAppend "Configuration: Ruflo configuration is created when running ruflo init/start in the target project directory."
+descriptionAppend "Notes: Ruflo is installed as a CLI wrapper that runs npx -y ruflo@${RUFLO_VERSION}."
+descriptionAppend "Logs: Check the terminal output or the process logs depending on how Ruflo is started."
