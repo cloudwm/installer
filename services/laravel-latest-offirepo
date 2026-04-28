@@ -6,10 +6,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist ubuntu-updateos.success
+
 rootDir=$(rootDir)
 
 echo "Installing php8.5 modules for laravel" | log
-packages=(zip unzip php8.5-pear libapache2-mod-php8.5 php8.5-ctype php8.5-curl php8.5-dom php8.5-fileinfo php8.5-mbstring php8.5-openssl php8.5-pdo php8.5-tokenizer php8.5-xml)
+packages=(zip unzip php8.5-pear php8.5-ctype php8.5-curl php8.5-dom php8.5-fileinfo php8.5-mbstring php8.5-openssl php8.5-pdo php8.5-tokenizer php8.5-xml)
 installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
@@ -17,7 +19,7 @@ echo "Installing composer" | log
 cd /var/www/
 curlDownload https://getcomposer.org/installer
 waitOrStop 0 "File not downloaded from official source"
-export COMPOSER_HOME="$HOME/.config/composer";
+export COMPOSER_HOME="$HOME/.config/composer"
 /usr/bin/php /var/www/installer >> /var/www/phpinstaller.txt
 mv composer.phar /usr/local/bin/composer
 chmod +x /usr/local/bin/composer
@@ -30,7 +32,7 @@ export DEBIAN_FRONTEND=noninteractive
 composer install
 sleep 5
 
-echo "adding SQL port to UFW" | log
+echo "Adding SQL port to UFW" | log
 ufw allow 3306
 
 echo "Granting Permissions" | log
@@ -40,7 +42,7 @@ chown -R www-data.www-data /var/www/laravel
 chmod -R 755 /var/www/laravel
 chmod -R 777 /var/www/laravel/storage
 
-echo "Generating ecryption key" | log
+echo "Generating encryption key" | log
 php artisan key:generate
 
 echo "Creating Laravel Database and User" | log
@@ -51,19 +53,49 @@ GRANT all privileges on laraveldb.* to laraveluser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
-echo "Setting enviroment and VirtualHost" | log
+echo "Setting environment and VirtualHost" | log
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/laravel/.env
 sed -i "s/ADMINPASS/${ADMINPASSWORD}/g" /var/www/laravel/.env
-unlink /etc/apache2/sites-enabled/000-default.conf
-unlink /etc/apache2/sites-enabled/default-ssl.conf
-cp $rootDir/tweaks/extras/laravel/laravel.conf /etc/apache2/sites-available/laravel.conf
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/laravel.conf
-ln -s /etc/apache2/sites-available/laravel.conf /etc/apache2/sites-enabled/
 
-echo "Enabling Laravel VirtualHost & Restarting Apache" | log
+cat << EOF > /etc/apache2/sites-available/laravel.conf
+<VirtualHost *:80>
+    ServerName ${CWM_DOMAIN}
+    Redirect permanent / https://${CWM_DOMAIN}/
+</VirtualHost>
+
+<IfModule mod_ssl.c>
+    <VirtualHost *:443>
+        ServerName ${CWM_DOMAIN}
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/laravel/public
+
+        SSLEngine on
+        SSLCertificateFile    /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
+        SSLCertificateKeyFile /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
+
+        <Directory /var/www/laravel/public>
+            Options FollowSymLinks
+            AllowOverride All
+            Require all granted
+        </Directory>
+
+        ErrorLog \${APACHE_LOG_DIR}/laravel-error.log
+        CustomLog \${APACHE_LOG_DIR}/laravel-access.log combined
+    </VirtualHost>
+</IfModule>
+EOF
+
+rm -f /etc/apache2/sites-enabled/000-default.conf
+rm -f /etc/apache2/sites-enabled/default-ssl.conf
+a2enmod ssl rewrite
 a2ensite laravel.conf
-a2enmod ssl
-service apache2 restart
+
+echo "Starting and enabling Apache" | log
+systemctl enable apache2
+systemctl start apache2
+apache2ctl configtest
+waitOrStop 0 "Apache config test failed"
+systemctl restart apache2
 waitOrStop 0 "Failed to restart Apache"
 
 echo "Adding descriptions" | log
@@ -73,6 +105,9 @@ descriptionAppend "Laravel Database User: laraveluser"
 descriptionAppend "Laravel Database Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
+tag apache2.success
+tag httpd.success
+tag laravel.success
 tagScript success
 
 exit 0
