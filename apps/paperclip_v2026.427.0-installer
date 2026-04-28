@@ -9,6 +9,7 @@ PAPERCLIP_VERSION="v2026.427.0"
 PAPERCLIP_USER="paperclip"
 PAPERCLIP_HOME="/opt/paperclip"
 PAPERCLIP_WORKDIR="/opt/paperclip"
+PAPERCLIP_PORT="3100"
 
 echo "Removing unsupported Nginx PPA if exists" | log
 add-apt-repository -r -y ppa:nginx/stable 2>/dev/null || true
