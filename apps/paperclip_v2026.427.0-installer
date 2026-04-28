@@ -93,8 +93,13 @@ echo "Using npx from ${NPX_PATH}" | log
 
 echo "Running Paperclip onboarding as paperclip user" | log
 cd "${PAPERCLIP_WORKDIR}"
-waitOrStop 0 "Failed to enter Paperclip working directory"
+waitOrStop $? "Failed to enter Paperclip working directory"
 
+sudo -u "${PAPERCLIP_USER}" env \
+  HOME="${PAPERCLIP_HOME}" \
+  npm_config_cache="${PAPERCLIP_HOME}/.npm" \
+  "${NPX_PATH}" -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes
+waitOrStop $? "Paperclip onboarding failed"
 
 echo "Fixing Paperclip directory ownership" | log
 chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
@@ -107,18 +112,21 @@ Description=Paperclip AI Orchestration Platform
 After=network-online.target
 Wants=network-online.target
 
+
 [Service]
 Type=simple
-User=${PAPERCLIP_USER}
-Group=${PAPERCLIP_USER}
-WorkingDirectory=${PAPERCLIP_WORKDIR}
-Environment=HOME=${PAPERCLIP_HOME}
+User=paperclip
+Group=paperclip
+WorkingDirectory=/opt/paperclip
+Environment=HOME=/opt/paperclip
 Environment=NODE_ENV=production
-ExecStart=${NPX_PATH} -y paperclipai@${PAPERCLIP_VERSION} run
+Environment=npm_config_cache=/opt/paperclip/.npm
+ExecStart=/usr/bin/npx -y paperclipai@v2026.427.0 run
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
+
 
 [Install]
 WantedBy=multi-user.target
