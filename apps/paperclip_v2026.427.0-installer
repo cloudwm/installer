@@ -18,8 +18,9 @@ rm -f /etc/apt/sources.list.d/*nginx*.sources
 
 echo "Updating apt package index" | log
 apt update
+useradd --system --create-home --home-dir /opt/paperclip --shell /usr/sbin/nologin paperclip || true
 mkdir -p "${PAPERCLIP_WORKDIR}"
-
+chown -R paperclip:paperclip /opt/paperclip
 
 echo "Removing old Node.js and npm packages" | log
 apt remove -y nodejs npm || true
@@ -72,7 +73,7 @@ waitOrStop 0 "Failed to create Paperclip working directory"
 
 
 echo "Creating Paperclip systemd service" | log
-cat >/etc/systemd/system/paperclip.service <<EOF
+cat >/etc/systemd/system/paperclip.service <<'EOF'
 [Unit]
 Description=Paperclip AI Orchestration Platform
 After=network-online.target
@@ -80,13 +81,16 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=${PAPERCLIP_USER}
-WorkingDirectory=${PAPERCLIP_WORKDIR}
-Environment=HOME=${PAPERCLIP_HOME}
+User=paperclip
+Group=paperclip
+WorkingDirectory=/opt/paperclip
+Environment=HOME=/opt/paperclip
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/npx -y paperclipai@${PAPERCLIP_VERSION} run
+ExecStart=/usr/bin/npx -y paperclipai@v2026.427.0 run
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
