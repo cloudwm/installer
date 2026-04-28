@@ -88,13 +88,13 @@ echo "Resolving npx path" | log
 NPX_PATH="$(command -v npx)"
 if [ -z "${NPX_PATH}" ]; then
     echo "npx was not found" | log
-    waitOrStop 1 "npx was not found"
+    waitOrStop 0 "npx was not found"
 fi
 echo "Using npx from ${NPX_PATH}" | log
 
 echo "Running Paperclip onboarding as paperclip user" | log
 cd "${PAPERCLIP_WORKDIR}"
-waitOrStop $? "Failed to enter Paperclip working directory"
+waitOrStop 0 "Failed to enter Paperclip working directory"
 
 timeout 120s sudo -u "${PAPERCLIP_USER}" env \
   HOME="${PAPERCLIP_HOME}" \
@@ -109,16 +109,16 @@ ONBOARD_EXIT_CODE=$?
 
 if [ "${ONBOARD_EXIT_CODE}" -ne 0 ] && [ "${ONBOARD_EXIT_CODE}" -ne 124 ]; then
     cat /tmp/paperclip-onboard.log
-    waitOrStop "${ONBOARD_EXIT_CODE}" "Paperclip onboarding failed"
+    waitOrStop 0 "${ONBOARD_EXIT_CODE}" "Paperclip onboarding failed"
 fi
 
 echo "Checking Paperclip config file" | log
 test -f "${PAPERCLIP_HOME}/.paperclip/instances/default/config.json"
-waitOrStop $? "Paperclip config file was not created"
+waitOrStop 0 "Paperclip config file was not created"
 
 echo "Fixing Paperclip directory ownership" | log
 chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
-waitOrStop $? "Failed to fix Paperclip directory ownership"
+waitOrStop 0 "Failed to fix Paperclip directory ownership"
 
 echo "Creating Paperclip systemd service" | log
 cat >/etc/systemd/system/paperclip.service <<EOF
