@@ -17,7 +17,8 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 waitOrStop 0 "Failed to configure Node.js 20 repository"
 
 echo "Installing Node.js and npm" | log
-apt install -y nodejs npm
+apt update
+apt install -y nodejs
 waitOrStop 0 "Failed to install Node.js and npm"
 
 echo "Checking Node.js installation" | log
