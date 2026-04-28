@@ -79,6 +79,10 @@ cat << EOF > /etc/apache2/sites-available/laravel.conf
             Require all granted
         </Directory>
 
+        <FilesMatch \.php\$>
+            SetHandler "proxy:fcgi://127.0.0.1:9000"
+        </FilesMatch>
+
         ErrorLog \${APACHE_LOG_DIR}/laravel-error.log
         CustomLog \${APACHE_LOG_DIR}/laravel-access.log combined
     </VirtualHost>
@@ -87,7 +91,7 @@ EOF
 
 rm -f /etc/apache2/sites-enabled/000-default.conf
 rm -f /etc/apache2/sites-enabled/default-ssl.conf
-a2enmod ssl rewrite
+a2enmod ssl rewrite actions fastcgi alias proxy_fcgi
 a2ensite laravel.conf
 
 echo "Starting and enabling Apache" | log
