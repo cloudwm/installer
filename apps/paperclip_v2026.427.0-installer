@@ -96,16 +96,29 @@ echo "Running Paperclip onboarding as paperclip user" | log
 cd "${PAPERCLIP_WORKDIR}"
 waitOrStop $? "Failed to enter Paperclip working directory"
 
-sudo -u "${PAPERCLIP_USER}" env \
+timeout 120s sudo -u "${PAPERCLIP_USER}" env \
   HOME="${PAPERCLIP_HOME}" \
   npm_config_cache="${PAPERCLIP_HOME}/.npm" \
+  npm_config_loglevel=error \
+  NO_COLOR=1 \
+  CI=1 \
   "${NPX_PATH}" -y "paperclipai@${PAPERCLIP_VERSION}" onboard --yes \
   > /tmp/paperclip-onboard.log 2>&1
-waitOrStop $? "Paperclip onboarding failed"
+
+ONBOARD_EXIT_CODE=$?
+
+if [ "${ONBOARD_EXIT_CODE}" -ne 0 ] && [ "${ONBOARD_EXIT_CODE}" -ne 124 ]; then
+    cat /tmp/paperclip-onboard.log
+    waitOrStop "${ONBOARD_EXIT_CODE}" "Paperclip onboarding failed"
+fi
+
+echo "Checking Paperclip config file" | log
+test -f "${PAPERCLIP_HOME}/.paperclip/instances/default/config.json"
+waitOrStop $? "Paperclip config file was not created"
 
 echo "Fixing Paperclip directory ownership" | log
 chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
-waitOrStop 0 "Failed to fix Paperclip directory ownership"
+waitOrStop $? "Failed to fix Paperclip directory ownership"
 
 echo "Creating Paperclip systemd service" | log
 cat >/etc/systemd/system/paperclip.service <<EOF
