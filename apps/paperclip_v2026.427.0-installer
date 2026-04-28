@@ -20,6 +20,7 @@ echo "Updating apt package index" | log
 apt update
 mkdir -p "${PAPERCLIP_WORKDIR}"
 
+
 echo "Removing old Node.js and npm packages" | log
 apt remove -y nodejs npm || true
 apt purge -y nodejs npm || true
@@ -30,41 +31,39 @@ rm -rf /usr/lib/node_modules/npm
 rm -rf /usr/lib/node_modules/.npm-*
 rm -rf /usr/local/lib/node_modules/npm
 rm -f /usr/bin/npm /usr/bin/npx
-rm -f /usr/bin/.npm-* /usr/bin/.npx-*
 rm -f /usr/local/bin/npm /usr/local/bin/npx
 rm -rf /root/.npm/_cacache
 
+echo "Removing old NodeSource repository files" | log
+rm -f /etc/apt/sources.list.d/nodesource.list
+rm -f /etc/apt/keyrings/nodesource.gpg
+
+echo "Installing NodeSource signing key" | log
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+  | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+
 echo "Configuring Node.js 22 repository" | log
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-waitOrStop 0 "Failed to configure Node.js 22 repository"
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+  > /etc/apt/sources.list.d/nodesource.list
 
 echo "Updating apt package index after NodeSource setup" | log
 apt update
-waitOrStop 0 "Failed to update apt package index after NodeSource setup"
 
 echo "Installing Node.js 22" | log
 apt install -y nodejs
-waitOrStop 0 "Failed to install Node.js 22"
 
 echo "Checking Node.js version" | log
 node -v
-waitOrStop 0 "Node.js command is not working"
 
 echo "Checking npm version" | log
 npm -v
-waitOrStop 0 "npm command is not working"
 
 echo "Checking npx version" | log
 npx -v
-waitOrStop 0 "npx command is not working"
 
 echo "Resolving npx path" | log
 NPX_PATH="$(command -v npx)"
-if [ -z "$NPX_PATH" ]; then
-    echo "npx was not found" | log
-    exit 1
-fi
-
 echo "Using npx from ${NPX_PATH}" | log
 
 echo "Creating Paperclip working directory" | log
