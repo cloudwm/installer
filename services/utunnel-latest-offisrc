@@ -1,0 +1,106 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+UTUNNEL_INSTALLER_URL="https://files.utunnel.io/production/deploy/install-accessgateway.sh"
+UTUNNEL_BIN=/utunnel/bin/utnservice
+
+echo "Installing UTunnel Access Gateway prerequisites" | log
+installPackage curl ca-certificates
+waitOrStop 0 "Failed apt install: curl ca-certificates"
+
+echo "Running upstream UTunnel installer" | log
+curl -fsSL "$UTUNNEL_INSTALLER_URL" | bash
+waitOrStop 0 "UTunnel installer (install-accessgateway.sh) failed"
+
+echo "Verifying utnservice is on disk" | log
+[ -x "$UTUNNEL_BIN" ] || { echo "Expected $UTUNNEL_BIN to exist and be executable after install" | log 1; exit 1; }
+
+echo "Opening UTunnel ports in UFW" | log
+# UTunnel Access Gateway listens on:
+#   TCP 443    OpenVPN-over-TCP
+#   UDP 443    OpenVPN-over-UDP
+#   UDP 53     OpenVPN-over-DNS
+#   UDP 500    IPsec IKE
+#   UDP 4500   IPsec NAT-T
+#   TCP 38081  Management (live sessions, firewall, site-to-site)
+ufw allow 443/tcp   | log
+ufw allow 443/udp   | log
+ufw allow 53/udp    | log
+ufw allow 500/udp   | log
+ufw allow 4500/udp  | log
+ufw allow 38081/tcp | log
+
+echo "Installing UTunnel MOTD fragment" | log
+# Dynamic MOTD: reads `utnservice status` at login time so registration state
+# is always current (registered vs pending), without needing to re-run any
+# installer step after the operator registers manually.
+cat > /etc/update-motd.d/99-utunnel <<'MOTD_EOF'
+#!/bin/sh
+UTN=/utunnel/bin/utnservice
+[ -x "$UTN" ] || exit 0
+
+ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
+STATUS_OUT=$("$UTN" status 2>/dev/null)
+if echo "$STATUS_OUT" | grep -qiE 'registered|active'; then
+    REG_STATE="Registered"
+    NEXT_STEP="    Manage at: https://app.utunnel.io/dashboard"
+else
+    REG_STATE="Pending registration"
+    NEXT_STEP="    1. Generate a token at https://app.utunnel.io (Servers > Add)
+    2. Run on this VM:
+         $UTN register YOUR_REG_TOKEN
+         $UTN start"
+fi
+
+cat <<EOM
+
+──────────────────────────────────────────────
+  UTunnel Access Gateway
+──────────────────────────────────────────────
+
+    Status:     $REG_STATE
+    Public IP:  $ADDR
+
+    Listening ports:
+      TCP 443    OpenVPN-over-TCP
+      UDP 443    OpenVPN-over-UDP
+      UDP 53     OpenVPN-over-DNS
+      UDP 500    IPsec IKE
+      UDP 4500   IPsec NAT-T
+      TCP 38081  Management
+
+  Next steps:
+$NEXT_STEP
+
+  CLI:
+    $UTN status
+    $UTN update
+    $UTN start | stop | restart
+
+  Remove this banner:
+    chmod -x /etc/update-motd.d/99-utunnel
+──────────────────────────────────────────────
+
+EOM
+MOTD_EOF
+chmod +x /etc/update-motd.d/99-utunnel
+
+echo "Adding descriptions" | log
+descriptionAppend "UTunnel Access Gateway installed"
+descriptionAppend "Admin dashboard: https://app.utunnel.io"
+descriptionAppend "Register on this VM: ${UTUNNEL_BIN} register <TOKEN>"
+descriptionAppend "Then start: ${UTUNNEL_BIN} start"
+descriptionAppend " "
+descriptionAppend "UTunnel CLI: ${UTUNNEL_BIN}"
+descriptionAppend "Listening ports: 443/tcp, 443/udp, 53/udp, 500/udp, 4500/udp, 38081/tcp"
+descriptionAppend " "
+
+tag utunnel.success
+tagScript success
+
+exit 0
