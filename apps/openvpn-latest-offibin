@@ -44,14 +44,26 @@ echo "Configuring certifications" | log
 service openvpnas stop
 ln -s -f /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /usr/local/openvpn_as/etc/web-ssl/server.crt
 ln -s -f /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem /usr/local/openvpn_as/etc/web-ssl/server.key
-service openvpnas start
+
+# Multiplex web UI onto the VPN's TCP 443 port via AS port-share. The web UI
+# binds to loopback only and AS forwards browser-looking TLS handshakes to it,
+# while OpenVPN-protocol handshakes stay on the VPN daemon.
+echo "Enabling port-share so the web UI is reachable on TCP 443" | log
+bash sacli --key vpn.server.port_share.enable --value true ConfigPut
+bash sacli --key vpn.server.port_share.service --value "admin+client" ConfigPut
+bash sacli --key vpn.server.port_share.port --value 943 ConfigPut
+bash sacli --key admin_ui.https.ip_address --value 127.0.0.1 ConfigPut
+bash sacli --key cs.https.ip_address --value 127.0.0.1 ConfigPut
+
+bash sacli start
+waitOrStop 0 "OpenVPN AS failed to apply port-share configuration"
 
 echo "Adding descriptions" | log
-descriptionAppend "OpenVPN Management Web UI: https://${CWM_DOMAIN}:943/admin"
+descriptionAppend "OpenVPN Management Web UI: https://${CWM_DOMAIN}/admin"
 descriptionAppend "OpenVPN Username: openvpn"
 descriptionAppend "OpenVPN Password: $ADMINPASSWORD"
 descriptionAppend " "
-descriptionAppend "OpenVPN Client Web UI: https://${CWM_DOMAIN}:943/"
+descriptionAppend "OpenVPN Client Web UI: https://${CWM_DOMAIN}/"
 descriptionAppend " "
 descriptionAppend "OpenVPN Install location: /usr/local/openvpn_as/"
 descriptionAppend "OpenVPN Command-line tools: /usr/local/openvpn_as/scripts"
