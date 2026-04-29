@@ -6,29 +6,49 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Installing main application" | log
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+[ -f "${LE_DIR}/fullchain.pem" ] || { echo "LE cert missing at ${LE_DIR}" | log 1; exit 1; }
+
 rootDir=$(rootDir)
 appPath=/etc/tomcat11
 assignedPort=9090
 
-apt install -y openjdk-17-jdk
-useradd -r -m -U -d /opt/tomcat -s /bin/false tomcat
-wget https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.9/bin/apache-tomcat-11.0.9.tar.gz
-tar -xzvf apache-tomcat-11.0.9.tar.gz
-mkdir $appPath
-mv apache-tomcat-11.0.9/* $appPath
-rm -f apache-tomcat-11.0.9.tar.gz apache-tomcat-11.0.9
-./$appPath/bin/startup.sh 
+echo "Installing main application" | log
 
-echo "Removing default configs" | log 
+installPackage openjdk-17-jdk
+waitOrStop 0 "Failed apt install: openjdk-17-jdk"
+
+useradd -r -m -U -d /opt/tomcat -s /bin/false tomcat
+
+# Discover the latest Tomcat 11.x version from dlcdn rather than pinning to one
+# that Apache will eventually rotate to archive.apache.org.
+echo "Discovering latest Tomcat 11.x release on dlcdn" | log
+TOMCAT_VERSION=$(curl -sf https://dlcdn.apache.org/tomcat/tomcat-11/ \
+    | grep -oE 'v11\.[0-9]+\.[0-9]+' | sort -uV | tail -1 | sed 's/^v//')
+[ -n "$TOMCAT_VERSION" ] || { echo "Could not discover Tomcat 11 version" | log 1; exit 1; }
+echo "Installing Tomcat ${TOMCAT_VERSION}" | log
+
+cd $rootDir/temp
+TARBALL="apache-tomcat-${TOMCAT_VERSION}.tar.gz"
+wget -q "https://dlcdn.apache.org/tomcat/tomcat-11/v${TOMCAT_VERSION}/bin/${TARBALL}"
+waitOrStop 0 "Failed to download ${TARBALL}"
+
+tar -xzf "${TARBALL}"
+waitOrStop 0 "Failed to extract ${TARBALL}"
+
+mkdir -p $appPath
+mv "apache-tomcat-${TOMCAT_VERSION}"/* $appPath/
+rm -rf "${TARBALL}" "apache-tomcat-${TOMCAT_VERSION}"
+
+echo "Removing default configs" | log
 rm -f $appPath/conf/tomcat-users.xml
 rm -f $appPath/webapps/host-manager/WEB-INF/manager.xml
 
 echo "Setting prebuilt configs" | log
 cp $rootDir/tweaks/extras/tomcat11-nginx/tomcat-users.xml $appPath/conf/tomcat-users.xml
 cp $rootDir/tweaks/extras/tomcat11-nginx/manager.xml $appPath/webapps/host-manager/WEB-INF/manager.xml
-sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/conf/tomcat-users.xml 
-sed -i 's/Connector port="8080"/Connector port="'${assignedPort}'"/g' $appPath/conf/server.xml 
+sed -i "s/password=\"password\"/password=\"${ADMINPASSWORD}\"/g" $appPath/conf/tomcat-users.xml
+sed -i 's/Connector port="8080"/Connector port="'${assignedPort}'"/g' $appPath/conf/server.xml
 
 echo "Setting up Tomcat as a systemd service" | log
 cat << EOF > /etc/systemd/system/tomcat.service
@@ -51,7 +71,6 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-# Set permissions
 echo "Setting Tomcat permissions" | log
 chown -R tomcat:tomcat $appPath
 chmod -R 755 $appPath
@@ -63,27 +82,57 @@ waitOrStop 0 "Enable tomcat service failed"
 systemctl start tomcat
 waitOrStop 0 "Start tomcat service failed"
 
-echo "Setting nginx configuration" | log
-nginxConfigPath=/etc/nginx/sites-available
-# copy readymade config to nginx sites
-cp -f $rootDir/tweaks/extras/tomcat11-nginx/tomcat.conf $nginxConfigPath/
-# place chosen port in config
-sed -i '/server/s/PORT_PLACEHOLDER/'"${assignedPort}"'/g' $nginxConfigPath/tomcat.conf
-ln -s $nginxConfigPath/tomcat.conf /etc/nginx/sites-enabled/
-unlink /etc/nginx/sites-enabled/default
-unlink /etc/nginx/sites-enabled/default-ssl
-service nginx reload
-waitOrStop 0 "Reload nginx service failed"
+echo "Writing Tomcat nginx vhost" | log
+cat << EOF > /etc/nginx/sites-available/tomcat
+upstream tomcat {
+    server 127.0.0.1:${assignedPort} fail_timeout=0;
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    location / {
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Server \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect http:// https://;
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_pass http://tomcat;
+    }
+}
+EOF
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/tomcat /etc/nginx/sites-enabled/tomcat
+nginx -t
+waitOrStop 0 "nginx config test failed"
+systemctl start nginx
+waitOrStop 0 "nginx did not start"
 
 echo "Adding descriptions" | log
-descriptionAppend "Apache Tomcat11 Web UI: https://${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "Apache Tomcat11 Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Apache Tomcat11 Username: admin"
 descriptionAppend "Apache Tomcat11 Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Apache Tomcat11 config files location: ${appPath}"
+descriptionAppend "Apache Tomcat11 version installed: ${TOMCAT_VERSION}"
 descriptionAppend " "
 
 tagScript success
 
 exit 0
-
