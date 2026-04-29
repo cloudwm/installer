@@ -55,8 +55,8 @@ bash sacli --key vpn.server.port_share.port --value 943 ConfigPut
 bash sacli --key admin_ui.https.ip_address --value 127.0.0.1 ConfigPut
 bash sacli --key cs.https.ip_address --value 127.0.0.1 ConfigPut
 
-bash sacli start
-waitOrStop 0 "OpenVPN AS failed to apply port-share configuration"
+service openvpnas start
+waitOrStop 0 "OpenVPN AS failed to start after port-share configuration"
 
 echo "Adding descriptions" | log
 descriptionAppend "OpenVPN Management Web UI: https://${CWM_DOMAIN}/admin"
