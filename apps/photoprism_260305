@@ -1,0 +1,141 @@
+#!/bin/bash
+
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+MAX_RETRIES=3
+SLEEP_TIME=5
+success=false
+PHOTOPRISM_VERSION="260305-fad9d5395-linux-amd64"
+
+apt update
+apt dist-upgrade -y
+apt install -y ffmpeg exiftool darktable libpng-dev libjpeg-dev libtiff-dev libvips imagemagick
+apt install -y mariadb-server
+
+echo "Create Nginx file" | log
+
+tee /etc/nginx/sites-available/photoprism > /dev/null <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass http://127.0.0.1:2342;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+EOF
+
+echo "Start Nginx service" | log 
+ln -s /etc/nginx/sites-available/photoprism /etc/nginx/sites-enabled/photoprism
+rm -f /etc/nginx/sites-enabled/default
+systemctl reload nginx
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+
+echo "Download and extract PhotoPrism version ${PHOTOPRISM_VERSION}" | log
+wget "https://dl.photoprism.app/pkg/linux/photoprism_${PHOTOPRISM_VERSION}.tar.gz"
+mkdir -p /opt/photoprism
+tar xzf "photoprism_${PHOTOPRISM_VERSION}.tar.gz" -C /opt/photoprism/
+rm -f "photoprism_${PHOTOPRISM_VERSION}.tar.gz"
+echo "Add user photoprism to ubuntu" | log
+useradd --system photoprism
+mkdir /var/lib/photoprism
+chown -R photoprism:photoprism /var/lib/photoprism /opt/photoprism
+cd /var/lib/photoprism
+
+
+echo "Create .env file" | log
+cat <<EOF > .env
+PHOTOPRISM_AUTH_MODE="password"
+PHOTOPRISM_ADMIN_PASSWORD="${ADMINPASSWORD}"
+
+# PhotoPrism storage directories
+PHOTOPRISM_STORAGE_PATH="/var/lib/photoprism"
+PHOTOPRISM_ORIGINALS_PATH="/var/lib/photoprism/photos/Originals"
+PHOTOPRISM_IMPORT_PATH="/var/lib/photoprism/photos/Import"
+
+EOF
+chown photoprism:photoprism .env
+chmod 640 .env
+
+
+echo "Create photoprism service file" | log
+cat <<EOF > /etc/systemd/system/photoprism.service
+[Unit]
+Description=PhotoPrism service
+After=network.target
+
+[Service]
+Type=forking
+User=photoprism
+Group=photoprism
+WorkingDirectory=/opt/photoprism
+EnvironmentFile=/var/lib/photoprism/.env
+ExecStart=/opt/photoprism/bin/photoprism up -d
+ExecStop=/opt/photoprism/bin/photoprism down
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Run photoprism service" | log
+systemctl daemon-reload
+systemctl enable --now photoprism
+waitOrStop 0 "PhotoPrism service not ready"
+
+
+
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    curl -fsS http://127.0.0.1/ > /dev/null
+    if [ $? -eq 0 ]; then
+        success=true
+        break
+    fi
+
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0
+
+
+
+echo "Adding descriptions" | log
+descriptionAppend "Succesfully installed."
+descriptionAppend "Service: PhotoPrism"
+descriptionAppend "Photoprism Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Photoprism Username: admin"
+descriptionAppend "Photoprism Password: ${ADMINPASSWORD}"
+descriptionAppend "Nginx config file /etc/nginx/sites-enabled/photoprism"
