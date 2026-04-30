@@ -38,6 +38,10 @@ echo "Downloading Appwrite configuration files" | log
 curl -fsSL -o docker-compose.yml "https://raw.githubusercontent.com/appwrite/appwrite/${APPWRITE_VERSION}/docker-compose.yml"
 curl -fsSL -o .env "https://raw.githubusercontent.com/appwrite/appwrite/${APPWRITE_VERSION}/.env"
 
+# The compose file ships with `image: appwrite-dev` (a local dev build).
+# Swap it for the published production image.
+sed -i "s|image: appwrite-dev|image: appwrite/appwrite:${APPWRITE_VERSION}|g" docker-compose.yml
+
 # Generate a random secret key
 APPWRITE_SECRET=$(openssl rand -hex 32)
 
