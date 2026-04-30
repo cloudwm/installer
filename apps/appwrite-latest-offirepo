@@ -6,6 +6,8 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+APPWRITE_VERSION="1.9.0"
+
 echo "Installing Docker and Docker Compose" | log
 export DEBIAN_FRONTEND="noninteractive"
 
@@ -33,8 +35,8 @@ cd /opt/appwrite
 echo "Downloading Appwrite configuration files" | log
 
 # Download docker-compose.yml and .env template
-curl -o docker-compose.yml https://appwrite.io/install/compose
-curl -o .env https://appwrite.io/install/env
+curl -fsSL -o docker-compose.yml "https://raw.githubusercontent.com/appwrite/appwrite/${APPWRITE_VERSION}/docker-compose.yml"
+curl -fsSL -o .env "https://raw.githubusercontent.com/appwrite/appwrite/${APPWRITE_VERSION}/.env"
 
 # Generate a random secret key
 APPWRITE_SECRET=$(openssl rand -hex 32)
