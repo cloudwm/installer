@@ -66,6 +66,7 @@ else
 fi
 
 echo "Starting Appwrite services" | log
+sed -i '/\/usr\/src\/code\/app/d;/\/usr\/src\/code\/src/d' docker-compose.yml
 docker compose up -d --remove-orphans
 waitOrStop 0 "Failed to start Appwrite services"
 
