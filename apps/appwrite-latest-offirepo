@@ -26,6 +26,10 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 # Add current user to docker group
 sudo usermod -aG docker $USER
 
+# Make sure the docker daemon is up before we try to run containers.
+sudo systemctl enable --now docker
+waitOrStop 0 "Failed to start docker daemon"
+
 sleep 5
 
 echo "Setting up Appwrite installation directory" | log
@@ -44,7 +48,7 @@ sudo docker run --rm \
     --http-port=80 \
     --https-port=443 \
     --interactive=N \
-    --no-start
+    --no-start 2>&1 | log
 waitOrStop 0 "Failed to generate Appwrite installation files"
 
 # Generate a random encryption key
