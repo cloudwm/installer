@@ -9,6 +9,16 @@ fi
 UTUNNEL_INSTALLER_URL="https://files.utunnel.io/production/deploy/install-accessgateway.sh"
 UTUNNEL_BIN=/utunnel/bin/utnservice
 
+# UTunnel Access Gateway is supported only on Ubuntu LTS releases (24.04 today;
+# 26.04, 28.04, etc. when the vendor adds support). The upstream installer
+# enforces a hard `grep "Ubuntu 24.04"` today — when that grep gets broadened
+# upstream, this preflight will already accept the new version.
+ubuntuVersion=$(lsb_release -sr 2>/dev/null)
+if ! [[ "$ubuntuVersion" =~ ^(2[4-9]|[3-9][0-9])\.04$ ]]; then
+    echo "UTunnel Access Gateway requires Ubuntu 24.04 LTS or newer; detected ${ubuntuVersion:-unknown}" | log 1
+    exit 1
+fi
+
 echo "Installing UTunnel Access Gateway prerequisites" | log
 installPackage curl ca-certificates
 waitOrStop 0 "Failed apt install: curl ca-certificates"
