@@ -32,37 +32,33 @@ echo "Setting up Appwrite installation directory" | log
 sudo mkdir -p /opt/appwrite
 cd /opt/appwrite
 
-echo "Downloading Appwrite configuration files" | log
+echo "Generating Appwrite production config via official installer" | log
 
-# Download docker-compose.yml and .env template
-curl -fsSL -o docker-compose.yml "https://raw.githubusercontent.com/appwrite/appwrite/${APPWRITE_VERSION}/docker-compose.yml"
-curl -fsSL -o .env "https://raw.githubusercontent.com/appwrite/appwrite/${APPWRITE_VERSION}/.env"
+# Run Appwrite's official installer to render a production docker-compose.yml + .env
+# into /opt/appwrite. --no-start lets us tweak before we bring services up.
+sudo docker run --rm \
+    --volume /var/run/docker.sock:/var/run/docker.sock \
+    --volume /opt/appwrite:/usr/src/code/appwrite:rw \
+    --entrypoint="install" \
+    appwrite/appwrite:${APPWRITE_VERSION} \
+    --http-port=80 \
+    --https-port=443 \
+    --interactive=N \
+    --no-start
+waitOrStop 0 "Failed to generate Appwrite installation files"
 
-# The compose file ships with `image: appwrite-dev` (a local dev build).
-# Swap it for the published production image.
-sed -i "s|image: appwrite-dev|image: appwrite/appwrite:${APPWRITE_VERSION}|g" docker-compose.yml
-
-# Generate a random secret key
+# Generate a random encryption key
 APPWRITE_SECRET=$(openssl rand -hex 32)
 
 echo "Configuring Appwrite environment" | log
 
-# Update .env file with custom configurations
 if [ -f ".env" ]; then
-    echo "Updating Appwrite configuration with domain settings" | log
+    sed -i "s|^_APP_DOMAIN=.*|_APP_DOMAIN=${CWM_DOMAIN}|" .env
+    sed -i "s|^_APP_DOMAIN_TARGET_CNAME=.*|_APP_DOMAIN_TARGET_CNAME=${CWM_DOMAIN}|" .env
+    sed -i "s|^_APP_OPENSSL_KEY_V1=.*|_APP_OPENSSL_KEY_V1=${APPWRITE_SECRET}|" .env
 
-    # Update the environment file with our settings
-    sed -i "s|_APP_DOMAIN=.*|_APP_DOMAIN=${CWM_DOMAIN}|g" .env
-    sed -i "s|_APP_DOMAIN_TARGET=.*|_APP_DOMAIN_TARGET=${CWM_DOMAIN}|g" .env
-    sed -i "s|_APP_SYSTEM_SECURITY_MASTER_KEY=.*|_APP_SYSTEM_SECURITY_MASTER_KEY=${APPWRITE_SECRET}|g" .env
-
-    # Set HTTP and HTTPS ports
-    sed -i "s|_APP_PORT_HTTP=.*|_APP_PORT_HTTP=80|g" .env
-    sed -i "s|_APP_PORT_HTTPS=.*|_APP_PORT_HTTPS=443|g" .env
-
-    # Enable HTTPS if domain is provided
     if [ ! -z "$CWM_DOMAIN" ]; then
-        sed -i "s|_APP_OPTIONS_FORCE_HTTPS=.*|_APP_OPTIONS_FORCE_HTTPS=enabled|g" .env
+        sed -i "s|^_APP_OPTIONS_FORCE_HTTPS=.*|_APP_OPTIONS_FORCE_HTTPS=enabled|" .env
     fi
 else
     echo "Error: .env file not found" | log
