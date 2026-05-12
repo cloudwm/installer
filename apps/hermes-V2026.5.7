@@ -93,8 +93,13 @@ cd "${HERMES_INSTALL_DIR}"
 waitOrStop 0 "Failed to create venv. See ${HERMES_LOG}"
 
 echo "Installing Hermes Python dependencies (this can take several minutes)" | log
-VIRTUAL_ENV="${HERMES_INSTALL_DIR}/venv" "${UV_BIN}" pip install -e '.[all]' >> "${HERMES_LOG}" 2>&1
-waitOrStop 0 "Failed to install Hermes dependencies. See ${HERMES_LOG}"
+# Mirror the official install.sh strategy: try [all] first, fall back to base
+# install if dep resolution fails (e.g. mistralai/matrix wheel issues).
+if ! VIRTUAL_ENV="${HERMES_INSTALL_DIR}/venv" "${UV_BIN}" pip install -e '.[all]' >> "${HERMES_LOG}" 2>&1; then
+    echo "Full install (.[all]) failed, falling back to base install (no extras)" | log
+    VIRTUAL_ENV="${HERMES_INSTALL_DIR}/venv" "${UV_BIN}" pip install -e . >> "${HERMES_LOG}" 2>&1
+    waitOrStop 0 "Hermes base install failed. See ${HERMES_LOG}"
+fi
 
 if [ ! -x "${HERMES_INSTALL_DIR}/venv/bin/hermes" ]; then
     echo "Hermes entry point missing at ${HERMES_INSTALL_DIR}/venv/bin/hermes. See ${HERMES_LOG}" | log
@@ -137,6 +142,11 @@ descriptionAppend ""
 descriptionAppend "Add or configure extensions / tools (skills):"
 descriptionAppend "  hermes tools            # Enable / disable available tools"
 descriptionAppend "  Skills directory: ${HERMES_HOME}/skills/   # Drop custom skills here"
+descriptionAppend ""
+descriptionAppend "Install optional integrations (extras) afterwards (one at a time):"
+descriptionAppend "  cd ${HERMES_INSTALL_DIR} && /root/.local/bin/uv pip install -e '.[messaging]'"
+descriptionAppend "  Available extras: messaging, cron, mcp, slack, matrix, voice, tts-premium,"
+descriptionAppend "  bedrock, mistral, google, web, sms, homeassistant, dingtalk, feishu, acp"
 descriptionAppend ""
 descriptionAppend "Other useful commands:"
 descriptionAppend "  hermes config edit      # Open ${HERMES_HOME}/.env in editor"
