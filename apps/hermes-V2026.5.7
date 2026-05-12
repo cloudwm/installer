@@ -1,0 +1,54 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+HERMES_VERSION="v2026.5.7"
+
+echo "Cleaning apt cache" | log
+apt clean
+waitOrStop 0 "Failed to clean apt cache"
+
+echo "Removing apt lists" | log
+rm -rf /var/lib/apt/lists/*
+waitOrStop 0 "Failed to remove apt lists"
+
+echo "Updating apt package index" | log
+apt update
+waitOrStop 0 "Failed to update apt package index"
+
+echo "Installing required dependencies" | log
+apt install -y curl ca-certificates
+waitOrStop 0 "Failed to install required dependencies"
+
+echo "Downloading and installing Hermes ${HERMES_VERSION} (skip-setup)" | log
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh \
+    | bash -s -- --skip-setup --branch ${HERMES_VERSION}
+waitOrStop 0 "Failed to install Hermes"
+
+descriptionAppend "Successfully installed."
+descriptionAppend "Service: Hermes"
+descriptionAppend "Version: ${HERMES_VERSION}"
+descriptionAppend "Installed without running setup (--skip-setup)."
+descriptionAppend ""
+descriptionAppend "To finish setup, SSH into the server and run:"
+descriptionAppend "  hermes setup            # Full interactive setup wizard"
+descriptionAppend ""
+descriptionAppend "Add or change a model:"
+descriptionAppend "  hermes model            # Choose LLM provider and model"
+descriptionAppend "  hermes config set <key>=<value>   # Set individual values (e.g. API keys)"
+descriptionAppend ""
+descriptionAppend "Add or configure extensions / tools (skills):"
+descriptionAppend "  hermes tools            # Enable / disable available tools"
+descriptionAppend "  Skills directory: ~/.hermes/skills/   # Drop custom skills here"
+descriptionAppend ""
+descriptionAppend "Other useful commands:"
+descriptionAppend "  hermes config edit      # Open ~/.hermes/.env in editor"
+descriptionAppend "  hermes doctor           # Diagnose configuration issues"
+descriptionAppend "  hermes gateway setup    # Configure messaging gateway (WhatsApp, etc.)"
+descriptionAppend "  hermes update           # Update Hermes to the latest version"
+
+exit 0
