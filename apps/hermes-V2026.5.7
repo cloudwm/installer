@@ -20,13 +20,10 @@ echo "Updating apt package index" | log
 apt update
 waitOrStop 0 "Failed to update apt package index"
 
-echo "Installing required dependencies" | log
-apt install -y curl ca-certificates
-waitOrStop 0 "Failed to install required dependencies"
 
 echo "Downloading and installing Hermes ${HERMES_VERSION} (skip-setup)" | log
 curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh \
-    | bash -s -- --skip-setup --branch ${HERMES_VERSION}
+    | bash -s -- --skip-setup --branch "${HERMES_VERSION}"
 waitOrStop 0 "Failed to install Hermes"
 
 descriptionAppend "Successfully installed."
