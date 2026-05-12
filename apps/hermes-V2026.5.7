@@ -7,6 +7,16 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 HERMES_VERSION="v2026.5.7"
+HERMES_REPO="https://github.com/NousResearch/hermes-agent.git"
+HERMES_INSTALL_DIR="/usr/local/lib/hermes-agent"
+HERMES_HOME="/root/.hermes"
+HERMES_LAUNCHER="/usr/local/bin/hermes"
+HERMES_LOG="/tmp/hermes-install.log"
+
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export HOME=/root
+export HERMES_HOME
 
 echo "Cleaning apt cache" | log
 apt clean
@@ -20,15 +30,101 @@ echo "Updating apt package index" | log
 apt update
 waitOrStop 0 "Failed to update apt package index"
 
+echo "Installing build prerequisites for Hermes" | log
+apt install -y \
+    curl ca-certificates gnupg sudo git \
+    python3 python3-venv python3-dev python3-pip \
+    build-essential libffi-dev libssl-dev pkg-config \
+    ripgrep ffmpeg
+waitOrStop 0 "Failed to install Hermes build prerequisites"
 
-echo "Downloading and installing Hermes ${HERMES_VERSION} (skip-setup)" | log
-curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh \
-    | bash -s -- --skip-setup --branch "${HERMES_VERSION}"
-waitOrStop 0 "Failed to install Hermes"
+echo "Removing old Node.js packages" | log
+apt remove -y nodejs npm || true
+apt purge -y nodejs npm || true
+apt autoremove -y || true
+rm -f /etc/apt/sources.list.d/nodesource.list
+rm -f /etc/apt/keyrings/nodesource.gpg
+
+echo "Installing NodeSource signing key" | log
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+    | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+waitOrStop 0 "Failed to install NodeSource signing key"
+
+echo "Configuring Node.js 22 repository" | log
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+    > /etc/apt/sources.list.d/nodesource.list
+waitOrStop 0 "Failed to configure Node.js 22 repository"
+
+echo "Installing Node.js 22" | log
+apt update
+apt install -y nodejs
+waitOrStop 0 "Failed to install Node.js 22"
+
+echo "Installing uv (Python package manager)" | log
+curl -LsSf https://astral.sh/uv/install.sh | sh > "${HERMES_LOG}" 2>&1
+waitOrStop 0 "Failed to install uv. See ${HERMES_LOG}"
+
+UV_BIN=""
+for candidate in /root/.local/bin/uv /root/.cargo/bin/uv "$(command -v uv 2>/dev/null)"; do
+    if [ -n "${candidate}" ] && [ -x "${candidate}" ]; then
+        UV_BIN="${candidate}"
+        break
+    fi
+done
+if [ -z "${UV_BIN}" ]; then
+    echo "uv binary not found after install. See ${HERMES_LOG}" | log
+    waitOrStop 0 "uv binary not found after install"
+fi
+echo "Using uv at ${UV_BIN}" | log
+
+echo "Preparing Hermes data directory ${HERMES_HOME}" | log
+mkdir -p "${HERMES_HOME}"
+waitOrStop 0 "Failed to create Hermes data directory"
+
+echo "Cloning Hermes ${HERMES_VERSION} into ${HERMES_INSTALL_DIR}" | log
+rm -rf "${HERMES_INSTALL_DIR}"
+git clone --depth 1 --branch "${HERMES_VERSION}" "${HERMES_REPO}" "${HERMES_INSTALL_DIR}"
+waitOrStop 0 "Failed to clone Hermes ${HERMES_VERSION}"
+
+echo "Creating Python virtual environment via uv" | log
+cd "${HERMES_INSTALL_DIR}"
+"${UV_BIN}" venv --python 3.11 venv >> "${HERMES_LOG}" 2>&1
+waitOrStop 0 "Failed to create venv. See ${HERMES_LOG}"
+
+echo "Installing Hermes Python dependencies (this can take several minutes)" | log
+VIRTUAL_ENV="${HERMES_INSTALL_DIR}/venv" "${UV_BIN}" pip install -e '.[all]' >> "${HERMES_LOG}" 2>&1
+waitOrStop 0 "Failed to install Hermes dependencies. See ${HERMES_LOG}"
+
+if [ ! -x "${HERMES_INSTALL_DIR}/venv/bin/hermes" ]; then
+    echo "Hermes entry point missing at ${HERMES_INSTALL_DIR}/venv/bin/hermes. See ${HERMES_LOG}" | log
+    waitOrStop 0 "Hermes entry point missing after pip install"
+fi
+
+echo "Installing hermes launcher at ${HERMES_LAUNCHER}" | log
+cat > "${HERMES_LAUNCHER}" <<EOF
+#!/usr/bin/env bash
+unset PYTHONPATH
+unset PYTHONHOME
+export HERMES_HOME="${HERMES_HOME}"
+exec "${HERMES_INSTALL_DIR}/venv/bin/hermes" "\$@"
+EOF
+chmod +x "${HERMES_LAUNCHER}"
+waitOrStop 0 "Failed to install hermes launcher"
+
+echo "Verifying hermes command" | log
+"${HERMES_LAUNCHER}" --help >> "${HERMES_LOG}" 2>&1
+waitOrStop 0 "hermes command did not run successfully. See ${HERMES_LOG}"
+
+echo "Hermes ${HERMES_VERSION} installed successfully" | log
 
 descriptionAppend "Successfully installed."
-descriptionAppend "Service: Hermes"
+descriptionAppend "Service: Hermes Agent"
 descriptionAppend "Version: ${HERMES_VERSION}"
+descriptionAppend "Code: ${HERMES_INSTALL_DIR}"
+descriptionAppend "Data / config: ${HERMES_HOME}"
+descriptionAppend "Command: ${HERMES_LAUNCHER}"
+descriptionAppend "Install log: ${HERMES_LOG}"
 descriptionAppend "Installed without running setup (--skip-setup)."
 descriptionAppend ""
 descriptionAppend "To finish setup, SSH into the server and run:"
@@ -40,10 +136,10 @@ descriptionAppend "  hermes config set <key>=<value>   # Set individual values (
 descriptionAppend ""
 descriptionAppend "Add or configure extensions / tools (skills):"
 descriptionAppend "  hermes tools            # Enable / disable available tools"
-descriptionAppend "  Skills directory: ~/.hermes/skills/   # Drop custom skills here"
+descriptionAppend "  Skills directory: ${HERMES_HOME}/skills/   # Drop custom skills here"
 descriptionAppend ""
 descriptionAppend "Other useful commands:"
-descriptionAppend "  hermes config edit      # Open ~/.hermes/.env in editor"
+descriptionAppend "  hermes config edit      # Open ${HERMES_HOME}/.env in editor"
 descriptionAppend "  hermes doctor           # Diagnose configuration issues"
 descriptionAppend "  hermes gateway setup    # Configure messaging gateway (WhatsApp, etc.)"
 descriptionAppend "  hermes update           # Update Hermes to the latest version"
