@@ -47,7 +47,7 @@ export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]'
 export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
 echo "  imageid: $imageID" >> $rootDir/guest.yaml 
 echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
-microk8s kubectl apply -f $rootDir/guest.yaml
+micr ok8s kubectl apply -f $rootDir/guest.yaml
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
@@ -64,6 +64,7 @@ git clone -b "${ADDONS_BRANCH}" \
 waitOrStop 0 "Failed to clone microk8s addons repository"
 
 microk8s addons repo remove core-fork || true
+microk8s addons repo remove core || true
 
 microk8s addons repo add core-fork "${ADDONS_DIR}"
 
@@ -110,7 +111,7 @@ export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Cloning dashboard repository" | log
 cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git
-waitOrStop 0 "Reload haproxy service failed"
+waitOrStop 0 "Clone k8s-dashboard repository failed"
 
 echo "Downloading helm dependencies" | log
 cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
