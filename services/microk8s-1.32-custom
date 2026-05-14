@@ -6,6 +6,9 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
+ADDONS_DIR="/opt/microk8s-addons/microk8s-core-addons"
+ADDONS_REPO="https://github.com/cloudwm/microk8s-core-addons.git"
+ADDONS_BRANCH="hay-refactor"
 
 checkTagExist ubuntu-updateos.success
 
@@ -48,9 +51,24 @@ microk8s kubectl apply -f $rootDir/guest.yaml
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
-microk8s addons repo remove core
-microk8s addons repo add core-fork https://github.com/cloudwm/microk8s-core-addons.git@Hay-microk8s-refactor
+
+
+mkdir -p /opt/microk8s-addons
+
+rm -rf "${ADDONS_DIR}"
+
+git clone -b "${ADDONS_BRANCH}" \
+  "${ADDONS_REPO}" \
+  "${ADDONS_DIR}"
+
+waitOrStop 0 "Failed to clone microk8s addons repository"
+
+microk8s addons repo remove core-fork || true
+
+microk8s addons repo add core-fork "${ADDONS_DIR}"
+
 waitOrStop 0 "Repository addition failed"
+
 
 echo "Generating admin-user and login token" | log
 cat << EOF > $rootDir/user.yaml
