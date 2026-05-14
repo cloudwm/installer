@@ -47,7 +47,7 @@ export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]'
 export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
 echo "  imageid: $imageID" >> $rootDir/guest.yaml 
 echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
-micr ok8s kubectl apply -f $rootDir/guest.yaml
+microk8s kubectl apply -f $rootDir/guest.yaml
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
