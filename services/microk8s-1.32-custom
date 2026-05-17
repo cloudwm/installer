@@ -126,6 +126,29 @@ echo "Installing dashboard helm chart" | log
 sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
 sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
 
+echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
+cat <<'EOF' | microk8s kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-web-ingress
+  namespace: kube-system
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  ingressClassName: internal-nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard-kubernetes-dashboard-web
+                port:
+                  number: 8000
+EOF
+
 microk8s helm install dashboard . --namespace kube-system
 waitOrStop 0 "Dashboard install failed"
 
