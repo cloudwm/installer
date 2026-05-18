@@ -170,10 +170,10 @@ microk8s kubectl delete secret dashboard-tls -n kube-system
 
 microk8s kubectl create secret tls dashboard-tls \
   -n kube-system \
-  --cert=/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
-  --key=/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
+  --cert="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
+  --key="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
 
-tee /tmp/dashboard-web-ingress.yaml <<'EOF'
+tee /tmp/dashboard-web-ingress.yaml <<EOF
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -185,10 +185,10 @@ spec:
   ingressClassName: internal-nginx
   tls:
     - hosts:
-        - $CWM_DOMAIN
+        - ${CWM_DOMAIN}
       secretName: dashboard-tls
   rules:
-    - host: $CWM_DOMAIN
+    - host: ${CWM_DOMAIN}
       http:
         paths:
           - path: /api
@@ -207,6 +207,7 @@ spec:
                   number: 8000
 EOF
 
+microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml
 echo "Applying dashboard ingress (with retry on webhook readiness)" | log
 for attempt in 1 2 3 4 5 6; do
   microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml 2>&1 | tee /tmp/dashboard-ingress-apply.log | log
