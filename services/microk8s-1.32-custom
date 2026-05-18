@@ -6,17 +6,17 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-ADDONS_DIR="/opt/microk8s-addons/microk8s-core-addons"
-ADDONS_REPO="https://github.com/cloudwm/microk8s-core-addons.git"
-ADDONS_BRANCH="hay-refactor"
 
+echo "Checking ubuntu-updateos.success tag" | log
 checkTagExist ubuntu-updateos.success
 
+echo "Setting root directory" | log
 rootDir=$(rootDir)
 
-echo "Purging old snapd and installing snapd + jq" | log
+echo "Purging existing snapd" | log
 # fix for snap
 apt purge snapd -y
+echo "Installing snapd and jq packages" | log
 apt install snapd jq -y
 waitOrStop 0 "snap install failed"
 
@@ -35,72 +35,34 @@ type: Opaque
 data:
 EOF
 
-echo "Copying guest.conf and encoding values into guest.yaml" | log
+echo "Copying guest.conf to root directory" | log
 cp /root/guest.conf $rootDir/guest.conf
 
-cat $rootDir/guest.conf | awk -F  '=' ' {cmd="printf %s "$2" | base64 -w 0";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
+echo "Encoding guest.conf values into guest.yaml" | log
+cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
+echo "Exporting API credentials from guest.conf" | log
 export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
 export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
 export apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`
 export apiZone=`cat $rootDir/guest.conf | grep 'zone=' | cut -d '=' -f 2`
-echo "Authenticating against provider API" | log
-export apiToken=`curl -k -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication`
-
-if [ -z "$apiToken" ] || [ "$apiToken" = "null" ]; then
-    echo "ERROR: provider API authentication failed (empty token) for url '$apiUrl'" | log
-    exit 1
-fi
-
-echo "Fetching server metadata from provider API" | log
-curl -k -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}"
-
-if [ ! -s "$rootDir/server.json" ]; then
-    echo "ERROR: server.json was not written or is empty (provider API fetch failed)" | log
-    exit 1
-fi
-export imageIDRaw=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id'`
-export trafficPackageRaw=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name'`
-
-if [ -z "$imageIDRaw" ] || [ "$imageIDRaw" = "null" ]; then
-    echo "ERROR: imageID lookup returned empty for zone '$apiZone' (ubuntu_server_24.04_64-bit)" | log
-    exit 1
-fi
-if [ -z "$trafficPackageRaw" ] || [ "$trafficPackageRaw" = "null" ]; then
-    echo "ERROR: trafficPackage lookup returned empty for zone '$apiZone'" | log
-    exit 1
-fi
-
-export imageID=`printf %s "$imageIDRaw" | base64 -w 0`
-export trafficPackage=`printf %s "$trafficPackageRaw" | base64 -w 0`
+echo "Authenticating against API to retrieve token" | log
+export apiToken=`curl -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication`
+echo "Fetching server.json from API" | log
+curl -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}"
+echo "Extracting imageID and trafficPackage from server.json" | log
+export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
+export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
+echo "Appending imageid and trafficpackage to guest.yaml" | log
 echo "  imageid: $imageID" >> $rootDir/guest.yaml
 echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
-
-echo "Applying provider secret to kube-system namespace" | log
+echo "Applying provider secret to cluster" | log
 microk8s kubectl apply -f $rootDir/guest.yaml
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
-
-
-mkdir -p /opt/microk8s-addons
-
-echo "Cloning microk8s addons repository (${ADDONS_BRANCH})" | log
-rm -rf "${ADDONS_DIR}"
-
-git clone -b "${ADDONS_BRANCH}" \
-  "${ADDONS_REPO}" \
-  "${ADDONS_DIR}"
-
-waitOrStop 0 "Failed to clone microk8s addons repository"
-
-echo "Replacing default microk8s addons repo with core-fork" | log
-microk8s addons repo remove core-fork || true
-microk8s addons repo remove core || true
-
-microk8s addons repo add core-fork "${ADDONS_DIR}"
-
+microk8s addons repo remove core
+microk8s addons repo add core-fork https://github.com/cloudwm/microk8s-core-addons.git
 waitOrStop 0 "Repository addition failed"
-
 
 echo "Generating admin-user and login token" | log
 cat << EOF > $rootDir/user.yaml
@@ -138,12 +100,13 @@ echo "Applying admin-user yaml to cluster" | log
 microk8s kubectl apply -f $rootDir/user.yaml
 waitOrStop 0 "Unable to apply admin-user yaml"
 
+echo "Resolving server IP and CWM domain" | log
 export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
 export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Cloning dashboard repository" | log
-cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b hay-refactor
-waitOrStop 0 "Clone k8s-dashboard repository failed"
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git
+waitOrStop 0 "Reload haproxy service failed"
 
 echo "Downloading helm dependencies" | log
 cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
@@ -154,13 +117,16 @@ microk8s helm repo add kong https://charts.konghq.com
 microk8s helm dependency build
 waitOrStop 0 "dependency build failed"
 
-echo "Patching dashboard values.yaml with domain and server IP" | log
+echo "Patching values.yaml with domain and server IP" | log
 sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
 sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
 
 echo "Installing dashboard helm chart" | log
 microk8s helm install dashboard . --namespace kube-system
 waitOrStop 0 "Dashboard install failed"
+
+echo "Retrieving admin-user token" | log
+export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
 
 echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
 cat <<'EOF' | microk8s kubectl apply -f -
@@ -186,10 +152,6 @@ spec:
 EOF
 waitOrStop 0 "Dashboard ingress apply failed"
 
-echo "Retrieving admin-user token from cluster" | log
-export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
-
-
 echo "Adding descriptions" | log
 descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
 descriptionAppend " "
@@ -199,4 +161,5 @@ descriptionAppend " "
 echo "Tagging script as success" | log
 tagScript success
 
+echo "Exiting microk8s-1.32-custom script" | log
 exit 0
