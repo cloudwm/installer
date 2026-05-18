@@ -140,7 +140,8 @@ echo "Retrieving admin-user token" | log
 export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
 
 echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
-cat <<'EOF' | microk8s kubectl apply -f -
+
+microk8s kubectl apply -f - <<'EOF'
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -161,6 +162,7 @@ spec:
                 port:
                   number: 8000
 EOF
+
 waitOrStop 0 "Dashboard ingress apply failed"
 
 echo "Adding descriptions" | log
