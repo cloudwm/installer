@@ -21,7 +21,7 @@ apt install snapd jq -y
 waitOrStop 0 "snap install failed"
 
 echo "Installing microk8s snap" | log
-snap install microk8s --classic --channel=1.32
+snap install microk8s --classic --channel=1.33
 waitOrStop 0 "snap install failed"
 
 echo "Generating Provider Secret" | log
@@ -120,7 +120,7 @@ export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
 export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Cloning dashboard repository" | log
-cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b hay-refactor
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git
 waitOrStop 0 "Clone k8s-dashboard repository failed"
 
 echo "Downloading helm dependencies" | log
@@ -136,33 +136,7 @@ echo "Patching dashboard values.yaml with domain and server IP" | log
 sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
 sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
 
-<<<<<<< HEAD
-echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
-cat <<'EOF' | microk8s kubectl apply -f -
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: dashboard-web-ingress
-  namespace: kube-system
-  annotations:
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-spec:
-  ingressClassName: internal-nginx
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: dashboard-kubernetes-dashboard-web
-                port:
-                  number: 8000
-EOF
-
-=======
 echo "Installing dashboard helm chart" | log
->>>>>>> aba77004 (add version to microk8s)
 microk8s helm install dashboard . --namespace kube-system
 waitOrStop 0 "Dashboard install failed"
 
