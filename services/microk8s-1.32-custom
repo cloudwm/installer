@@ -173,64 +173,17 @@ microk8s kubectl create secret tls dashboard-tls \
   --cert="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
   --key="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
 
-tee /tmp/dashboard-web-ingress.yaml <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: dashboard-web-ingress
-  namespace: kube-system
-  annotations:
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-spec:
-  ingressClassName: internal-nginx
-  tls:
-    - hosts:
-        - ${CWM_DOMAIN}
-      secretName: dashboard-tls
-  rules:
-    - host: ${CWM_DOMAIN}
-      http:
-        paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: dashboard-kubernetes-dashboard-api
-                port:
-                  number: 8000
-          - path: /auth
-            pathType: Prefix
-            backend:
-              service:
-                name: dashboard-kubernetes-dashboard-auth
-                port:
-                  number: 8000
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: dashboard-kubernetes-dashboard-web
-                port:
-                  number: 8000
-EOF
+microk8s kubectl patch ingress kubernetes-dashboard -n kube-system \
+  --type='json' \
+  -p="[
+    {\"op\":\"replace\",\"path\":\"/spec/tls/0/hosts/0\",\"value\":\"${CWM_DOMAIN}\"},
+    {\"op\":\"replace\",\"path\":\"/spec/tls/0/secretName\",\"value\":\"dashboard-tls\"},
+    {\"op\":\"replace\",\"path\":\"/spec/rules/0/host\",\"value\":\"${CWM_DOMAIN}\"}
+  ]"
 
-microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml
 
-microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml
-echo "Applying dashboard ingress (with retry on webhook readiness)" | log
-for attempt in 1 2 3 4 5 6; do
-  microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml 2>&1 | tee /tmp/dashboard-ingress-apply.log | log
-  apply_rc=${PIPESTATUS[0]}
-  if [ "$apply_rc" -eq 0 ]; then
-    break
-  fi
-  echo "Dashboard ingress apply attempt ${attempt} failed (rc=${apply_rc}), retrying in 10s..." | log
-  sleep 10
-done
-[ "$apply_rc" -eq 0 ]
-waitOrStop 0 "Dashboard ingress apply failed"
 
-microk8s kubectl get ingress dashboard-web-ingress -n kube-system
+microk8s kubectl get ingress kubernetes-dashboard -n kube-system
 waitOrStop 0 "Dashboard ingress was not created"
 #------------+
 
