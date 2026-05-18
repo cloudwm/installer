@@ -38,7 +38,7 @@ EOF
 echo "Copying guest.conf and encoding values into guest.yaml" | log
 cp /root/guest.conf $rootDir/guest.conf
 
-cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
+cat $rootDir/guest.conf | awk -F  '=' ' {cmd="printf %s "$2" | base64 -w 0";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
 export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
 export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
 export apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`
@@ -48,8 +48,20 @@ export apiToken=`curl -X POST --url "https://${apiUrl}/service/authenticate" -H 
 
 echo "Fetching server metadata from provider API" | log
 curl -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}"
-export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
-export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
+export imageIDRaw=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id'`
+export trafficPackageRaw=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name'`
+
+if [ -z "$imageIDRaw" ] || [ "$imageIDRaw" = "null" ]; then
+    echo "ERROR: imageID lookup returned empty for zone '$apiZone' (ubuntu_server_24.04_64-bit)" | log
+    exit 1
+fi
+if [ -z "$trafficPackageRaw" ] || [ "$trafficPackageRaw" = "null" ]; then
+    echo "ERROR: trafficPackage lookup returned empty for zone '$apiZone'" | log
+    exit 1
+fi
+
+export imageID=`printf %s "$imageIDRaw" | base64 -w 0`
+export trafficPackage=`printf %s "$trafficPackageRaw" | base64 -w 0`
 echo "  imageid: $imageID" >> $rootDir/guest.yaml
 echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
 
@@ -136,7 +148,10 @@ echo "Patching dashboard values.yaml with domain and server IP" | log
 sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
 sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
 
-<<<<<<< HEAD
+echo "Installing dashboard helm chart" | log
+microk8s helm install dashboard . --namespace kube-system
+waitOrStop 0 "Dashboard install failed"
+
 echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
 cat <<'EOF' | microk8s kubectl apply -f -
 apiVersion: networking.k8s.io/v1
@@ -159,12 +174,7 @@ spec:
                 port:
                   number: 8000
 EOF
-
-=======
-echo "Installing dashboard helm chart" | log
->>>>>>> aba77004 (add version to microk8s)
-microk8s helm install dashboard . --namespace kube-system
-waitOrStop 0 "Dashboard install failed"
+waitOrStop 0 "Dashboard ingress apply failed"
 
 echo "Retrieving admin-user token from cluster" | log
 export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
