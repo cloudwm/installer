@@ -56,7 +56,15 @@ echo "Appending imageid and trafficpackage to guest.yaml" | log
 echo "  imageid: $imageID" >> $rootDir/guest.yaml
 echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
 echo "Applying provider secret to cluster" | log
-microk8s kubectl apply -f $rootDir/guest.yaml
+echo "Waiting for MicroK8s API to be ready" | log
+microk8s status --wait-ready
+
+until microk8s kubectl get nodes >/dev/null 2>&1; do
+  echo "Waiting for Kubernetes API..." | log
+  sleep 5
+done
+echo "Applying provider secret to cluster" | log
+microk8s kubectl apply -f "$rootDir/guest.yaml"
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
