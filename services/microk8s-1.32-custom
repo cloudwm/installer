@@ -141,7 +141,24 @@ export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o json
 
 echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
 
-microk8s kubectl apply -f - <<'EOF'
+#-------------
+echo "Waiting for Kubernetes API before creating dashboard ingress" | log
+microk8s status --wait-ready
+
+until microk8s kubectl get nodes >/dev/null 2>&1; do
+  echo "Waiting for Kubernetes API..." | log
+  sleep 5
+done
+
+echo "Waiting for dashboard web service" | log
+until microk8s kubectl get svc dashboard-kubernetes-dashboard-web -n kube-system >/dev/null 2>&1; do
+  echo "Waiting for dashboard-kubernetes-dashboard-web service..." | log
+  sleep 5
+done
+
+echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
+
+cat > /tmp/dashboard-web-ingress.yaml <<'EOF'
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -163,7 +180,12 @@ spec:
                   number: 8000
 EOF
 
+microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml 2>&1 | tee /tmp/dashboard-ingress-apply.log
 waitOrStop 0 "Dashboard ingress apply failed"
+
+microk8s kubectl get ingress dashboard-web-ingress -n kube-system
+waitOrStop 0 "Dashboard ingress was not created"
+#------------+
 
 echo "Adding descriptions" | log
 descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
