@@ -156,9 +156,18 @@ until microk8s kubectl get svc dashboard-kubernetes-dashboard-web -n kube-system
   sleep 5
 done
 
+echo "Waiting for internal-nginx IngressClass" | log
+until microk8s kubectl get ingressclass internal-nginx >/dev/null 2>&1; do
+  echo "Waiting for internal-nginx IngressClass..." | log
+  sleep 5
+done
+
+echo "Waiting for ingress-nginx controller to become Ready" | log
+microk8s kubectl rollout status deployment/dashboard-nginx-controller -n kube-system --timeout=300s
+
 echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
 
-cat > /tmp/dashboard-web-ingress.yaml <<'EOF'
+tee /tmp/dashboard-web-ingress.yaml <<'EOF' | log
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -180,7 +189,17 @@ spec:
                   number: 8000
 EOF
 
-microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml 2>&1 | tee /tmp/dashboard-ingress-apply.log
+echo "Applying dashboard ingress (with retry on webhook readiness)" | log
+for attempt in 1 2 3 4 5 6; do
+  microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml 2>&1 | tee /tmp/dashboard-ingress-apply.log | log
+  apply_rc=${PIPESTATUS[0]}
+  if [ "$apply_rc" -eq 0 ]; then
+    break
+  fi
+  echo "Dashboard ingress apply attempt ${attempt} failed (rc=${apply_rc}), retrying in 10s..." | log
+  sleep 10
+done
+[ "$apply_rc" -eq 0 ]
 waitOrStop 0 "Dashboard ingress apply failed"
 
 microk8s kubectl get ingress dashboard-web-ingress -n kube-system
