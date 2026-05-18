@@ -68,9 +68,12 @@ microk8s kubectl apply -f "$rootDir/guest.yaml"
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
-microk8s addons repo remove core
-microk8s addons repo add core-fork https://github.com/cloudwm/microk8s-core-addons.git -b  hay-refactor
-waitOrStop 0 "Repository addition failed"
+microk8s addons repo remove core-fork || true
+
+microk8s addons repo add core-fork \
+  https://github.com/cloudwm/microk8s-core-addons.git \
+  --reference hay-refactor
+  waitOrStop 0 "Repository addition failed"
 
 echo "Generating admin-user and login token" | log
 cat << EOF > $rootDir/user.yaml
