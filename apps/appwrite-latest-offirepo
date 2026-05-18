@@ -6,6 +6,11 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+if [ -z "$CWM_DOMAIN" ]; then
+    echo "Error: CWM_DOMAIN is empty. Appwrite requires a real hostname for the platform domain check; without it the Console returns 401 (general_access_forbidden)." | log 1
+    exit 1
+fi
+
 echo "Installing Docker and Docker Compose" | log
 export DEBIAN_FRONTEND="noninteractive"
 
@@ -52,9 +57,30 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-if [ -n "$CWM_DOMAIN" ]; then
-    echo "Enabling forced HTTPS for ${CWM_DOMAIN}" | log
-    sed -i "s|_APP_OPTIONS_FORCE_HTTPS=.*|_APP_OPTIONS_FORCE_HTTPS=enabled|g" .env
+# The platform-hostname allowlist in app/config/platform.php is built from
+# _APP_DOMAIN and _APP_CONSOLE_DOMAIN. Defaults are "localhost", so any other
+# Host header is rejected with HTTP 401 general_access_forbidden ("Router
+# protection does not allow accessing Appwrite over this domain"). The
+# installer container's -e _APP_DOMAIN sets _APP_DOMAIN but not
+# _APP_CONSOLE_DOMAIN, so we set both here from CWM_DOMAIN.
+echo "Setting platform hostnames to ${CWM_DOMAIN}" | log
+sed -i "s|^_APP_DOMAIN=.*|_APP_DOMAIN=${CWM_DOMAIN}|" .env
+# _APP_CONSOLE_DOMAIN isn't in the installer-generated .env by default, so a
+# plain sed would no-op. Replace if present, append if not.
+if grep -q '^_APP_CONSOLE_DOMAIN=' .env; then
+    sed -i "s|^_APP_CONSOLE_DOMAIN=.*|_APP_CONSOLE_DOMAIN=${CWM_DOMAIN}|" .env
+else
+    echo "_APP_CONSOLE_DOMAIN=${CWM_DOMAIN}" >> .env
+fi
+sed -i "s|^_APP_OPTIONS_FORCE_HTTPS=.*|_APP_OPTIONS_FORCE_HTTPS=enabled|" .env
+
+# Upstream's mongodb service is the only one without a restart policy (every
+# other appwrite-* container ships restart: unless-stopped). Its custom
+# entrypoint can self-terminate after replica-set init in some races, leaving
+# the whole stack DB-less with no recovery. Inject the policy here.
+if ! grep -qE '^    restart:' <(sed -n '/^  mongodb:/,/^  [a-z]/p' docker-compose.yml); then
+    echo "Adding restart: unless-stopped to mongodb service" | log
+    sed -i '/^  mongodb:$/a\    restart: unless-stopped' docker-compose.yml
 fi
 
 echo "Starting Appwrite services" | log
@@ -88,6 +114,9 @@ descriptionAppend "Security Note:"
 descriptionAppend "- Anyone can create the first user, so set it up immediately"
 descriptionAppend "- After setup, consider disabling public registration in .env:"
 descriptionAppend "  _APP_CONSOLE_WHITELIST_ROOT=disabled"
+descriptionAppend "- TLS cert for ${CWM_DOMAIN} is issued automatically by Appwrite's"
+descriptionAppend "  certificates worker on first HTTPS request. May take 1-2 minutes."
+descriptionAppend "  If HTTPS doesn't work, check: docker logs appwrite-worker-certificates"
 descriptionAppend " "
 descriptionAppend "To manage Appwrite:"
 descriptionAppend "  Start: cd /opt/appwrite/appwrite && docker compose start"
