@@ -166,8 +166,14 @@ echo "Waiting for ingress-nginx controller to become Ready" | log
 microk8s kubectl rollout status deployment/dashboard-nginx-controller -n kube-system --timeout=300s
 
 echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
+microk8s kubectl delete secret dashboard-tls -n kube-system
 
-tee /tmp/dashboard-web-ingress.yaml <<'EOF' | log
+microk8s kubectl create secret tls dashboard-tls \
+  -n kube-system \
+  --cert=/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
+  --key=/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
+
+tee /tmp/dashboard-web-ingress.yaml <<'EOF'
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -177,9 +183,21 @@ metadata:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
 spec:
   ingressClassName: internal-nginx
+  tls:
+    - hosts:
+        - $CWM_DOMAIN
+      secretName: dashboard-tls
   rules:
-    - http:
+    - host: $CWM_DOMAIN
+      http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard-kubernetes-dashboard-api
+                port:
+                  number: 8000
           - path: /
             pathType: Prefix
             backend:
