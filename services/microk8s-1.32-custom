@@ -198,6 +198,13 @@ spec:
                 name: dashboard-kubernetes-dashboard-api
                 port:
                   number: 8000
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard-kubernetes-dashboard-auth
+                port:
+                  number: 8000
           - path: /
             pathType: Prefix
             backend:
@@ -206,6 +213,8 @@ spec:
                 port:
                   number: 8000
 EOF
+
+microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml
 
 microk8s kubectl apply -f /tmp/dashboard-web-ingress.yaml
 echo "Applying dashboard ingress (with retry on webhook readiness)" | log
