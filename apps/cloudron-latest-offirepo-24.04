@@ -51,9 +51,15 @@ descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Open the URL in your browser and complete the setup wizard."
 descriptionAppend "Cloudron issues its own Let's Encrypt cert after the wizard."
 
-echo "Cleaning up..." | log
-apt-get autoremove -y
-apt-get autoclean -y
+# Intentionally NOT running `apt-get autoremove` here. Cloudron's install
+# pulls in linux-image-generic, which on Ubuntu 24.04 marks the previously
+# running kernel (e.g. linux-image-6.8.0-106-generic) as auto-installed.
+# A subsequent `apt-get autoremove` purges that kernel, and dpkg's kernel
+# postremoval hooks trigger a reboot. That reboot kills cloudinit before
+# its final `poweroff`, so CWM never sees the VM stop and marks the
+# provisioning as failed even though the install succeeded.
+# cloudron-setup already ran its own autoremove --purge -y earlier in
+# the run, so there's nothing left for us to clean up here anyway.
 
 tagScript success
 exit 0
