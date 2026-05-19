@@ -2,62 +2,20 @@
 
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
-    
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-updateAndFinalize() {
-    local rootDir="$1"
-    local CWM_DOMAIN="$2"
+set -o pipefail
 
-    # Target directories and files
-    local html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
-	local setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
-    local js_target_dir="/home/yellowtent/box/dashboard/dist/js"
-    local js_target="${js_target_dir}/setupdns.js"
+if [ -z "$CWM_DOMAIN" ]; then
+    echo "Error: CWM_DOMAIN is empty. Cloudron's setup wizard needs a real hostname pointing at this VM." | log 1
+    exit 1
+fi
 
-    # Check every if the directories and files exist
-    while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
-        sleep 2
-    done
-
-    # Perform operations once the directories exist
-    echo "Cloud-Ron Directories found. Performing operations..." | log
-
-    # Replace placeholders in HTML and JS files
-	sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
-    sed -i "s/example.com/${CWM_DOMAIN}/g" "$html_target"
-    sed -i "s/example.com/${CWM_DOMAIN}/g" "$js_target"
-
-    echo "Setup DNS files have been updated." | log
-	
-	# Touchups
-	bash tweaks/motd-description-append
-	bash tweaks/cwm-description-autoconfig
-	
-	echo "Adding descriptions" | log
-	descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
-	descriptionAppend "SSL will be configured after the first step."
-	
-	# Cleanup
-	echo "Cleaning up..." | log
-	apt-get autoremove -y
-	apt-get autoclean -y
-	
-	tagScript success
-	exit 0
-}
-
-#clear
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
-
-# Run the Cloudron setup and tee the output to both stdout and the log file
-if [ ! -f "$LOG_PATH" ]; then
-	touch "$LOG_PATH"
-fi
 
 echo "Enabling and starting cron service..." | log
 systemctl enable cron
@@ -67,31 +25,32 @@ ubuntu_version=$(lsb_release -rs)
 if [[ "$ubuntu_version" == "24.04" ]]; then
     echo "Adding shutdown cron job to root's crontab for Ubuntu 24..." | log
     CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
-    (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
+    (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
     echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
-
 else
     echo "This is not Ubuntu 24. Shutdown cron job will not be added." | log
 fi
 
-# Wait for App dir and replace files
-echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
-updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
-
 echo "Running CloudRon setup..." | log
-declare -a pre_display_list=()
-echo Y | bash cloudron-setup | while IFS= read -r line; do
-    # Check if the line contains "=>"
-    if [[ "$line" == *"=>"* ]]; then
-        # Process each line that contains "=>"
-        line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
-        pre_display_list+=("$line")
-        #"$updateStatus" "$HTML_PATH" -cp
-        
-        for stage in "${pre_display_list[@]}"; do
-            # Clean and append dots to the output
-            cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
-            final_stage="${cleaned_stage}..."
-        done
-    fi
-done
+# cloudron-setup writes its detailed log to /var/log/cloudron-setup.log; stdout
+# is a sparse progress stream. Pipe through tee so both go to the installer
+# log, and rely on set -o pipefail so a non-zero exit from cloudron-setup is
+# preserved despite the pipe.
+if ! echo Y | bash cloudron-setup 2>&1 | tee -a "${CWM_LOGDIR:-/root}/cloudron-setup.stdout.log" | log; then
+    rc=$?
+    echo "cloudron-setup failed with exit $rc. Last 40 lines of /var/log/cloudron-setup.log:" | log 1
+    tail -n 40 /var/log/cloudron-setup.log 2>&1 | log 1
+    exit 1
+fi
+
+echo "Adding descriptions" | log
+descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Open the URL in your browser and complete the setup wizard."
+descriptionAppend "Cloudron issues its own Let's Encrypt cert after the wizard."
+
+echo "Cleaning up..." | log
+apt-get autoremove -y
+apt-get autoclean -y
+
+tagScript success
+exit 0
