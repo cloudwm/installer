@@ -31,6 +31,21 @@ else
     echo "This is not Ubuntu 24. Shutdown cron job will not be added." | log
 fi
 
+# Cloudron's setup wizard POSTs /api/v1/provision/detect_ip on every page load
+# of /setup.html, which calls https://ipv6.api.cloudron.io (AAAA-only host).
+# On VMs without a default IPv6 route the TCP SYN hangs for the full 30s
+# superagent timeout, making the wizard appear blank for ~30s on first load.
+# If this VM has no public IPv6, install one ip6tables OUTPUT REJECT rule so
+# the call fails in ms instead of seconds. Skipped if a default v6 route
+# exists, so dual-stack VMs keep working unchanged.
+if ! ip -6 route show default 2>/dev/null | grep -q .; then
+    echo "No default IPv6 route detected; rejecting outbound TCP/IPv6 to speed up Cloudron setup wizard" | log
+    installPackage iptables-persistent
+    ip6tables -C OUTPUT -p tcp -j REJECT --reject-with adm-prohibited 2>/dev/null \
+        || ip6tables -I OUTPUT -p tcp -j REJECT --reject-with adm-prohibited
+    netfilter-persistent save 2>&1 | log
+fi
+
 echo "Running CloudRon setup..." | log
 # cloudron-setup writes its detailed log to /var/log/cloudron-setup.log; stdout
 # is a sparse progress stream. Pipe through tee so both go to the installer
