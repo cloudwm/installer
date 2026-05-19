@@ -6,22 +6,22 @@ if [ -f "include/startup.sh" ]; then
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
-ADDONS_DIR="/opt/microk8s-addons/microk8s-core-addons"
-ADDONS_REPO="https://github.com/cloudwm/microk8s-core-addons.git"
-ADDONS_BRANCH="hay-refactor"
 
+echo "Checking ubuntu-updateos.success tag" | log
 checkTagExist ubuntu-updateos.success
 
+echo "Setting root directory" | log
 rootDir=$(rootDir)
 
-echo "Purging old snapd and installing snapd + jq" | log
+echo "Purging existing snapd" | log
 # fix for snap
 apt purge snapd -y
+echo "Installing snapd and jq packages" | log
 apt install snapd jq -y
 waitOrStop 0 "snap install failed"
 
 echo "Installing microk8s snap" | log
-snap install microk8s --classic --channel=1.33
+snap install microk8s --classic --channel=1.34
 waitOrStop 0 "snap install failed"
 
 echo "Generating Provider Secret" | log
@@ -35,50 +35,45 @@ type: Opaque
 data:
 EOF
 
-echo "Copying guest.conf and encoding values into guest.yaml" | log
+echo "Copying guest.conf to root directory" | log
 cp /root/guest.conf $rootDir/guest.conf
 
+echo "Encoding guest.conf values into guest.yaml" | log
 cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
+echo "Exporting API credentials from guest.conf" | log
 export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
 export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
 export apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`
 export apiZone=`cat $rootDir/guest.conf | grep 'zone=' | cut -d '=' -f 2`
-echo "Authenticating against provider API" | log
+echo "Authenticating against API to retrieve token" | log
 export apiToken=`curl -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication`
-
-echo "Fetching server metadata from provider API" | log
+echo "Fetching server.json from API" | log
 curl -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}"
+echo "Extracting imageID and trafficPackage from server.json" | log
 export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
 export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
+echo "Appending imageid and trafficpackage to guest.yaml" | log
 echo "  imageid: $imageID" >> $rootDir/guest.yaml
 echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
+echo "Applying provider secret to cluster" | log
+echo "Waiting for MicroK8s API to be ready" | log
+microk8s status --wait-ready
 
-echo "Applying provider secret to kube-system namespace" | log
-microk8s kubectl apply -f $rootDir/guest.yaml
+until microk8s kubectl get nodes >/dev/null 2>&1; do
+  echo "Waiting for Kubernetes API..." | log
+  sleep 5
+done
+echo "Applying provider secret to cluster" | log
+microk8s kubectl apply -f "$rootDir/guest.yaml"
 waitOrStop 0 "Unable to apply provider secret"
 
 echo "Modifying microk8s repository" | log
-
-
-mkdir -p /opt/microk8s-addons
-
-echo "Cloning microk8s addons repository (${ADDONS_BRANCH})" | log
-rm -rf "${ADDONS_DIR}"
-
-git clone -b "${ADDONS_BRANCH}" \
-  "${ADDONS_REPO}" \
-  "${ADDONS_DIR}"
-
-waitOrStop 0 "Failed to clone microk8s addons repository"
-
-echo "Replacing default microk8s addons repo with core-fork" | log
 microk8s addons repo remove core-fork || true
-microk8s addons repo remove core || true
 
-microk8s addons repo add core-fork "${ADDONS_DIR}"
-
-waitOrStop 0 "Repository addition failed"
-
+microk8s addons repo add core-fork \
+  https://github.com/cloudwm/microk8s-core-addons.git \
+  --reference hay-refactor
+  waitOrStop 0 "Repository addition failed"
 
 echo "Generating admin-user and login token" | log
 cat << EOF > $rootDir/user.yaml
@@ -116,12 +111,12 @@ echo "Applying admin-user yaml to cluster" | log
 microk8s kubectl apply -f $rootDir/user.yaml
 waitOrStop 0 "Unable to apply admin-user yaml"
 
+echo "Resolving server IP and CWM domain" | log
 export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
-export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Cloning dashboard repository" | log
-cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git
-waitOrStop 0 "Clone k8s-dashboard repository failed"
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b  hay-refactor
+waitOrStop 0 "Reload haproxy service failed"
 
 echo "Downloading helm dependencies" | log
 cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
@@ -132,7 +127,7 @@ microk8s helm repo add kong https://charts.konghq.com
 microk8s helm dependency build
 waitOrStop 0 "dependency build failed"
 
-echo "Patching dashboard values.yaml with domain and server IP" | log
+echo "Patching values.yaml with domain and server IP" | log
 sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
 sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
 
@@ -140,9 +135,70 @@ echo "Installing dashboard helm chart" | log
 microk8s helm install dashboard . --namespace kube-system
 waitOrStop 0 "Dashboard install failed"
 
-echo "Retrieving admin-user token from cluster" | log
+echo "Retrieving admin-user token" | log
 export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
 
+echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
+
+#-------------
+echo "Waiting for Kubernetes API before creating dashboard ingress" | log
+microk8s status --wait-ready
+
+until microk8s kubectl get nodes >/dev/null 2>&1; do
+  echo "Waiting for Kubernetes API..." | log
+  sleep 5
+done
+
+echo "Waiting for dashboard web service" | log
+until microk8s kubectl get svc dashboard-kubernetes-dashboard-web -n kube-system >/dev/null 2>&1; do
+  echo "Waiting for dashboard-kubernetes-dashboard-web service..." | log
+  sleep 5
+done
+
+echo "Waiting for internal-nginx IngressClass" | log
+until microk8s kubectl get ingressclass internal-nginx >/dev/null 2>&1; do
+  echo "Waiting for internal-nginx IngressClass..." | log
+  sleep 5
+done
+
+echo "Waiting for ingress-nginx controller to become Ready" | log
+microk8s kubectl rollout status deployment/dashboard-nginx-controller -n kube-system --timeout=300s
+
+echo "Waiting for Let's Encrypt certificate files for ${CWM_DOMAIN}" | log
+CERT_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+KEY_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+until [ -s "$CERT_PATH" ] && [ -s "$KEY_PATH" ]; do
+  echo "Waiting for certificate files at /etc/letsencrypt/live/${CWM_DOMAIN}/..." | log
+  sleep 5
+done
+
+echo "Creating/updating dashboard-tls secret from Let's Encrypt certificate" | log
+microk8s kubectl create secret tls dashboard-tls \
+  -n kube-system \
+  --cert="$CERT_PATH" \
+  --key="$KEY_PATH" \
+  --dry-run=client -o yaml | microk8s kubectl apply -f -
+waitOrStop 0 "Failed to create/update dashboard-tls secret"
+
+echo "Waiting for kubernetes-dashboard ingress to exist" | log
+until microk8s kubectl get ingress kubernetes-dashboard -n kube-system >/dev/null 2>&1; do
+  echo "Waiting for kubernetes-dashboard ingress..." | log
+  sleep 5
+done
+
+echo "Patching kubernetes-dashboard ingress with domain and TLS secret" | log
+microk8s kubectl patch ingress kubernetes-dashboard -n kube-system \
+  --type='json' \
+  -p="[
+    {\"op\":\"replace\",\"path\":\"/spec/tls/0/hosts/0\",\"value\":\"${CWM_DOMAIN}\"},
+    {\"op\":\"replace\",\"path\":\"/spec/tls/0/secretName\",\"value\":\"dashboard-tls\"},
+    {\"op\":\"replace\",\"path\":\"/spec/rules/0/host\",\"value\":\"${CWM_DOMAIN}\"}
+  ]"
+waitOrStop 0 "Failed to patch dashboard ingress"
+
+microk8s kubectl get ingress kubernetes-dashboard -n kube-system
+waitOrStop 0 "Dashboard ingress was not created"
+#------------+
 
 echo "Adding descriptions" | log
 descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
@@ -153,4 +209,5 @@ descriptionAppend " "
 echo "Tagging script as success" | log
 tagScript success
 
+echo "Exiting microk8s-1.32-custom script" | log
 exit 0
