@@ -115,7 +115,7 @@ echo "Resolving server IP and CWM domain" | log
 export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
 
 echo "Cloning dashboard repository" | log
-cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b  upgrade-iamges
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b  hay-refactor
 waitOrStop 0 "Reload haproxy service failed"
 
 echo "Downloading helm dependencies" | log
