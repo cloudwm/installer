@@ -21,16 +21,6 @@ echo "Enabling and starting cron service..." | log
 systemctl enable cron
 systemctl start cron
 
-ubuntu_version=$(lsb_release -rs)
-if [[ "$ubuntu_version" == "24.04" ]]; then
-    echo "Adding shutdown cron job to root's crontab for Ubuntu 24..." | log
-    CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
-    (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-    echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
-else
-    echo "This is not Ubuntu 24. Shutdown cron job will not be added." | log
-fi
-
 # Cloudron's setup wizard POSTs /api/v1/provision/detect_ip on every page load
 # of /setup.html, which calls https://ipv6.api.cloudron.io (AAAA-only host).
 # On VMs without a default IPv6 route the TCP SYN hangs for the full 30s
@@ -46,12 +36,10 @@ if ! ip -6 route show default 2>/dev/null | grep -q .; then
     netfilter-persistent save 2>&1 | log
 fi
 
-echo "Running CloudRon setup..." | log
-# cloudron-setup writes its detailed log to /var/log/cloudron-setup.log; stdout
-# is a sparse progress stream. Pipe through tee so both go to the installer
-# log, and rely on set -o pipefail so a non-zero exit from cloudron-setup is
-# preserved despite the pipe.
-if ! echo Y | bash cloudron-setup 2>&1 | tee -a "${CWM_LOGDIR:-/root}/cloudron-setup.stdout.log" | log; then
+echo "Running CloudRon setup (with --skip-reboot)..." | log
+# --skip-reboot is critical: without it, cloudron-setup runs `systemctl reboot`
+# at the end, which kills the cloudinit before it reaches its final `poweroff`.
+if ! bash cloudron-setup --skip-reboot 2>&1 | tee -a "${CWM_LOGDIR:-/root}/cloudron-setup.stdout.log" | log; then
     rc=$?
     echo "cloudron-setup failed with exit $rc. Last 40 lines of /var/log/cloudron-setup.log:" | log 1
     tail -n 40 /var/log/cloudron-setup.log 2>&1 | log 1
