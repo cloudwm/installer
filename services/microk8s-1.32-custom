@@ -113,7 +113,6 @@ waitOrStop 0 "Unable to apply admin-user yaml"
 
 echo "Resolving server IP and CWM domain" | log
 export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
-export CWM_DOMAIN="${CWM_SERVERIP//./-}.cloud-xip.com"
 
 echo "Cloning dashboard repository" | log
 cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b  hay-refactor
@@ -165,14 +164,29 @@ done
 echo "Waiting for ingress-nginx controller to become Ready" | log
 microk8s kubectl rollout status deployment/dashboard-nginx-controller -n kube-system --timeout=300s
 
-echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
-microk8s kubectl delete secret dashboard-tls -n kube-system
+echo "Waiting for Let's Encrypt certificate files for ${CWM_DOMAIN}" | log
+CERT_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+KEY_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+until [ -s "$CERT_PATH" ] && [ -s "$KEY_PATH" ]; do
+  echo "Waiting for certificate files at /etc/letsencrypt/live/${CWM_DOMAIN}/..." | log
+  sleep 5
+done
 
+echo "Creating/updating dashboard-tls secret from Let's Encrypt certificate" | log
 microk8s kubectl create secret tls dashboard-tls \
   -n kube-system \
-  --cert="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
-  --key="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+  --cert="$CERT_PATH" \
+  --key="$KEY_PATH" \
+  --dry-run=client -o yaml | microk8s kubectl apply -f -
+waitOrStop 0 "Failed to create/update dashboard-tls secret"
 
+echo "Waiting for kubernetes-dashboard ingress to exist" | log
+until microk8s kubectl get ingress kubernetes-dashboard -n kube-system >/dev/null 2>&1; do
+  echo "Waiting for kubernetes-dashboard ingress..." | log
+  sleep 5
+done
+
+echo "Patching kubernetes-dashboard ingress with domain and TLS secret" | log
 microk8s kubectl patch ingress kubernetes-dashboard -n kube-system \
   --type='json' \
   -p="[
@@ -180,8 +194,7 @@ microk8s kubectl patch ingress kubernetes-dashboard -n kube-system \
     {\"op\":\"replace\",\"path\":\"/spec/tls/0/secretName\",\"value\":\"dashboard-tls\"},
     {\"op\":\"replace\",\"path\":\"/spec/rules/0/host\",\"value\":\"${CWM_DOMAIN}\"}
   ]"
-
-
+waitOrStop 0 "Failed to patch dashboard ingress"
 
 microk8s kubectl get ingress kubernetes-dashboard -n kube-system
 waitOrStop 0 "Dashboard ingress was not created"
