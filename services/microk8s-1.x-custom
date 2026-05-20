@@ -21,7 +21,10 @@ apt install snapd jq -y
 waitOrStop 0 "snap install failed"
 
 echo "Installing microk8s snap" | log
-snap install microk8s --classic --channel=1.35
+# Channel comes as a request parameter (CWM_MICROK8SCHANNEL); default to 1.35 if not provided
+microk8sChannel="${CWM_MICROK8SCHANNEL:-1.35}"
+echo "Using microk8s channel: ${microk8sChannel}" | log
+snap install microk8s --classic --channel="${microk8sChannel}"
 waitOrStop 0 "snap install failed"
 
 echo "Generating Provider Secret" | log
