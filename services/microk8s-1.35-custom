@@ -75,6 +75,7 @@ microk8s addons repo add core-fork \
   --reference upgrade-iamges
   waitOrStop 0 "Repository addition failed"
 
+sudo microk8s addons repo remove core
 echo "Generating admin-user and login token" | log
 cat << EOF > $rootDir/user.yaml
 apiVersion: v1
