@@ -13,6 +13,24 @@ if [ -z "$CWM_DOMAIN" ]; then
     exit 1
 fi
 
+CLOUDRON_NGINX_CERT="/home/yellowtent/platformdata/nginx/cert/default.cert"
+CLOUDRON_NGINX_KEY="/home/yellowtent/platformdata/nginx/cert/default.key"
+LE_LIVE="/etc/letsencrypt/live/${CWM_DOMAIN}"
+LE_DEPLOY_HOOK="/etc/letsencrypt/renewal-hooks/deploy/cloudron-nginx.sh"
+
+LE_OK=0
+if [ -f "${LE_LIVE}/fullchain.pem" ] && [ -f "${LE_LIVE}/privkey.pem" ]; then
+    if openssl x509 -in "${LE_LIVE}/fullchain.pem" -noout -issuer 2>/dev/null \
+            | grep -qi "Let's Encrypt"; then
+        LE_OK=1
+        echo "Real LE cert from tweak detected for ${CWM_DOMAIN}" | log
+    else
+        echo "Tweak produced a self-signed fallback at ${LE_LIVE}; keeping Cloudron's own default cert" | log
+    fi
+else
+    echo "Tweak did not produce cert files at ${LE_LIVE}; continuing without pre-staged TLS" | log
+fi
+
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
@@ -21,10 +39,6 @@ echo "Enabling and starting cron service..." | log
 systemctl enable cron
 systemctl start cron
 
-# Cloudron's setup wizard POSTs /api/v1/provision/detect_ip on every page load
-# of /setup.html, which calls https://ipv6.api.cloudron.io (AAAA-only host).
-# On VMs without a default IPv6 route the TCP SYN hangs for the full 30s
-# superagent timeout, making the wizard appear blank for ~30s on first load.
 # If this VM has no public IPv6, install one ip6tables OUTPUT REJECT rule so
 # the call fails in ms instead of seconds. Skipped if a default v6 route
 # exists, so dual-stack VMs keep working unchanged.
@@ -46,20 +60,55 @@ if ! bash cloudron-setup --skip-reboot 2>&1 | tee -a "${CWM_LOGDIR:-/root}/cloud
     exit 1
 fi
 
+if [ "$LE_OK" = "1" ]; then
+    echo "Installing LE cert as Cloudron's default nginx cert" | log
+    cp -f "${LE_LIVE}/fullchain.pem" "${CLOUDRON_NGINX_CERT}"
+    cp -f "${LE_LIVE}/privkey.pem"   "${CLOUDRON_NGINX_KEY}"
+    chmod 644 "${CLOUDRON_NGINX_CERT}"
+    chmod 600 "${CLOUDRON_NGINX_KEY}"
+
+    # Switch certbot's renewal config from standalone (needed port 80 free,
+    # only true during install) to webroot, using the directory Cloudron's
+    # nginx default vhost serves /.well-known/acme-challenge/ from (see
+    # /etc/nginx/applications/default.conf in Cloudron). Without this, the
+    # twice-daily certbot.timer would fail because port 80 is bound by
+    # Cloudron's nginx.
+    RENEWAL_CONF="/etc/letsencrypt/renewal/${CWM_DOMAIN}.conf"
+    if [ -f "${RENEWAL_CONF}" ]; then
+        sed -i \
+            -e 's|^authenticator = standalone|authenticator = webroot|' \
+            -e '/^\[\[webroot_map\]\]/,$d' \
+            "${RENEWAL_CONF}"
+        printf '\n[[webroot_map]]\n%s = /home/yellowtent/platformdata/acme\n' "${CWM_DOMAIN}" >> "${RENEWAL_CONF}"
+    fi
+    # Certbot's systemd timer renews certs every ~60 days. This deploy hook
+    # fires after a successful renewal and copies the new cert into Cloudron's
+    # nginx cert path, then reloads nginx so the new bytes are served.
+    mkdir -p "$(dirname "${LE_DEPLOY_HOOK}")"
+    cat > "${LE_DEPLOY_HOOK}" <<HOOK
+#!/bin/bash
+set -e
+if [[ ":\${RENEWED_LINEAGE}:" != *":/etc/letsencrypt/live/${CWM_DOMAIN}:"* ]]; then
+    exit 0
+fi
+cp -f "\${RENEWED_LINEAGE}/fullchain.pem" "${CLOUDRON_NGINX_CERT}"
+cp -f "\${RENEWED_LINEAGE}/privkey.pem"   "${CLOUDRON_NGINX_KEY}"
+chmod 644 "${CLOUDRON_NGINX_CERT}"
+chmod 600 "${CLOUDRON_NGINX_KEY}"
+nginx -s reload
+HOOK
+    chmod +x "${LE_DEPLOY_HOOK}"
+    nginx -s reload 2>&1 | log || systemctl reload nginx 2>&1 | log
+fi
+
 echo "Adding descriptions" | log
 descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Open the URL in your browser and complete the setup wizard."
-descriptionAppend "Cloudron issues its own Let's Encrypt cert after the wizard."
-
-# Intentionally NOT running `apt-get autoremove` here. Cloudron's install
-# pulls in linux-image-generic, which on Ubuntu 24.04 marks the previously
-# running kernel (e.g. linux-image-6.8.0-106-generic) as auto-installed.
-# A subsequent `apt-get autoremove` purges that kernel, and dpkg's kernel
-# postremoval hooks trigger a reboot. That reboot kills cloudinit before
-# its final `poweroff`, so CWM never sees the VM stop and marks the
-# provisioning as failed even though the install succeeded.
-# cloudron-setup already ran its own autoremove --purge -y earlier in
-# the run, so there's nothing left for us to clean up here anyway.
+if [ "$LE_OK" = "1" ]; then
+    descriptionAppend "TLS: Let's Encrypt cert installed at install time (auto-renews via certbot.timer)."
+else
+    descriptionAppend "TLS: self-signed during install. Cloudron will issue an LE cert after you complete the wizard."
+fi
 
 tagScript success
 exit 0
