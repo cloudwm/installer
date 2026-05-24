@@ -46,6 +46,23 @@ if ! grep -q -- "--hostname-override=" /var/snap/microk8s/current/args/kubelet; 
 else
   sed -i 's#--hostname-override=.*#--hostname-override='"${NODE_NAME}"'#' /var/snap/microk8s/current/args/kubelet
 fi
+# Configure containerd to pull docker.io images through the Harbor mirror
+# first, falling back to docker.io only when Harbor misses or is unreachable.
+# containerd tries the listed [host] entries in order, then the canonical
+# "server" last. override_path is required because the Harbor URL already
+# carries the proxy-cache path (/v2/dockerhub); without it containerd would
+# append its own /v2/ and break the request.
+echo "Configuring docker.io registry mirror via Harbor" | log
+DOCKERIO_CERTS_DIR="/var/snap/microk8s/current/args/certs.d/docker.io"
+mkdir -p "${DOCKERIO_CERTS_DIR}"
+cat << 'EOF' > "${DOCKERIO_CERTS_DIR}/hosts.toml"
+server = "https://registry-1.docker.io"
+
+[host."https://harbor-us-ny2.cloudwm.com/v2/dockerhub"]
+  capabilities = ["pull", "resolve"]
+  override_path = true
+EOF
+
 microk8s stop
 microk8s start
 waitOrStop 0 "Failed to restart microk8s after setting hostname-override"
