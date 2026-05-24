@@ -1,50 +1,31 @@
-  #!/bin/bash
+#!/bin/bash
 
-  # Add this at the begining of all scripts.
-  if [ -f "include/startup.sh" ]; then
-      . include/startup.sh
-  elif [ -f "../include/startup.sh" ]; then
-      . ../include/startup.sh
-  fi
-
-  echo "Checking ubuntu-updateos.success tag" | log
-  checkTagExist ubuntu-updateos.success
-
-  echo "Setting root directory" | log
-  rootDir=$(rootDir)
-
-  echo "Purging existing snapd" | log
-  # fix for snap
-  apt purge snapd -y
-  echo "Installing snapd and jq packages" | log
-  apt install snapd jq -y
-  waitOrStop 0 "snap install failed"
-
-  echo "Installing microk8s snap" | log
-  # Channel comes as a request parameter (CWM_MICROK8SCHANNEL); default to 1.35 if not provided
-  microk8sChannel="${CWM_MICROK8SCHANNEL:-1.35}"
-  echo "Using microk8s channel: ${microk8sChannel}" | log
-  snap install microk8s --classic --channel="${microk8sChannel}"
-  waitOrStop 0 "snap install failed"
-
-<<<<<<< Updated upstream
-# Pin the kubelet node name to the CWM_DOMAIN FQDN (a stable value from
-# guest.conf) via --hostname-override, so a hostname change after a reboot
-# (cloud-init swapping e.g. "host.k8s-135" -> "host") does NOT make kubelet
-# re-register under a new name and leave a stale node behind.
-echo "Pinning kubelet node name via --hostname-override" | log
-# Use the full CWM_DOMAIN FQDN, lowercased (Kubernetes node names must be
-# RFC-1123 compliant). Fall back to the hostname if CWM_DOMAIN is somehow empty.
-NODE_NAME="$(echo "${CWM_DOMAIN:-$(hostname)}" | tr '[:upper:]' '[:lower:]')"
-echo "Using node name: ${NODE_NAME}" | log
-if ! grep -q -- "--hostname-override=" /var/snap/microk8s/current/args/kubelet; then
-  echo "--hostname-override=${NODE_NAME}" >> /var/snap/microk8s/current/args/kubelet
-else
-  sed -i 's#--hostname-override=.*#--hostname-override='"${NODE_NAME}"'#' /var/snap/microk8s/current/args/kubelet
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
 fi
-microk8s stop
-microk8s start
-waitOrStop 0 "Failed to restart microk8s after setting hostname-override"
+
+echo "Checking ubuntu-updateos.success tag" | log
+checkTagExist ubuntu-updateos.success
+
+echo "Setting root directory" | log
+rootDir=$(rootDir)
+
+echo "Purging existing snapd" | log
+# fix for snap
+apt purge snapd -y
+echo "Installing snapd and jq packages" | log
+apt install snapd jq -y
+waitOrStop 0 "snap install failed"
+
+echo "Installing microk8s snap" | log
+# Channel comes as a request parameter (CWM_MICROK8SCHANNEL); default to 1.35 if not provided
+microk8sChannel="${CWM_MICROK8SCHANNEL:-1.35}"
+echo "Using microk8s channel: ${microk8sChannel}" | log
+snap install microk8s --classic --channel="${microk8sChannel}"
+waitOrStop 0 "snap install failed"
 
 echo "Generating Provider Secret" | log
 cat << EOF > guest.yaml
@@ -56,224 +37,181 @@ metadata:
 type: Opaque
 data:
 EOF
-=======
-  echo "Generating Provider Secret" | log
-  cat << EOF > guest.yaml
-  apiVersion: v1
-  kind: Secret
-  metadata:
-    name: provider-guest-secret
-    namespace: kube-system
-  type: Opaque
-  data:
-  EOF
->>>>>>> Stashed changes
 
-  echo "Copying guest.conf to root directory" | log
-  cp /root/guest.conf $rootDir/guest.conf
+echo "Copying guest.conf to root directory" | log
+cp /root/guest.conf $rootDir/guest.conf
 
-  echo "Encoding guest.conf values into guest.yaml" | log
-  cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
-  echo "Exporting API credentials from guest.conf" | log
-  export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
-  export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
-  export apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`
-  export apiZone=`cat $rootDir/guest.conf | grep 'zone=' | cut -d '=' -f 2`
-  echo "Authenticating against API to retrieve token" | log
-  export apiToken=`curl -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication`
-  echo "Fetching server.json from API" | log
-  curl -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}"
-  echo "Extracting imageID and trafficPackage from server.json" | log
-  export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
-  export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
-  echo "Appending imageid and trafficpackage to guest.yaml" | log
-  echo "  imageid: $imageID" >> $rootDir/guest.yaml
-  echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
-  echo "Applying provider secret to cluster" | log
-  echo "Waiting for MicroK8s API to be ready" | log
-  microk8s status --wait-ready
+echo "Encoding guest.conf values into guest.yaml" | log
+cat $rootDir/guest.conf | awk -F  '=' ' {cmd="echo "$2" | base64";cmd| getline x;close(cmd);print "  "$1": "x }' >> $rootDir/guest.yaml
+echo "Exporting API credentials from guest.conf" | log
+export apiClientId=`cat $rootDir/guest.conf | grep apiClientId | cut -d '=' -f 2`
+export apiSecret=`cat $rootDir/guest.conf | grep apiSecret | cut -d '=' -f 2`
+export apiUrl=`cat $rootDir/guest.conf | grep url | cut -d '=' -f 2`
+export apiZone=`cat $rootDir/guest.conf | grep 'zone=' | cut -d '=' -f 2`
+echo "Authenticating against API to retrieve token" | log
+export apiToken=`curl -X POST --url "https://${apiUrl}/service/authenticate" -H "content-type: application/json" -d "{\"clientId\": \"${apiClientId}\",\"secret\": \"${apiSecret}\"}" | jq -r .authentication`
+echo "Fetching server.json from API" | log
+curl -o $rootDir/server.json -X GET --url "https://${apiUrl}/service/server" -H "content-type: application/json" -H "Authorization: Bearer ${apiToken}"
+echo "Extracting imageID and trafficPackage from server.json" | log
+export imageID=`cat $rootDir/server.json  | jq '.diskImages | .["'"$apiZone"'"]' | jq -r '.[] |  select( [ .description | contains("ubuntu_server_24.04_64-bit") ] | any) | .id' | base64`
+export trafficPackage=`cat $rootDir/server.json  | jq '.traffic | .["'"$apiZone"'"]'  | jq -r '.[] |  select( [ .info | contains("traffic") ] | any) | .name' | base64`
+echo "Appending imageid and trafficpackage to guest.yaml" | log
+echo "  imageid: $imageID" >> $rootDir/guest.yaml
+echo "  trafficpackage: $trafficPackage" >> $rootDir/guest.yaml
+echo "Applying provider secret to cluster" | log
+echo "Waiting for MicroK8s API to be ready" | log
+microk8s status --wait-ready
 
-<<<<<<< Updated upstream
+until microk8s kubectl get nodes >/dev/null 2>&1; do
+  echo "Waiting for Kubernetes API..." | log
+  sleep 5
+done
+echo "Applying provider secret to cluster" | log
+microk8s kubectl apply -f "$rootDir/guest.yaml"
+waitOrStop 0 "Unable to apply provider secret"
+
+echo "Modifying microk8s repository" | log
+microk8s addons repo remove core-fork || true
+
+microk8s addons repo add core-fork \
+  https://github.com/cloudwm/microk8s-core-addons.git \
+  --reference upgrade-iamges
+  waitOrStop 0 "Repository addition failed"
+
+sudo microk8s addons repo remove core
+echo "Generating admin-user and login token" | log
+cat << EOF > $rootDir/user.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: "admin-user"   
+type: kubernetes.io/service-account-token  
+EOF
+echo "Applying admin-user yaml to cluster" | log
+microk8s kubectl apply -f $rootDir/user.yaml
+waitOrStop 0 "Unable to apply admin-user yaml"
+
+echo "Resolving server IP and CWM domain" | log
+export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
+
+echo "Cloning dashboard repository" | log
+cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b  upgrade-iamges
+waitOrStop 0 "Reload haproxy service failed"
+
+echo "Downloading helm dependencies" | log
+cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
+microk8s helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+microk8s helm repo add jetstack.io https://charts.jetstack.io
+microk8s helm repo add kubernetes-sigs https://kubernetes-sigs.github.io/metrics-server/
+microk8s helm repo add kong https://charts.konghq.com
+microk8s helm dependency build
+waitOrStop 0 "dependency build failed"
+
+echo "Patching values.yaml with domain and server IP" | log
+sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
+sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
+
+echo "Installing dashboard helm chart" | log
+microk8s helm install dashboard . --namespace kube-system
+waitOrStop 0 "Dashboard install failed"
+
+echo "Retrieving admin-user token" | log
+export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
+
+echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
+
+#-------------
+echo "Waiting for Kubernetes API before creating dashboard ingress" | log
+microk8s status --wait-ready
+
 until microk8s kubectl get nodes >/dev/null 2>&1; do
   echo "Waiting for Kubernetes API..." | log
   sleep 5
 done
 
-# Wait for our (correctly named) node to register and become Ready.
-echo "Waiting for node ${NODE_NAME} to be Ready" | log
-until microk8s kubectl get node "${NODE_NAME}" \
-        -o jsonpath='{range .status.conditions[?(@.type=="Ready")]}{.status}{end}' 2>/dev/null \
-        | grep -q "True"; do
-  echo "Waiting for node ${NODE_NAME} to become Ready..." | log
+echo "Waiting for dashboard web service" | log
+until microk8s kubectl get svc dashboard-kubernetes-dashboard-web -n kube-system >/dev/null 2>&1; do
+  echo "Waiting for dashboard-kubernetes-dashboard-web service..." | log
   sleep 5
 done
 
-# Remove any stale node registered under the old hostname (e.g. the FQDN the
-# kubelet used before --hostname-override took effect). Single-node install, so
-# anything that is not NODE_NAME is an orphan.
-echo "Removing stale node entries (anything other than ${NODE_NAME})" | log
-for staleNode in $(microk8s kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
-  if [ "${staleNode}" != "${NODE_NAME}" ]; then
-    echo "Deleting stale node: ${staleNode}" | log
-    microk8s kubectl delete node "${staleNode}" || true
-  fi
+echo "Waiting for internal-nginx IngressClass" | log
+until microk8s kubectl get ingressclass internal-nginx >/dev/null 2>&1; do
+  echo "Waiting for internal-nginx IngressClass..." | log
+  sleep 5
 done
 
-echo "Applying provider secret to cluster" | log
-microk8s kubectl apply -f "$rootDir/guest.yaml"
-waitOrStop 0 "Unable to apply provider secret"
-=======
-  until microk8s kubectl get nodes >/dev/null 2>&1; do
-    echo "Waiting for Kubernetes API..." | log
-    sleep 5
-  done
-  echo "Applying provider secret to cluster" | log
-  microk8s kubectl apply -f "$rootDir/guest.yaml"
-  waitOrStop 0 "Unable to apply provider secret"
->>>>>>> Stashed changes
+echo "Waiting for ingress-nginx controller to become Ready" | log
+microk8s kubectl rollout status deployment/dashboard-nginx-controller -n kube-system --timeout=300s
 
-  echo "Modifying microk8s repository" | log
-  microk8s addons repo remove core-fork || true
+echo "Waiting for Let's Encrypt certificate files for ${CWM_DOMAIN}" | log
+CERT_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+KEY_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+until [ -s "$CERT_PATH" ] && [ -s "$KEY_PATH" ]; do
+  echo "Waiting for certificate files at /etc/letsencrypt/live/${CWM_DOMAIN}/..." | log
+  sleep 5
+done
 
-  microk8s addons repo add core-fork \
-    https://github.com/cloudwm/microk8s-core-addons.git \
-    --reference upgrade-iamges
-    waitOrStop 0 "Repository addition failed"
+echo "Creating/updating dashboard-tls secret from Let's Encrypt certificate" | log
+microk8s kubectl create secret tls dashboard-tls \
+  -n kube-system \
+  --cert="$CERT_PATH" \
+  --key="$KEY_PATH" \
+  --dry-run=client -o yaml | microk8s kubectl apply -f -
+waitOrStop 0 "Failed to create/update dashboard-tls secret"
 
-  sudo microk8s addons repo remove core
-  echo "Generating admin-user and login token" | log
-  cat << EOF > $rootDir/user.yaml
-  apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: admin-user
-    namespace: kube-system
+echo "Waiting for kubernetes-dashboard ingress to exist" | log
+until microk8s kubectl get ingress kubernetes-dashboard -n kube-system >/dev/null 2>&1; do
+  echo "Waiting for kubernetes-dashboard ingress..." | log
+  sleep 5
+done
 
-  ---
-  apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRoleBinding
-  metadata:
-    name: admin-user
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: cluster-admin
-  subjects:
-  - kind: ServiceAccount
-    name: admin-user
-    namespace: kube-system
+echo "Patching kubernetes-dashboard ingress with domain and TLS secret" | log
+microk8s kubectl patch ingress kubernetes-dashboard -n kube-system \
+  --type='json' \
+  -p="[
+    {\"op\":\"replace\",\"path\":\"/spec/tls/0/hosts/0\",\"value\":\"${CWM_DOMAIN}\"},
+    {\"op\":\"replace\",\"path\":\"/spec/tls/0/secretName\",\"value\":\"dashboard-tls\"},
+    {\"op\":\"replace\",\"path\":\"/spec/rules/0/host\",\"value\":\"${CWM_DOMAIN}\"}
+  ]"
+waitOrStop 0 "Failed to patch dashboard ingress"
 
-  ---
-  apiVersion: v1
-  kind: Secret
-  metadata:
-    name: admin-user
-    namespace: kube-system
-    annotations:
-      kubernetes.io/service-account.name: "admin-user"   
-  type: kubernetes.io/service-account-token  
-  EOF
-  echo "Applying admin-user yaml to cluster" | log
-  microk8s kubectl apply -f $rootDir/user.yaml
-  waitOrStop 0 "Unable to apply admin-user yaml"
+microk8s kubectl get ingress kubernetes-dashboard -n kube-system
+waitOrStop 0 "Dashboard ingress was not created"
+#------------+
 
-  echo "Resolving server IP and CWM domain" | log
-  export CWM_SERVERIP=`hostname -I | awk '{print $1}'`
+echo "Adding descriptions" | log
+descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
+descriptionAppend " "
+descriptionAppend "Kubernetest admin-user token: ${ADMINTOKEN}"
+descriptionAppend " "
 
-  echo "Cloning dashboard repository" | log
-  cd $rootDir && git clone https://github.com/cloudwm/k8s-dashboard.git -b  upgrade-iamges
-  waitOrStop 0 "Reload haproxy service failed"
+echo "Tagging script as success" | log
+tagScript success
 
-  echo "Downloading helm dependencies" | log
-  cd $rootDir/k8s-dashboard/charts/kubernetes-dashboard
-  microk8s helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-  microk8s helm repo add jetstack.io https://charts.jetstack.io
-  microk8s helm repo add kubernetes-sigs https://kubernetes-sigs.github.io/metrics-server/
-  microk8s helm repo add kong https://charts.konghq.com
-  microk8s helm dependency build
-  waitOrStop 0 "dependency build failed"
-
-  echo "Patching values.yaml with domain and server IP" | log
-  sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
-  sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
-
-  echo "Installing dashboard helm chart" | log
-  microk8s helm install dashboard . --namespace kube-system
-  waitOrStop 0 "Dashboard install failed"
-
-  echo "Retrieving admin-user token" | log
-  export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
-
-  echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
-
-  #-------------
-  echo "Waiting for Kubernetes API before creating dashboard ingress" | log
-  microk8s status --wait-ready
-
-  until microk8s kubectl get nodes >/dev/null 2>&1; do
-    echo "Waiting for Kubernetes API..." | log
-    sleep 5
-  done
-
-  echo "Waiting for dashboard web service" | log
-  until microk8s kubectl get svc dashboard-kubernetes-dashboard-web -n kube-system >/dev/null 2>&1; do
-    echo "Waiting for dashboard-kubernetes-dashboard-web service..." | log
-    sleep 5
-  done
-
-  echo "Waiting for internal-nginx IngressClass" | log
-  until microk8s kubectl get ingressclass internal-nginx >/dev/null 2>&1; do
-    echo "Waiting for internal-nginx IngressClass..." | log
-    sleep 5
-  done
-
-  echo "Waiting for ingress-nginx controller to become Ready" | log
-  microk8s kubectl rollout status deployment/dashboard-nginx-controller -n kube-system --timeout=300s
-
-  echo "Waiting for Let's Encrypt certificate files for ${CWM_DOMAIN}" | log
-  CERT_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
-  KEY_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
-  until [ -s "$CERT_PATH" ] && [ -s "$KEY_PATH" ]; do
-    echo "Waiting for certificate files at /etc/letsencrypt/live/${CWM_DOMAIN}/..." | log
-    sleep 5
-  done
-
-  echo "Creating/updating dashboard-tls secret from Let's Encrypt certificate" | log
-  microk8s kubectl create secret tls dashboard-tls \
-    -n kube-system \
-    --cert="$CERT_PATH" \
-    --key="$KEY_PATH" \
-    --dry-run=client -o yaml | microk8s kubectl apply -f -
-  waitOrStop 0 "Failed to create/update dashboard-tls secret"
-
-  echo "Waiting for kubernetes-dashboard ingress to exist" | log
-  until microk8s kubectl get ingress kubernetes-dashboard -n kube-system >/dev/null 2>&1; do
-    echo "Waiting for kubernetes-dashboard ingress..." | log
-    sleep 5
-  done
-
-  echo "Patching kubernetes-dashboard ingress with domain and TLS secret" | log
-  microk8s kubectl patch ingress kubernetes-dashboard -n kube-system \
-    --type='json' \
-    -p="[
-      {\"op\":\"replace\",\"path\":\"/spec/tls/0/hosts/0\",\"value\":\"${CWM_DOMAIN}\"},
-      {\"op\":\"replace\",\"path\":\"/spec/tls/0/secretName\",\"value\":\"dashboard-tls\"},
-      {\"op\":\"replace\",\"path\":\"/spec/rules/0/host\",\"value\":\"${CWM_DOMAIN}\"}
-    ]"
-  waitOrStop 0 "Failed to patch dashboard ingress"
-
-  microk8s kubectl get ingress kubernetes-dashboard -n kube-system
-  waitOrStop 0 "Dashboard ingress was not created"
-  #------------+
-
-  echo "Adding descriptions" | log
-  descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
-  descriptionAppend " "
-  descriptionAppend "Kubernetest admin-user token: ${ADMINTOKEN}"
-  descriptionAppend " "
-
-  echo "Tagging script as success" | log
-  tagScript success
-
-  echo "Exiting microk8s-1.35-custom script" | log
-  exit 0
+echo "Exiting microk8s-1.35-custom script" | log
+exit 0
