@@ -27,6 +27,13 @@ echo "Using microk8s channel: ${microk8sChannel}" | log
 snap install microk8s --classic --channel="${microk8sChannel}"
 waitOrStop 0 "snap install failed"
 
+# Let microk8s fully come up first. The first start sideloads the bundled images
+# (calico/cni, calico/node, ...) into containerd; restarting mid-sideload (below)
+# corrupts the content store and breaks the calico image pull. Wait for ready
+# BEFORE touching the kubelet args and restarting.
+echo "Waiting for MicroK8s to be ready before changing kubelet args" | log
+microk8s status --wait-ready
+
 # Pin the kubelet node name to the first label of the hostname (everything
 # before the first dot), so a hostname change after a reboot (e.g. "hay.k8s"
 # -> "hay") does not make kubelet re-register under a new name and leave a
