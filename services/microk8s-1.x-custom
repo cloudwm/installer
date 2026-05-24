@@ -27,6 +27,21 @@ echo "Using microk8s channel: ${microk8sChannel}" | log
 snap install microk8s --classic --channel="${microk8sChannel}"
 waitOrStop 0 "snap install failed"
 
+# Pin the kubelet node name to the short hostname so a later hostname change
+# (cloud-init/provisioning swapping e.g. "host.k8s-135" -> "host") does not make
+# kubelet re-register under a new name and leave a stale NotReady node behind.
+echo "Pinning kubelet node name via --hostname-override" | log
+NODE_NAME="$(hostname -s)"
+echo "Using node name: ${NODE_NAME}" | log
+if ! grep -q -- "--hostname-override=" /var/snap/microk8s/current/args/kubelet; then
+  echo "--hostname-override=${NODE_NAME}" >> /var/snap/microk8s/current/args/kubelet
+else
+  sed -i 's#--hostname-override=.*#--hostname-override='"${NODE_NAME}"'#' /var/snap/microk8s/current/args/kubelet
+fi
+microk8s stop
+microk8s start
+waitOrStop 0 "Failed to restart microk8s after setting hostname-override"
+
 echo "Generating Provider Secret" | log
 cat << EOF > guest.yaml
 apiVersion: v1
