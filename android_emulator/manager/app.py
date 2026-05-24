@@ -207,6 +207,7 @@ def generate_compose():
             lines.append("    environment:")
             lines.append("      - WEB_VNC=true")
             lines.append("      - WEB_LOG=true")
+            lines.append(f"      - EMULATOR_DEVICE={emu.get('device', 'Samsung Galaxy S10')}")
             lines.append(f"      - EMULATOR_SCREEN_RESOLUTION={emu['resolution']}")
             lines.append(f"      - EMULATOR_DPI={emu['dpi']}")
             lines.append("      - DATAPARTITION=2g")
