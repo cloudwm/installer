@@ -81,6 +81,27 @@ until microk8s kubectl get nodes >/dev/null 2>&1; do
   echo "Waiting for Kubernetes API..." | log
   sleep 5
 done
+
+# Wait for our (correctly named) node to register and become Ready.
+echo "Waiting for node ${NODE_NAME} to be Ready" | log
+until microk8s kubectl get node "${NODE_NAME}" \
+        -o jsonpath='{range .status.conditions[?(@.type=="Ready")]}{.status}{end}' 2>/dev/null \
+        | grep -q "True"; do
+  echo "Waiting for node ${NODE_NAME} to become Ready..." | log
+  sleep 5
+done
+
+# Remove any stale node registered under the old hostname (e.g. the FQDN the
+# kubelet used before --hostname-override took effect). Single-node install, so
+# anything that is not NODE_NAME is an orphan.
+echo "Removing stale node entries (anything other than ${NODE_NAME})" | log
+for staleNode in $(microk8s kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
+  if [ "${staleNode}" != "${NODE_NAME}" ]; then
+    echo "Deleting stale node: ${staleNode}" | log
+    microk8s kubectl delete node "${staleNode}" || true
+  fi
+done
+
 echo "Applying provider secret to cluster" | log
 microk8s kubectl apply -f "$rootDir/guest.yaml"
 waitOrStop 0 "Unable to apply provider secret"
