@@ -20,6 +20,13 @@ echo "Installing snapd and jq packages" | log
 apt install snapd jq -y
 waitOrStop 0 "snap install failed"
 
+# Pin the system hostname to the short name BEFORE installing microk8s, so the
+# kubelet never registers under the FQDN (e.g. "hay.k8s-132") that cloud-init
+# later rewrites to the short name ("hay") on reboot. Without this, two nodes
+# appear: the FQDN one (orphaned) and the short one.
+echo "Pinning system hostname to short name before microk8s install" | log
+hostnamectl set-hostname "$(hostname -s)"
+
 echo "Installing microk8s snap" | log
 # Channel comes as a request parameter (CWM_MICROK8SCHANNEL); default to 1.35 if not provided
 microk8sChannel="${CWM_MICROK8SCHANNEL:-1.35}"
