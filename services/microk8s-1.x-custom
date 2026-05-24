@@ -265,6 +265,97 @@ microk8s kubectl get ingress kubernetes-dashboard -n kube-system
 waitOrStop 0 "Dashboard ingress was not created"
 #------------+
 
+#-------------
+# Front the in-cluster ingress with the host's own nginx.
+#
+# The chart binds the in-cluster ingress-nginx controller to the node's public
+# IP via service.externalIPs (the 1.1.1.1 -> CWM_SERVERIP substitution), which
+# claims CWM_SERVERIP:443 in kube-proxy and leaves no room for the host nginx.
+# We switch that service to NodePort (and drop externalIPs) so 443 is free, then
+# point the host nginx at the controller's https NodePort. The host nginx
+# terminates the real Let's Encrypt cert to the browser and reverse-proxies over
+# HTTPS to the controller (proxy_ssl_verify off, since the in-cluster side serves
+# the same cert/self-signed and routing already lives in the ingress).
+echo "Switching in-cluster ingress controller service to NodePort" | log
+CTRL_SVC="$(microk8s kubectl get svc -n kube-system \
+  -l app.kubernetes.io/name=ingress-nginx,app.kubernetes.io/component=controller \
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
+[ -z "${CTRL_SVC}" ] && CTRL_SVC="dashboard-nginx-controller"
+echo "Ingress controller service: ${CTRL_SVC}" | log
+
+microk8s kubectl patch svc "${CTRL_SVC}" -n kube-system \
+  -p '{"spec":{"type":"NodePort","externalIPs":[]}}'
+waitOrStop 0 "Failed to switch ${CTRL_SVC} to NodePort"
+
+echo "Resolving https NodePort of ${CTRL_SVC}" | log
+HTTPS_NODEPORT=""
+until [ -n "${HTTPS_NODEPORT}" ]; do
+  HTTPS_NODEPORT="$(microk8s kubectl get svc "${CTRL_SVC}" -n kube-system \
+    -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null)"
+  [ -z "${HTTPS_NODEPORT}" ] && { echo "Waiting for https NodePort..." | log; sleep 3; }
+done
+echo "Ingress https NodePort: ${HTTPS_NODEPORT}" | log
+
+echo "Writing host nginx reverse-proxy config for ${CWM_DOMAIN}" | log
+cat << EOF > /etc/nginx/conf.d/k8s-dashboard-upgrade.conf
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+EOF
+
+cat << EOF > /etc/nginx/sites-available/k8s-dashboard
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${CERT_PATH};
+    ssl_certificate_key ${KEY_PATH};
+
+    client_max_body_size 0;
+
+    location / {
+        proxy_pass https://${CWM_SERVERIP}:${HTTPS_NODEPORT};
+        proxy_ssl_server_name on;
+        proxy_ssl_name ${CWM_DOMAIN};
+        proxy_ssl_verify off;
+
+        proxy_set_header Host ${CWM_DOMAIN};
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/k8s-dashboard /etc/nginx/sites-enabled/k8s-dashboard
+rm -f /etc/nginx/sites-enabled/default
+
+echo "Validating host nginx configuration" | log
+nginx -t
+waitOrStop 0 "Host nginx config test failed"
+
+echo "Enabling and restarting host nginx" | log
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to (re)start host nginx"
+#------------+
+
 echo "Adding descriptions" | log
 descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
 descriptionAppend " "
