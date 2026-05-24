@@ -27,13 +27,14 @@ echo "Using microk8s channel: ${microk8sChannel}" | log
 snap install microk8s --classic --channel="${microk8sChannel}"
 waitOrStop 0 "snap install failed"
 
-# Pin the kubelet node name to the short hostname so a later hostname change
-# (cloud-init/provisioning swapping e.g. "host.k8s-135" -> "host") does not make
-# kubelet re-register under a new name and leave a stale NotReady node behind.
+# Pin the kubelet node name to the CWM_DOMAIN FQDN (a stable value from
+# guest.conf) via --hostname-override, so a hostname change after a reboot
+# (cloud-init swapping e.g. "host.k8s-135" -> "host") does NOT make kubelet
+# re-register under a new name and leave a stale node behind.
 echo "Pinning kubelet node name via --hostname-override" | log
-# Take only the first label of the hostname (everything before the first dot)
-# and force lowercase, since Kubernetes node names must be RFC-1123 compliant.
-NODE_NAME="$(hostname | cut -d. -f1 | tr '[:upper:]' '[:lower:]')"
+# Use the full CWM_DOMAIN FQDN, lowercased (Kubernetes node names must be
+# RFC-1123 compliant). Fall back to the hostname if CWM_DOMAIN is somehow empty.
+NODE_NAME="$(echo "${CWM_DOMAIN:-$(hostname)}" | tr '[:upper:]' '[:lower:]')"
 echo "Using node name: ${NODE_NAME}" | log
 if ! grep -q -- "--hostname-override=" /var/snap/microk8s/current/args/kubelet; then
   echo "--hostname-override=${NODE_NAME}" >> /var/snap/microk8s/current/args/kubelet
