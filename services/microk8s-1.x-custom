@@ -127,6 +127,15 @@ for staleNode in $(microk8s kubectl get nodes -o jsonpath='{.items[*].metadata.n
   fi
 done
 
+# Final guard: this is a single-node install. If more than one node remains
+# after stale-node cleanup, a second node genuinely joined the cluster -- abort
+# rather than continue with an unexpected topology.
+echo "Verifying single-node topology" | log
+NODE_COUNT="$(microk8s kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+echo "Detected ${NODE_COUNT} node(s)" | log
+[ "${NODE_COUNT}" -eq 1 ]
+waitOrStop 0 "Expected exactly 1 node but found ${NODE_COUNT}"
+
 echo "Applying provider secret to cluster" | log
 microk8s kubectl apply -f "$rootDir/guest.yaml"
 waitOrStop 0 "Unable to apply provider secret"
@@ -344,6 +353,7 @@ EOF
 
 ln -sf /etc/nginx/sites-available/k8s-dashboard /etc/nginx/sites-enabled/k8s-dashboard
 rm -f /etc/nginx/sites-enabled/default
+
 
 echo "Validating host nginx configuration" | log
 nginx -t
