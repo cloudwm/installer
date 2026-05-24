@@ -24,8 +24,10 @@ waitOrStop 0 "snap install failed"
 # kubelet never registers under the FQDN (e.g. "hay.k8s-132") that cloud-init
 # later rewrites to the short name ("hay") on reboot. Without this, two nodes
 # appear: the FQDN one (orphaned) and the short one.
-echo "Pinning system hostname to short name before microk8s install" | log
-hostnamectl set-hostname "$(hostname -s)"
+# Take only the first label of the hostname (everything before the first dot).
+SHORT_HOSTNAME="$(hostname | cut -d. -f1)"
+echo "Pinning system hostname to short name '${SHORT_HOSTNAME}' before microk8s install" | log
+hostnamectl set-hostname "${SHORT_HOSTNAME}"
 
 echo "Installing microk8s snap" | log
 # Channel comes as a request parameter (CWM_MICROK8SCHANNEL); default to 1.35 if not provided
@@ -38,7 +40,8 @@ waitOrStop 0 "snap install failed"
 # (cloud-init/provisioning swapping e.g. "host.k8s-135" -> "host") does not make
 # kubelet re-register under a new name and leave a stale NotReady node behind.
 echo "Pinning kubelet node name via --hostname-override" | log
-NODE_NAME="$(hostname -s)"
+# Use only the first label of the hostname (everything before the first dot).
+NODE_NAME="$(hostname | cut -d. -f1)"
 echo "Using node name: ${NODE_NAME}" | log
 if ! grep -q -- "--hostname-override=" /var/snap/microk8s/current/args/kubelet; then
   echo "--hostname-override=${NODE_NAME}" >> /var/snap/microk8s/current/args/kubelet
