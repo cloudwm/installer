@@ -10,6 +10,25 @@ echo "Downloading and installing Coolify" | log
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 waitOrStop 0 "Failed to install Coolify"
 
-descriptionAppend "Coolify Web UI: http://${CWM_DISPLAYED_ADDRESS}:8000"
+# Wait for the coolify container to report healthy before invoking artisan inside it.
+echo "Waiting for Coolify to be healthy" | log
+for i in {1..60}; do
+    health=$(docker inspect -f '{{.State.Health.Status}}' coolify 2>/dev/null || echo "missing")
+    if [ "$health" = "healthy" ]; then
+        break
+    fi
+    sleep 5
+done
+[ "$health" = "healthy" ]
+waitOrStop 0 "Coolify container did not become healthy"
 
-exit 0 
+# Tell Coolify its public FQDN. This sets instance_settings.fqdn and regenerates
+# /data/coolify/proxy/dynamic/coolify.yaml so Traefik routes ${CWM_DOMAIN} -> coolify:8080.
+# Mirrors what the Settings page Save button does (App\Livewire\Settings\Index::submit).
+echo "Setting Coolify FQDN to https://${CWM_DOMAIN}" | log
+docker exec coolify php artisan tinker --execute="\$s = \App\Models\InstanceSettings::get(); \$s->fqdn = 'https://${CWM_DOMAIN}'; \$s->save(); \$server = \App\Models\Server::findOrFail(0); \$server->setupDynamicProxyConfiguration(); echo 'fqdn=' . \$s->fqdn;" | log
+waitOrStop 0 "Failed to configure Coolify FQDN"
+
+descriptionAppend "Coolify Web UI: https://${CWM_DOMAIN}/"
+
+exit 0
