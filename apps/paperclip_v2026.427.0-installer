@@ -117,7 +117,25 @@ test -f "${PAPERCLIP_HOME}/.paperclip/instances/default/config.json"
 waitOrStop 0 "Paperclip config file was not created"
 
 echo "Fixing Paperclip directory ownership" | log
-chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"
+# The onboarding step can be killed by its timeout and leave lingering npx/node
+# child processes that keep writing to the npm cache under ${PAPERCLIP_WORKDIR}.
+# A recursive chown then races with files appearing/disappearing and fails with
+# "No such file or directory". Stop any leftover paperclip-owned processes, let
+# the filesystem settle, and retry the chown a few times before giving up.
+pkill -u "${PAPERCLIP_USER}" 2>/dev/null || true
+sleep 3
+
+chownOk=1
+for attempt in 1 2 3; do
+  echo "Ownership fix attempt ${attempt}/3" | log
+  if chown -R "${PAPERCLIP_USER}:${PAPERCLIP_USER}" "${PAPERCLIP_WORKDIR}"; then
+    chownOk=0
+    break
+  fi
+  echo "Ownership fix failed (attempt ${attempt}/3), retrying" | log
+  sleep 5
+done
+[ "${chownOk}" -eq 0 ]
 waitOrStop 0 "Failed to fix Paperclip directory ownership"
 
 echo "Allowing Paperclip hostname" | log
