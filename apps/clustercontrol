@@ -52,52 +52,36 @@ sed -i "s|tls_cert:.*|tls_cert: /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pe
 sed -i "s|tls_key:.*|tls_key: /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|"     /usr/share/ccmgr/ccmgr.yaml
 waitOrStop 0 "Failed to configure ccmgr"
 
-# Create ccmgr systemd service
-echo "Creating ccmgr service" | log
-cat <<EOF > /lib/systemd/system/ccmgr.service
-[Unit]
-Description=ClusterControl Manager
-After=network.target cmon.service
-Requires=cmon.service
+# Restart the packaged cmon-proxy.service so it picks up the new ccmgr.yaml.
+# (The clustercontrol-proxy .deb installs /etc/systemd/system/cmon-proxy.service
+#  which runs /usr/bin/ccmgr --basedir=/usr/share/ccmgr/ as s9s_cc.)
+echo "Restarting cmon-proxy with new config" | log
+systemctl restart cmon-proxy | log
+waitOrStop 0 "Failed to restart cmon-proxy"
 
-[Service]
-Type=simple
-ExecStart=/usr/bin/ccmgr
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable ccmgr
-systemctl start ccmgr
-waitOrStop 0 "Failed to start ccmgr"
-
-# Wait for ccmgr to be ready
+# Wait for cmon-proxy to be ready on the new ports
 sleep 5
 
-echo "Checking ccmgr service status" | log
+echo "Checking cmon-proxy service status" | log
 
 success=false
 
 for ((i=1; i<=MAX_RETRIES; i++)); do
-    if systemctl is-active --quiet ccmgr; then
+    if systemctl is-active --quiet cmon-proxy; then
         success=true
         break
     fi
 
-    ccmgr_status=$(systemctl is-active ccmgr 2>/dev/null || echo "unknown")
+    cmon_proxy_status=$(systemctl is-active cmon-proxy 2>/dev/null || echo "unknown")
 
-    echo "ccmgr service status: $ccmgr_status (attempt $i/$MAX_RETRIES)" | log
-    systemctl status ccmgr --no-pager 2>&1 | log
+    echo "cmon-proxy service status: $cmon_proxy_status (attempt $i/$MAX_RETRIES)" | log
+    systemctl status cmon-proxy --no-pager 2>&1 | log
 
     sleep "$SLEEP_TIME"
 done
 
 [ "$success" = true ]
-waitOrStop 0 "ccmgr service is not running"
+waitOrStop 0 "cmon-proxy service is not running"
 
 # nginx vhost: :80 redirects to :443; :443 terminates TLS and proxies to ccmgr on :8443
 echo "Installing nginx reverse-proxy vhost for ClusterControl" | log
@@ -242,8 +226,8 @@ waitOrStop 0 "Failed to restart cmon"
 
 sleep 5
 
-systemctl restart ccmgr
-waitOrStop 0 "Failed to restart ccmgr"
+systemctl restart cmon-proxy
+waitOrStop 0 "Failed to restart cmon-proxy"
 
 echo "Admin user created successfully" | log
 
