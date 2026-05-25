@@ -36,18 +36,17 @@ waitOrStop 0 "Failed to run ansible playbook"
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 tag global-domain-set.success
 
-# Cert was obtained by tweaks/nginx-letsencrypt-cert at /etc/letsencrypt/live/${CWM_DOMAIN}/.
-# nginx terminates TLS on :80/:443 and reverse-proxies to ccmgr on loopback.
-
-chmod 755 "/etc/letsencrypt/live/${CWM_DOMAIN}"
-chmod 644 "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
-chmod 600 "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+# ccmgr runs as user s9s_cc:severalnines and needs to read the LE cert/key.
+# Grant the severalnines group read on the LE dirs and traverse on subdirs.
+chgrp -R severalnines /etc/letsencrypt/live /etc/letsencrypt/archive
+chmod -R g+rX         /etc/letsencrypt/live /etc/letsencrypt/archive
 
 # Move ccmgr off the public ports so nginx can take :80/:443.
+# http_port: 8081 avoids the conflict with kuber-proxy which hardcodes :8080.
 # (nginx vhost is written and started later, after ccmgr is healthy.)
 echo "Configuring ccmgr to listen on loopback ports" | log
 sed -i "s|^port:.*|port: 8443|"             /usr/share/ccmgr/ccmgr.yaml
-sed -i "s|^http_port:.*|http_port: 8080|"   /usr/share/ccmgr/ccmgr.yaml
+sed -i "s|^http_port:.*|http_port: 8081|"   /usr/share/ccmgr/ccmgr.yaml
 # ccmgr still needs a cert/key to start (it serves TLS on :8443); use the same files
 sed -i "s|tls_cert:.*|tls_cert: /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /usr/share/ccmgr/ccmgr.yaml
 sed -i "s|tls_key:.*|tls_key: /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|"     /usr/share/ccmgr/ccmgr.yaml
