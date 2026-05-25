@@ -27,76 +27,28 @@ ubuntu_version=$(lsb_release -rs)
 if [[ "$ubuntu_version" == "24.04" ]]; then
     sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
     sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
-    apt -y install software-properties-common
-    add-apt-repository ppa:ondrej/php
-    apt-get update
-    apt -y install php7.4 php7.4-mysql php7.4-curl
-    a2dismod php8.3
-    a2enmod php7.4
 fi
 
-systemctl stop apache2.service
 echo "Running playbook" | log
 ansible-playbook cc.playbook | log
 waitOrStop 0 "Failed to run ansible playbook"
 
-#### SSL ####
-echo "Installing certbot" | log
-installPackage python3-certbot-apache
-waitOrStop 0 "Failed apt install: python3-certbot-apache"
-
-execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challenges http --agree-tos --email ${ADMINEMAIL} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
-if [[ $? == 1 ]]; then
-    export certbot_failed=1
-    echo "Generating self-signed certificate" | log
-    mkdir -p /etc/letsencrypt/live/${CWM_DOMAIN}
-    openssl req -x509 -sha256 -newkey rsa:2048 \
-        -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
-        -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
-        -days 1024 -nodes \
-        -subj "/CN=${CWM_DOMAIN}" \
-        -addext "subjectAltName=DNS:${CWM_DOMAIN}"
-    waitOrStop 0 "Certificate creation failed"
-    curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" \
-        http://${CWM_DOMAIN}
-else
-    export certbot_failed=0
-fi
-
-
-
-#### SSL END ####
-
 export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
 tag global-domain-set.success
 
-# Stop and disable Apache - ccmgr handles web serving on ports 80/443
-echo "Stopping Apache - ccmgr will handle web serving" | log
-systemctl stop apache2.service
-systemctl disable apache2.service
+# Cert was obtained by tweaks/nginx-letsencrypt-cert at /etc/letsencrypt/live/${CWM_DOMAIN}/.
+# Disable nginx so it doesn't race ccmgr for :80/:443 on reboot.
+systemctl disable nginx 2>/dev/null
 
-# Configure ccmgr with correct cert paths
+# Point ccmgr at the LE cert
 echo "Configuring ccmgr" | log
 sed -i "s|tls_cert:.*|tls_cert: /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /usr/share/ccmgr/ccmgr.yaml
 sed -i "s|tls_key:.*|tls_key: /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /usr/share/ccmgr/ccmgr.yaml
 waitOrStop 0 "Failed to configure ccmgr"
-mkdir -p "/etc/letsencrypt/live/${CWM_DOMAIN}"
 
-openssl req -x509 -sha256 -newkey rsa:2048 \
-  -keyout "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem" \
-  -out "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" \
-  -days 1024 -nodes \
-  -subj "/CN=${CWM_DOMAIN}" \
-  -addext "subjectAltName=DNS:${CWM_DOMAIN}"
-
-chown -R root:root "/etc/letsencrypt/live/${CWM_DOMAIN}"
 chmod 755 "/etc/letsencrypt/live/${CWM_DOMAIN}"
 chmod 644 "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
 chmod 600 "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
-
-
-
 
 # Create ccmgr systemd service
 echo "Creating ccmgr service" | log
