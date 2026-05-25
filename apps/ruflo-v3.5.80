@@ -52,7 +52,20 @@ echo "Refreshing shell command cache" | log
 hash -r
 
 echo "Checking Ruflo version" | log
-/usr/local/bin/ruflo --version
+# Retry a few times: on slower machines the first invocation can fail while
+# npx is still resolving/warming up, so give it up to 3 attempts with a pause
+# between them before giving up.
+rufloCheck=1
+for attempt in 1 2 3; do
+  echo "Ruflo version check attempt ${attempt}/3" | log
+  if /usr/local/bin/ruflo --version; then
+    rufloCheck=0
+    break
+  fi
+  echo "Ruflo version check failed (attempt ${attempt}/3)" | log
+  sleep 10
+done
+[ "${rufloCheck}" -eq 0 ]
 waitOrStop 0 "Ruflo command is not working"
 
 descriptionAppend "Successfully installed."
