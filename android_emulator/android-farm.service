@@ -1,0 +1,16 @@
+[Unit]
+Description=Android Farm (Docker Compose)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/android-farm
+ExecStart=/usr/bin/docker compose -f docker-compose.yml up -d --remove-orphans
+ExecStartPost=/bin/sh -c 'sleep 5 && [ -f docker-compose.emulators.yml ] && /usr/bin/docker compose -f docker-compose.emulators.yml up -d || true'
+ExecStop=/bin/sh -c '/usr/bin/docker compose -f docker-compose.emulators.yml down 2>/dev/null; /usr/bin/docker compose -f docker-compose.yml down'
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

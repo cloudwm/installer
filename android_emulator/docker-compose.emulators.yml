@@ -1,0 +1,7 @@
+version: '3.8'
+
+# This file is dynamically managed by the android-farm.sh script.
+# Do NOT edit manually - emulator services are added/removed via the CLI.
+# Use: ./android-farm.sh create --name <name> --version <android_version> --resolution <WxH>
+
+services: {}
