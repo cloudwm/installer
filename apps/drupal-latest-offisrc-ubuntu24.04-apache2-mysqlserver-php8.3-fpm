@@ -56,12 +56,17 @@ install_php() {
 install_composer() {
     echo "Installing Composer..." | log
     cd /tmp
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    if [ $? -ne 0 ] || [ ! -x /usr/local/bin/composer ]; then
-        echo "Composer setup failed. Exiting." | log 1
+    rm -f composer-setup.php
+    curlDownload https://getcomposer.org/installer composer-setup.php
+    waitOrStop 0 "Failed to download composer installer from getcomposer.org"
+    php composer-setup.php --install-dir=/usr/local/bin --filename=composer 2>&1 | log
+    waitOrStop 0 "php composer-setup.php failed"
+    rm -f composer-setup.php
+    if [ ! -x /usr/local/bin/composer ]; then
+        echo "Composer setup ran but /usr/local/bin/composer is missing or not executable. Exiting." | log 1
         exit 1
     fi
-    echo "Composer Version: $(composer --version)" | log
+    echo "Composer Version: $(composer --version 2>&1)" | log
 }
 
 install_drupal() {
