@@ -54,55 +54,34 @@ install_php() {
 }
 
 install_composer() {
-	echo "Installing Composer..." | log
-	cd /tmp
-
-    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-    HASH="$(curl -sS https://composer.github.io/installer.sig)"
-
-    echo "Validating Composer installer hash..." | log
-    php -r "if (hash_file('SHA384', 'composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); } echo PHP_EOL;"
-
-    echo "Running Composer setup..." | log
-    php composer-setup.php --install-dir=/usr/local/bin --filename=composer </dev/null || { echo "Composer setup failed. Exiting." | log; exit 1; }
-
-    echo "Cleaning up Composer setup files..." | log
-    rm -f /tmp/composer-setup.php
-
+    echo "Installing Composer..." | log
+    cd /tmp
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer </dev/null
+    if [ $? -ne 0 ] || [ ! -x /usr/local/bin/composer ]; then
+        echo "Composer setup failed. Exiting." | log 1
+        exit 1
+    fi
     echo "Composer Version: $(composer --version)" | log
 }
 
 install_drupal() {
-    TEMP_USER="temp_composer_user"
+    echo "Installing git (required by Composer for VCS operations)..." | log
+    installPackage git
 
     echo "Creating Drupal project directory..." | log
-    if [ ! -d "$DRUPAL_DIR" ]; then
-        mkdir -p "$DRUPAL_DIR"
-    fi
+    mkdir -p "$DRUPAL_DIR"
 
-    if ! id -u "$TEMP_USER" >/dev/null 2>&1; then
-        useradd -m "$TEMP_USER"
-    fi
-    chown -R "$TEMP_USER:$TEMP_USER" "$DRUPAL_DIR"
-
-    echo "Installing Drupal using Composer as $TEMP_USER..." | log
-    sudo -u "$TEMP_USER" COMPOSER_NO_INTERACTION=1 bash -c "composer create-project --no-interaction drupal/recommended-project '$DRUPAL_DIR'" </dev/null || { echo "Composer failed to install Drupal. Exiting." | log; exit 1; }
-
-    echo "Validating Drupal installation..." | log
-    if [ ! -d "$DRUPAL_DIR/web/core" ]; then
-        echo "Drupal core files were not found. Installation failed. Exiting." | log
+    echo "Installing Drupal via Composer..." | log
+    composer create-project --no-interaction drupal/recommended-project "$DRUPAL_DIR" </dev/null
+    if [ $? -ne 0 ] || [ ! -d "$DRUPAL_DIR/web/core" ]; then
+        echo "Composer failed to install Drupal. Exiting." | log 1
         exit 1
     fi
-
-    echo "Installing additional dependencies..." | log
-    sudo -u "$TEMP_USER" COMPOSER_NO_INTERACTION=1 bash -c "cd '$DRUPAL_DIR' && composer install --no-interaction" </dev/null || { echo "Composer failed to install dependencies. Exiting." | log; exit 1; }
 
     echo "Adjusting file permissions..." | log
     chown -Rf www-data:www-data "$DRUPAL_DIR"
 
-    userdel -r "$TEMP_USER"
-
-    echo "Drupal installation and permission setup completed successfully." | log
+    echo "Drupal installation completed successfully." | log
 }
 
 check_certs() {
@@ -220,11 +199,11 @@ main () {
 	descriptionAppend "Database user Password: ${DB_PASS}"
 	descriptionAppend "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
 	descriptionAppend ""
-	descriptionAppend "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser."
+	descriptionAppend "You can now finish the Drupal setup by visiting https://$DOMAIN in your web browser."
 	descriptionAppend ""
 		
 	echo "Installation complete!" | log
-	echo "You can now finish the Drupal setup by visiting http://$DOMAIN in your web browser." | log
+	echo "You can now finish the Drupal setup by visiting https://$DOMAIN in your web browser." | log
 }
 
 main
