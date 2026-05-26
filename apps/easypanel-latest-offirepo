@@ -10,9 +10,23 @@ echo "Downloading and installing EasyPanel" | log
 curl -sSL https://get.easypanel.io | sh
 waitOrStop 0 "Failed to install EasyPanel"
 
+# The curl|sh installer returns as soon as `docker stack deploy` accepts the
+# spec, but EasyPanel's containers take 30-60s to finish initializing — and
+# during that window EasyPanel writes its own Traefik config, overwriting
+# anything we put there too early. Wait until the easypanel container has
+# been serving HTTP for at least 10s before patching.
+echo "Waiting for EasyPanel to finish initializing..." | log
+for i in $(seq 1 60); do
+    if curl -sf http://127.0.0.1:3000/ >/dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+sleep 15  # let EasyPanel finish writing its own Traefik config
+
 # EasyPanel's Traefik only routes the admin UI to numeric IPs by default
 # (HostRegexp(`^[0-9.]+$`)). Add a router for ${CWM_DOMAIN} so the user can
-# log in via the FQDN. Traefik file-provider hot-reloads this within seconds.
+# log in via the FQDN. Traefik file-provider hot-reloads this within ~10s.
 TRAEFIK_CFG=/etc/easypanel/traefik/config/main.yaml
 PATCH=$(mktemp)
 python3 - "$TRAEFIK_CFG" "$PATCH" "${CWM_DOMAIN}" <<'PY'
