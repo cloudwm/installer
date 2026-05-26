@@ -7,6 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 rootDir=$(rootDir)
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
 echo "Setting Hostname & adding it to hosts" | log
 hostnamectl set-hostname ${CWM_DOMAIN}
@@ -19,11 +20,97 @@ waitOrStop 0 "File not downloaded from github"
 DOKKU_TAG=v0.37.3 bash bootstrap.sh
 waitOrStop 0 "Failed to install application"
 
-echo "Setting dokku domain"
+echo "Setting dokku domain" | log
 dokku domains:set-global ${CWM_DOMAIN}
 
+# Seed root's SSH key into Dokku so `git push dokku` works out of the box.
+if [ -s /root/.ssh/authorized_keys ]; then
+    echo "Seeding admin SSH key into Dokku" | log
+    cat /root/.ssh/authorized_keys | dokku ssh-keys:add admin || true
+fi
+
+echo "Installing Pruvon web UI" | log
+installPackage apache2-utils
+waitOrStop 0 "Failed to install apache2-utils (needed for bcrypt hashing)"
+
+# Pre-seed /etc/pruvon.yml so the Pruvon installer keeps our admin (instead of
+# generating a random password we'd have to scrape from its stdout). Per
+# pruvon's install.sh, it leaves an existing /etc/pruvon.yml alone unless the
+# file still contains the bundled example hash.
+PRUVON_HASH=$(htpasswd -bnBC 10 "" "${ADMINPASSWORD}" | tr -d ':\n' | sed 's/^\$2y/\$2a/')
+cat <<EOF > /etc/pruvon.yml
+users:
+  - username: admin
+    password: "${PRUVON_HASH}"
+    role: admin
+
+pruvon:
+  listen: 127.0.0.1:8080
+
+dokku: {}
+server: null
+
+backup:
+  backup_dir: "/var/lib/dokku/data/pruvon-backup"
+  do_weekly: 0
+  do_monthly: 1
+  db_types:
+    - "postgres"
+    - "mariadb"
+    - "mongo"
+    - "redis"
+  keep_daily_days: 7
+  keep_weekly_num: 6
+  keep_monthly_num: 3
+EOF
+chmod 0600 /etc/pruvon.yml
+
+curl -fsSL https://pruvon.dev/install.sh | bash
+waitOrStop 0 "Failed to install Pruvon"
+
+systemctl enable pruvon.service
+systemctl restart pruvon.service
+waitOrStop 0 "Failed to start Pruvon"
+
+echo "Replacing Dokku default vhost with Pruvon HTTPS reverse proxy" | log
+cat <<EOF > /etc/nginx/conf.d/00-default-vhost.conf
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+nginx -t
+waitOrStop 0 "nginx config test failed"
+systemctl reload nginx
+waitOrStop 0 "Failed to reload nginx"
+
 echo "Adding descriptions" | log
-descriptionAppend "Please proceed to http://${CWM_DOMAIN}/ to finish the installation"
+descriptionAppend "Dokku is installed. Manage it via the Pruvon web UI:"
+descriptionAppend "  WebUI: https://${CWM_DOMAIN}/"
+descriptionAppend "  Username: admin"
+descriptionAppend "  Password: ${ADMINPASSWORD}"
+descriptionAppend "To deploy apps, push via SSH:"
+descriptionAppend "  git remote add dokku dokku@${CWM_DOMAIN}:myapp"
+descriptionAppend "  git push dokku main:master"
 descriptionAppend " "
 
 tagScript success
