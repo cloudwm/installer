@@ -82,7 +82,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-sed -i "s/ALLOWED_HOSTS \= \[]/ALLOWED_HOSTS \= \['${CWM_DOMAIN}']/g" $appPath/djangoproject/settings.py
+SETTINGS_FILE="$appPath/djangoproject/settings.py"
+sed -i "s/^DEBUG = True/DEBUG = False/" "$SETTINGS_FILE"
+sed -i "s|^ALLOWED_HOSTS = \[\]|ALLOWED_HOSTS = ['${CWM_DOMAIN}', '${CWM_SERVERIP}', 'localhost', '127.0.0.1']|" "$SETTINGS_FILE"
+cat <<EOF >> "$SETTINGS_FILE"
+
+# Added by CWM installer (apps/django-latest-osrepo)
+CSRF_TRUSTED_ORIGINS = ['https://${CWM_DOMAIN}']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+EOF
 
 echo "Creating Django service" | log
 cat << EOF > /etc/systemd/system/django.service
@@ -151,7 +159,7 @@ systemctl reload nginx
 waitOrStop 0 "Failed to reload nginx"
 
 echo "Adding descriptions" | log
-descriptionAppend "Django Debug mode is on."
+descriptionAppend "Django Debug mode is off (production)."
 descriptionAppend "Make sure to add your website CSS and index files"
 descriptionAppend "Django root directory: $appPath"
 descriptionAppend "Django settings file: $appPath/djangoproject/settings.py"

@@ -8,8 +8,22 @@ fi
 
 DISCOURSE_DIR="/var/discourse"
 APP_NAME="app"
+MIN_FREE_GB=10
 
 echo "Installing Discourse Forum with Docker + Nginx + SSL" | log
+
+# Discourse's launcher refuses to bootstrap with <5GB free on /var/lib/docker.
+# The base image alone is ~5GB, the bootstrapped app image is another ~3-4GB,
+# plus Postgres/Redis data + logs. 10 GB free at start is the practical minimum.
+echo "Checking free disk on /var/lib/docker volume" | log
+mkdir -p /var/lib/docker
+freeGB=$(df -BG --output=avail /var/lib/docker | tail -1 | tr -dc '0-9')
+if [ -z "$freeGB" ] || [ "$freeGB" -lt "$MIN_FREE_GB" ]; then
+    df -h /var/lib/docker | log
+    echo "ERROR: Less than ${MIN_FREE_GB} GB free on the volume hosting /var/lib/docker. Discourse cannot bootstrap. Provision a VM with at least 20 GB root disk (30+ GB recommended)." | log 1
+    exit 1
+fi
+echo "Free disk OK (${freeGB} GB)" | log
 
 echo "Updating system packages..." | log
 apt-get update -q
@@ -83,20 +97,27 @@ EOF
 
 echo "Configuration created at: ${DISCOURSE_DIR}/containers/${APP_NAME}.yml" | log
 
-./launcher bootstrap ${APP_NAME}
+echo "Bootstrapping Discourse container (this can take 10+ minutes)..." | log
+./launcher bootstrap ${APP_NAME} 2>&1 | log
+waitOrStop 0 "launcher bootstrap failed"
 
 echo "Starting Discourse..." | log
-./launcher start ${APP_NAME}
+./launcher start ${APP_NAME} 2>&1 | log
+waitOrStop 0 "launcher start failed"
 
 echo "Waiting for Discourse to become available..." | log
+discourse_up=0
 for i in {1..30}; do
     if curl -f -s -o /dev/null "http://localhost"; then
         echo "Discourse is running!" | log
+        discourse_up=1
         break
     fi
     echo "Waiting... (${i}/30)" | log
     sleep 10
 done
+[ "$discourse_up" = "1" ]
+waitOrStop 0 "Discourse did not respond on http://localhost after 5 minutes"
 
 GEN_PASS=$(openssl rand -base64 32 | head -c 15)
 
