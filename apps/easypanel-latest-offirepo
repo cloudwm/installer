@@ -10,7 +10,47 @@ echo "Downloading and installing EasyPanel" | log
 curl -sSL https://get.easypanel.io | sh
 waitOrStop 0 "Failed to install EasyPanel"
 
-descriptionAppend "EasyPanel Web UI: http://${CWM_DISPLAYED_ADDRESS}:3000"
+# EasyPanel's Traefik only routes the admin UI to numeric IPs by default
+# (HostRegexp(`^[0-9.]+$`)). Add a router for ${CWM_DOMAIN} so the user can
+# log in via the FQDN. Traefik file-provider hot-reloads this within seconds.
+TRAEFIK_CFG=/etc/easypanel/traefik/config/main.yaml
+PATCH=$(mktemp)
+python3 - "$TRAEFIK_CFG" "$PATCH" "${CWM_DOMAIN}" <<'PY'
+import json, sys
+cfg_path, out_path, domain = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(cfg_path) as f:
+    cfg = json.load(f)
+routers = cfg['http']['routers']
+routers['https-easypanel-fqdn'] = {
+    'service': 'easypanel',
+    'rule': f'Host(`{domain}`)',
+    'priority': 3,
+    'tls': {},
+    'entryPoints': ['https'],
+    'middlewares': [],
+}
+routers['http-easypanel-fqdn'] = {
+    'service': 'easypanel',
+    'rule': f'Host(`{domain}`)',
+    'priority': 3,
+    'entryPoints': ['http'],
+    'middlewares': ['redirect-to-https'],
+}
+with open(out_path, 'w') as f:
+    json.dump(cfg, f, indent=2)
+PY
+if [ ! -s "$PATCH" ]; then
+    echo "Failed to patch Traefik config; leaving original untouched" | log 1
+    exit 1
+fi
+install -m 0644 "$PATCH" "$TRAEFIK_CFG"
+rm -f "$PATCH"
 
-exit 0 
+descriptionAppend "EasyPanel WebUI: https://${CWM_DOMAIN}/"
+descriptionAppend "(Self-signed certificate — accept the browser warning on first visit.)"
+descriptionAppend "On first visit you'll be asked to create an admin account."
+descriptionAppend "After login, set up TLS via Settings → General → Panel Domain."
+descriptionAppend "Fallback access by IP: https://${CWM_SERVERIP}/"
+descriptionAppend " "
 
+exit 0
