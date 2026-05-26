@@ -24,19 +24,22 @@ for i in $(seq 1 60); do
 done
 sleep 15  # let EasyPanel finish writing its own Traefik config
 
-# Release host 80/443 from Traefik so nginx can bind them.
-# Raft-persisted via Swarm — survives reboots.
-echo "Removing host port publications from easypanel_traefik" | log
+# Scale EasyPanel's Traefik to 0 so nginx can own host 80/443.
+# Service publishes 80/443 in mode=host, so --publish-rm is unreliable;
+# scaling to 0 is idempotent and Raft-persisted (survives reboots).
+# Service name is "easypanel-traefik" (hyphen) — EasyPanel deploys services
+# directly, not via docker stack, so there's no "<stack>_<service>" prefix.
+echo "Scaling easypanel-traefik to 0 replicas" | log
 for i in $(seq 1 30); do
-    docker service inspect easypanel_traefik >/dev/null 2>&1 && break
+    docker service inspect easypanel-traefik >/dev/null 2>&1 && break
     sleep 2
 done
-docker service update --publish-rm 80 --publish-rm 443 easypanel_traefik >/dev/null
-waitOrStop 0 "Failed to detach Traefik from host 80/443"
+docker service scale --detach easypanel-traefik=0 >/dev/null
+waitOrStop 0 "Failed to scale easypanel-traefik to 0"
 
-# Wait for kernel to actually release the ports (service update is async).
+# Wait for Traefik task to fully stop and release any held ports.
 for i in $(seq 1 30); do
-    ss -tlnp 2>/dev/null | grep -qE ':(80|443)\s' || break
+    [ "$(docker service ps easypanel-traefik --filter desired-state=running -q 2>/dev/null | wc -l)" = "0" ] && break
     sleep 2
 done
 
