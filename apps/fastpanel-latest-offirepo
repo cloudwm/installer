@@ -22,32 +22,16 @@ ufw reload
 FASTPASSWORD=$(grep -oP "Password:\s*\K.*" "$LOG_FILE")
 rm -f $LOG_FILE
 
-PANEL_URL_HOST="${CWM_DISPLAYED_ADDRESS}"
-if [ -n "${CWM_DOMAIN}" ] && [[ "${CWM_DOMAIN}" == *.* ]]; then
-    echo "Registering FastPanel address ${CWM_DOMAIN}" | log
+if [ -n "${CWM_DOMAIN}" ]; then
     /usr/local/fastpanel2/fastpanel panel add --server-name="${CWM_DOMAIN}" 2>&1 | log
-
-    LE_OK=0
-    for attempt in 1 2 3; do
-        echo "Issuing Let's Encrypt cert for ${CWM_DOMAIN} (attempt ${attempt}/3)" | log
-        if /usr/local/fastpanel2/fastpanel panel change-certificate \
-                --server-name="${CWM_DOMAIN}" \
-                --certificate-type=letsencrypt 2>&1 | log; then
-            LE_OK=1
-            break
-        fi
-        sleep 20
-    done
-    if [ "${LE_OK}" = "1" ]; then
-        export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
-        tag global-domain-set.success
-        PANEL_URL_HOST="${CWM_DOMAIN}"
-    else
-        echo "FastPanel LE cert issuance failed after 3 attempts; panel still works on self-signed cert and can be reissued from the UI" | log 1
-    fi
+    /usr/local/fastpanel2/fastpanel panel change-certificate \
+        --server-name="${CWM_DOMAIN}" \
+        --certificate-type=letsencrypt 2>&1 | log
+    export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+    tag global-domain-set.success
 fi
 
-descriptionAppend "FastPanel Web UI: https://${PANEL_URL_HOST}:8888"
+descriptionAppend "FastPanel Web UI: https://${CWM_DISPLAYED_ADDRESS}:8888"
 descriptionAppend "FastPanel Web User: fastuser"
 descriptionAppend "FastPanel Web Password: ${FASTPASSWORD}"
 
