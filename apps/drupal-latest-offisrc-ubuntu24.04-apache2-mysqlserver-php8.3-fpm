@@ -12,6 +12,8 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 export COMPOSER_ALLOW_SUPERUSER=1
 export COMPOSER_NO_INTERACTION=1
+export HOME="${HOME:-/root}"
+export COMPOSER_HOME="${COMPOSER_HOME:-/root/.composer}"
 
 DRUPAL_DIR="/opt/drupal-site"
 DB_NAME="drupal_db"
