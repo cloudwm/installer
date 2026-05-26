@@ -139,6 +139,10 @@ server {
         fastcgi_pass 127.0.0.1:9000;
     }
 
+    location = / {
+        return 302 /admin/;
+    }
+
     location / {
         try_files \$uri @django;
     }
@@ -163,8 +167,8 @@ descriptionAppend "Django Debug mode is off (production)."
 descriptionAppend "Make sure to add your website CSS and index files"
 descriptionAppend "Django root directory: $appPath"
 descriptionAppend "Django settings file: $appPath/djangoproject/settings.py"
-descriptionAppend "Django WebUI: https://${CWM_DOMAIN}"
-descriptionAppend "Django Admin UI: https://${CWM_DOMAIN}/admin"
+descriptionAppend "Django Admin UI: https://${CWM_DOMAIN}/admin (root URL redirects here)"
+descriptionAppend "Add your own routes to djangoproject/urls.py to serve / with your app"
 descriptionAppend "Django user: root"
 descriptionAppend "Django password: ${ADMINPASSWORD}"
 descriptionAppend " "
