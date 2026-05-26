@@ -34,13 +34,15 @@ for i in $(seq 1 30); do
     docker service inspect easypanel-traefik >/dev/null 2>&1 && break
     sleep 2
 done
-docker service scale --detach easypanel-traefik=0 >/dev/null
+docker service scale easypanel-traefik=0 2>&1 | log
 waitOrStop 0 "Failed to scale easypanel-traefik to 0"
 
-# Wait for Traefik task to fully stop and release any held ports.
+# Belt-and-suspenders: confirm the host ports are actually free before
+# nginx tries to bind them. `service scale` returns after Swarm converges,
+# but the kernel can take an extra moment to release the listening socket.
 for i in $(seq 1 30); do
-    [ "$(docker service ps easypanel-traefik --filter desired-state=running -q 2>/dev/null | wc -l)" = "0" ] && break
-    sleep 2
+    ss -tlnp 2>/dev/null | grep -qE ':(80|443)\s' || break
+    sleep 1
 done
 
 # Nginx vhost: terminate SSL on 443, proxy to EasyPanel on :3000.
