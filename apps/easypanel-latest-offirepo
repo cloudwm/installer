@@ -37,13 +37,19 @@ done
 docker service scale easypanel-traefik=0 2>&1 | log
 waitOrStop 0 "Failed to scale easypanel-traefik to 0"
 
-# Belt-and-suspenders: confirm the host ports are actually free before
-# nginx tries to bind them. `service scale` returns after Swarm converges,
-# but the kernel can take an extra moment to release the listening socket.
-for i in $(seq 1 30); do
-    ss -tlnp 2>/dev/null | grep -qE ':(80|443)\s' || break
+# Wait until Traefik's docker-proxy is gone from 80/443. The `ss` check must
+# match the docker-proxy user specifically — the nginx-letsencrypt-cert tweak
+# left nginx bound to :80, so a generic "anything on 80/443" check would exit
+# immediately while Traefik is still mid-shutdown on 443.
+for i in $(seq 1 60); do
+    ss -tlnp 2>/dev/null | grep -E ':(80|443)\s' | grep -q docker-proxy || break
     sleep 1
 done
+
+# Stop nginx so it releases :80 cleanly before we restart with the SSL vhost.
+# This avoids the brief window during `systemctl restart` where nginx drops
+# :80 and something else (e.g. a still-shutting-down docker-proxy) could grab it.
+systemctl stop nginx
 
 # Nginx vhost: terminate SSL on 443, proxy to EasyPanel on :3000.
 # WebSocket upgrade headers are mandatory — EasyPanel uses WS for live logs / terminal.
@@ -76,11 +82,9 @@ EOF
 ln -sf /etc/nginx/sites-available/easypanel /etc/nginx/sites-enabled/easypanel
 rm -f /etc/nginx/sites-enabled/default
 nginx -t 2>&1 | log
-systemctl restart nginx
-waitOrStop 0 "Failed to restart Nginx for EasyPanel"
+systemctl start nginx
+waitOrStop 0 "Failed to start Nginx for EasyPanel"
 
 descriptionAppend "EasyPanel WebUI: https://${CWM_DOMAIN}/"
 descriptionAppend "On first visit you'll be asked to create an admin account."
-descriptionAppend " "
-
-exit 0
+ttps://${CWM_SERVERIP}/"
