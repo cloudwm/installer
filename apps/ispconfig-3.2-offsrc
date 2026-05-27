@@ -37,6 +37,19 @@ php install.php --autoinstall=autoinstall.ini
 systemctl start mysql.service
 
 sed -i 's/^\(\s*fastcgi_pass\s*\).*/\1127.0.0.1:9000;/' /etc/nginx/sites-available/ispconfig.vhost
+
+# ISPConfig's IDS Monitor writes to /usr/local/ispconfig/interface/temp on every PHP request.
+# Ubuntu's php7.4-fpm.service ships with ProtectSystem=full, which mounts /usr read-only for
+# the FPM workers — even though /usr/local/ispconfig/interface/temp is owned by www-data, PHP
+# gets EROFS and Monitor.php throws InvalidArgumentException -> HTTP 500 on the login page.
+# Drop in a unit override exposing only /usr/local/ispconfig as read-write; keep the rest of
+# the hardening intact.
+mkdir -p /etc/systemd/system/php7.4-fpm.service.d
+cat > /etc/systemd/system/php7.4-fpm.service.d/ispconfig.conf <<'EOF'
+[Service]
+ReadWritePaths=/usr/local/ispconfig
+EOF
+systemctl daemon-reload
 chown -R www-data:www-data /usr/local/ispconfig
 systemctl restart php7.4-fpm.service
 
@@ -51,15 +64,19 @@ else
 fi
 
 echo "Writing port-80 redirect vhost (eliminates default 'Welcome to nginx' page)" | log
+# default_server: ISPConfig ships acme.vhost on :80 with server_name=server1.example.com
+# which would otherwise become the implicit default and 403 every request to http://<ip>/.
+# Prefix 000- so it sorts before 999-acme.vhost (lexical load order in sites-enabled).
 cat > /etc/nginx/sites-available/ispconfig-http <<EOF
 server {
-    listen 80;
-    listen [::]:80;
+    listen 80 default_server;
+    listen [::]:80 default_server;
     server_name ${CWM_DOMAIN} _;
     return 301 https://\$host:8080\$request_uri;
 }
 EOF
-ln -sf /etc/nginx/sites-available/ispconfig-http /etc/nginx/sites-enabled/ispconfig-http
+rm -f /etc/nginx/sites-enabled/ispconfig-http
+ln -sf /etc/nginx/sites-available/ispconfig-http /etc/nginx/sites-enabled/000-ispconfig-http
 rm -f /etc/nginx/sites-enabled/default
 
 nginx -t
