@@ -49,7 +49,6 @@ Signed-By: $ondrejKeyring
 EOF
 fi
 apt-get update 2>&1 | log
-waitOrStop 0 "apt-get update failed after adding ondrej/php PPA"
 
 echo "Installing php8.1-fpm" | log
 installPackage php8.1-fpm
