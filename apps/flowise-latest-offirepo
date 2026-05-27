@@ -8,6 +8,17 @@ fi
 
 appPath=/var/flowise
 rootDir=$(rootDir)
+MIN_FREE_GB=10
+
+echo "Checking free disk on /var/lib/docker volume" | log
+mkdir -p /var/lib/docker
+freeGB=$(df -BG --output=avail /var/lib/docker | tail -1 | tr -dc '0-9')
+if [ -z "$freeGB" ] || [ "$freeGB" -lt "$MIN_FREE_GB" ]; then
+    df -h /var/lib/docker | log
+    echo "ERROR: Less than ${MIN_FREE_GB} GB free on the volume hosting /var/lib/docker. Flowise's Docker image (~1 GB compressed, ~3 GB on disk) cannot be pulled. Provision a VM with at least 20 GB root disk." | log 1
+    exit 1
+fi
+echo "Free disk OK (${freeGB} GB)" | log
 
 echo "Installing Docker dependencies" | log
 installPackage curl git
@@ -17,10 +28,6 @@ echo "Installing Docker" | log
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
 waitOrStop 0 "Failed to install Docker"
-
-echo "Installing Docker Compose" | log
-apt-get install docker-compose -y
-waitOrStop 0 "Failed to install Docker Compose"
 
 echo "Cloning Flowise repository" | log
 git clone https://github.com/FlowiseAI/Flowise.git $appPath
