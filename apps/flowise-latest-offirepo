@@ -37,6 +37,12 @@ cd $appPath/docker
 cp .env.example .env
 sed -i "s|^FLOWISE_USERNAME=.*|FLOWISE_USERNAME=${ADMINEMAIL}|" .env
 sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
+# Flowise's docker-compose.yml forwards LOG_PATH unconditionally; with no value
+# the container does mkdirSync('') and crash-loops. Mount /var/log/flowise so
+# logs land on the host and survive container recreation.
+mkdir -p /var/log/flowise
+sed -i "s|^# LOG_PATH=.*|LOG_PATH=/var/log/flowise|" .env
+sed -i "/- ~\/.flowise:\/root\/.flowise/a\            - /var/log/flowise:/var/log/flowise" docker-compose.yml
 chown -R root:root $appPath
 chmod -R 755 $appPath
 
@@ -66,6 +72,7 @@ server {
 }
 EOF
 ln -sf /etc/nginx/sites-available/flowise /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
 nginx -t
 waitOrStop 0 "Nginx configuration test failed"
 systemctl restart nginx
