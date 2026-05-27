@@ -144,7 +144,7 @@ echo "Modifying microk8s repository" | log
 microk8s addons repo remove core-fork || true
 
 microk8s addons repo add core-fork \
-  https://github.com/cloudwm/microk8s-core-addons.git 
+  https://github.com/cloudwm/microk8s-core-addons.git
   waitOrStop 0 "Repository addition failed"
 
 sudo microk8s addons repo remove core
@@ -177,8 +177,8 @@ metadata:
   name: admin-user
   namespace: kube-system
   annotations:
-    kubernetes.io/service-account.name: "admin-user"   
-type: kubernetes.io/service-account-token  
+    kubernetes.io/service-account.name: "admin-user"
+type: kubernetes.io/service-account-token
 EOF
 echo "Applying admin-user yaml to cluster" | log
 microk8s kubectl apply -f $rootDir/user.yaml
@@ -201,30 +201,81 @@ microk8s helm dependency build
 waitOrStop 0 "dependency build failed"
 
 echo "Patching values.yaml with domain and server IP" | log
+# Ingress host (0.0.0.0 -> CWM_DOMAIN) and the in-cluster ingress-nginx public
+# address (externalIPs 1.1.1.1 -> CWM_SERVERIP). The controller therefore owns
+# CWM_SERVERIP:80 and :443 directly and terminates TLS itself -- no host nginx.
 sed -i 's/0.0.0.0/'"$CWM_DOMAIN"'/' values.yaml
 sed -i 's/1.1.1.1/'"$CWM_SERVERIP"'/' values.yaml
 
-echo "Installing dashboard helm chart" | log
-microk8s helm install dashboard . --namespace kube-system
+echo "Selecting ACME (Let's Encrypt) settings" | log
+# Email used to register the ACME account (expiry/renewal notices).
+ACME_EMAIL="${CWM_EMAIL:-admin@${CWM_DOMAIN}}"
+# Default Let's Encrypt environment for the dashboard ingress. Both the staging
+# and production ClusterIssuers are always created below; this only selects which
+# one the ingress is annotated with.
+#   prod    -> trusted certificate (subject to LE rate limits)
+#   staging -> untrusted test certificate (no rate limits)
+ACME_ENV="${CWM_LETSENCRYPT_ENV:-prod}"
+case "${ACME_ENV}" in
+  staging) ACME_ISSUER="letsencrypt-staging" ;;
+  *)       ACME_ISSUER="letsencrypt-prod" ;;
+esac
+echo "ACME email: ${ACME_EMAIL} | default issuer: ${ACME_ISSUER}" | log
+
+echo "Writing dashboard helm override values" | log
+# - cert-manager.enabled: deploy the bundled cert-manager (the in-cluster
+#   "certbot") so certificates are issued AND renewed automatically; no
+#   host-level certbot and no /etc/letsencrypt files are needed anymore.
+# - app.ingress.issuer.{scope,name}: annotate the dashboard ingress with
+#   'cert-manager.io/cluster-issuer: <ACME_ISSUER>' so cert-manager's
+#   ingress-shim auto-creates the Certificate + TLS secret for CWM_DOMAIN.
+# - useDefaultAnnotations is turned off on purpose: the chart default enables
+#   ssl-passthrough, which would stop the controller from terminating TLS with
+#   the Let's Encrypt secret. We keep only backend-protocol HTTPS (kong serves
+#   TLS to the controller) and ssl-redirect; cert-manager's HTTP-01 solver
+#   overrides the redirect on the ACME challenge path automatically.
+cat << EOF > $rootDir/dashboard-override.yaml
+cert-manager:
+  enabled: true
+  installCRDs: true
+  crds:
+    enabled: true
+app:
+  ingress:
+    tls:
+      enabled: true
+    issuer:
+      scope: cluster
+      name: ${ACME_ISSUER}
+    useDefaultAnnotations: false
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+EOF
+
+echo "Installing dashboard helm chart (in-cluster ingress-nginx + cert-manager)" | log
+microk8s helm install dashboard . --namespace kube-system -f "$rootDir/dashboard-override.yaml"
 waitOrStop 0 "Dashboard install failed"
 
 echo "Retrieving admin-user token" | log
 export ADMINTOKEN=`microk8s kubectl get secret admin-user -n kube-system -o jsonpath="{.data.token}" | base64 -d && echo`
 
-echo "Expose Kubernetes Dashboard through internal NGINX ingress" | log
-
 #-------------
-echo "Waiting for Kubernetes API before creating dashboard ingress" | log
-microk8s status --wait-ready
+# Automatic TLS with the in-cluster ingress-nginx + cert-manager.
+#
+# The bundled ingress-nginx controller owns CWM_SERVERIP:80 and :443 directly
+# (service.externalIPs), so it serves the dashboard on the public IP and answers
+# the ACME HTTP-01 challenge on port 80. cert-manager (deployed as a sub-chart)
+# watches the dashboard ingress, requests a Let's Encrypt certificate via the
+# selected ClusterIssuer, and renews it automatically. There is no host nginx
+# and no host-level certbot anymore.
+echo "Freeing host ports 80/443 for the in-cluster ingress (disabling host nginx if present)" | log
+systemctl disable --now nginx 2>/dev/null || true
 
+echo "Waiting for Kubernetes API before configuring TLS automation" | log
+microk8s status --wait-ready
 until microk8s kubectl get nodes >/dev/null 2>&1; do
   echo "Waiting for Kubernetes API..." | log
-  sleep 5
-done
-
-echo "Waiting for dashboard web service" | log
-until microk8s kubectl get svc dashboard-kubernetes-dashboard-web -n kube-system >/dev/null 2>&1; do
-  echo "Waiting for dashboard-kubernetes-dashboard-web service..." | log
   sleep 5
 done
 
@@ -237,21 +288,66 @@ done
 echo "Waiting for ingress-nginx controller to become Ready" | log
 microk8s kubectl rollout status deployment/dashboard-nginx-controller -n kube-system --timeout=300s
 
-echo "Waiting for Let's Encrypt certificate files for ${CWM_DOMAIN}" | log
-CERT_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
-KEY_PATH="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
-until [ -s "$CERT_PATH" ] && [ -s "$KEY_PATH" ]; do
-  echo "Waiting for certificate files at /etc/letsencrypt/live/${CWM_DOMAIN}/..." | log
+echo "Waiting for cert-manager CRDs to be registered" | log
+until microk8s kubectl get crd clusterissuers.cert-manager.io >/dev/null 2>&1; do
+  echo "Waiting for clusterissuers.cert-manager.io CRD..." | log
   sleep 5
 done
 
-echo "Creating/updating dashboard-tls secret from Let's Encrypt certificate" | log
-microk8s kubectl create secret tls dashboard-tls \
-  -n kube-system \
-  --cert="$CERT_PATH" \
-  --key="$KEY_PATH" \
-  --dry-run=client -o yaml | microk8s kubectl apply -f -
-waitOrStop 0 "Failed to create/update dashboard-tls secret"
+echo "Waiting for cert-manager components to become Available" | log
+microk8s kubectl wait --for=condition=Available --timeout=300s \
+  -n kube-system deployment \
+  -l app.kubernetes.io/instance=dashboard,app.kubernetes.io/name=cert-manager || true
+microk8s kubectl wait --for=condition=Available --timeout=300s \
+  -n kube-system deployment \
+  -l app.kubernetes.io/instance=dashboard,app.kubernetes.io/name=webhook || true
+
+echo "Creating Let's Encrypt ClusterIssuers (staging + production)" | log
+cat << EOF > $rootDir/letsencrypt-clusterissuers.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: ${ACME_EMAIL}
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: internal-nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ${ACME_EMAIL}
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: internal-nginx
+EOF
+
+# Apply with retry: the cert-manager webhook can reject requests for a short
+# while after the deployment reports Available.
+ISSUER_APPLIED=0
+for attempt in $(seq 1 30); do
+  if microk8s kubectl apply -f "$rootDir/letsencrypt-clusterissuers.yaml"; then
+    ISSUER_APPLIED=1
+    break
+  fi
+  echo "cert-manager webhook not ready yet, retrying ClusterIssuer apply (${attempt}/30)..." | log
+  sleep 10
+done
+[ "${ISSUER_APPLIED}" -eq 1 ]
+waitOrStop 0 "Failed to apply Let's Encrypt ClusterIssuers"
 
 echo "Waiting for kubernetes-dashboard ingress to exist" | log
 until microk8s kubectl get ingress kubernetes-dashboard -n kube-system >/dev/null 2>&1; do
@@ -259,113 +355,27 @@ until microk8s kubectl get ingress kubernetes-dashboard -n kube-system >/dev/nul
   sleep 5
 done
 
-echo "Patching kubernetes-dashboard ingress with domain and TLS secret" | log
-microk8s kubectl patch ingress kubernetes-dashboard -n kube-system \
-  --type='json' \
-  -p="[
-    {\"op\":\"replace\",\"path\":\"/spec/tls/0/hosts/0\",\"value\":\"${CWM_DOMAIN}\"},
-    {\"op\":\"replace\",\"path\":\"/spec/tls/0/secretName\",\"value\":\"dashboard-tls\"},
-    {\"op\":\"replace\",\"path\":\"/spec/rules/0/host\",\"value\":\"${CWM_DOMAIN}\"}
-  ]"
-waitOrStop 0 "Failed to patch dashboard ingress"
+echo "Dashboard ingress (cert-manager requests the certificate automatically):" | log
+microk8s kubectl get ingress kubernetes-dashboard -n kube-system -o wide || true
 
-microk8s kubectl get ingress kubernetes-dashboard -n kube-system
-waitOrStop 0 "Dashboard ingress was not created"
-#------------+
-
-#-------------
-# Front the in-cluster ingress with the host's own nginx.
-#
-# The chart binds the in-cluster ingress-nginx controller to the node's public
-# IP via service.externalIPs (the 1.1.1.1 -> CWM_SERVERIP substitution), which
-# claims CWM_SERVERIP:443 in kube-proxy and leaves no room for the host nginx.
-# We switch that service to NodePort (and drop externalIPs) so 443 is free, then
-# point the host nginx at the controller's https NodePort. The host nginx
-# terminates the real Let's Encrypt cert to the browser and reverse-proxies over
-# HTTPS to the controller (proxy_ssl_verify off, since the in-cluster side serves
-# the same cert/self-signed and routing already lives in the ingress).
-echo "Switching in-cluster ingress controller service to NodePort" | log
-CTRL_SVC="$(microk8s kubectl get svc -n kube-system \
-  -l app.kubernetes.io/name=ingress-nginx,app.kubernetes.io/component=controller \
-  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
-[ -z "${CTRL_SVC}" ] && CTRL_SVC="dashboard-nginx-controller"
-echo "Ingress controller service: ${CTRL_SVC}" | log
-
-microk8s kubectl patch svc "${CTRL_SVC}" -n kube-system \
-  -p '{"spec":{"type":"NodePort","externalIPs":[]}}'
-waitOrStop 0 "Failed to switch ${CTRL_SVC} to NodePort"
-
-echo "Resolving https NodePort of ${CTRL_SVC}" | log
-HTTPS_NODEPORT=""
-until [ -n "${HTTPS_NODEPORT}" ]; do
-  HTTPS_NODEPORT="$(microk8s kubectl get svc "${CTRL_SVC}" -n kube-system \
-    -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null)"
-  [ -z "${HTTPS_NODEPORT}" ] && { echo "Waiting for https NodePort..." | log; sleep 3; }
-done
-echo "Ingress https NodePort: ${HTTPS_NODEPORT}" | log
-
-echo "Writing host nginx reverse-proxy config for ${CWM_DOMAIN}" | log
-cat << EOF > /etc/nginx/conf.d/k8s-dashboard-upgrade.conf
-map \$http_upgrade \$connection_upgrade {
-    default upgrade;
-    ''      close;
-}
-EOF
-
-cat << EOF > /etc/nginx/sites-available/k8s-dashboard
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${CWM_DOMAIN};
-    return 301 https://\$host\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${CWM_DOMAIN};
-
-    ssl_certificate     ${CERT_PATH};
-    ssl_certificate_key ${KEY_PATH};
-
-    client_max_body_size 0;
-
-    location / {
-        proxy_pass https://${CWM_SERVERIP}:${HTTPS_NODEPORT};
-        proxy_ssl_server_name on;
-        proxy_ssl_name ${CWM_DOMAIN};
-        proxy_ssl_verify off;
-
-        proxy_set_header Host ${CWM_DOMAIN};
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-    }
-}
-EOF
-
-ln -sf /etc/nginx/sites-available/k8s-dashboard /etc/nginx/sites-enabled/k8s-dashboard
-rm -f /etc/nginx/sites-enabled/default
-
-
-echo "Validating host nginx configuration" | log
-nginx -t
-waitOrStop 0 "Host nginx config test failed"
-
-echo "Enabling and restarting host nginx" | log
-systemctl enable nginx
-systemctl restart nginx
-waitOrStop 0 "Failed to (re)start host nginx"
+# Best-effort wait for issuance. HTTP-01 needs CWM_DOMAIN to resolve to this
+# server and port 80 reachable from the internet; cert-manager keeps retrying on
+# its own, so do not fail the whole install if it is not Ready within the window.
+echo "Waiting (best-effort) for the dashboard TLS certificate to be issued" | log
+if microk8s kubectl wait --for=condition=Ready certificate -n kube-system --all --timeout=300s; then
+  echo "Dashboard TLS certificate issued via ${ACME_ISSUER}" | log
+else
+  echo "Certificate not Ready yet; cert-manager will keep retrying in the background." | log
+  echo "Inspect with: microk8s kubectl describe certificate -n kube-system" | log
+fi
 #------------+
 
 echo "Adding descriptions" | log
 descriptionAppend "Kubernetes Dashboard UI: https://${CWM_DOMAIN}/"
+descriptionAppend " "
+descriptionAppend "TLS is managed automatically in-cluster by cert-manager (issuer: ${ACME_ISSUER})."
+descriptionAppend "To switch the environment, re-annotate the ingress, e.g.:"
+descriptionAppend "  microk8s kubectl annotate ingress kubernetes-dashboard -n kube-system --overwrite cert-manager.io/cluster-issuer=letsencrypt-prod"
 descriptionAppend " "
 descriptionAppend "Kubernetest admin-user token: ${ADMINTOKEN}"
 descriptionAppend " "
