@@ -28,6 +28,18 @@ resolve_domain() {
     fi
 }
 
+ensure_swap() {
+    if [ -n "$(swapon --show=NAME --noheadings 2>/dev/null)" ]; then
+        echo "Swap already active; skipping" | log
+        return 0
+    fi
+    echo "Creating 4 GB swap at /swapfile (GitLab reconfigure is RAM-hungry)" | log
+    createSwapFile swapfile 4096 / | log
+    if ! grep -q '^/swapfile' /etc/fstab; then
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+}
+
 install_dependencies() {
     echo "Installing dependencies" | log
     installPackage ca-certificates tzdata perl
@@ -70,23 +82,34 @@ free_web_ports() {
     systemctl disable --now nginx 2>/dev/null || true
 }
 
+pre_seed_gitlab_rb() {
+    echo "Pre-seeding /etc/gitlab/gitlab.rb before package post-install reconfigure" | log
+    mkdir -p /etc/gitlab
+    cat > /etc/gitlab/gitlab.rb <<EOF
+external_url "http://${CWM_DOMAIN}"
+# alertmanager (memberlist) needs an RFC1918 address; on single-IP public-only
+# VMs it cannot bind and reconfigure aborts. Disable it.
+alertmanager['enable'] = false
+EOF
+}
+
 install_gitlab_package() {
     echo "Installing GitLab from apt" | log
     apt update >>"${LOG_FILE}" 2>&1
-    EXTERNAL_URL="http://${CWM_DOMAIN}" installPackage gitlab-ce
+    installPackage gitlab-ce
     waitOrStop 0 "Failed to install gitlab-ce"
 }
 
 configure_gitlab_ssl() {
     echo "Wiring GitLab to pre-issued certificates from nginx-letsencrypt-cert tweak" | log
-    cat >> /etc/gitlab/gitlab.rb << EOF
-
-# SSL — certificates provisioned by tweaks/nginx-letsencrypt-cert
+    cat > /etc/gitlab/gitlab.rb <<EOF
 external_url "https://${CWM_DOMAIN}"
 letsencrypt['enable'] = false
 nginx['redirect_http_to_https'] = true
 nginx['ssl_certificate']     = "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
 nginx['ssl_certificate_key'] = "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+# Keep alertmanager disabled (memberlist needs RFC1918 — fatal on public-only VMs)
+alertmanager['enable'] = false
 EOF
 }
 
@@ -153,12 +176,15 @@ main() {
     setup_environment
     resolve_domain
 
+    ensure_swap
+
     install_dependencies
     refresh_ca_trust
     ensure_cert_cn
 
     add_gitlab_repo
     free_web_ports
+    pre_seed_gitlab_rb
     install_gitlab_package
 
     configure_gitlab_ssl
