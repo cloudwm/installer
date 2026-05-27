@@ -237,9 +237,13 @@ echo "Writing dashboard helm override values" | log
 cat << EOF > $rootDir/dashboard-override.yaml
 cert-manager:
   enabled: true
-  installCRDs: true
+  # cert-manager v1.16 fails if both the deprecated .installCRDs and its
+  # replacement .crds.enabled are set. The dashboard chart hardcodes
+  # installCRDs: true, so force it off here and use the modern crds.* path.
+  installCRDs: false
   crds:
     enabled: true
+    keep: true
 app:
   ingress:
     tls:
