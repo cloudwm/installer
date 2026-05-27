@@ -244,6 +244,25 @@ cert-manager:
   crds:
     enabled: true
     keep: true
+  # Trust the host's CA bundle inside the cert-manager controller. In the cloudwm
+  # dev environment, outbound TLS to acme-v02.api.letsencrypt.org is intercepted
+  # and re-signed by the private "acme-dev-ca" (which fronts an internal ACME
+  # server, acme.cloudwm-dev.com); without this the prod ClusterIssuer fails ACME
+  # account registration with "x509: certificate signed by unknown authority".
+  # Mounting the host bundle (already trusted on dev hosts) makes prod work there,
+  # and is a harmless no-op on real production hosts where the bundle is just the
+  # standard public CAs.
+  extraEnv:
+    - name: SSL_CERT_FILE
+      value: /etc/cwm-ca/ca-certificates.crt
+  volumes:
+    - name: cwm-host-ca
+      configMap:
+        name: cwm-host-ca
+  volumeMounts:
+    - name: cwm-host-ca
+      mountPath: /etc/cwm-ca
+      readOnly: true
 app:
   ingress:
     tls:
@@ -256,6 +275,14 @@ app:
       nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
       nginx.ingress.kubernetes.io/ssl-redirect: "true"
 EOF
+
+echo "Publishing host CA bundle to the cluster for cert-manager to trust" | log
+# Must exist before the helm install: the cert-manager controller pod mounts this
+# ConfigMap, and a missing ConfigMap would leave the pod stuck ContainerCreating.
+microk8s kubectl create configmap cwm-host-ca -n kube-system \
+  --from-file=ca-certificates.crt=/etc/ssl/certs/ca-certificates.crt \
+  --dry-run=client -o yaml | microk8s kubectl apply -f -
+waitOrStop 0 "Failed to publish host CA bundle ConfigMap"
 
 echo "Installing dashboard helm chart (in-cluster ingress-nginx + cert-manager)" | log
 microk8s helm install dashboard . --namespace kube-system -f "$rootDir/dashboard-override.yaml"
