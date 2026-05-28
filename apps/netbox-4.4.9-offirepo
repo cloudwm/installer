@@ -28,9 +28,9 @@ fi
 
 appDir="/opt/netbox"
 rm -rf $appDir
-mkdir -p $appDir/config/netbox $appDir/config/postgres $appDir/config/redis \
-         $appDir/config/reports $appDir/config/scripts $appDir/config/startup_scripts \
-         $appDir/media $appDir/config/netbox/static
+mkdir -p $appDir/config/postgres $appDir/config/redis \
+         $appDir/config/reports $appDir/config/scripts \
+         $appDir/media
 chown -R $USER:$USER $appDir
 
 DB_PASSWORD=$(openssl rand -hex 16)
@@ -53,46 +53,6 @@ SUPERUSER_NAME=admin
 SUPERUSER_EMAIL=admin@$CWM_DOMAIN
 SUPERUSER_PASSWORD=$ADMIN_PASS
 SKIP_SUPERUSER=false
-STATIC_ROOT=/opt/netbox/config/netbox/static
-EOF
-
-cat > $appDir/config/netbox/configuration.py << 'EOF'
-from os import environ
-
-ALLOWED_HOSTS = ['*']
-
-DATABASE = {
-    "ENGINE": "django.db.backends.postgresql",
-    "NAME": environ.get("DB_NAME", "netbox"),
-    "USER": environ.get("DB_USER", "netbox"),
-    "PASSWORD": environ.get("DB_PASSWORD", ""),
-    "HOST": environ.get("DB_HOST", "netbox-postgres"),
-    "PORT": environ.get("DB_PORT", "5432"),
-    "CONN_MAX_AGE": 300,
-}
-
-REDIS = {
-    "tasks": {
-        "HOST": environ.get("REDIS_HOST", "netbox-redis"),
-        "PORT": int(environ.get("REDIS_PORT", 6379)),
-        "DATABASE": int(environ.get("REDIS_DB_TASKS", 0)),
-        "SSL": False,
-    },
-    "caching": {
-        "HOST": environ.get("REDIS_HOST", "netbox-redis"),
-        "PORT": int(environ.get("REDIS_PORT", 6379)),
-        "DATABASE": int(environ.get("REDIS_DB_CACHE", 1)),
-        "SSL": False,
-    },
-}
-
-SECRET_KEY = environ.get("SECRET_KEY", "")
-DEBUG = False
-PLUGINS = []
-
-STATIC_URL = "/static/"
-STATIC_ROOT = environ.get("STATIC_ROOT", "/opt/netbox/config/netbox/static")
-STATICFILES_DIRS = []
 EOF
 
 cat > $appDir/docker-compose.yml << 'EOF'
@@ -137,34 +97,17 @@ services:
         condition: service_healthy
     env_file: .env
     ports:
-      - "8000:8080"
+      - "8000:8000"
     volumes:
-      - ./config/netbox:/etc/netbox/config:z
       - ./config/reports:/etc/netbox/reports:z
       - ./config/scripts:/etc/netbox/scripts:z
       - ./media:/opt/netbox/netbox/media:z
-      - ./config/netbox/static:/opt/netbox/netbox/static:z
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/login/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f -H 'Host: localhost' http://localhost:8000/login/ || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 120s
-
-  netbox-worker:
-    image: netboxcommunity/netbox:latest-3.4.1
-    container_name: netbox-worker
-    restart: unless-stopped
-    depends_on:
-      netbox:
-        condition: service_healthy
-    env_file: .env
-    volumes:
-      - ./config/netbox:/etc/netbox/config:z
-      - ./config/reports:/etc/netbox/reports:z
-      - ./config/scripts:/etc/netbox/scripts:z
-      - ./media:/opt/netbox/netbox/media:z
-    command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "rqworker"]
 
   # netbox-housekeeping:
   #   image: netboxcommunity/netbox:latest
@@ -230,16 +173,6 @@ done
 echo "Starting NetBox..." | log
 docker compose up -d netbox
 sleep 60
-
-echo "Running migrations..." | log
-docker compose exec netbox ./manage.py migrate --noinput
-
-echo "Collecting static files..." | log
-docker compose exec netbox ./manage.py collectstatic --noinput --clear
-
-echo "Starting worker..." | log
-docker compose up -d netbox-worker
-
 
 systemctl restart nginx
 
