@@ -105,15 +105,13 @@ cat << 'EOF' > /var/www/minecraft/index.html
   <h1>Minecraft Server</h1>
   <p class="note">This host has no web UI. Connect with the Minecraft client.</p>
   <div class="addr">
-    <code id="a">__DOMAIN__:__PORT__</code>
+    <code id="a">__SERVERIP__:__PORT__</code>
     <button onclick="navigator.clipboard.writeText(document.getElementById('a').innerText)">Copy</button>
   </div>
-  <div class="fallback">or by IP: __SERVERIP__:__PORT__</div>
   <p class="howto">In Minecraft: Multiplayer &rarr; Add Server &rarr; paste the address above.</p>
 </div></body></html>
 EOF
 
-sed -i "s/__DOMAIN__/${CWM_DOMAIN}/g"     /var/www/minecraft/index.html
 sed -i "s/__SERVERIP__/${CWM_SERVERIP}/g" /var/www/minecraft/index.html
 sed -i "s/__PORT__/25565/g"               /var/www/minecraft/index.html
 
