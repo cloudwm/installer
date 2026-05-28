@@ -38,7 +38,7 @@ SECRET_KEY=$(openssl rand -base64 48 | tr -d /=+ | cut -c1-50)
 ADMIN_PASS=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-20)
 
 cat > $appDir/.env << EOF
-ALLOWED_HOSTS=*
+ALLOWED_HOST=$CWM_DOMAIN
 DB_NAME=netbox
 DB_USER=netbox
 DB_PASSWORD=$DB_PASSWORD
@@ -47,12 +47,8 @@ DB_PORT=5432
 REDIS_HOST=netbox-redis
 REDIS_PORT=6379
 REDIS_DB_CACHE=1
-REDIS_DB_TASKS=0
+REDIS_DB_TASK=0
 SECRET_KEY=$SECRET_KEY
-SUPERUSER_NAME=admin
-SUPERUSER_EMAIL=admin@$CWM_DOMAIN
-SUPERUSER_PASSWORD=$ADMIN_PASS
-SKIP_SUPERUSER=false
 EOF
 
 cat > $appDir/docker-compose.yml << 'EOF'
@@ -172,7 +168,39 @@ done
 
 echo "Starting NetBox..." | log
 docker compose up -d netbox
-sleep 60
+
+echo "Waiting for NetBox to become healthy (up to 10 min)..." | log
+for i in {1..120}; do
+    health=$(docker inspect --format '{{.State.Health.Status}}' netbox 2>/dev/null)
+    if [ "$health" = "healthy" ]; then
+        echo "NetBox is healthy after $((i*5))s" | log
+        break
+    fi
+    sleep 5
+done
+
+if [ "$health" != "healthy" ]; then
+    echo "NetBox failed to become healthy; aborting" | log 1
+    docker logs netbox --tail 50 2>&1 | log 1
+    exit 1
+fi
+
+echo "Creating admin superuser..." | log
+docker exec -e DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS" netbox \
+    /app/netbox/venv/bin/python /app/netbox/netbox/manage.py shell -c "
+from django.contrib.auth import get_user_model
+U = get_user_model()
+if not U.objects.filter(username='admin').exists():
+    U.objects.create_superuser('admin', 'admin@$CWM_DOMAIN', '$ADMIN_PASS')
+    print('Superuser admin created')
+else:
+    u = U.objects.get(username='admin')
+    u.set_password('$ADMIN_PASS')
+    u.is_superuser = True
+    u.is_staff = True
+    u.save()
+    print('Superuser admin password reset')
+" 2>&1 | log
 
 systemctl restart nginx
 
