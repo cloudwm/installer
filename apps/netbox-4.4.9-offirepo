@@ -99,7 +99,7 @@ services:
       - ./config/scripts:/etc/netbox/scripts:z
       - ./media:/opt/netbox/netbox/media:z
     healthcheck:
-      test: ["CMD-SHELL", "curl -f -H 'Host: localhost' http://localhost:8000/login/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f -H 'Host: __CWM_DOMAIN__' http://localhost:8000/login/ || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -110,6 +110,8 @@ services:
   #   restart: unless-stopped
   #   command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "housekeeping"]
 EOF
+
+sed -i "s|__CWM_DOMAIN__|$CWM_DOMAIN|g" $appDir/docker-compose.yml
 
 cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem $appDir/config/https-cert.pem
 cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem $appDir/config/https-key.pem
