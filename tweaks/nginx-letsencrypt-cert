@@ -16,9 +16,27 @@ installPackage certbot python3-certbot-nginx openssl nginx
 echo "🔒 Attempting to obtain Let's Encrypt SSL certificate..." | log
 systemctl enable nginx
 systemctl stop nginx
-if certbot certonly --standalone -d "${CWM_DOMAIN}" \
-    --non-interactive --agree-tos \
-    -m "admin@${CWM_DOMAIN}" -v; then
+# Retry LE up to 3 times — DNS CAA lookups at the ACME side time out occasionally
+# (observed on xip.com-style wildcards), and a single failure shouldn't drop us
+# straight to a self-signed cert. 3 attempts = max 5 LE failures per hour, well
+# under the per-account rate limit even when multiple installs run nearby.
+LE_ATTEMPTS=3
+LE_SLEEP=30
+le_ok=0
+for attempt in $(seq 1 $LE_ATTEMPTS); do
+    echo "Let's Encrypt attempt ${attempt}/${LE_ATTEMPTS}" | log
+    if certbot certonly --standalone -d "${CWM_DOMAIN}" \
+        --non-interactive --agree-tos \
+        -m "admin@${CWM_DOMAIN}" -v; then
+        le_ok=1
+        break
+    fi
+    if [ "$attempt" -lt "$LE_ATTEMPTS" ]; then
+        echo "Let's Encrypt attempt ${attempt} failed; retrying in ${LE_SLEEP}s" | log
+        sleep "$LE_SLEEP"
+    fi
+done
+if [ "$le_ok" = "1" ]; then
     echo "LetsEncrypt Certificate Issued for server ${CWM_DOMAIN}" | log
 else
     mkdir -p "${LE_DIR}"
