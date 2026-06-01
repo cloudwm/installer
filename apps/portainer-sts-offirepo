@@ -19,16 +19,12 @@ sleep 5
 
 echo "Creating and cleaning Portainer directories" | log
 sudo rm -rf /opt/portainer/data
-sudo mkdir -p /opt/portainer/{certs,data}
+sudo mkdir -p /opt/portainer/data
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
 
-# Copy certificates for Portainer
-sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
-sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
-
-
+# TLS is terminated by nginx (see reverse proxy below); Portainer serves plain HTTP on localhost only.
 echo "Creating Docker Compose file for Portainer (without initial password)" | log
 cat << 'EOF' > /opt/portainer/docker-compose.yml
 services:
@@ -37,17 +33,10 @@ services:
     container_name: portainer
     restart: always
     ports:
-      - "127.0.0.1:8080:9000"
-      - "9443:9443"
+      - "127.0.0.1:9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
-      - /opt/portainer/certs:/certs
-    command:
-      - --sslcert 
-      - /certs/portainer.crt
-      - --sslkey
-      - /certs/portainer.key
 EOF
 
 echo "Generated docker-compose.yml:" | log
@@ -63,7 +52,7 @@ sleep 60
 
 echo "Setting up admin user via API..." | log
 # Initialize admin user through the API
-INIT_RESPONSE=$(curl -k -s -X POST https://localhost:9443/api/users/admin/init \
+INIT_RESPONSE=$(curl -s -X POST http://127.0.0.1:9000/api/users/admin/init \
   -H "Content-Type: application/json" \
   -d "{\"Username\":\"admin\",\"Password\":\"${ADMINPASSWORD}\"}")
 
@@ -98,17 +87,10 @@ services:
     container_name: portainer
     restart: always
     ports:
-      - "127.0.0.1:8080:9000"
-      - "9443:9443"
+      - "127.0.0.1:9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
-      - /opt/portainer/certs:/certs
-    command:
-      - --sslcert 
-      - /certs/portainer.crt
-      - --sslkey
-      - /certs/portainer.key
 EOFCOMPOSE
 
     # Add the hashed password to the command
@@ -141,7 +123,7 @@ server {
     client_max_body_size 500M;
 
     location / {
-        proxy_pass         http://127.0.0.1:8080;
+        proxy_pass         http://127.0.0.1:9000;
         proxy_http_version 1.1;
         proxy_set_header   Upgrade \$http_upgrade;
         proxy_set_header   Connection "upgrade";
@@ -167,7 +149,6 @@ descriptionAppend "Portainer Admin Password: $ADMINPASSWORD"
 descriptionAppend " "
 descriptionAppend "Portainer config location: /opt/portainer/docker-compose.yml"
 descriptionAppend "Portainer data location: /opt/portainer/data"
-descriptionAppend "Portainer certificates location: /opt/portainer/certs"
 
 tagScript success
 
