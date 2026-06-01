@@ -37,7 +37,7 @@ services:
     container_name: portainer
     restart: always
     ports:
-      - "8080:9000"
+      - "127.0.0.1:8080:9000"
       - "9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -98,7 +98,7 @@ services:
     container_name: portainer
     restart: always
     ports:
-      - "8080:9000"
+      - "127.0.0.1:8080:9000"
       - "9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -120,14 +120,50 @@ EOFCOMPOSE
 fi
 
 
+echo "Configuring nginx reverse proxy for Portainer" | log
+NGINX_CONF="/etc/nginx/sites-available/portainer.conf"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+    }
+}
+EOF
+
+ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/portainer.conf
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl enable nginx && systemctl restart nginx
+waitOrStop 0 "Failed to start nginx reverse proxy"
+
 echo "Adding descriptions" | log
-descriptionAppend "Portainer Web Interface: https://$CWM_DOMAIN:9443"
+descriptionAppend "Portainer Web Interface: https://$CWM_DOMAIN"
 descriptionAppend " "
 descriptionAppend "Portainer Admin Username: admin"
 descriptionAppend "Portainer Admin Password: $ADMINPASSWORD"
-descriptionAppend " "
-descriptionAppend "⚠️  IMPORTANT: On first access, your browser may show a certificate warning."
-descriptionAppend "This is normal for Let's Encrypt certificates. Click 'Advanced' and 'Proceed'."
 descriptionAppend " "
 descriptionAppend "Portainer config location: /opt/portainer/docker-compose.yml"
 descriptionAppend "Portainer data location: /opt/portainer/data"

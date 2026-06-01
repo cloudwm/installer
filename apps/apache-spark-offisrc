@@ -1,0 +1,186 @@
+#!/bin/bash
+set -e
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+CONFIG_FILE=/root/guest.conf
+MACHINE_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME=$(grep '^fqdn0=' "$CONFIG_FILE" | cut -d'=' -f2)
+if [ -z "$DOMAIN_NAME" ]; then
+    echo "ERROR: fqdn0 not found in $CONFIG_FILE" | log
+    exit 1
+fi
+
+# Restarting nginx to show the UI installer
+systemctl start nginx 2>/dev/null
+
+install_dependencies() {
+    echo "Installing dependencies..." | log
+    apt update -y
+    apt install -y python3-full python3-venv curl wget openjdk-17-jre-headless certbot python3-certbot-nginx
+}
+
+create_venv() {
+    echo "Creating Python virtual environment for Spark..." | log
+    python3 -m venv /opt/pyspark-env
+    source /opt/pyspark-env/bin/activate
+    pip install pyspark
+}
+
+setup_spark_wrapper() {
+    echo "Setting up Spark run wrapper..." | log
+    cat >/usr/local/bin/start-spark.sh <<'EOF'
+#!/bin/bash
+source /opt/pyspark-env/bin/activate
+export SPARK_HOME=/opt/pyspark-env/lib/python3.12/site-packages/pyspark
+export PYSPARK_PYTHON=/opt/pyspark-env/bin/python
+export PYSPARK_DRIVER_PYTHON=/opt/pyspark-env/bin/python
+LOG_DIR=/var/log/spark
+mkdir -p "$LOG_DIR"
+cd "$SPARK_HOME" || exit 1
+
+# Start persistent Spark session so Web UI stays up
+$PYSPARK_PYTHON - <<'PYCODE'
+from pyspark.sql import SparkSession
+import time
+spark = SparkSession.builder.master("local[*]").appName("PersistentSpark").getOrCreate()
+print("Spark started. Web UI available on port 4040.")
+while True:
+    time.sleep(3600)
+PYCODE
+EOF
+    chmod +x /usr/local/bin/start-spark.sh
+}
+
+create_systemd_service() {
+    echo "Creating systemd service for Spark..." | log
+    mkdir -p /var/log/spark
+    cat >/etc/systemd/system/pyspark.service <<'EOF'
+[Unit]
+Description=Apache Spark (PySpark) Local Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/start-spark.sh
+Restart=on-failure
+User=root
+WorkingDirectory=/opt/pyspark-env
+StandardOutput=file:/var/log/spark/pyspark.out
+StandardError=file:/var/log/spark/pyspark.err
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable pyspark.service
+    systemctl restart pyspark.service
+}
+
+configure_nginx() {
+    echo "Configuring Nginx reverse proxy for Spark UI..." | log
+
+    # Remove the install progress site so it doesn't conflict
+    rm -f /etc/nginx/sites-enabled/installProgress.conf
+
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    NGINX_CONF="/etc/nginx/sites-available/spark.conf"
+
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        echo "SSL certificates found, configuring HTTPS..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN_NAME};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:4040;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    else
+        echo "No SSL certificates found, configuring HTTP only..." | log
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN_NAME};
+
+    location / {
+        proxy_pass http://127.0.0.1:4040;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    fi
+
+    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/spark.conf
+    nginx -t && systemctl reload nginx
+}
+
+set_motd() {
+    echo "Configuring MOTD..." | log
+
+    LE_DIR="/etc/letsencrypt/live/${DOMAIN_NAME}"
+    if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+        SCHEME="https"
+    else
+        SCHEME="http"
+    fi
+
+    rm -f /etc/update-motd.d/*
+    cat >/etc/motd <<EOF
+=============================================
+ Apache Spark Service (Persistent Mode)
+=============================================
+
+ Web UI:   ${SCHEME}://$DOMAIN_NAME/
+ Service:  pyspark.service
+ Logs:     /var/log/spark/
+
+ Basic usage:
+  - The Spark Web UI is automatically available when Spark is running.
+  - You can stop or restart the service using:
+        systemctl stop pyspark
+        systemctl restart pyspark
+  - Access logs with:
+        journalctl -u pyspark -f
+  - The Spark process runs in local[*] mode by default.
+
+=============================================
+EOF
+}
+
+main() {
+    install_dependencies
+    create_venv
+    setup_spark_wrapper
+    create_systemd_service
+    configure_nginx
+    set_motd
+
+    echo "Spark installation and service setup complete." | log
+    echo "Access Spark Web UI at: ${SCHEME}://$DOMAIN_NAME/" | log
+}
+
+main "$@"
