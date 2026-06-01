@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# Add this at the begining of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+replaceAdPass() {
+	changePassScript="$REPO_DIR/change_admin_password.rb"
+	echo "Writing password change script to $changePassScript..."
+	touch $changePassScript
+	cat <<_EOF_ > $changePassScript
+#!/usr/bin/env ruby
+
+require_relative 'config/environment'
+admin_user = User.where(admin: true).first
+
+if admin_user.nil?
+  puts "Admin user not found!"
+  exit 1
+
+else
+  admin_user.password = ENV['NEW_ADMIN_PASSWORD']
+  admin_user.password_confirmation = ENV['NEW_ADMIN_PASSWORD']
+  admin_user.must_change_passwd = false
+
+  if admin_user.save
+    puts "Password updated successfully."
+	
+  else
+    puts "Failed to update password: #{admin_user.errors.full_messages.join(", ")}"
+    exit 1
+  end
+end
+_EOF_
+
+	# Replace default admin password
+	echo "Replacing default admin password..."
+	RAILS_ENV=production NEW_ADMIN_PASSWORD='${ADMINPASSWORD}' rails runner $changePassScript
+	
+	echo "Removing $changePassScript..."
+	rm -f $changePassScript
+	
+}
+
+# Variables
+DB_REDMINE_PASS="redmine"
+REPO_URL="https://www.redmine.org/releases/redmine-5.1.1.tar.gz"
+REPO_DIR="/opt/redmine"
+WEBAPP_CONF="/etc/apache2/sites-available"
+
+# Update system and install required packages
+apt-get update
+apt-get install -y libmysqlclient-dev apt-transport-https
+
+# Secure MySQL and set up Redmine database
+mysql --user=root <<_EOF_
+DELETE FROM mysql.user WHERE User='';
+CREATE DATABASE redmine CHARACTER SET utf8mb4;
+CREATE USER 'redmine'@'localhost' IDENTIFIED BY '${DB_REDMINE_PASS}';
+GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';
+FLUSH PRIVILEGES;
+_EOF_
+
+# Install Redmine
+mkdir -p ${REPO_DIR}
+curl -s ${REPO_URL} | sudo tar xz -C ${REPO_DIR} --strip-components=1
+
+# Configuring permissions
+echo "Configuring permissions..."
+chown -R www-data:www-data /opt/redmine/
+
+cd ${REPO_DIR}
+# Configure database connection
+cat <<_EOF_ > ${REPO_DIR}/config/database.yml
+production:
+  adapter: mysql2
+  database: redmine
+  host: localhost
+  username: redmine
+  password: "${DB_REDMINE_PASS}"
+  encoding: utf8mb4
+_EOF_
+
+# Install gems
+gem install bundler
+bundle config set --local without 'development test'
+bundle install
+
+# Prepare the database
+bundle exec rake generate_secret_token
+RAILS_ENV=production bundle exec rake db:migrate
+RAILS_ENV=production REDMINE_LANG=en bundle exec rake redmine:load_default_data
+
+# Install ImageMagic for Redmine
+echo "Installing ImageMagic & ghostscript..."
+apt update
+apt install -y imagemagick libmagickwand-dev
+convert -version
+apt install -y ghostscript
+
+#replaceAdPass
+echo "Writing apache configuration file..."
+cat <<_EOF_ > $WEBAPP_CONF/redmine.conf
+<VirtualHost *:80>
+    ServerName _
+    DocumentRoot ${REPO_DIR}/public
+    <Directory ${REPO_DIR}/public>
+        Allow from all
+        Options -MultiViews
+        Require all granted
+    </Directory>
+</VirtualHost>
+
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+    ServerName _
+    DocumentRoot ${REPO_DIR}/public
+
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/apache-selfsigned.crt
+    SSLCertificateKeyFile /etc/ssl/private/apache-selfsigned.key
+
+    <Directory ${REPO_DIR}/public>
+        Allow from all
+        Options -MultiViews
+        Require all granted
+    </Directory>
+</VirtualHost>
+</IfModule>
+_EOF_
+
+
+# Enable Redmine site, disable default site
+echo "Enabling redmine site & disabling defaults..."
+a2ensite redmine
+a2dissite installProgress
+systemctl reload apache2
+
+echo "Redmine installation is complete."
