@@ -14,33 +14,46 @@ export DEBIAN_FRONTEND="noninteractive"
 
 # Install system dependencies
 echo "Installing system dependencies..." | log
-sudo apt update
-sudo apt install -y curl git ca-certificates
-sudo update-ca-certificates
+apt update 2>&1 | log
+apt install -y curl git ca-certificates 2>&1 | log
+waitOrStop 0 "Failed to install system dependencies (curl/git/ca-certificates)"
+update-ca-certificates 2>&1 | log
 
 # Install Node.js 20
 echo "Installing Node.js 20..." | log
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+curl -fsSL https://deb.nodesource.com/setup_20.x 2>&1 | bash - 2>&1 | log
+apt install -y nodejs 2>&1 | log
+waitOrStop 0 "Failed to install Node.js 20"
 
 appInstallDir="/opt/storybook-app"
 mkdir -p "${appInstallDir}"
 cd "${appInstallDir}"
 
 echo "Creating React + Vite project..." | log
-npx -y create-vite@latest . --template react-ts --no-interactive
+npx -y create-vite@latest . --template react-ts --no-interactive 2>&1 | log
+waitOrStop 0 "Failed to scaffold the React + Vite project"
 
 echo "Installing project dependencies..." | log
-npm install
+npm install 2>&1 | log
+waitOrStop 0 "npm install of project dependencies failed"
 
 echo "Installing Storybook..." | log
-CI=true npx storybook@${version} init --yes --skip-install --no-dev
+CI=true npx storybook@${version} init --yes --skip-install --no-dev 2>&1 | log
+
+# create-vite@latest scaffolds vite 8 + @vitejs/plugin-react 6, both newer than
+# @storybook/react-vite ${version} supports (peer: vite ^5||^6||^7). Pin them to the
+# compatible major before installing, else `npm install` aborts with ERESOLVE, the
+# storybook binary is never installed, and the build below fails with "storybook: not found".
+npm pkg set devDependencies.vite='^7.0.0' 2>&1 | log
+npm pkg set 'devDependencies.@vitejs/plugin-react'='^5.0.0' 2>&1 | log
 
 echo "Installing Storybook dependencies..." | log
-npm install
+npm install 2>&1 | log
+waitOrStop 0 "npm install of Storybook dependencies failed"
 
 echo "Building Storybook for production..." | log
-npm run build-storybook
+npm run build-storybook 2>&1 | log
+waitOrStop 0 "Storybook build failed"
 
 if [ ! -d "${appInstallDir}/storybook-static" ]; then
     echo "❌ Storybook build failed: storybook-static directory not found" | log
@@ -77,8 +90,8 @@ server {
 }
 NGINXCONF
 
-sudo ln -sf /etc/nginx/sites-available/storybook /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/storybook /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
 
 systemctl restart nginx
 waitOrStop 0 "Failed to restart Nginx"
