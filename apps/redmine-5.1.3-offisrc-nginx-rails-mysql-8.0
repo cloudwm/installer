@@ -211,7 +211,9 @@ fi
 ln -sf /etc/nginx/sites-available/redmine.conf /etc/nginx/sites-enabled/redmine.conf
 
 nginx -t
-systemctl reload nginx
+# Use restart, not reload: tweaks/nginx-letsencrypt-cert stops nginx for certbot
+# --standalone and leaves it stopped; reload is a no-op on a stopped service.
+systemctl restart nginx
 
 # Setup MOTD
 echo "Setting custom Redmine MOTD..." | log
