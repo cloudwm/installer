@@ -14,11 +14,21 @@ apt update
 echo "Installing Python 3.14" | log
 installPackage python3.14-full
 waitOrStop 0 "Failed apt install: python3.14-full"
+echo "Making python3 resolve to 3.14 via update-alternatives" | log
+if [ ! -x "/usr/bin/python3.14" ]; then
+    echo "Expected /usr/bin/python3.14 not found after install" | log 1
+    exit 1
+fi
+# Remember the current system interpreter so the switch stays reversible.
+syspy=$(readlink -f /usr/bin/python3)
+update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.14 2
+if [ -n "$syspy" ] && [ -x "$syspy" ] && [ "$syspy" != "/usr/bin/python3.14" ]; then
+    update-alternatives --install /usr/bin/python3 python3 "$syspy" 1
+fi
+update-alternatives --set python3 /usr/bin/python3.14
+python3 --version | log
 echo "Adding descriptions" | log
-descriptionAppend "To test basic functionality, run 'python3.14 --help' or 'python3.14 --version'"
-descriptionAppend " "
-descriptionAppend "Note: This installs Python 3.14 alongside the system default Python."
-descriptionAppend "Use 'python3.14' explicitly, or create virtual environments."
+descriptionAppend "To test basic functionality, run 'python3 --help' or 'python3 --version'"
 descriptionAppend " "
 tagScript success
 exit 0
