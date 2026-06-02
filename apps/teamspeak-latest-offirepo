@@ -62,7 +62,110 @@ echo "Extracting token" | log
 TS3_TOKEN=$(grep "token=" ${appDir}/logs/ts3server_*.log | awk -F'=' '{print $2}')
 my_ip=$(curl -s ifconfig.me)
 
+# Static landing page. TeamSpeak has no HTTP UI of its own; this gives anyone who
+# hits the host in a browser the client connect details instead of a refused
+# connection. nginx + cert come from tweaks/nginx-letsencrypt-cert in the contrib.
+echo "Writing TeamSpeak landing page" | log
+mkdir -p /var/www/teamspeak
+cat << 'EOF' > /var/www/teamspeak/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeamSpeak Server — __DOMAIN__</title>
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 40px 20px; background: #121212; color: #E0E0E0; min-height: 100vh; }
+  .card { max-width: 640px; margin: 0 auto; background: #1E1E1E; border-radius: 12px; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  h1 { margin: 0 0 8px; color: #3a9ce2; font-size: 28px; }
+  .sub { color: #888; margin-bottom: 24px; }
+  .row { background: #000; border: 1px solid #3a9ce2; border-radius: 6px; padding: 14px 16px; margin: 10px 0; font-family: 'Courier New', monospace; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .label { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .value { color: #5cc0ff; font-size: 16px; word-break: break-all; }
+  .copy { background: #3a9ce2; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .copy:hover { background: #4fb0f5; }
+  .note { color: #888; font-size: 13px; margin-top: 24px; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>TeamSpeak 3 Server</h1>
+    <div class="sub">This is a voice server. Connect with the TeamSpeak client — there is no web UI.</div>
+
+    <div class="row">
+      <div>
+        <div class="label">Connect address</div>
+        <div class="value" id="addr">__DOMAIN__</div>
+      </div>
+      <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('addr').innerText)">Copy</button>
+    </div>
+
+    <div class="row">
+      <div>
+        <div class="label">Voice port</div>
+        <div class="value">__VOICE_PORT__</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <div class="label">Server password</div>
+        <div class="value" id="pass">__ADMINPASS__</div>
+      </div>
+      <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('pass').innerText)">Copy</button>
+    </div>
+
+    <div class="row">
+      <div>
+        <div class="label">Server admin token (privilege key)</div>
+        <div class="value" id="token">__TOKEN__</div>
+      </div>
+      <button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('token').innerText)">Copy</button>
+    </div>
+
+    <div class="note">
+      In the TeamSpeak client: <em>Connections → Connect</em>, enter the address above
+      (default voice port __VOICE_PORT__). On first connect, paste the admin token to claim
+      Server Admin rights.<br><br>
+      ServerQuery port: __QUERY_PORT__ &nbsp;·&nbsp; Filetransfer port: __FILE_PORT__<br>
+      Direct IP: __IP__ &nbsp;·&nbsp; Allow query IPs in <code>query_ip_allowlist.txt</code> (one per line).
+    </div>
+  </div>
+</body>
+</html>
+EOF
+sed -i "s|__DOMAIN__|${CWM_DOMAIN}|g; s|__IP__|${my_ip}|g; s|__VOICE_PORT__|9987|g; s|__QUERY_PORT__|10011|g; s|__FILE_PORT__|30033|g; s|__TOKEN__|${TS3_TOKEN}|g; s|__ADMINPASS__|${ADMINPASSWORD}|g" /var/www/teamspeak/index.html
+
+echo "Writing nginx vhost for TeamSpeak landing page" | log
+cat << EOF > /etc/nginx/sites-available/teamspeak
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    root /var/www/teamspeak;
+    index index.html;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/teamspeak /etc/nginx/sites-enabled/teamspeak
+rm -f /etc/nginx/sites-enabled/default
+nginx -t 2>&1 | log
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart nginx for TeamSpeak landing page"
+
 echo "Adding descriptions" | log
+descriptionAppend "Web info page: https://${CWM_DOMAIN}/"
 descriptionAppend "Use your machine IP to connect via TeamSpeak client: $my_ip"
 descriptionAppend "Teamspeak password: $ADMINPASSWORD"
 descriptionAppend "This is the token you need to confirm your connection: $TS3_TOKEN"
