@@ -28,15 +28,6 @@ mv prometheus promtool /usr/local/bin/
 mv consoles/ console_libraries/ /etc/prometheus/
 mv prometheus.yml /etc/prometheus/prometheus.yml
 
-echo "Configuring SSL" | log
-cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /etc/prometheus/
-cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem /etc/prometheus/
-    cat << EOF > /etc/prometheus/web-config.yml
-tls_server_config:
-  cert_file: /etc/prometheus/fullchain.pem
-  key_file: /etc/prometheus/privkey.pem
-EOF
-
 echo "Creating Prometheus group and user" | log
 groupadd --system prometheus
 useradd -s /sbin/nologin --system -g prometheus prometheus
@@ -59,18 +50,14 @@ Restart=always
 Type=simple
 ExecStart=/usr/local/bin/prometheus \
     --config.file=/etc/prometheus/prometheus.yml \
-    --web.config.file=/etc/prometheus/web-config.yml \
     --storage.tsdb.path=/var/lib/prometheus/ \
     --web.console.templates=/etc/prometheus/consoles \
     --web.console.libraries=/etc/prometheus/console_libraries \
-    --web.listen-address=0.0.0.0:9090
+    --web.listen-address=127.0.0.1:9090
 
 [Install]
 WantedBy=multi-user.target
 EOF
-
-echo "Adding Prometheus port to UFW" | log
-ufw allow 9090
 
 echo "Starting and enabling services" | log
 systemctl daemon-reload
@@ -81,9 +68,66 @@ waitOrStop 0 "Start Prometheus service failed"
 systemctl enable prometheus
 sleep 1
 
+echo "Verifying Prometheus is running" | log
+systemctl is-active --quiet prometheus
+waitOrStop 0 "Prometheus service is not active after start"
+
+# Poll the local readiness endpoint (Prometheus exposes /-/ready)
+for i in $(seq 1 15); do
+    curl -fsS http://127.0.0.1:9090/-/ready >/dev/null 2>&1 && break
+    sleep 2
+done
+curl -fsS http://127.0.0.1:9090/-/ready >/dev/null 2>&1
+waitOrStop 0 "Prometheus did not become ready on 127.0.0.1:9090"
+
+echo "Creating basic auth credentials" | log
+installPackage apache2-utils
+htpasswd -bc /etc/nginx/.htpasswd-prometheus admin "$ADMINPASSWORD"
+waitOrStop 0 "Failed to create basic auth credentials"
+
+echo "Configuring nginx reverse proxy for Prometheus" | log
+NGINX_CONF="/etc/nginx/sites-available/prometheus.conf"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    auth_basic           "Prometheus";
+    auth_basic_user_file /etc/nginx/.htpasswd-prometheus;
+
+    location / {
+        proxy_pass         http://127.0.0.1:9090;
+        proxy_http_version 1.1;
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+    }
+}
+EOF
+
+ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/prometheus.conf
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl enable nginx && systemctl restart nginx
+waitOrStop 0 "Failed to start nginx reverse proxy"
+
 echo "Adding descriptions" | log
 descriptionAppend ""
-descriptionAppend "Prometheus web UI: https://${CWM_DOMAIN}:9090"
+descriptionAppend "Prometheus web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Prometheus username: admin"
+descriptionAppend "Prometheus password: ${ADMINPASSWORD}"
 descriptionAppend ""
 
 tagScript success
