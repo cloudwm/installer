@@ -87,7 +87,7 @@ services:
       retries: 5
 
   panel:
-    image: ghcr.io/pterodactyl/panel:latest
+    image: ghcr.io/pterodactyl/panel:v1.11.11
     container_name: pterodactyl_panel
     restart: unless-stopped
     depends_on:
@@ -215,6 +215,25 @@ EOF
 # Replace placeholder with actual domain
 sed -i "s|CWM_DOMAIN_PLACEHOLDER|${CWM_DOMAIN}|g" /var/www/pterodactyl/nginx.conf
 
+# Free host ports 80/443 for the dockerized nginx.
+# The shared nginx-letsencrypt-cert tweak installs a host nginx (pulled in by
+# python3-certbot-nginx) to obtain the LE cert and leaves it enabled. Its default
+# "Welcome to nginx" site holds 80/443 and prevents the pterodactyl_nginx container
+# from binding. Stop + disable + mask it so it cannot return on reboot or via a
+# service dependency, then kill anything still squatting on the ports.
+echo "Freeing host ports 80/443 (stopping + masking host nginx)" | log
+systemctl stop nginx 2>/dev/null || true
+systemctl disable nginx 2>/dev/null || true
+systemctl mask nginx 2>/dev/null || true
+fuser -k 80/tcp 443/tcp 2>/dev/null || true
+
+# Verify the TLS cert exists before bringing up the stack — the nginx container
+# mounts it read-only and crash-loops silently if it is missing.
+if [ ! -f "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" ]; then
+    echo "TLS cert missing for ${CWM_DOMAIN} at /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" | log 1
+    waitOrStop 0 "TLS cert missing for ${CWM_DOMAIN}"
+fi
+
 # Start Docker Compose services
 echo "Starting Docker Compose services" | log
 cd /var/www/pterodactyl
@@ -277,8 +296,7 @@ sudo docker exec pterodactyl_panel php artisan p:user:make \
     --name-first=Admin \
     --name-last=User \
     --password="${ADMINPASSWORD}" \
-    --admin=1 2>&1 | grep -v "pkg_resources\|UserWarning\|CRIT Server" || truepassword="${ADMINPASSWORD}" \
-    --admin=1
+    --admin=1 2>&1 | grep -v "pkg_resources\|UserWarning\|CRIT Server" || true
 
 # Create location
 echo "Creating default location" | log
