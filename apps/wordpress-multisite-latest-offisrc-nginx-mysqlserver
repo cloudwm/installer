@@ -11,7 +11,6 @@ checkOs
 checkRootUser
 runOnceCheck
 
-checkTagExist nginx.success
 checkTagExist mysqld.success
 checkTagExist php.success
 checkTagExist maild.success
@@ -27,10 +26,11 @@ sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/wordpress.conf
 # Symlink wordpress vhost
 ln -s /etc/nginx/sites-available/wordpress.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
-unlink /etc/nginx/sites-enabled/default
-unlink /etc/nginx/sites-enabled/default-ssl
-service nginx reload
-waitOrStop 0 "Nginx failed to restart" 
+rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default-ssl
+# nginx was stopped by nginx-letsencrypt-cert for certbot --standalone; restart
+# (not reload) to bring it up with the WordPress vhost.
+service nginx restart
+waitOrStop 0 "Nginx failed to restart"
 
 echo "Creating mysql user and permissions" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -57,7 +57,7 @@ ini=$(find /etc -type f -name "php.ini" | grep fpm)
 sed -i '/display_errors = /s/On/Off/g' $ini
 
 echo "Misc. cleanups" | log
-rm $WP_PATH/index.nginx-debian.html
+rm -f $WP_PATH/index.nginx-debian.html
 
 echo "Adding descriptions" | log
 descriptionAppend "Wordpress Admin Web UI: https://${CWM_DOMAIN}/wp-login.php"
