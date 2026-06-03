@@ -6,22 +6,65 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Installing Packages"
+echo "Installing Packages" | log
 curl -o webmin-setup-repo.sh https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repo.sh
 sh webmin-setup-repo.sh -f
 waitOrStop 0 "Failed to setup Webmin repository"
 
-echo "Installing Webmin App"
+echo "Installing Webmin App" | log
 apt-get install -y webmin --install-recommends
 waitOrStop 0 "Failed apt install Webmin"
+
+# Lock miniserv to loopback — public access is via the Apache SSL proxy on 443.
+# Webmin keeps its own self-signed SSL on 10000; it is only reached from localhost now.
+echo "Locking Webmin miniserv to localhost" | log
+sed -i '/^bind=/d' /etc/webmin/miniserv.conf
+echo "bind=127.0.0.1" >> /etc/webmin/miniserv.conf
+# Apache forwards Host: localhost:10000 (no ProxyPreserveHost), so trust that referer.
+echo "referer=localhost" >> /etc/webmin/config
+systemctl restart webmin
+
+echo "Configuring Apache SSL reverse proxy" | log
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+a2enmod proxy proxy_http ssl
+
+cat > /etc/apache2/sites-available/webmin.conf <<EOF
+<VirtualHost *:80>
+    ServerName ${CWM_DOMAIN}
+    Redirect permanent / https://${CWM_DOMAIN}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName ${CWM_DOMAIN}
+
+    SSLEngine on
+    SSLProxyEngine on
+    SSLProxyVerify none
+    SSLProxyCheckPeerName off
+    SSLProxyCheckPeerCN off
+    SSLCertificateFile ${LE_DIR}/fullchain.pem
+    SSLCertificateKeyFile ${LE_DIR}/privkey.pem
+
+    ProxyPass / https://localhost:10000/
+    ProxyPassReverse / https://localhost:10000/
+</VirtualHost>
+EOF
+
+a2dissite 000-default.conf 2>/dev/null
+a2ensite webmin.conf
+apache2ctl configtest && systemctl restart apache2
+waitOrStop 0 "Failed to start Apache reverse proxy"
 
 echo "Adding descriptions" | log
 descriptionAppend "Webmin Username: root"
 descriptionAppend "Webmin Password: ${ADMINPASSWORD}"
-descriptionAppend "Webmin UI: https://${CWM_DISPLAYED_ADDRESS}:10000"
+descriptionAppend "Webmin UI: https://${CWM_DOMAIN}"
+descriptionAppend " "
+descriptionAppend "Webmin app location: /etc/webmin/"
+descriptionAppend "Webmin mini-server configuration: /etc/webmin/miniserv.conf"
+descriptionAppend "Webmin-Apache proxy configuration: /etc/apache2/sites-available/webmin.conf"
 descriptionAppend " "
 
 tagScript success
 
 exit 0
-
