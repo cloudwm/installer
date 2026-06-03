@@ -5,6 +5,26 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+# Verify the app is actually serving before declaring success.
+# Waits for the container healthcheck and confirms HTTPS is wired end-to-end
+# (nginx + SSL + proxy + app). Fatal exit 1 on failure so the installer aborts
+# instead of reporting a false positive.
+verify_vaultwarden() {
+    echo "Verifying Vaultwarden availability (HTTPS)..." | log
+    for i in {1..12}; do
+        health=$(docker inspect -f '{{.State.Health.Status}}' vaultwarden-vaultwarden-1 2>/dev/null)
+        if [ "${health}" = "healthy" ] && curl -kfsS "https://${CWM_DOMAIN}/" >/dev/null 2>&1; then
+            adminCode=$(curl -k -o /dev/null -s -w '%{http_code}' "https://${CWM_DOMAIN}/admin")
+            echo "✅ Vaultwarden reachable at https://${CWM_DOMAIN} (admin -> ${adminCode})" | log
+            return
+        fi
+        echo "⏳ Waiting for Vaultwarden... (attempt $i/12, health=${health:-none})" | log
+        sleep 5
+    done
+    echo "❌ Vaultwarden not reachable after setup." | log 1
+    exit 1
+}
+
 echo "Installing Vaultwarden (Bitwarden Compatible) with Docker + Nginx + SSL" | log
 
 export DEBIAN_FRONTEND="noninteractive"
@@ -112,13 +132,11 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_http_version 1.1;
-        auth_basic "Admin Area";
-        auth_basic_user_file /etc/nginx/.htpasswd;
+        # /admin is protected by Vaultwarden's own ADMIN_TOKEN (set in .env);
+        # no extra nginx basic-auth layer (it only adds a confusing second prompt).
     }
 }
 EOF
-
-echo "admin:$(openssl passwd -apr1 ${ADMINPASSWORD})" | sudo tee /etc/nginx/.htpasswd
 
 # Enable Nginx site
 sudo ln -sf /etc/nginx/sites-available/vaultwarden /etc/nginx/sites-enabled/
@@ -136,17 +154,17 @@ waitOrStop 0 "Failed to start Vaultwarden services"
 ADMIN_TOKEN=$(grep "^ADMIN_TOKEN=" ${appInstallDir}/.env | cut -d= -f2)
 
 echo "Waiting for Vaultwarden to initialize..." | log
-sleep 30
+verify_vaultwarden
 
 echo "Adding descriptions" | log
 descriptionAppend "Vaultwarden Password Manager is LIVE!"
 descriptionAppend "URL: https://${CWM_DOMAIN}"
-descriptionAppend "Admin: https://${CWM_DOMAIN}/admin (user: admin, pass: ${ADMINPASSWORD})"
+descriptionAppend "Admin: https://${CWM_DOMAIN}/admin (login with the Admin Token below)"
 descriptionAppend "   Admin Token → ${ADMIN_TOKEN}"
 descriptionAppend "Data Volume: ${appInstallDir}/data"
 descriptionAppend "Docker Compose: ${appInstallDir}/docker-compose.yml"
 descriptionAppend "Nginx Config: /etc/nginx/sites-available/vaultwarden"
-descriptionAppend "SSL Certs: ${appInstallDir}/config/https-{cert,key}.pem"
+descriptionAppend "SSL Certs: /etc/letsencrypt/live/${CWM_DOMAIN}/{fullchain,privkey}.pem"
 
 tagScript success
 exit 0
