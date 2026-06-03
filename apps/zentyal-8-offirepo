@@ -67,6 +67,9 @@ EOF
 
 ln -sf /etc/nginx/sites-available/zentyal /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
+# Zentyal's install disables the stock nginx (it manages its own on 8443); re-enable here,
+# after the Zentyal install, so the proxy survives the CWM provisioning reboot.
+systemctl enable nginx
 systemctl restart nginx
 waitOrStop 0 "Failed to restart nginx after Zentyal proxy config"
 
