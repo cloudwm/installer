@@ -12,10 +12,26 @@ fi
 echo "Downloading and installing FastPanel" | log
 installPackage ca-certificates wget
 LOG_FILE="/tmp/fastpanel_install.log"
-wget https://repo.fastpanel.direct/install_fastpanel.sh -O - | bash - 2>&1 | tee "$LOG_FILE"
-waitOrStop 0 "Failed to install FastPanel"
+INSTALLER="/tmp/install_fastpanel.sh"
 
-rm -f $LOG_FILE
+# FASTPANEL's installer does a panel-only ("minimal") install -- skipping nginx, apache,
+# MySQL and PHP -- whenever a `minimal` variable is set in the environment. CWM
+# provisioning leaks one, which silently cripples the server (panel works on :8888 but
+# can't host anything and nothing answers on 80/443). Strip it from the env so the full
+# server stack is installed. `env -u` is a no-op when the var is absent.
+curlDownload https://repo.fastpanel.direct/install_fastpanel.sh "$INSTALLER"
+env -u minimal bash "$INSTALLER" 2>&1 | tee "$LOG_FILE"
+rm -f "$INSTALLER" "$LOG_FILE"
+
+# The installer wrapper ends with `rm` and swallows its own exit code, so verify the
+# outcome directly rather than trusting a return status.
+if [ ! -x /usr/local/fastpanel2/fastpanel ]; then
+    echo "FastPanel install failed: panel binary missing" | log 1
+    exit 1
+fi
+if ! command -v nginx >/dev/null 2>&1; then
+    echo "WARNING: full install did not provide nginx; bare-domain redirect will be skipped" | log 1
+fi
 
 ufw allow 8888
 ufw allow 7777
