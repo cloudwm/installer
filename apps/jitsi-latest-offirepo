@@ -31,6 +31,49 @@ echo "jitsi-meet jitsi-meet/cert-choice select Self-signed certificate will be g
 installPackage jitsi-meet
 echo "${ADMINEMAIL}" | /usr/share/jitsi-meet/scripts/install-letsencrypt-cert.sh
 
+echo "Configuring ${CWM_DOMAIN} -> https://jitsi.${CWM_DOMAIN} redirect" | log
+# Port-80 server block: serve the ACME challenge from Jitsi's webroot (so the cert
+# expansion below can validate the bare domain) and redirect everything else to Jitsi.
+cat << EOF > /etc/nginx/sites-available/jitsi-redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /usr/share/jitsi-meet;
+    }
+    location / {
+        return 301 https://jitsi.${CWM_DOMAIN}\$request_uri;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/jitsi-redirect /etc/nginx/sites-enabled/
+nginx -t | log && systemctl reload nginx | log
+
+echo "Expanding Jitsi certificate to cover ${CWM_DOMAIN}" | log
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /usr/share/jitsi-meet --cert-name jitsi.${CWM_DOMAIN} --expand -d jitsi.${CWM_DOMAIN} -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
+
+if [[ $? == 0 ]]; then
+    echo "Adding HTTPS redirect server block for ${CWM_DOMAIN}" | log
+    cat << EOF >> /etc/nginx/sites-available/jitsi-redirect
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/jitsi.${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/jitsi.${CWM_DOMAIN}/privkey.pem;
+
+    return 301 https://jitsi.${CWM_DOMAIN}\$request_uri;
+}
+EOF
+    nginx -t | log && systemctl reload nginx | log
+else
+    echo "Certificate expansion failed; keeping HTTP-only redirect for ${CWM_DOMAIN}" | log 1
+fi
+
 echo "Adding descriptions" | log
 descriptionAppend "Jitsi Web UI: https://jitsi.${CWM_DOMAIN}"
 descriptionAppend " "
