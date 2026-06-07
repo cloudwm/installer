@@ -67,6 +67,35 @@ if [ -n "${CWM_DOMAIN}" ]; then
         echo "WARNING: Let's Encrypt certificate for ${CWM_DOMAIN} failed; panel remains on self-signed cert" | log 1
     fi
 
+    # When the full website stack is installed, stock nginx owns 80/443 and serves the
+    # FastPanel parking/"troubleshoot" placeholder for the bare domain (the panel itself
+    # only listens on :8888). Redirect the bare domain to the panel so visitors land on
+    # the login. Skip cleanly on panel-only installs (no website nginx). The drop-in goes
+    # in sites-enabled/ -- included by nginx.conf but not managed by FastPanel, so it
+    # survives. Reuse the parking cert and ACME include; nginx -t gates the reload.
+    if command -v nginx >/dev/null 2>&1 && [ -f /etc/nginx/ssl-certs/parking.crt ]; then
+        mkdir -p /etc/nginx/sites-enabled
+        cat > /etc/nginx/sites-enabled/cwm-fastpanel-redirect.conf <<EOF
+server {
+    listen ${CWM_SERVERIP}:80;
+    listen ${CWM_SERVERIP}:443 ssl;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate /etc/nginx/ssl-certs/parking.crt;
+    ssl_certificate_key /etc/nginx/ssl-certs/parking.key;
+    include /etc/nginx/fastpanel2-includes/letsencrypt.conf;
+    location / { return 301 https://${CWM_DOMAIN}:8888\$request_uri; }
+}
+EOF
+        nginx -t 2>&1 | log
+        if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            systemctl reload nginx 2>&1 | log
+            echo "Configured ${CWM_DOMAIN} 80/443 -> :8888 panel redirect" | log
+        else
+            echo "WARNING: redirect vhost failed nginx -t; removing it" | log 1
+            rm -f /etc/nginx/sites-enabled/cwm-fastpanel-redirect.conf
+        fi
+    fi
+
     export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
     tag global-domain-set.success
 fi
