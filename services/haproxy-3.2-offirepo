@@ -10,8 +10,7 @@ fi
 checkTagExist ssl-ready.success
 
 rootDir=$(rootDir)
-certsPath=/etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}
-certsArchivePath=/etc/letsencrypt/archive/${CWM_DISPLAYED_ADDRESS}
+certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
 certsUpdateService=/opt/update-certs.sh
 certGeneratedName="haproxy-fullcert.pem"
 
@@ -52,17 +51,6 @@ sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.c
 
 echo "Generating proper haproxy certificate" | log
 
-<<<<<<< HEAD
-if [[ ! -d ${certsArchivePath} ]]; then
-        cd ${certsPath}
-        cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
-else
-        cd ${certsArchivePath}
-        cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
-        cd ${certsPath}
-        ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
-fi
-=======
 # Combine fullchain + private key into the single PEM HAProxy expects, directly in
 # the live cert dir. This mirrors the manual fix that worked on the server. Use the
 # live symlinks fullchain.pem/privkey.pem (they always point at the current cert)
@@ -72,7 +60,13 @@ cd ${certsPath}
 waitOrStop 0 "Certificate directory ${certsPath} not found"
 cat fullchain.pem privkey.pem > ${certGeneratedName}
 waitOrStop 0 "Failed to build ${certGeneratedName}"
->>>>>>> e0ed78a8 (fix certificate issue)
+
+echo "Freeing port 80 for HAProxy (disabling nginx if present)" | log
+# nginx is pulled in by the Let's Encrypt step and left enabled, so it auto-starts
+# on boot (e.g. after the kernel upgrade mid-install) and holds :80, making HAProxy
+# fail with "cannot bind socket (Address already in use)". HAProxy is the front LB
+# here, so take :80 from nginx for good.
+systemctl disable --now nginx 2>/dev/null || true
 
 service haproxy reload
 waitOrStop 0 "Reload haproxy service failed"
@@ -81,11 +75,7 @@ cat << EOF > ${certsUpdateService}
 
 certbot -q renew
 cd ${certsPath}
-<<<<<<< HEAD
-ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
-=======
 cat fullchain.pem privkey.pem > ${certGeneratedName}
->>>>>>> e0ed78a8 (fix certificate issue)
 service haproxy reload
 
 EOF
@@ -120,9 +110,9 @@ systemctl reload haproxy
 waitOrStop 0 "Failed to reload HAProxy" | log
 
 echo "Adding descriptions" | log
-descriptionAppend "HAProxy Address: ${CWM_DISPLAYED_ADDRESS}"
+descriptionAppend "HAProxy Address: ${CWM_DOMAIN}"
 descriptionAppend " "
-descriptionAppend "HAProxy Stats Web UI: https://${CWM_DISPLAYED_ADDRESS}:8404/stats"
+descriptionAppend "HAProxy Stats Web UI: https://${CWM_DOMAIN}:8404/stats"
 descriptionAppend "HAProxy Stats Web UI Username: admin"
 descriptionAppend "HAProxy Stats Web UI Password: ${ADMINPASSWORD}"
 descriptionAppend " "
@@ -136,4 +126,3 @@ descriptionAppend " "
 tagScript success
 
 exit 0
-
