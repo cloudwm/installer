@@ -52,6 +52,7 @@ sed -i 's/CERT_GENERATED_NAME/'"${certGeneratedName}"'/g' /etc/haproxy/haproxy.c
 
 echo "Generating proper haproxy certificate" | log
 
+<<<<<<< HEAD
 if [[ ! -d ${certsArchivePath} ]]; then
         cd ${certsPath}
         cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
@@ -61,6 +62,17 @@ else
         cd ${certsPath}
         ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
 fi
+=======
+# Combine fullchain + private key into the single PEM HAProxy expects, directly in
+# the live cert dir. This mirrors the manual fix that worked on the server. Use the
+# live symlinks fullchain.pem/privkey.pem (they always point at the current cert)
+# instead of globbing the archive, which would concatenate every past
+# *fullchain*/*privk* version and produce a broken PEM.
+cd ${certsPath}
+waitOrStop 0 "Certificate directory ${certsPath} not found"
+cat fullchain.pem privkey.pem > ${certGeneratedName}
+waitOrStop 0 "Failed to build ${certGeneratedName}"
+>>>>>>> e0ed78a8 (fix certificate issue)
 
 service haproxy reload
 waitOrStop 0 "Reload haproxy service failed"
@@ -68,11 +80,12 @@ waitOrStop 0 "Reload haproxy service failed"
 cat << EOF > ${certsUpdateService}
 
 certbot -q renew
-cd ${certsArchivePath}
-rm ${certGeneratedName}
-cat $(find $(pwd) -name "*fullchain*") $(find $(pwd) -name "*privk*") > ${certGeneratedName}
 cd ${certsPath}
+<<<<<<< HEAD
 ln -s ../../archive/${CWM_DISPLAYED_ADDRESS}/${certGeneratedName}
+=======
+cat fullchain.pem privkey.pem > ${certGeneratedName}
+>>>>>>> e0ed78a8 (fix certificate issue)
 service haproxy reload
 
 EOF
