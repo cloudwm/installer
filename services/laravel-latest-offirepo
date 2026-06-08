@@ -11,7 +11,7 @@ checkTagExist ubuntu-updateos.success
 rootDir=$(rootDir)
 
 echo "Installing php8.5 modules for laravel" | log
-packages=(zip unzip php8.5-pear php8.5-ctype php8.5-curl php8.5-dom php8.5-fileinfo php8.5-mbstring php8.5-openssl php8.5-pdo php8.5-tokenizer php8.5-xml)
+packages=(zip unzip php8.5-pear php8.5-ctype php8.5-curl php8.5-dom php8.5-fileinfo php8.5-mbstring php8.5-mysql php8.5-openssl php8.5-pdo php8.5-tokenizer php8.5-xml)
 installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
@@ -44,6 +44,41 @@ chmod -R 777 /var/www/laravel/storage
 
 echo "Generating encryption key" | log
 php artisan key:generate
+
+echo "Installing MySQL server (Ubuntu native package — stable on 24.04)" | log
+# Install MySQL from Ubuntu's own repo, NOT the mysql.com APT repo: that repo is
+# pinned to 'bionic' and pulls libs that don't exist on 24.04 (noble), so
+# `apt install mysql-server` fails with unmet dependencies. Ubuntu's own
+# mysql-server (8.0) needs no third-party repo and installs cleanly.
+# Defensive: if an earlier step left the broken mysql.com repo behind, drop it
+# first so it can't poison dependency resolution here.
+if [ -f /etc/apt/sources.list.d/mysql.list ]; then
+    rm -f /etc/apt/sources.list.d/mysql.list
+    apt update
+fi
+installPackage mysql-server
+waitOrStop 0 "Failed apt install: mysql-server"
+systemctl enable --now mysql
+waitOrStop 0 "Failed to start mysql service"
+
+# Fresh Ubuntu mysql-server authenticates root via the unix socket (no password).
+# We run as root, so connect over the socket to set a password, then write a
+# ~/.my.cnf so the DB-creation step below (and later CLI work) can authenticate.
+# Skip if ~/.my.cnf already exists (a separate mysql service already configured it).
+if [ ! -f /root/.my.cnf ]; then
+    echo "Setting MySQL root password" | log
+    mysql <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+EOF
+    waitOrStop 0 "Failed to set MySQL root password"
+    cat << MYCNF > /root/.my.cnf
+[client]
+user=root
+password='${ADMINPASSWORD}'
+MYCNF
+    chmod 600 /root/.my.cnf
+fi
 
 echo "Creating Laravel Database and User" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -91,7 +126,10 @@ EOF
 
 rm -f /etc/apache2/sites-enabled/000-default.conf
 rm -f /etc/apache2/sites-enabled/default-ssl.conf
-a2enmod ssl rewrite actions fastcgi alias proxy_fcgi
+# 24.04 has no mod_fastcgi package; proxy_fcgi is the modern handler and needs
+# mod_proxy enabled explicitly. (Dropped the non-existent 'fastcgi' module, which
+# made a2enmod error out.)
+a2enmod ssl rewrite proxy proxy_fcgi
 a2ensite laravel.conf
 
 echo "Starting and enabling Apache" | log
