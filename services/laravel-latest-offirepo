@@ -109,6 +109,11 @@ descriptionAppend "Laravel Database User: laraveluser"
 descriptionAppend "Laravel Database Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
+# Return to the installer dir before tagging: tag()/tagScript() recompute rootDir
+# from the current dir, and we are still in /var/www/laravel from the steps above,
+# where that lookup fails and the tags would be written to the wrong place (the
+# log still prints "Tagging ..." regardless, which hides the problem).
+cd "$rootDir"
 tag apache2.success
 tag httpd.success
 tag laravel.success
