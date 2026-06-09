@@ -15,13 +15,13 @@ echo "Installing Webmin App" | log
 apt-get install -y webmin --install-recommends
 waitOrStop 0 "Failed apt install Webmin"
 
-# Lock miniserv to loopback — public access is via the Apache SSL proxy on 443.
-# Webmin keeps its own self-signed SSL on 10000; it is only reached from localhost now.
-echo "Locking Webmin miniserv to localhost" | log
-sed -i '/^bind=/d' /etc/webmin/miniserv.conf
-echo "bind=127.0.0.1" >> /etc/webmin/miniserv.conf
-# Apache forwards Host: localhost:10000 (no ProxyPreserveHost), so trust that referer.
-echo "referer=localhost" >> /etc/webmin/config
+# Webmin keeps its default all-interface bind on 10000 (self-signed SSL) so it stays
+# directly reachable as a fallback. Secured public access is via the Apache SSL proxy on 443.
+# Trust two referers: Apache forwards Host: localhost:10000 (no ProxyPreserveHost), and direct
+# hits land on ${CWM_DOMAIN}:10000 — neither should trip Webmin's referer check.
+echo "Configuring Webmin trusted referers" | log
+sed -i '/^referer=/d' /etc/webmin/config
+echo "referer=localhost ${CWM_DOMAIN}" >> /etc/webmin/config
 systemctl restart webmin
 
 echo "Configuring Apache SSL reverse proxy" | log
@@ -55,10 +55,36 @@ a2ensite webmin.conf
 apache2ctl configtest && systemctl restart apache2
 waitOrStop 0 "Failed to start Apache reverse proxy"
 
+echo "Verifying Webmin is reachable through the Apache SSL proxy" | log
+
+# Apache must be up to serve the proxy on 443.
+if ! systemctl is-active --quiet apache2; then
+    echo "Apache is not active after restart — Webmin UI is not reachable" | log 1
+    exit 1
+fi
+
+# A trusted public cert is expected; a self-signed fallback is functional but not "secured",
+# so warn (don't abort — the cert tweak intentionally falls back on transient LE outages).
+if ! [ -f "${LE_DIR}/fullchain.pem" ]; then
+    echo "No certificate found at ${LE_DIR}/fullchain.pem" | log 1
+    exit 1
+fi
+if openssl x509 -in "${LE_DIR}/fullchain.pem" -noout -issuer 2>/dev/null | grep -qi "Self-Signed"; then
+    echo "WARNING: serving a self-signed certificate for ${CWM_DOMAIN} (Let's Encrypt fell back)" | log 1
+fi
+
+# End-to-end: the proxy must actually serve Webmin's login over 443 for this vhost.
+code=$(curl -sk -o /dev/null -w '%{http_code}' -m 10 -H "Host: ${CWM_DOMAIN}" https://localhost/)
+case "$code" in
+    200|302|401) echo "Webmin proxy reachable on https://${CWM_DOMAIN}/ (HTTP $code)" | log ;;
+    *) echo "Webmin proxy check failed on https://${CWM_DOMAIN}/ (HTTP $code)" | log 1; exit 1 ;;
+esac
+
 echo "Adding descriptions" | log
 descriptionAppend "Webmin Username: root"
 descriptionAppend "Webmin Password: ${ADMINPASSWORD}"
 descriptionAppend "Webmin UI: https://${CWM_DOMAIN}"
+descriptionAppend "Webmin UI (direct, self-signed): https://${CWM_DOMAIN}:10000"
 descriptionAppend " "
 descriptionAppend "Webmin app location: /etc/webmin/"
 descriptionAppend "Webmin mini-server configuration: /etc/webmin/miniserv.conf"
