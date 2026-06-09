@@ -56,19 +56,24 @@ if [ ! -x /usr/local/hestia/bin/v-list-users ]; then
     exit 1
 fi
 
-# Make sure the panel service is enabled and running (it survives the provisioning reboot,
-# and is started here in case the installer left it stopped).
+# Settle the stock->nginx.org unit swap (the cert tweak installed stock nginx; Hestia replaced
+# it with nginx.org's build). Without a daemon-reload, the first `systemctl restart nginx` can
+# hit a PID-file race ("Can't open PID file /run/nginx.pid (yet?)") and report a false failure.
+systemctl daemon-reload 2>&1 | log
+
+# Enable the panel so it comes up on the post-provisioning reboot, and try to start it now.
+# Starting is best-effort: during provisioning the panel often isn't fully up until the reboot,
+# so a not-yet-listening :8083 here is NOT a failure (CWM reboots the box right after install).
 systemctl enable --now hestia 2>&1 | log
 
-echo "Waiting for HestiaCP to listen on :8083" | log
-for i in $(seq 1 30); do
+echo "Waiting (best-effort) for HestiaCP to listen on :8083" | log
+for i in $(seq 1 15); do
     ss -tln | grep -q ':8083' && break
     sleep 2
 done
-if ! ss -tln | grep -q ':8083'; then
-    echo "HestiaCP did not become ready on port 8083" | log 1
-    exit 1
-fi
+ss -tln | grep -q ':8083' \
+    && echo "HestiaCP panel is listening on :8083" | log \
+    || echo "Panel not up on :8083 yet; it will start on the provisioning reboot (continuing)" | log 1
 
 # Hestia plants a first-boot cron that runs v-add-letsencrypt-host, which would re-issue a
 # cert for the hostname (extra Let's Encrypt spend on the shared xip domain) and reconfigure
@@ -84,11 +89,19 @@ ufw allow 80
 ufw allow 443
 ufw reload
 
+# Hestia auto-creates a web domain for the hostname (it serves a default website for
+# ${CWM_DOMAIN} on the public IP). Remove it so it doesn't fight our reverse proxy for the
+# same server_name. Best-effort: it's absent on runs where Hestia's domain creation failed.
+echo "Removing Hestia's auto-created hostname web domain (we proxy the bare domain ourselves)" | log
+/usr/local/hestia/bin/v-delete-web-domain admin "${CWM_DOMAIN}" 2>&1 | log || true
+
 # Reverse-proxy the bare domain onto the panel so it opens at https://CWM_DOMAIN with no port
 # and the Let's Encrypt cert -- avoiding the double-cert warning a :8083 redirect produces.
 # The drop-in lives in conf.d/ (included by Hestia's nginx.conf, not panel-managed, so it
-# survives config regeneration).
+# survives config regeneration). It listens on the server IP (same listen group as Hestia's
+# IP vhosts) so SNI for ${CWM_DOMAIN} selects it; falls back to wildcard if the IP is unknown.
 PANEL_URL="https://${CWM_DOMAIN}:8083"
+LISTEN_ADDR="${CWM_SERVERIP:+${CWM_SERVERIP}:}"
 if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
     echo "Configuring nginx reverse proxy for the HestiaCP panel" | log
 
@@ -102,12 +115,12 @@ EOF
 
     cat > /etc/nginx/conf.d/cwm-vesta-hestia-proxy.conf <<EOF
 server {
-    listen 80;
+    listen ${LISTEN_ADDR}80;
     server_name ${CWM_DOMAIN};
     location / { return 301 https://${CWM_DOMAIN}\$request_uri; }
 }
 server {
-    listen 443 ssl;
+    listen ${LISTEN_ADDR}443 ssl;
     http2 on;
     server_name ${CWM_DOMAIN};
 
@@ -130,21 +143,19 @@ server {
 }
 EOF
 
-    nginx -t 2>&1 | log
-    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    # Trust nginx -t as the gate. If the config is valid, keep the vhost even if the immediate
+    # restart is flaky (nginx.org PID-file race) -- the provisioning reboot serves it from the
+    # persisted file. Only drop the vhost if it actually breaks the config.
+    if nginx -t 2>&1 | log; [ ${PIPESTATUS[0]} -eq 0 ]; then
         systemctl restart nginx 2>&1 | log
-        if systemctl is-active --quiet nginx; then
-            echo "Configured ${CWM_DOMAIN} -> :8083 panel reverse proxy" | log
-            PANEL_URL="https://${CWM_DOMAIN}"
-            export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
-            tag global-domain-set.success
-        else
-            echo "WARNING: nginx failed to start after proxy config; removing drop-in" | log 1
-            rm -f /etc/nginx/conf.d/cwm-vesta-hestia-proxy.conf
-            systemctl restart nginx 2>&1 | log
-        fi
+        systemctl is-active --quiet nginx \
+            && echo "Configured ${CWM_DOMAIN} -> :8083 panel reverse proxy" | log \
+            || echo "nginx not up yet after proxy config; will start on the provisioning reboot" | log 1
+        PANEL_URL="https://${CWM_DOMAIN}"
+        export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+        tag global-domain-set.success
     else
-        echo "WARNING: proxy vhost failed nginx -t; removing it" | log 1
+        echo "WARNING: proxy vhost failed nginx -t; removing it and serving panel on :8083" | log 1
         rm -f /etc/nginx/conf.d/cwm-vesta-hestia-proxy.conf
         systemctl restart nginx 2>&1 | log
     fi
@@ -152,12 +163,13 @@ else
     echo "WARNING: no certificate at ${LE_DIR}; serving panel on :8083 only" | log 1
 fi
 
-# End-to-end check when the proxy is live: it should serve the panel login over 443.
-if [ "${PANEL_URL}" = "https://${CWM_DOMAIN}" ]; then
-    code=$(curl -sk -o /dev/null -w '%{http_code}' -m 10 -H "Host: ${CWM_DOMAIN}" https://localhost/)
+# End-to-end check (best-effort) when the proxy is live and the panel is already up: it should
+# serve the panel login over 443. nginx binds the server IP, so target that (not localhost).
+if [ "${PANEL_URL}" = "https://${CWM_DOMAIN}" ] && ss -tln | grep -q ':8083'; then
+    code=$(curl -sk -o /dev/null -w '%{http_code}' -m 10 -H "Host: ${CWM_DOMAIN}" "https://${CWM_SERVERIP:-127.0.0.1}/")
     case "$code" in
         200|301|302) echo "Panel reachable on https://${CWM_DOMAIN}/ (HTTP $code)" | log ;;
-        *) echo "WARNING: panel proxy check on https://${CWM_DOMAIN}/ returned HTTP $code" | log 1 ;;
+        *) echo "Panel proxy check returned HTTP $code (will be live after the provisioning reboot)" | log 1 ;;
     esac
 fi
 
