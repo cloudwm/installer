@@ -31,6 +31,16 @@ else
     echo "Tweak did not produce cert files at ${LE_LIVE}; continuing without pre-staged TLS" | log
 fi
 
+# The apache-letsencrypt-cert tweak installs and `systemctl enable`s apache2 (only
+# to obtain the cert via certbot --standalone). Cloudron ships its OWN nginx that
+# must own ports 80/443; an enabled apache2 squats port 80 on the next boot and
+# Cloudron's nginx can then never bind → no HTTPS. The cert files are already on
+# disk by now, so apache has done its job — stop and disable it for good.
+if systemctl list-unit-files apache2.service >/dev/null 2>&1; then
+    echo "Disabling apache2 so Cloudron's nginx can own ports 80/443" | log
+    systemctl disable --now apache2 2>&1 | log || true
+fi
+
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
@@ -39,15 +49,20 @@ echo "Enabling and starting cron service..." | log
 systemctl enable cron
 systemctl start cron
 
-# If this VM has no public IPv6, install one ip6tables OUTPUT REJECT rule so
-# the call fails in ms instead of seconds. Skipped if a default v6 route
-# exists, so dual-stack VMs keep working unchanged.
+# If this VM has no public IPv6, reject outbound TCP/IPv6 so the wizard's
+# IPv6-first connection attempts fail in ms instead of timing out. Done via ufw
+# (already active here) so the rule persists across the provisioning reboot and
+# we never pull in iptables-persistent — which would interactively hang apt AND
+# remove ufw (ufw declares Breaks: iptables-persistent). Skipped on dual-stack.
 if ! ip -6 route show default 2>/dev/null | grep -q .; then
     echo "No default IPv6 route detected; rejecting outbound TCP/IPv6 to speed up Cloudron setup wizard" | log
-    installPackage iptables-persistent
-    ip6tables -C OUTPUT -p tcp -j REJECT --reject-with adm-prohibited 2>/dev/null \
-        || ip6tables -I OUTPUT -p tcp -j REJECT --reject-with adm-prohibited
-    netfilter-persistent save 2>&1 | log
+    if command -v ufw >/dev/null 2>&1; then
+        ufw reject out proto tcp to ::/0 2>&1 | log
+    else
+        # ufw absent (unexpected) — runtime-only fallback, no package install.
+        ip6tables -C OUTPUT -p tcp -j REJECT --reject-with adm-prohibited 2>/dev/null \
+            || ip6tables -I OUTPUT -p tcp -j REJECT --reject-with adm-prohibited
+    fi
 fi
 
 echo "Running CloudRon setup (with --skip-reboot)..." | log
