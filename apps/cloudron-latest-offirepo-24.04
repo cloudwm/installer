@@ -41,6 +41,24 @@ if systemctl list-unit-files apache2.service >/dev/null 2>&1; then
     systemctl disable --now apache2 2>&1 | log || true
 fi
 
+# Ubuntu's unattended-upgrades + apt-daily{,-upgrade}.timer fire on first boot and
+# grab the dpkg lock, racing cloudron-setup's apt. cloudron-setup retries with
+# `pgrep -x "apt-get|apt|dpkg"`, which never matches the "unattended-upgr" process,
+# so it bails instantly and the install dies at "installing script dependencies".
+# Mask the timers/service for the duration, then wait out any run already holding
+# the lock. Re-enabled at the end of this script once Cloudron is up.
+echo "Disabling unattended-upgrades and apt-daily timers to free the dpkg lock" | log
+systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>&1 | log || true
+systemctl disable apt-daily.timer apt-daily-upgrade.timer 2>&1 | log || true
+systemctl mask apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>&1 | log || true
+systemctl stop unattended-upgrades.service 2>&1 | log || true
+# mask doesn't kill an already-running instance — wait (max 5 min) for the lock.
+for i in $(seq 1 60); do
+    fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || break
+    echo "Waiting for dpkg lock to be released (${i})..." | log
+    sleep 5
+done
+
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
@@ -68,8 +86,18 @@ fi
 echo "Running CloudRon setup (with --skip-reboot)..." | log
 # --skip-reboot is critical: without it, cloudron-setup runs `systemctl reboot`
 # at the end, which kills the cloudinit before it reaches its final `poweroff`.
-if ! bash cloudron-setup --skip-reboot 2>&1 | tee -a "${CWM_LOGDIR:-/root}/cloudron-setup.stdout.log" | log; then
-    rc=$?
+#
+# Do NOT pipe cloudron-setup straight into `log`: log mirrors every line to
+# /dev/ttyS0, and on a VM whose serial console errors (EIO on write) that `cat`
+# dies and SIGPIPEs back up the pipe — killing cloudron-setup (it runs
+# `set -o pipefail`) ~3s in, right after the apt step, so the install dies
+# silently. Redirect to a plain file (SIGPIPE-proof), then fold the captured
+# output into the dated log afterwards (best-effort, never fatal).
+CLOUDRON_STDOUT="${CWM_LOGDIR:-/root}/cloudron-setup.stdout.log"
+bash cloudron-setup --skip-reboot > "${CLOUDRON_STDOUT}" 2>&1
+rc=$?
+cat "${CLOUDRON_STDOUT}" 2>/dev/null | log || true
+if [ "$rc" -ne 0 ]; then
     echo "cloudron-setup failed with exit $rc. Last 40 lines of /var/log/cloudron-setup.log:" | log 1
     tail -n 40 /var/log/cloudron-setup.log 2>&1 | log 1
     exit 1
@@ -124,6 +152,13 @@ if [ "$LE_OK" = "1" ]; then
 else
     descriptionAppend "TLS: self-signed during install. Cloudron will issue an LE cert after you complete the wizard."
 fi
+
+# Restore Ubuntu's automatic security upgrades now that Cloudron is installed
+# (disabled earlier to keep the dpkg lock free during cloudron-setup).
+echo "Re-enabling unattended-upgrades and apt-daily timers" | log
+systemctl unmask apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>&1 | log || true
+systemctl enable --now apt-daily.timer apt-daily-upgrade.timer 2>&1 | log || true
+systemctl enable unattended-upgrades.service 2>&1 | log || true
 
 tagScript success
 exit 0
