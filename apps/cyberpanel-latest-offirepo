@@ -22,7 +22,7 @@ ufw allow 7090
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 mkdir -p /var/www/
 cd /var/www/
-curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&Ubuntu"
+curlDownload "https://cyberpanel.sh/?dl&Ubuntu" cyberpanel.sh
 waitOrStop 0 "File not downloaded from official source"
 chmod +x cyberpanel.sh
 export DEBIAN_FRONTEND=noninteractive
