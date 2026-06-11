@@ -12,8 +12,10 @@ if [ -f "$CWM_DESCFILE" ]; then
 
     echo "Adding $CWM_DESCFILE to $descriptionMotd file" | log
     installPackage libu2f-udev
-    installPackage update-motd
-    waitOrStop 0 "Failed apt install: update-motd"
+    # On Ubuntu there is no 'update-motd' apt package - the /etc/update-motd.d/
+    # mechanism is built into pam_motd. Try to install (for Debian) but never
+    # let a missing package abort the install; the banner works without it.
+    installPackage update-motd || echo "update-motd package unavailable (built into Ubuntu), continuing" | log
 
     echo "#!/bin/sh" >> $descriptionMotd
     echo "echo \"=== System Description =======================================================\"" >> $descriptionMotd
