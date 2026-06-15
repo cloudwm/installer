@@ -1,0 +1,122 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+[ -f "${LE_DIR}/fullchain.pem" ] || { echo "LE cert missing at ${LE_DIR}" | log 1; exit 1; }
+
+rootDir=$(rootDir)
+
+echo "Adding Minio user" | log
+useradd --system minio-user --shell /sbin/nologin
+
+echo "Download Minio Binary" | log
+cd $rootDir/temp
+curl --insecure --remote-name --fail --location --write-out %{http_code} --max-redirs 3 --retry 3 --retry-connrefused --retry-delay 15 --speed-time 300 --speed-limit 1000 --url https://dl.minio.io/server/minio/release/linux-amd64/minio
+waitOrStop 0 "File not downloaded from official source"
+
+echo "Install minio binary" | log
+mv $rootDir/temp/minio /usr/local/bin
+chmod +x /usr/local/bin/minio
+chown minio-user:minio-user /usr/local/bin/minio
+
+echo "Creating data directory" | log
+mkdir /minio
+chown minio-user:minio-user /minio
+
+echo "Adding Systemd Service" | log
+cp $rootDir/tweaks/extras/minio/minio.service /etc/systemd/system
+waitOrStop 0 "copy minio.service failed"
+
+echo "Pinning MinIO ports via systemd drop-in" | log
+mkdir -p /etc/systemd/system/minio.service.d
+access_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')
+secret_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16 ; echo '')
+cat << EOF > /etc/systemd/system/minio.service.d/override.conf
+[Service]
+Environment=
+Environment="MINIO_VOLUMES=/minio/"
+Environment="MINIO_OPTS=--address 127.0.0.1:9000 --console-address 127.0.0.1:9001"
+Environment="MINIO_ROOT_USER=${access_key}"
+Environment="MINIO_ROOT_PASSWORD=${secret_key}"
+Environment="MINIO_BROWSER_REDIRECT_URL=https://${CWM_DOMAIN}/minio/ui/"
+ExecStart=
+ExecStart=/usr/local/bin/minio server \$MINIO_OPTS \$MINIO_VOLUMES
+EOF
+systemctl daemon-reload
+waitOrStop 0 "daemon-reload failed"
+
+echo "Starting Minio service" | log
+systemctl enable minio.service
+systemctl start minio.service
+waitOrStop 0 "Minio Service did not start"
+sleep 5
+
+echo "Writing MinIO nginx vhost" | log
+cat << EOF > /etc/nginx/sites-available/minio
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    client_max_body_size 0;
+    ignore_invalid_headers off;
+    proxy_buffering off;
+    proxy_request_buffering off;
+
+    location / {
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 300;
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+        proxy_pass http://127.0.0.1:9000;
+    }
+
+    location /minio/ui/ {
+        rewrite ^/minio/ui/(.*) /\$1 break;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-NginX-Proxy true;
+        real_ip_header X-Real-IP;
+        proxy_connect_timeout 300;
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+        proxy_pass http://127.0.0.1:9001;
+    }
+}
+EOF
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/minio /etc/nginx/sites-enabled/minio
+nginx -t
+waitOrStop 0 "nginx config test failed"
+systemctl start nginx
+waitOrStop 0 "nginx did not start"
+
+descriptionAppend "MinIO S3 API: https://${CWM_DOMAIN}"
+descriptionAppend "MinIO Console: https://${CWM_DOMAIN}/minio/ui/"
+descriptionAppend "MinIO Access key: $access_key"
+descriptionAppend "MinIO Secret key: $secret_key"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

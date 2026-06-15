@@ -9,13 +9,14 @@ fi
 
 echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
-sudo apt update
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools  apache2-utils jq
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-sudo usermod -aG docker $USER
+apt update 2>&1 | log
+apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools apache2-utils jq 2>&1 | log
+waitOrStop 0 "Failed to install base dependencies"
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+apt update 2>&1 | log
+apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>&1 | log
+waitOrStop 0 "Failed to install Docker"
 sleep 5
 
 echo "Creating Syncthing user and directories" | log
@@ -29,18 +30,14 @@ if ! id -u "${syncthingUser}" >/dev/null 2>&1; then
     useradd -r -g "${syncthingGroup}" -d "${appInstallDir}" -s /usr/sbin/nologin "${syncthingUser}"
 fi
 
-sudo rm -rf ${appInstallDir}/data ${appInstallDir}/config ${appInstallDir}/certs
-sudo mkdir -p ${appInstallDir}/{certs,config,data}
-sudo chown -R ${syncthingUser}:${syncthingGroup} ${appInstallDir}/{config,data,certs}
-sudo chmod -R 750 ${appInstallDir}/{config,data,certs}
+rm -rf ${appInstallDir}/data ${appInstallDir}/config
+mkdir -p ${appInstallDir}/{config,data}
+chown -R ${syncthingUser}:${syncthingGroup} ${appInstallDir}/{config,data}
+chmod -R 750 ${appInstallDir}/{config,data}
 
-sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem ${appInstallDir}/config/https-cert.pem
-sudo cp /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem ${appInstallDir}/config/https-key.pem
-sudo chown ${syncthingUser}:${syncthingGroup} ${appInstallDir}/config/https-{cert,key}.pem
-sudo chmod 640 ${appInstallDir}/config/https-{cert,key}.pem
-
-systemctl enbale nginx && systemctl start nginx
-
+# Syncthing GUI runs as plain HTTP bound to the host loopback only; nginx (below)
+# terminates TLS with the Let's Encrypt cert and reverse-proxies to it. No certs are
+# copied into Syncthing's config — nginx holds TLS.
 echo "Creating Docker Compose file for Syncthing" | log
 cat << EOF > ${appInstallDir}/docker-compose.yml
 services:
@@ -49,7 +46,7 @@ services:
     container_name: syncthing
     restart: always
     ports:
-      - "8384:8384"
+      - "127.0.0.1:8384:8384"
       - "22000:22000/tcp"
       - "22000:22000/udp"
     volumes:
@@ -60,40 +57,82 @@ services:
       - PGID=$(id -g ${syncthingGroup})
     command: --home=/var/syncthing --gui-address=0.0.0.0:8384
 EOF
-sudo chown ${syncthingUser}:${syncthingGroup} ${appInstallDir}/docker-compose.yml
+chown ${syncthingUser}:${syncthingGroup} ${appInstallDir}/docker-compose.yml
 echo "Generated docker-compose.yml:" | log
 cat ${appInstallDir}/docker-compose.yml | log
 
 echo "Starting Syncthing services" | log
 cd ${appInstallDir}
-docker compose up -d
+docker compose up -d 2>&1 | log
 waitOrStop 0 "Failed to start Syncthing services"
 
-echo "Waiting for Syncthing to initialize (30 seconds)..." | log
-sleep 30
-
-echo "Configuring Syncthing for HTTPS and admin user..." | log
-ADMINPASSWORD_HASH=$(htpasswd -nbB admin "${adminPassword}" | cut -d: -f2)
-echo "Generated password hash (length: ${#ADMINPASSWORD_HASH})" | log
-docker exec syncthing sed -i 's|<tls>false</tls>|<tls>true</tls>|' /var/syncthing/config.xml
-docker exec syncthing sed -i "/<gui enabled=\"true\"/a <user>admin</user>\n<password>${ADMINPASSWORD_HASH}</password>" /var/syncthing/config.xml
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to configure HTTPS or admin in config.xml" | log
-    waitOrStop 0 "Configuration failed"
+# Wait for Syncthing's first run to write config.xml (host path via the config volume).
+configFile="${appInstallDir}/config/config.xml"
+echo "Waiting for Syncthing to generate config.xml..." | log
+for i in $(seq 1 30); do
+    [ -f "${configFile}" ] && break
+    sleep 2
+done
+if [ ! -f "${configFile}" ]; then
+    echo "Syncthing did not create ${configFile}" | log 1
+    exit 1
 fi
 
+# Set the admin GUI user/password. Stop the container first so Syncthing isn't holding
+# the in-memory config — editing config.xml while it runs is ignored / overwritten on
+# shutdown (the original bug that left auth unset). Insert once (idempotent on re-run).
+echo "Configuring Syncthing admin user..." | log
+ADMINPASSWORD_HASH=$(htpasswd -nbB admin "${adminPassword}" | cut -d: -f2)
+docker compose stop 2>&1 | log
+if ! grep -q "<user>" "${configFile}"; then
+    sed -i "/<gui enabled=\"true\"/a\\        <user>admin</user>\n        <password>${ADMINPASSWORD_HASH}</password>" "${configFile}"
+fi
+docker compose up -d 2>&1 | log
+waitOrStop 0 "Failed to restart Syncthing after configuring admin user"
+
+echo "Configuring Nginx reverse proxy..." | log
+cat > /etc/nginx/sites-available/syncthing << NGINXCONF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8384;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s;
+    }
+}
+NGINXCONF
+
+ln -sf /etc/nginx/sites-available/syncthing /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t 2>&1 | log
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx for the Syncthing reverse proxy"
+
 echo "Adding descriptions" | log
-descriptionAppend "Syncthing Web Interface: https://${CWM_DOMAIN}:8384/"
+descriptionAppend "Syncthing Web Interface: https://${CWM_DOMAIN}/"
 descriptionAppend " "
 descriptionAppend "Syncthing Admin Username: admin"
-descriptionAppend "Syncthing Admin Password: ${ADMINPASSWORD}"
-descriptionAppend " "
-descriptionAppend "⚠️  IMPORTANT: On first access, your browser may show a certificate warning."
-descriptionAppend "This is normal for Let's Encrypt certificates. Click 'Advanced' and 'Proceed'."
+descriptionAppend "Syncthing Admin Password: ${adminPassword}"
 descriptionAppend " "
 descriptionAppend "Syncthing config location: ${appInstallDir}/docker-compose.yml"
 descriptionAppend "Syncthing data location: ${appInstallDir}/data"
-descriptionAppend "Syncthing certificates location: ${appInstallDir}/config (https-cert.pem, https-key.pem)"
 descriptionAppend "Syncthing sync port: 22000 (TCP/UDP) - open in firewall if needed"
 descriptionAppend " "
 

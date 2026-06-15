@@ -29,10 +29,96 @@ export DEBIAN_FRONTEND="noninteractive"
 echo "jitsi-videobridge jitsi-videobridge/jvb-hostname string jitsi.${CWM_DOMAIN}" | debconf-set-selections
 echo "jitsi-meet jitsi-meet/cert-choice select Self-signed certificate will be generated" | debconf-set-selections
 installPackage jitsi-meet
-echo "${ADMINEMAIL}" | /usr/share/jitsi-meet/scripts/install-letsencrypt-cert.sh
+# Reload nginx only if the config tests clean, so a bad vhost can never take nginx down.
+reloadNginx() {
+    nginx -t 2>&1 | log
+    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+        systemctl reload nginx 2>&1 | log
+    else
+        echo "nginx config test failed; skipping reload" | log 1
+    fi
+}
+
+# jitsi-meet ships a self-signed cert at /etc/jitsi/meet/jitsi.${CWM_DOMAIN}.{crt,key}
+# (debconf "Self-signed certificate ..." above) and its vhost already points at those paths.
+# We obtain ONE trusted SAN cert covering both jitsi.${CWM_DOMAIN} and ${CWM_DOMAIN} and
+# install it OVER those same files. On any failure the self-signed cert simply stays in
+# place, so HTTPS keeps working and we never lock anyone out.
+CERT=/etc/jitsi/meet/jitsi.${CWM_DOMAIN}
+
+# Redirect vhost (port 80): serves the ACME http-01 challenge for the bare domain from
+# Jitsi's webroot and redirects plain HTTP to the Jitsi subdomain. No cert needed -> safe.
+echo "Configuring ${CWM_DOMAIN} -> https://jitsi.${CWM_DOMAIN} redirect" | log
+cat << EOF > /etc/nginx/sites-available/jitsi-redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        root /usr/share/jitsi-meet;
+    }
+    location / {
+        return 301 https://jitsi.${CWM_DOMAIN}\$request_uri;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/jitsi-redirect /etc/nginx/sites-enabled/jitsi-redirect
+reloadNginx
+
+# This Jitsi build uses acme.sh (NOT certbot) for Let's Encrypt. Bootstrap it if the vendor
+# install path is not already present, then issue a SAN cert for both names in one shot.
+export HOME=/opt/acmesh
+ACME=/opt/acmesh/.acme.sh/acme.sh
+if [ ! -x "$ACME" ]; then
+    echo "Bootstrapping acme.sh" | log
+    curl https://get.acme.sh | sh -s email=${ADMINEMAIL} 2>&1 | log
+fi
+
+echo "Issuing Let's Encrypt SAN cert for jitsi.${CWM_DOMAIN} + ${CWM_DOMAIN}" | log
+acmeOk=1
+if [ -x "$ACME" ]; then
+    n=0
+    until [ $n -ge 5 ]; do
+        "$ACME" -f --issue -d jitsi.${CWM_DOMAIN} -d ${CWM_DOMAIN} -w /usr/share/jitsi-meet --server letsencrypt > /tmp/acme-issue.out 2>&1
+        acmeRc=$?
+        cat /tmp/acme-issue.out | log
+        if [ $acmeRc -eq 0 ]; then acmeOk=0; break; fi
+        n=$((n + 1))
+        echo "acme.sh issue attempt $n failed (rate limit / DNS not ready); retrying in 30s" | log 1
+        sleep 30
+    done
+fi
+
+if [ $acmeOk -eq 0 ]; then
+    # Install the trusted cert over the jitsi self-signed paths and refresh nginx + coturn.
+    "$ACME" -f --install-cert -d jitsi.${CWM_DOMAIN} \
+        --key-file ${CERT}.key --fullchain-file ${CERT}.crt \
+        --reloadcmd "systemctl force-reload nginx.service && /usr/share/jitsi-meet/scripts/coturn-le-update.sh jitsi.${CWM_DOMAIN}" 2>&1 | log
+else
+    echo "Let's Encrypt issuance failed; keeping self-signed cert for jitsi.${CWM_DOMAIN}" | log 1
+fi
+
+# Redirect vhost (port 443): redirect HTTPS on the bare domain to the Jitsi subdomain.
+# Reuses the jitsi cert files (always present), so this can never reference a missing cert.
+cat << EOF >> /etc/nginx/sites-available/jitsi-redirect
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${CERT}.crt;
+    ssl_certificate_key ${CERT}.key;
+
+    return 301 https://jitsi.${CWM_DOMAIN}\$request_uri;
+}
+EOF
+reloadNginx
 
 echo "Adding descriptions" | log
-descriptionAppend "Jitsi Web UI: https://jitsi.${CWM_DOMAIN}"
+descriptionAppend "Jitsi Web UI: https://jitsi.${CWM_DOMAIN} (https://${CWM_DOMAIN} redirects here)"
 descriptionAppend " "
 
 tagScript success

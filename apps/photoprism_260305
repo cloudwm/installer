@@ -118,8 +118,8 @@ waitOrStop 0 "PhotoPrism service not ready"
 
 
 for ((i=1; i<=MAX_RETRIES; i++)); do
-    curl -fsS http://127.0.0.1/ > /dev/null
-    if [ $? -eq 0 ]; then
+    code=$(curl -ksSL -o /dev/null -w '%{http_code}' "https://${CWM_DOMAIN}/")
+    if [ "$code" = "200" ]; then
         success=true
         break
     fi
@@ -128,7 +128,7 @@ for ((i=1; i<=MAX_RETRIES; i++)); do
 done
 
 [ "$success" = true ]
-waitOrStop 0
+waitOrStop 0 "Secured SSL WebUI not reachable at https://${CWM_DOMAIN}/"
 
 
 

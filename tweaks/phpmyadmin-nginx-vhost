@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+checkTagExist phpmyadmin.success
+
+rootDir=$(rootDir)
+echo "Installing phpMyAdmin nginx vhost for ${CWM_DOMAIN}" | log
+cp $rootDir/tweaks/extras/phpmyadmin-nginx/phpmyadmin.conf /etc/nginx/sites-available/
+sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/phpmyadmin.conf
+ln -sf /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default-ssl
+# nginx was stopped by nginx-letsencrypt-cert (certbot --standalone); restart it.
+service nginx restart
+waitOrStop 0 "Nginx failed to restart"
+
+tagScript success
+exit 0

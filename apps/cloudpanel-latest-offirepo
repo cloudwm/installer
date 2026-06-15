@@ -11,6 +11,35 @@ curl -sSL https://installer.cloudpanel.io/ce/v2/install.sh -o install.sh; \
 sudo DB_ENGINE=MYSQL_8.4 bash install.sh
 waitOrStop 0 "Failed to install CloudPanel"
 
+# CloudPanel's install.sh exits 0 and the panel is fully usable even when the cloudpanel .deb
+# postinst (a `set -e` script) trips on a non-essential, environment-specific step — dpkg then
+# leaves the package "half-configured". Verify the panel is genuinely up before trusting that.
+echo "Verifying CloudPanel admin is up on :8443" | log
+panelStatus=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 https://127.0.0.1:8443)
+if ! systemctl is-active --quiet clp-nginx || ! ss -tlnp | grep -q ':8443 ' || \
+   ! echo "$panelStatus" | grep -qE '^[23]'; then
+    echo "CloudPanel admin not reachable (clp-nginx/:8443, http=${panelStatus:-none})" | log 1
+    exit 1
+fi
+echo "CloudPanel admin reachable (http ${panelStatus})" | log
+
+# A half-configured cloudpanel package makes EVERY later `apt install` fail (apt keeps re-running
+# the doomed `dpkg --configure cloudpanel`), which would falsely abort downstream steps such as the
+# motd tweaks. The panel is verified healthy above and its real setup already ran inside install.sh,
+# so force dpkg to record the package as configured. A plain configure retries the same failing
+# postinst, so neutralize it with a no-op for one configure pass, then restore the original.
+if dpkg -s cloudpanel 2>/dev/null | grep -q 'half-configured'; then
+    echo "Repairing half-configured cloudpanel package (postinst is non-fatal; panel verified up)" | log
+    dpkg --configure cloudpanel 2>&1 | log || true
+    if dpkg -s cloudpanel 2>/dev/null | grep -q 'half-configured'; then
+        pi=/var/lib/dpkg/info/cloudpanel.postinst
+        mv "$pi" "${pi}.orig"
+        printf '#!/bin/sh\nexit 0\n' > "$pi"; chmod +x "$pi"
+        dpkg --configure cloudpanel 2>&1 | log || true
+        mv "${pi}.orig" "$pi"
+    fi
+fi
+
 echo "Restarting and enabling  services" | log
 systemctl enable nginx
 systemctl restart nginx
@@ -19,5 +48,53 @@ systemctl enable mysql
 systemctl restart mysql
 waitOrStop 0 "Failed to restart mysql"
 
-exit 0 
+echo "Configuring nginx reverse proxy in front of CloudPanel admin (8443)" | log
+# CloudPanel runs its admin panel on a self-signed-cert nginx on 8443 and keeps 80/443 for the
+# sites it hosts. Add a vhost scoped to CWM_DOMAIN only (not default_server) so the bare domain
+# reaches the admin while hosted sites on other domains keep using 443 normally. CloudPanel's
+# nginx includes sites-enabled/*.conf, so the file must end in .conf.
+mkdir -p /etc/nginx/sites-enabled
+cat << EOF > /etc/nginx/sites-enabled/cloudpanel.conf
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 0;
+
+    location / {
+        proxy_pass https://127.0.0.1:8443;
+        proxy_ssl_verify off;                       # CloudPanel serves a self-signed cert on 8443
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
+        proxy_buffering off;
+    }
+}
+EOF
+
+nginx -t
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart nginx after CloudPanel proxy config"
+
+echo "Adding descriptions" | log
+descriptionAppend "CloudPanel Admin URI: https://${CWM_DOMAIN}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
 

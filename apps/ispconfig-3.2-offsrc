@@ -23,6 +23,11 @@ cd $rootDir/temp/ispconfig3*/install/
 echo "Installing Pure-FTPD" | log
 apt install pure-ftpd-mysql -y
 
+echo "Switching PHP-FPM 7.4 from unix socket to 127.0.0.1:9000 (ISPConfig vhost expects TCP)" | log
+sed -i 's|^listen = /run/php/php7.4-fpm.sock|listen = 127.0.0.1:9000|' /etc/php/7.4/fpm/pool.d/www.conf
+systemctl restart php7.4-fpm.service
+waitOrStop 0 "Failed to restart php7.4-fpm after socket->TCP switch"
+
 echo "Generating Configuration" | log
 mv $rootDir/temp/ispconfig3*/docs/autoinstall_samples/autoinstall.ini.sample  ./autoinstall.ini
 sed   -i "/^mysql_root_password/c\mysql_root_password=${ADMINPASSWORD}" ./autoinstall.ini
@@ -32,12 +37,55 @@ php install.php --autoinstall=autoinstall.ini
 systemctl start mysql.service
 
 sed -i 's/^\(\s*fastcgi_pass\s*\).*/\1127.0.0.1:9000;/' /etc/nginx/sites-available/ispconfig.vhost
+
+# ISPConfig's IDS Monitor writes to /usr/local/ispconfig/interface/temp on every PHP request.
+# Ubuntu's php7.4-fpm.service ships with ProtectSystem=full, which mounts /usr read-only for
+# the FPM workers — even though /usr/local/ispconfig/interface/temp is owned by www-data, PHP
+# gets EROFS and Monitor.php throws InvalidArgumentException -> HTTP 500 on the login page.
+# Drop in a unit override exposing only /usr/local/ispconfig as read-write; keep the rest of
+# the hardening intact.
+mkdir -p /etc/systemd/system/php7.4-fpm.service.d
+cat > /etc/systemd/system/php7.4-fpm.service.d/ispconfig.conf <<'EOF'
+[Service]
+ReadWritePaths=/usr/local/ispconfig
+EOF
+systemctl daemon-reload
 chown -R www-data:www-data /usr/local/ispconfig
 systemctl restart php7.4-fpm.service
+
+LE_FC="/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
+LE_PK="/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+if [ -f "${LE_FC}" ] && [ -f "${LE_PK}" ]; then
+    echo "Wiring ISPConfig vhost to LE cert at /etc/letsencrypt/live/${CWM_DOMAIN}/" | log
+    sed -i "s|^\(\s*ssl_certificate\s\+\).*|\1${LE_FC};|" /etc/nginx/sites-available/ispconfig.vhost
+    sed -i "s|^\(\s*ssl_certificate_key\s\+\).*|\1${LE_PK};|" /etc/nginx/sites-available/ispconfig.vhost
+else
+    echo "LE cert files missing under /etc/letsencrypt/live/${CWM_DOMAIN}/ — leaving ISPConfig's self-signed cert in place" | log 1
+fi
+
+echo "Writing port-80 redirect vhost (eliminates default 'Welcome to nginx' page)" | log
+# default_server: ISPConfig ships acme.vhost on :80 with server_name=server1.example.com
+# which would otherwise become the implicit default and 403 every request to http://<ip>/.
+# Prefix 000- so it sorts before 999-acme.vhost (lexical load order in sites-enabled).
+cat > /etc/nginx/sites-available/ispconfig-http <<EOF
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name ${CWM_DOMAIN} _;
+    return 301 https://\$host:8080\$request_uri;
+}
+EOF
+rm -f /etc/nginx/sites-enabled/ispconfig-http
+ln -sf /etc/nginx/sites-available/ispconfig-http /etc/nginx/sites-enabled/000-ispconfig-http
+rm -f /etc/nginx/sites-enabled/default
+
+nginx -t
+waitOrStop 0 "nginx -t failed after ISPConfig vhost rewrite"
 systemctl reload nginx.service
+waitOrStop 0 "nginx reload failed after ISPConfig vhost rewrite"
 
 echo "adding descriptions" | log
-descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_SERVERIP}:8080/"
+descriptionAppend "ISPConfig Admin Web Interface: https://${CWM_DOMAIN}:8080/"
 descriptionAppend "ISPConfig Admin Username: admin"
 descriptionAppend "ISPConfig Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

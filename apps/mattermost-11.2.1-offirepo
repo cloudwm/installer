@@ -51,6 +51,8 @@ echo "Configuring database connection" | log
 jq '.SqlSettings.DriverName = "postgres"' $confFile > tmp.$$.json && mv tmp.$$.json $confFile
 jq --arg datasource "postgres://${mmuser_name}:${mmuser_password}@localhost:5432/mattermost?sslmode=disable&connect_timeout=10" \
    '.SqlSettings.DataSource = $datasource' $confFile > tmp.$$.json && mv tmp.$$.json $confFile
+jq --arg siteurl "https://${CWM_DOMAIN}" \
+   '.ServiceSettings.SiteURL = $siteurl' $confFile > tmp.$$.json && mv tmp.$$.json $confFile
 
 chown mattermost:mattermost $confFile
 
@@ -82,14 +84,73 @@ systemctl enable mattermost.service
 systemctl start mattermost.service
 waitOrStop 0 "Starting mattermost service failed"
 
-echo "Allowing MatterMost App in UFW" | log
-ufw allow 8065
+echo "Configuring Nginx for Mattermost (HTTPS)" | log
+# nginx + LE cert provided by tweaks/nginx-letsencrypt-cert (run earlier in
+# the contrib). Certs at /etc/letsencrypt/live/${CWM_DOMAIN}/{fullchain,privkey}.pem.
+# 8065 stays loopback-only — many hosting providers drop non-22 inbound until
+# explicitly whitelisted, so we front-end everything through nginx on 80/443.
+cat << EOF > /etc/nginx/sites-available/mattermost
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    client_max_body_size 100M;
+
+    location ~ /api/v[0-9]+/(users/)?websocket\$ {
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Frame-Options SAMEORIGIN;
+        proxy_buffers 256 16k;
+        proxy_buffer_size 16k;
+        proxy_read_timeout 600s;
+        proxy_pass http://127.0.0.1:8065;
+    }
+
+    location / {
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Frame-Options SAMEORIGIN;
+        proxy_buffers 256 16k;
+        proxy_buffer_size 16k;
+        proxy_read_timeout 600s;
+        proxy_http_version 1.1;
+        proxy_pass http://127.0.0.1:8065;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/mattermost /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding Nginx ports to UFW" | log
+ufw allow 80
+ufw allow 443
 
 echo "Adding descriptions" | log
 descriptionAppend "Mattermost Database Username: ${mmuser_name}"
 descriptionAppend "Mattermost Database Password: ${mmuser_password}"
 descriptionAppend " "
-descriptionAppend "Mattermost Web UI: http://${CWM_DISPLAYED_ADDRESS}:8065"
+descriptionAppend "Mattermost Web UI: https://${CWM_DOMAIN}/"
 descriptionAppend "# Open Web UI to set Admin Username and Password"
 descriptionAppend " "
 

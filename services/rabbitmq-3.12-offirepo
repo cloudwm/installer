@@ -12,9 +12,9 @@ rootDir=$(rootDir)
 erlangVersion=25.x
 rabbitmqVersion=3.12.\*
 
-
-#rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.io"
-rabbitmqDomain="${CWM_SERVERIP//./-}.cloud-xip.com"
+# Use CWM_DOMAIN — the machine's real FQDN provided by the platform — as the
+# address for the cert and vhosts, instead of a hardcoded "<ip>.cloud-xip.com"
+# (which is wrong for dev boxes whose FQDN is "<ip>.dev-cloud-xip.com").
 
 echo "Adding RabbitMQ repository" | log
 apt-key adv --keyserver "hkps://keys.openpgp.org" --recv-keys "0x0A9AF2115F4687BD29803A206B73A36E6026DFCA"
@@ -52,45 +52,42 @@ cp $rootDir/tweaks/extras/rabbitmq-nginx/register.conf /etc/nginx/sites-availabl
 ln -s /etc/nginx/sites-available/register.conf /etc/nginx/sites-enabled/
 
 # creating certbot
-execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${rabbitmqDomain} ${CWM_DEBUG:+"--test-cert"}
+execSpecial 3 '(fail|error)' certbot certonly --agree-tos -n --email ${ADMINEMAIL} --webroot -w /var/lib/letsencrypt/ -d ${CWM_DOMAIN} ${CWM_DEBUG:+"--test-cert"}
 
-if [[ $? == 1 ]]
-then
-export certbot_failed=1
-echo "Generating self-signed certificate" | log
-mkdir /etc/letsencrypt/live
-mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem -out /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
-
-else
-
-export certbot_failed=0
-#waitOrStop 0 "Failed certbot certificate generation"
+# Fall back to a self-signed cert if Let's Encrypt couldn't issue one (e.g. the
+# ACME API is unreachable on dev/internal boxes), so the install doesn't die.
+if [ ! -f /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem ]; then
+    echo "Let's Encrypt unavailable; issuing self-signed certificate for ${CWM_DOMAIN}" | log
+    mkdir -p /etc/letsencrypt/live/${CWM_DOMAIN}
+    openssl req -x509 -sha256 -newkey rsa:2048 -nodes -days 1024 \
+        -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem \
+        -out    /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem \
+        -subj   "/CN=${CWM_DOMAIN}" 2>/dev/null
+    waitOrStop 0 "Certificate creation failed"
 fi
 
 unlink /etc/nginx/sites-enabled/register.conf
 cp $rootDir/tweaks/extras/rabbitmq-nginx/rabbitmq.conf /etc/nginx/sites-available/
 # add keys to ssl configs
-sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem|" /etc/nginx/sites-available/rabbitmq.conf
-sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem|" /etc/nginx/sites-available/rabbitmq.conf
+sed -i "s|/path/to/your.key|/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|" /etc/nginx/sites-available/rabbitmq.conf
+sed -i "s|/path/to/your.crt|/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /etc/nginx/sites-available/rabbitmq.conf
 
-if [[ -f /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem ]]; then 
-      	sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${rabbitmqDomain}/chain.pem|" /etc/nginx/sites-available/rab
-	at << EOF > /etc/rabbitmq/rabbitmq.conf
+if [[ -f /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem ]]; then 
+      	sed -i "s|/path/to/your.chain|/etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem|" /etc/nginx/sites-available/rabbitmq.conf
+	cat << EOF > /etc/rabbitmq/rabbitmq.conf
 
 listeners.ssl.default = 5671
 management.ssl.port   = 15671
 
-ssl_options.cacertfile = /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem
-ssl_options.certfile   = /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem
-ssl_options.keyfile    = /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem
+ssl_options.cacertfile = /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem
+ssl_options.certfile   = /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
+ssl_options.keyfile    = /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
 ssl_options.verify     = verify_peer
 ssl_options.fail_if_no_peer_cert = true
 
-management.ssl.cacertfile = /etc/letsencrypt/live/${rabbitmqDomain}/chain.pem
-management.ssl.certfile   = /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem
-management.ssl.keyfile    = /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem
+management.ssl.cacertfile = /etc/letsencrypt/live/${CWM_DOMAIN}/chain.pem
+management.ssl.certfile   = /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
+management.ssl.keyfile    = /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
 EOF
 
 else
@@ -100,21 +97,24 @@ else
 listeners.ssl.default = 5671
 management.ssl.port   = 15671
 
-ssl_options.certfile   = /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem
-ssl_options.keyfile    = /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem
+ssl_options.certfile   = /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
+ssl_options.keyfile    = /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
 ssl_options.verify     = verify_peer
 ssl_options.fail_if_no_peer_cert = true
 
-management.ssl.certfile   = /etc/letsencrypt/live/${rabbitmqDomain}/fullchain.pem
-management.ssl.keyfile    = /etc/letsencrypt/live/${rabbitmqDomain}/privkey.pem
+management.ssl.certfile   = /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
+management.ssl.keyfile    = /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
 EOF
 
 fi
 
 chmod 771 /etc/letsencrypt/live
-chmod -R 775 /etc/letsencrypt/live/${rabbitmqDomain}
-chmod 771 /etc/letsencrypt/archive
-chmod -R 775 /etc/letsencrypt/archive/${rabbitmqDomain}
+chmod -R 775 /etc/letsencrypt/live/${CWM_DOMAIN}
+# archive/ only exists when certbot issued the cert; skip for the self-signed fallback
+if [ -d /etc/letsencrypt/archive/${CWM_DOMAIN} ]; then
+    chmod 771 /etc/letsencrypt/archive
+    chmod -R 775 /etc/letsencrypt/archive/${CWM_DOMAIN}
+fi
 
 ln -s /etc/nginx/sites-available/rabbitmq.conf /etc/nginx/sites-enabled/
 systemctl restart nginx
@@ -128,7 +128,7 @@ systemctl restart rabbitmq-server
 waitOrStop 0 "Starting rabbitmq service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "RabbitMQ Web UI: https://${rabbitmqDomain}"
+descriptionAppend "RabbitMQ Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "RabbitMQ Username: admin"
 descriptionAppend "RabbitMQ Password: ${ADMINPASSWORD}"
 descriptionAppend " "

@@ -1,0 +1,186 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+else
+    echo "Error: startup.sh not found in include/ or ../include/" >&2
+    exit 1
+fi
+
+runOnceCheck
+
+# HestiaCP is the actively maintained fork of the (now deprecated) Vesta Control Panel and
+# the only Vesta-family panel that supports Ubuntu 24.04. It ships its own full web stack --
+# system nginx on 80/443 (reverse proxy in front of apache:8080), MariaDB, exim, dovecot,
+# bind -- plus a separate panel "hestia" nginx serving the UI on :8083.
+#
+# This runs AFTER tweaks/nginx-letsencrypt-cert, which already obtained the cert for
+# ${CWM_DOMAIN} (installing stock nginx in the process). We install Hestia over that with
+# --force, then reverse-proxy the bare domain onto the panel using that cert.
+
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+echo "Downloading HestiaCP installer" | log
+INSTALLER="hst-install.sh"
+curlDownload https://raw.githubusercontent.com/hestiacp/hestiacp/release/install/hst-install.sh "$INSTALLER"
+waitOrStop 0 "File not downloaded from official source"
+
+# Fully non-interactive install. --force is required: the cert tweak already installed
+# stock nginx and the framework's ufw, both of which are on Hestia's conflict list -- without
+# --force the installer would stop at the removal prompt. apt then replaces stock nginx with
+# Hestia's own. --iptables/--fail2ban no: ufw stays the sole firewall.
+# NB: there is no --nginx flag (Hestia always installs nginx); passing one trips its option
+# parser with "illegal option". clamav/spamassassin self-disable under 1.5GB RAM.
+echo "Installing HestiaCP (this takes several minutes)" | log
+# Hestia's installer calls clear/tput; with no TTY and TERM unset (unattended run) those
+# fail and the installer aborts immediately. Give it a terminal type.
+export TERM="${TERM:-xterm}"
+bash "$INSTALLER" --interactive no --force \
+    --hostname "${CWM_DOMAIN}" \
+    --email "admin@${CWM_DOMAIN}" \
+    --username admin --password "${ADMINPASSWORD}" \
+    --port 8083 --lang en \
+    --apache yes --phpfpm yes \
+    --mariadb yes --named yes --exim yes --dovecot yes \
+    --vsftpd yes \
+    --iptables no --fail2ban no \
+    --api yes --quota no 2>&1 | log
+rm -f "$INSTALLER"
+
+# The installer's own exit status is unreliable through the pipe, so verify directly: the
+# control CLI must exist and the panel must actually be listening on :8083.
+if [ ! -x /usr/local/hestia/bin/v-list-users ]; then
+    echo "HestiaCP install failed: /usr/local/hestia/bin/v-list-users missing" | log 1
+    exit 1
+fi
+
+# Settle the stock->nginx.org unit swap (the cert tweak installed stock nginx; Hestia replaced
+# it with nginx.org's build). Without a daemon-reload, the first `systemctl restart nginx` can
+# hit a PID-file race ("Can't open PID file /run/nginx.pid (yet?)") and report a false failure.
+systemctl daemon-reload 2>&1 | log
+
+# Enable the panel so it comes up on the post-provisioning reboot, and try to start it now.
+# Starting is best-effort: during provisioning the panel often isn't fully up until the reboot,
+# so a not-yet-listening :8083 here is NOT a failure (CWM reboots the box right after install).
+systemctl enable --now hestia 2>&1 | log
+
+echo "Waiting (best-effort) for HestiaCP to listen on :8083" | log
+for i in $(seq 1 15); do
+    ss -tln | grep -q ':8083' && break
+    sleep 2
+done
+ss -tln | grep -q ':8083' \
+    && echo "HestiaCP panel is listening on :8083" | log \
+    || echo "Panel not up on :8083 yet; it will start on the provisioning reboot (continuing)" | log 1
+
+# Hestia plants a first-boot cron that runs v-add-letsencrypt-host, which would re-issue a
+# cert for the hostname (extra Let's Encrypt spend on the shared xip domain) and reconfigure
+# the panel's nginx -- clashing with the reverse-proxy vhost below. We own SSL via the cert
+# tweak, so remove it.
+rm -f /etc/cron.d/hestia-ssl
+
+# Panel + http/https. Full hosting use (mail/FTP/DNS) would also need
+# 21/25/465/587/993/995/53 -- left closed by default for a panel-access install.
+echo "Adding firewall rules" | log
+ufw allow 8083
+ufw allow 80
+ufw allow 443
+ufw reload
+
+# Hestia auto-creates a web domain for the hostname (it serves a default website for
+# ${CWM_DOMAIN} on the public IP). Remove it so it doesn't fight our reverse proxy for the
+# same server_name. Best-effort: it's absent on runs where Hestia's domain creation failed.
+echo "Removing Hestia's auto-created hostname web domain (we proxy the bare domain ourselves)" | log
+/usr/local/hestia/bin/v-delete-web-domain admin "${CWM_DOMAIN}" 2>&1 | log || true
+
+# Reverse-proxy the bare domain onto the panel so it opens at https://CWM_DOMAIN with no port
+# and the Let's Encrypt cert -- avoiding the double-cert warning a :8083 redirect produces.
+# The drop-in lives in conf.d/ (included by Hestia's nginx.conf, not panel-managed, so it
+# survives config regeneration). It listens on the server IP (same listen group as Hestia's
+# IP vhosts) so SNI for ${CWM_DOMAIN} selects it; falls back to wildcard if the IP is unknown.
+PANEL_URL="https://${CWM_DOMAIN}:8083"
+LISTEN_ADDR="${CWM_SERVERIP:+${CWM_SERVERIP}:}"
+if [ -f "${LE_DIR}/fullchain.pem" ] && [ -f "${LE_DIR}/privkey.pem" ]; then
+    echo "Configuring nginx reverse proxy for the HestiaCP panel" | log
+
+    # Hestia's nginx has no $connection_upgrade map; define one (http{} context) for
+    # websocket upgrades, unless one already exists.
+    if ! grep -rqs 'connection_upgrade' /etc/nginx/; then
+        cat > /etc/nginx/conf.d/cwm-proxy-upgrade.conf <<'EOF'
+map $http_upgrade $connection_upgrade { default upgrade; '' close; }
+EOF
+    fi
+
+    cat > /etc/nginx/conf.d/cwm-vesta-hestia-proxy.conf <<EOF
+server {
+    listen ${LISTEN_ADDR}80;
+    server_name ${CWM_DOMAIN};
+    location / { return 301 https://${CWM_DOMAIN}\$request_uri; }
+}
+server {
+    listen ${LISTEN_ADDR}443 ssl;
+    http2 on;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    location / {
+        proxy_pass https://127.0.0.1:8083;
+        proxy_ssl_verify off;
+        proxy_ssl_server_name on;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_read_timeout 120s;
+    }
+}
+EOF
+
+    # Trust nginx -t as the gate. If the config is valid, keep the vhost even if the immediate
+    # restart is flaky (nginx.org PID-file race) -- the provisioning reboot serves it from the
+    # persisted file. Only drop the vhost if it actually breaks the config.
+    if nginx -t 2>&1 | log; [ ${PIPESTATUS[0]} -eq 0 ]; then
+        systemctl restart nginx 2>&1 | log
+        systemctl is-active --quiet nginx \
+            && echo "Configured ${CWM_DOMAIN} -> :8083 panel reverse proxy" | log \
+            || echo "nginx not up yet after proxy config; will start on the provisioning reboot" | log 1
+        PANEL_URL="https://${CWM_DOMAIN}"
+        export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+        tag global-domain-set.success
+    else
+        echo "WARNING: proxy vhost failed nginx -t; removing it and serving panel on :8083" | log 1
+        rm -f /etc/nginx/conf.d/cwm-vesta-hestia-proxy.conf
+        systemctl restart nginx 2>&1 | log
+    fi
+else
+    echo "WARNING: no certificate at ${LE_DIR}; serving panel on :8083 only" | log 1
+fi
+
+# End-to-end check (best-effort) when the proxy is live and the panel is already up: it should
+# serve the panel login over 443. nginx binds the server IP, so target that (not localhost).
+if [ "${PANEL_URL}" = "https://${CWM_DOMAIN}" ] && ss -tln | grep -q ':8083'; then
+    code=$(curl -sk -o /dev/null -w '%{http_code}' -m 10 -H "Host: ${CWM_DOMAIN}" "https://${CWM_SERVERIP:-127.0.0.1}/")
+    case "$code" in
+        200|301|302) echo "Panel reachable on https://${CWM_DOMAIN}/ (HTTP $code)" | log ;;
+        *) echo "Panel proxy check returned HTTP $code (will be live after the provisioning reboot)" | log 1 ;;
+    esac
+fi
+
+echo "Adding descriptions" | log
+descriptionAppend " "
+descriptionAppend "HestiaCP Web UI: ${PANEL_URL}"
+descriptionAppend "HestiaCP Web UI (direct): https://${CWM_DOMAIN}:8083"
+descriptionAppend "HestiaCP User: admin"
+descriptionAppend "HestiaCP Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+
+tagScript success
+
+exit 0

@@ -7,14 +7,71 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 appDir="/opt/n8n"
-mkdir $appDir
-cp /opt/installer/tweaks/extras/n8n/docker-compose.yml $appDir
+rootDir=$(rootDir)
 
+echo "Preparing n8n directory" | log
+mkdir -p $appDir
+
+echo "Installing n8n docker-compose.yml with domain ${CWM_DOMAIN}" | log
+cp $rootDir/tweaks/extras/n8n/docker-compose.yml $appDir/docker-compose.yml
+sed -i "s|__CWM_DOMAIN__|${CWM_DOMAIN}|g" $appDir/docker-compose.yml
+
+echo "Starting n8n with Docker Compose" | log
 cd $appDir
-docker-compose up -d
-waitOrStop 0 "Failed to start docker-compose file"
+docker compose up -d
+waitOrStop 0 "Failed to start n8n with Docker Compose"
 
-descriptionAppend "N8N UI: http://${CWM_DISPLAYED_ADDRESS}:5678"
+echo "Configuring Nginx for n8n (HTTPS)" | log
+# nginx + LE cert provided by tweaks/nginx-letsencrypt-cert (run earlier in
+# the contrib). Certs at /etc/letsencrypt/live/${CWM_DOMAIN}/{fullchain,privkey}.pem.
+cat << EOF > /etc/nginx/sites-available/n8n
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:5678;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/n8n /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding Nginx ports to ufw" | log
+ufw allow 80
+ufw allow 443
+
+echo "Adding descriptions" | log
+descriptionAppend "n8n is installed and running with Docker."
+descriptionAppend "n8n directory: $appDir"
+descriptionAppend "n8n Web UI: https://${CWM_DOMAIN}/"
+descriptionAppend "To stop n8n: cd $appDir && docker compose down"
+descriptionAppend "To start n8n: cd $appDir && docker compose up -d"
+descriptionAppend "n8n logs: cd $appDir && docker compose logs -f"
+descriptionAppend " "
 
 tagScript success
 

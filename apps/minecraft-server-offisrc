@@ -77,6 +77,74 @@ descriptionAppend " "
 descriptionAppend "To connect to your server go to the game client and connect to: ${CWM_SERVERIP}:25565"
 descriptionAppend " "
 
+echo "Creating landing page" | log
+mkdir -p /var/www/minecraft
+
+cat << 'EOF' > /var/www/minecraft/index.html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Minecraft Server</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ body{margin:0;font-family:system-ui,sans-serif;background:#0f1419;color:#e6e6e6;
+      min-height:100vh;display:flex;align-items:center;justify-content:center}
+ .card{background:#1b2330;border:1px solid #2a3446;border-radius:12px;
+       padding:2.5rem;max-width:520px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+ h1{margin:0 0 .25rem;color:#4ade80;font-size:1.8rem}
+ .note{color:#9aa4b2;font-size:.9rem;margin:0 0 1.5rem}
+ .addr{background:#0b1018;border:1px solid #2a3446;border-radius:8px;
+       padding:1rem;font-family:ui-monospace,monospace;font-size:1.25rem;
+       display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+ .addr code{color:#4ade80}
+ .fallback{margin-top:.5rem;color:#6b7280;font-size:.85rem;font-family:ui-monospace,monospace}
+ button{background:#4ade80;color:#0f1419;border:0;border-radius:6px;
+        padding:.4rem .8rem;font-weight:600;cursor:pointer}
+ .howto{margin-top:1.5rem;color:#cbd5e1;font-size:.95rem;line-height:1.5}
+</style></head><body>
+<div class="card">
+  <h1>Minecraft Server</h1>
+  <p class="note">This host has no web UI. Connect with the Minecraft client.</p>
+  <div class="addr">
+    <code id="a">__SERVERIP__:__PORT__</code>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('a').innerText)">Copy</button>
+  </div>
+  <p class="howto">In Minecraft: Multiplayer &rarr; Add Server &rarr; paste the address above.</p>
+</div></body></html>
+EOF
+
+sed -i "s/__SERVERIP__/${CWM_SERVERIP}/g" /var/www/minecraft/index.html
+sed -i "s/__PORT__/25565/g"               /var/www/minecraft/index.html
+
+cat << EOF > /etc/nginx/sites-available/minecraft
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    root /var/www/minecraft;
+    index index.html;
+    location / { try_files \$uri \$uri/ =404; }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/minecraft /etc/nginx/sites-enabled/minecraft
+rm -f /etc/nginx/sites-enabled/default
+nginx -t 2>&1 | log
+ufw allow 443
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart nginx for minecraft landing page"
+
+descriptionAppend "Landing page: https://${CWM_DOMAIN}/"
+descriptionAppend " "
+
 tagScript success
 
 exit 0

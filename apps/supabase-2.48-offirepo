@@ -19,8 +19,10 @@ LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 
 system_setup() {
     echo "🔧 Updating system and installing dependencies..." | log
-    apt-get update -y
-    apt-get install -y curl wget git docker.io docker-compose jq nginx
+    # DPkg::Lock::Timeout makes apt wait for the lock (unattended-upgrades holds it on
+    # fresh boot) instead of failing instantly and aborting the whole run.
+    apt-get update -y -o DPkg::Lock::Timeout=300
+    apt-get install -y -o DPkg::Lock::Timeout=300 curl wget git docker.io docker-compose jq nginx
     systemctl enable docker nginx
     systemctl start docker nginx
 }
@@ -54,10 +56,13 @@ install_supabase_cli() {
     local URL="https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/${DEB_FILE}"
 
     echo "⬇️  Downloading Supabase CLI v${SUPABASE_VERSION}..." | log
-    wget -q -O "/tmp/${DEB_FILE}" "$URL"
+    # curlDownload retries and exits 1 on a non-200 (wget -q silently wrote a bad file).
+    curlDownload "$URL" "/tmp/${DEB_FILE}"
 
     echo "📦 Installing Supabase CLI..." | log
-    dpkg -i "/tmp/${DEB_FILE}" || apt-get install -f -y
+    # Install via apt (not bare dpkg) so it resolves deps and, with DPkg::Lock::Timeout,
+    # waits for the unattended-upgrades lock instead of failing instantly.
+    apt-get install -y -o DPkg::Lock::Timeout=300 "/tmp/${DEB_FILE}"
     if ! command -v supabase &>/dev/null; then
         echo "❌ Supabase CLI installation failed." | log
         exit 1
@@ -235,12 +240,7 @@ post_install_configuration() {
     sed -i -E 's|^[[:space:]]*site_url[[:space:]]*=.*|site_url = "https://'"${CWM_DOMAIN}"'"|g' "$CONFIG_FILE"
     sed -i -E 's|^\s*additional_redirect_urls\s*=.*|additional_redirect_urls = ["https://'"${CWM_DOMAIN}"'"]|g' "$CONFIG_FILE"
 
-    # Set Supabase Studio theme to 'system'
-    if grep -q "^\[studio\]" "$CONFIG_FILE"; then
-        sed -i '/^\[studio\]/a theme = "system"' "$CONFIG_FILE"
-    fi
-
-    echo "✅ Updated studio.api_url, auth.site_url, and set theme=system" | log
+    echo "✅ Updated studio.api_url and auth.site_url" | log
 
     # Restart stack to apply config
     cd "${INSTALL_DIR}/${PROJECT_NAME}"
