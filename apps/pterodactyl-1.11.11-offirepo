@@ -228,6 +228,25 @@ if [ ! -f "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" ]; then
     waitOrStop 0 "TLS cert missing for ${CWM_DOMAIN}"
 fi
 
+# Free host ports 80/443 for the dockerized nginx.
+# The shared nginx-letsencrypt-cert tweak installs a host nginx (pulled in by
+# python3-certbot-nginx) to obtain the LE cert and leaves it enabled. Its default
+# "Welcome to nginx" site holds 80/443 and prevents the pterodactyl_nginx container
+# from binding. Stop + disable + mask it so it cannot return on reboot or via a
+# service dependency, then kill anything still squatting on the ports.
+echo "Freeing host ports 80/443 (stopping + masking host nginx)" | log
+systemctl stop nginx 2>/dev/null || true
+systemctl disable nginx 2>/dev/null || true
+systemctl mask nginx 2>/dev/null || true
+fuser -k 80/tcp 443/tcp 2>/dev/null || true
+
+# Verify the TLS cert exists before bringing up the stack — the nginx container
+# mounts it read-only and crash-loops silently if it is missing.
+if [ ! -f "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" ]; then
+    echo "TLS cert missing for ${CWM_DOMAIN} at /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" | log 1
+    waitOrStop 0 "TLS cert missing for ${CWM_DOMAIN}"
+fi
+
 # Start Docker Compose services
 echo "Starting Docker Compose services" | log
 cd /var/www/pterodactyl

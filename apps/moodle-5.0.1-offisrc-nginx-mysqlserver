@@ -56,6 +56,9 @@ fi
 echo "Creating nginx configurations" | log
 cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
 sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/moodle.conf
+# certs are renamed by nginx-enable-ssl-letsencrypt; use the generated snippet instead of *.pem
+sed -i '/ssl_certificate_key/d' /etc/nginx/sites-available/moodle.conf
+sed -i 's#^[[:space:]]*ssl_certificate .*#    include snippets/letsencrypt-nginx-certs.conf;#' /etc/nginx/sites-available/moodle.conf
 ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl
