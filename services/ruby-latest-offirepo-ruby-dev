@@ -25,3 +25,4 @@ waitOrStop 0 "Failed to install build-essential"
 tag ruby.success
 tagScript success
 exit 0
+

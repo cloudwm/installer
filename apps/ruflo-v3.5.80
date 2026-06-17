@@ -82,3 +82,4 @@ descriptionAppend "MCP command: ruflo mcp start"
 descriptionAppend "Configuration: Ruflo configuration is created when running ruflo init/start in the target project directory."
 descriptionAppend "Notes: Ruflo is installed as a CLI wrapper that runs npx -y ruflo@${RUFLO_VERSION}."
 descriptionAppend "Logs: Check the terminal output or the process logs depending on how Ruflo is started."
+

@@ -6,8 +6,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist ubuntu-updateos.success
-
 echo "Adding official repository packages to apt" | log
 cat << EOF > /etc/apt/sources.list.d/mysql.list
 deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-apt-config

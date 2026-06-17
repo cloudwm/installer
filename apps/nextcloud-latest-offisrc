@@ -7,9 +7,7 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist php.success
-checkTagExist nginx.success
 checkTagExist mysqld.success
-checkTagExist ssl-ready.success
 
 phpVersion=$(php -v | head -n 1 | cut -d " " -f 2 | cut -f1-2 -d".")
 appVersion=latest
@@ -46,7 +44,7 @@ EOF
 echo "Installing application" | log
 cd $appPath
 rm index.nginx-debian.html
-sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud"  --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
+sudo -u www-data php occ  maintenance:install --database "mysql" --database-name "nextcloud" --database-user "nextcloud" --database-pass "${ADMINPASSWORD}" --admin-user "admin" --admin-pass "${ADMINPASSWORD}"
 waitOrStop 0 "Application failed to install"
 sudo -u www-data php occ db:convert-filecache-bigint --no-interaction
 sudo -u www-data php occ db:add-missing-indices
@@ -54,6 +52,8 @@ sudo -u www-data php occ db:add-missing-indices
 echo "Configuring nginx" | log
 # Copy Virtual Host
 cp $rootDir/tweaks/extras/nextcloud-nginx/nextcloud.conf /etc/nginx/sites-available/
+sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/nextcloud.conf
+php /var/www/html/occ config:system:set trusted_domains 1 --value="${CWM_DOMAIN}"
 # Symlink nextcloud vhost
 ln -s /etc/nginx/sites-available/nextcloud.conf /etc/nginx/sites-enabled/
 # Remove default vhosts
@@ -91,7 +91,7 @@ systemctl restart php$phpVersion-fpm.service
 waitOrStop 0 "Restart php-fpm service failed"
 
 echo "Adding descriptions" | log
-descriptionAppend "Nextcloud Web UI: https://${CWM_DISPLAYED_ADDRESS}/"
+descriptionAppend "Nextcloud Web UI: https://${CWM_DOMAIN}/"
 descriptionAppend "Nextcloud Username: admin "
 descriptionAppend "Nextcloud Password: ${ADMINPASSWORD} "
 descriptionAppend " "
