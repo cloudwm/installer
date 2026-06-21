@@ -1,0 +1,182 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+SENTRY_VERSION="26.6.0"
+SENTRY_DIR="/opt/sentry"
+SENTRY_REPO="https://github.com/getsentry/self-hosted.git"
+
+# Sentry's bundled nginx serves plain HTTP on this localhost-only host port; the
+# product's host nginx terminates TLS for CWM_DOMAIN and reverse-proxies to it
+# (see vhost below). Binding to 127.0.0.1 keeps Sentry off the public interface.
+SENTRY_BIND_PORT=9000
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+SENTRY_ADMIN_EMAIL="${ADMINEMAIL:-admin@${CWM_DOMAIN}}"
+SENTRY_ADMIN_PASSWORD="${ADMINPASSWORD}"
+
+echo "Installing Sentry ${SENTRY_VERSION} with Docker + Nginx + SSL" | log
+
+echo "Updating packages..." | log
+apt-get update -q
+apt-get install -yq ca-certificates curl gnupg git
+
+echo "Installing Docker..." | log
+if ! command -v docker >/dev/null 2>&1; then
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo \
+"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" \
+        > /etc/apt/sources.list.d/docker.list
+    apt-get update -q
+    apt-get install -yq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    echo "Docker installed." | log
+else
+    echo "Docker already installed." | log
+fi
+
+systemctl enable --now docker
+waitOrStop 0 "Failed to enable docker"
+
+echo "Fetching Sentry self-hosted ${SENTRY_VERSION}..." | log
+if [ ! -d "$SENTRY_DIR/.git" ]; then
+    rm -rf "$SENTRY_DIR"
+    git clone "$SENTRY_REPO" "$SENTRY_DIR"
+    waitOrStop 0 "Failed to clone Sentry repository"
+fi
+
+cd "$SENTRY_DIR"
+git fetch --tags
+git checkout "$SENTRY_VERSION"
+waitOrStop 0 "Failed to checkout Sentry ${SENTRY_VERSION}"
+
+# Sentry's event-processing pipeline needs at least 4 CPU cores; the install
+# aborts on under-provisioned hosts rather than crash-looping later.
+DOCKER_CORES="$(docker run --rm busybox nproc)"
+if [ "$DOCKER_CORES" -lt 4 ]; then
+    echo "ERROR: Docker sees only $DOCKER_CORES CPU cores. Sentry requires at least 4. Increase CPU, reboot, then re-run." | log 1
+    exit 1
+fi
+
+echo "Running Sentry installer (this can take 10+ minutes)..." | log
+REPORT_SELF_HOSTED_ISSUES=0 ./install.sh \
+    --no-report-self-hosted-issues \
+    --skip-user-creation 2>&1 | log
+waitOrStop 0 "Sentry install.sh failed"
+
+# Pin Sentry's bundled nginx to localhost so only the host nginx is exposed.
+echo "Binding Sentry to 127.0.0.1:${SENTRY_BIND_PORT}..." | log
+if grep -q '^SENTRY_BIND=' "$SENTRY_DIR/.env"; then
+    sed -i "s|^SENTRY_BIND=.*|SENTRY_BIND=127.0.0.1:${SENTRY_BIND_PORT}|" "$SENTRY_DIR/.env"
+else
+    echo "SENTRY_BIND=127.0.0.1:${SENTRY_BIND_PORT}" >> "$SENTRY_DIR/.env"
+fi
+
+echo "Starting Sentry..." | log
+docker compose up -d
+waitOrStop 0 "Failed to start Sentry containers"
+
+echo "Waiting for Sentry to become available..." | log
+sentry_up=0
+for i in {1..30}; do
+    if curl -f -s -o /dev/null "http://127.0.0.1:${SENTRY_BIND_PORT}"; then
+        echo "Sentry is running!" | log
+        sentry_up=1
+        break
+    fi
+    echo "Waiting... (${i}/30)" | log
+    sleep 10
+done
+[ "$sentry_up" = "1" ]
+waitOrStop 0 "Sentry did not respond on http://127.0.0.1:${SENTRY_BIND_PORT} after 5 minutes"
+
+# Add the product's host nginx vhost: terminate TLS for CWM_DOMAIN and
+# reverse-proxy to Sentry's localhost-bound nginx. Certs are provided earlier by
+# tweaks/nginx-letsencrypt-cert (real LE cert when the domain is publicly
+# reachable, self-signed fallback otherwise) so nginx always starts.
+echo "Configuring host Nginx reverse-proxy for Sentry (HTTPS)" | log
+cat << EOF > /etc/nginx/sites-available/sentry
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    # Sentry uploads (source maps, large events) can be sizeable.
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass http://127.0.0.1:${SENTRY_BIND_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
+    }
+}
+EOF
+
+if [ -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]; then
+    sed -i 's/fullchain.pem/cert.pem/g' /etc/nginx/sites-available/sentry
+fi
+
+ln -sf /etc/nginx/sites-available/sentry /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/installProgress.conf
+nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding Nginx ports to ufw" | log
+ufw allow 80
+ufw allow 443
+
+echo "Creating Sentry admin account..." | log
+docker compose run --rm web sentry createuser \
+    --email "$SENTRY_ADMIN_EMAIL" \
+    --password "$SENTRY_ADMIN_PASSWORD" \
+    --superuser \
+    --no-input 2>&1 | log || true
+
+echo "Adding Docker Compose cron job to root's crontab..." | log
+CRON_JOB="@reboot (cd ${SENTRY_DIR} && /usr/bin/docker compose up -d)"
+(crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+
+descriptionAppend "Sentry Installation Complete!"
+descriptionAppend ""
+descriptionAppend "🌐 Sentry URL: https://${CWM_DOMAIN}"
+descriptionAppend "👤 Admin Account:"
+descriptionAppend "  Email: ${SENTRY_ADMIN_EMAIL}"
+descriptionAppend "  Password: ${SENTRY_ADMIN_PASSWORD}"
+descriptionAppend ""
+descriptionAppend "📁 Important Files:"
+descriptionAppend "  Install Dir: ${SENTRY_DIR}"
+descriptionAppend "  Config File: ${SENTRY_DIR}/.env"
+descriptionAppend "  Compose File: ${SENTRY_DIR}/docker-compose.yml"
+descriptionAppend ""
+descriptionAppend "🔧 Manage Sentry:"
+descriptionAppend "  cd ${SENTRY_DIR} && docker compose ps"
+descriptionAppend "  cd ${SENTRY_DIR} && docker compose logs -f"
+descriptionAppend ""
+
+tagScript success
+exit 0
