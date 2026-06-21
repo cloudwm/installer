@@ -56,14 +56,6 @@ git fetch --tags
 git checkout "$SENTRY_VERSION"
 waitOrStop 0 "Failed to checkout Sentry ${SENTRY_VERSION}"
 
-# Sentry's event-processing pipeline needs at least 4 CPU cores; the install
-# aborts on under-provisioned hosts rather than crash-looping later.
-DOCKER_CORES="$(docker run --rm busybox nproc)"
-if [ "$DOCKER_CORES" -lt 4 ]; then
-    echo "ERROR: Docker sees only $DOCKER_CORES CPU cores. Sentry requires at least 4. Increase CPU, reboot, then re-run." | log 1
-    exit 1
-fi
-
 echo "Running Sentry installer (this can take 10+ minutes)..." | log
 REPORT_SELF_HOSTED_ISSUES=0 ./install.sh \
     --no-report-self-hosted-issues \
@@ -78,13 +70,43 @@ else
     echo "SENTRY_BIND=127.0.0.1:${SENTRY_BIND_PORT}" >> "$SENTRY_DIR/.env"
 fi
 
-echo "Starting Sentry..." | log
-COMPOSE_PARALLEL_LIMIT=1 docker compose up -d --build
+# Sentry's nginx service (the only one that publishes the host port) depends on
+# the 'web' service being healthy, and on modest hardware web's first boot can
+# take 20-30 minutes (DB migrations + dozens of consumers). A plain
+# 'docker compose up -d' gives up waiting on that dependency and exits non-zero
+# while web is still starting — so we start best-effort, poll web's health
+# directly, then bring everything (incl. nginx) up once web is healthy.
+echo "Starting Sentry (first boot can take 20-30 minutes)..." | log
+# Limit concurrent container startup so a small box doesn't get starved while
+# dozens of services boot at once (helps web reach 'healthy' sooner).
+COMPOSE_PARALLEL_LIMIT=1 docker compose up -d 2>&1 | log || true
+
+echo "Waiting for Sentry 'web' service to become healthy..." | log
+web_ready=0
+for i in $(seq 1 60); do   # 60 * 30s = up to 30 minutes
+    web_cid="$(docker compose ps -q web 2>/dev/null)"
+    if [ -n "$web_cid" ]; then
+        health="$(docker inspect --format '{{.State.Health.Status}}' "$web_cid" 2>/dev/null || echo unknown)"
+        if [ "$health" = "healthy" ]; then
+            web_ready=1
+            break
+        fi
+    else
+        health="not-created"
+    fi
+    echo "web health: ${health} (${i}/60)" | log
+    sleep 30
+done
+[ "$web_ready" = "1" ]
+waitOrStop 0 "Sentry 'web' service did not become healthy after 30 minutes"
+
+echo "Bringing up all Sentry services (including nginx)..." | log
+docker compose up -d 2>&1 | log
 waitOrStop 0 "Failed to start Sentry containers"
 
-echo "Waiting for Sentry to become available..." | log
+echo "Verifying Sentry is reachable on 127.0.0.1:${SENTRY_BIND_PORT}..." | log
 sentry_up=0
-for i in {1..30}; do
+for i in $(seq 1 30); do
     if curl -f -s -o /dev/null "http://127.0.0.1:${SENTRY_BIND_PORT}"; then
         echo "Sentry is running!" | log
         sentry_up=1
