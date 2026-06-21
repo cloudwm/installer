@@ -79,7 +79,7 @@ else
 fi
 
 echo "Starting Sentry..." | log
-docker compose up -d
+COMPOSE_PARALLEL_LIMIT=1 docker compose up -d --build
 waitOrStop 0 "Failed to start Sentry containers"
 
 echo "Waiting for Sentry to become available..." | log
