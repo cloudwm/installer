@@ -114,6 +114,18 @@ else
     echo "SENTRY_BIND=127.0.0.1:${SENTRY_BIND_PORT}" >> "$SENTRY_DIR/.env"
 fi
 
+# Tell Sentry its real external URL. We terminate TLS at the host nginx and proxy
+# plain HTTP inward, so Sentry would otherwise think it's http://localhost:9000 and
+# reject form submits with "CSRF Validation Failed" (Django compares the browser's
+# Origin header against CSRF_TRUSTED_ORIGINS, which Sentry derives from url-prefix).
+echo "Setting Sentry system.url-prefix to https://${CWM_DOMAIN}..." | log
+CONFIG_YML="$SENTRY_DIR/sentry/config.yml"
+if grep -qE '^#?\s*system\.url-prefix:' "$CONFIG_YML"; then
+    sed -i "s|^#\?\s*system\.url-prefix:.*|system.url-prefix: 'https://${CWM_DOMAIN}'|" "$CONFIG_YML"
+else
+    echo "system.url-prefix: 'https://${CWM_DOMAIN}'" >> "$CONFIG_YML"
+fi
+
 # Bringing every service up at once overwhelms a 4-CPU / 16 GB host: ~60
 # containers boot their processes simultaneously and the machine thrashes. So we
 # start services one at a time with '--wait', which blocks until each service
