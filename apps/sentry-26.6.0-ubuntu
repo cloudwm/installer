@@ -15,8 +15,11 @@ SENTRY_REPO="https://github.com/getsentry/self-hosted.git"
 # (see vhost below). Binding to 127.0.0.1 keeps Sentry off the public interface.
 SENTRY_BIND_PORT=9000
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-
-SENTRY_ADMIN_EMAIL="${ADMINEMAIL:-admin@${CWM_DOMAIN}}"
+descriptionAppend "Webmin Password: ${ADMINPASSWORD}"
+# CWM_EMAIL is the account email from the site (email= in /root/guest.conf) — the
+# email the user signed up with. Fall back to admin@<domain> only if it's somehow
+# empty (e.g. running outside the CWM environment).
+SENTRY_ADMIN_EMAIL="${CWM_EMAIL:-admin@${CWM_DOMAIN}}"
 SENTRY_ADMIN_PASSWORD="${ADMINPASSWORD}"
 
 SWAP_SIZE_MB=16384   # 16 GB
