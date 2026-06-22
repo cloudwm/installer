@@ -1,0 +1,145 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# Root password / datacenter come from the CWM provisioning config.
+PASSWORD=$(grep -m1 '^password=' /root/guest.conf 2>/dev/null | cut -d= -f2-)
+
+PRODUCTION="false"
+DATACENTER=$(grep -m1 '^zone=' /root/guest.conf 2>/dev/null | cut -d= -f2-)
+if [[ ! "$DATACENTER" =~ [Dd][Ee][Vv] ]]; then
+    PRODUCTION="true"
+fi
+
+validate_environment() {
+    echo "Validating environment..." | log
+
+    [[ $EUID -eq 0 ]] || { echo "Must run as root, exiting (1)." | log 1; exit 1; }
+
+    if [[ -d /usr/local/cpanel ]]; then
+        echo "cPanel already installed, nothing to do." | log
+        tagScript success
+        exit 0
+    fi
+
+    [[ -f /etc/os-release ]] || { echo "Cannot detect OS, exiting (1)." | log 1; exit 1; }
+    . /etc/os-release
+    if [[ "$ID" != "almalinux" || ! "$VERSION_ID" =~ ^10 ]]; then
+        echo "This installer requires AlmaLinux 10 (found ${ID} ${VERSION_ID}), exiting (1)." | log 1
+        exit 1
+    fi
+    echo "Found supported OS: ${PRETTY_NAME}" | log
+}
+
+set_hostname() {
+    # cPanel requires a fully-qualified hostname.
+    local fqdn="cpanel.${CWM_DOMAIN}"
+    hostnamectl set-hostname "$fqdn"
+    echo "Hostname set to: $fqdn" | log
+}
+
+prepare_system() {
+    echo "Preparing AlmaLinux 10 for cPanel..." | log
+
+    # cPanel & WHM does not support SELinux or firewalld — it manages its own
+    # firewall. Disable both before installing so the installer doesn't abort.
+    echo "Disabling SELinux..." | log
+    setenforce 0 2>/dev/null || true
+    sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config 2>/dev/null || true
+
+    echo "Disabling firewalld (cPanel manages its own firewall)..." | log
+    systemctl stop firewalld 2>/dev/null || true
+    systemctl disable firewalld 2>/dev/null || true
+
+    # NetworkManager must stay; cPanel supports it on AlmaLinux 10.
+    echo "Updating system and installing prerequisites..." | log
+    dnf -y update 2>&1 | log
+    dnf -y install perl curl wget 2>&1 | log
+    waitOrStop 0 "Failed to install prerequisites"
+}
+
+install_cpanel() {
+    echo "Installing cPanel & WHM (this can take 30+ minutes)..." | log
+
+    cd /home
+    curl -so latest -L https://securedownloads.cpanel.net/latest
+    waitOrStop 0 "Failed to download cPanel installer"
+
+    sh latest 2>&1 | log
+    waitOrStop 0 "cPanel installation failed"
+
+    if [[ ! -d /usr/local/cpanel ]]; then
+        echo "cPanel installation did not complete (/usr/local/cpanel missing), exiting (1)." | log 1
+        exit 1
+    fi
+    echo "cPanel & WHM installed successfully." | log
+}
+
+print_summary() {
+    local ip fqdn whm_fqdn webmail_fqdn
+    ip=$(hostname -I | awk '{print $1}')
+    fqdn="cpanel.${CWM_DOMAIN}"
+    whm_fqdn="whm.${CWM_DOMAIN}"
+    webmail_fqdn="webmail.${CWM_DOMAIN}"
+
+    cat > /etc/motd << EOF
+================================================================================
+                    cPanel Server - Installation Complete
+================================================================================
+
+WHM (Server Administration):
+  https://${whm_fqdn}:2087   (or https://${ip}:2087)
+
+  Username: root
+  Password: ${PASSWORD}
+
+--------------------------------------------------------------------------------
+
+cPanel (User Control Panel):
+  https://${fqdn}:2083
+
+Webmail:
+  https://${webmail_fqdn}:2096
+
+--------------------------------------------------------------------------------
+
+SERVER DETAILS:
+  Hostname:   ${fqdn}
+  IP Address: ${ip}
+  OS:         AlmaLinux 10
+
+================================================================================
+EOF
+    cat /etc/motd | log
+
+    descriptionAppend "cPanel & WHM Installation Complete!"
+    descriptionAppend ""
+    descriptionAppend "WHM (admin): https://${whm_fqdn}:2087"
+    descriptionAppend "cPanel:      https://${fqdn}:2083"
+    descriptionAppend "Webmail:     https://${webmail_fqdn}:2096"
+    descriptionAppend ""
+    descriptionAppend "Username: root"
+    descriptionAppend "Password: ${PASSWORD}"
+    descriptionAppend ""
+    descriptionAppend "Log in to WHM to complete the initial setup wizard."
+}
+
+main() {
+    echo "Starting AlmaLinux 10 cPanel & WHM installer..." | log
+
+    validate_environment
+    set_hostname
+    prepare_system
+    install_cpanel
+    print_summary
+
+    echo "Install script completed successfully!" | log
+    tagScript success
+    exit 0
+}
+
+main
