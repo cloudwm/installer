@@ -24,17 +24,37 @@ SWAP_SIZE_MB=16384   # 16 GB
 # Sentry's first boot (install.sh migrations + ~60 containers) is RAM-hungry.
 # A 16 GB swap file lets a 16 GB-RAM box absorb the peaks without OOM-killing
 # services. It trades RAM pressure for disk I/O, which is fine on fast storage.
+# An earlier optimize tweak (ubuntu-sysctl-swap) already creates a small 1 GB
+# /swapfile, so we check the TOTAL swap and, if it's under 16 GB, replace
+# /swapfile rather than skipping. fallocate is used directly to avoid the
+# half-the-free-disk cap that the createSwapFile helper enforces.
 ensure_swap() {
-    if [ -n "$(swapon --show=NAME --noheadings 2>/dev/null)" ]; then
-        echo "Swap already active; skipping swap creation" | log
+    local cur_total
+    cur_total="$(free -m | awk '/^Swap:/ {print $2}')"
+    cur_total="${cur_total:-0}"
+    if [ "$cur_total" -ge "$SWAP_SIZE_MB" ]; then
+        echo "Swap already ${cur_total} MB (>= ${SWAP_SIZE_MB} MB); skipping" | log
         return 0
     fi
-    echo "Creating ${SWAP_SIZE_MB} MB swap at /swapfile..." | log
-    createSwapFile swapfile "$SWAP_SIZE_MB" / | log
-    if ! grep -q '^/swapfile' /etc/fstab; then
+
+    echo "Swap is ${cur_total} MB; (re)creating /swapfile at ${SWAP_SIZE_MB} MB..." | log
+    if swapon --show=NAME --noheadings 2>/dev/null | grep -qx /swapfile; then
+        swapoff /swapfile | log
+    fi
+    rm -f /swapfile
+
+    fallocate -l "${SWAP_SIZE_MB}M" /swapfile \
+        || dd if=/dev/zero of=/swapfile bs=1M count="$SWAP_SIZE_MB" status=none
+    chmod 600 /swapfile
+    mkswap /swapfile | log
+    swapon /swapfile | log
+    waitOrStop 0 "Failed to enable ${SWAP_SIZE_MB} MB swap (not enough free disk?)"
+
+    if ! grep -q '^/swapfile ' /etc/fstab; then
         echo '/swapfile none swap sw 0 0' >> /etc/fstab
     fi
     swapon --show | log
+    free -h | log
 }
 
 echo "Installing Sentry ${SENTRY_VERSION} with Docker + Nginx + SSL" | log
