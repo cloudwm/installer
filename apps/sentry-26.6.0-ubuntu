@@ -19,6 +19,24 @@ LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 SENTRY_ADMIN_EMAIL="${ADMINEMAIL:-admin@${CWM_DOMAIN}}"
 SENTRY_ADMIN_PASSWORD="${ADMINPASSWORD}"
 
+SWAP_SIZE_MB=16384   # 16 GB
+
+# Sentry's first boot (install.sh migrations + ~60 containers) is RAM-hungry.
+# A 16 GB swap file lets a 16 GB-RAM box absorb the peaks without OOM-killing
+# services. It trades RAM pressure for disk I/O, which is fine on fast storage.
+ensure_swap() {
+    if [ -n "$(swapon --show=NAME --noheadings 2>/dev/null)" ]; then
+        echo "Swap already active; skipping swap creation" | log
+        return 0
+    fi
+    echo "Creating ${SWAP_SIZE_MB} MB swap at /swapfile..." | log
+    createSwapFile swapfile "$SWAP_SIZE_MB" / | log
+    if ! grep -q '^/swapfile' /etc/fstab; then
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+    swapon --show | log
+}
+
 echo "Installing Sentry ${SENTRY_VERSION} with Docker + Nginx + SSL" | log
 
 echo "Updating packages..." | log
@@ -56,6 +74,9 @@ git fetch --tags
 git checkout "$SENTRY_VERSION"
 waitOrStop 0 "Failed to checkout Sentry ${SENTRY_VERSION}"
 
+# Bring swap online before the RAM-heavy install (migrations) and compose bring-up.
+ensure_swap
+
 echo "Running Sentry installer (this can take 10+ minutes)..." | log
 REPORT_SELF_HOSTED_ISSUES=0 ./install.sh \
     --no-report-self-hosted-issues \
@@ -70,39 +91,43 @@ else
     echo "SENTRY_BIND=127.0.0.1:${SENTRY_BIND_PORT}" >> "$SENTRY_DIR/.env"
 fi
 
-# Sentry's nginx service (the only one that publishes the host port) depends on
-# the 'web' service being healthy, and on modest hardware web's first boot can
-# take 20-30 minutes (DB migrations + dozens of consumers). A plain
-# 'docker compose up -d' gives up waiting on that dependency and exits non-zero
-# while web is still starting — so we start best-effort, poll web's health
-# directly, then bring everything (incl. nginx) up once web is healthy.
-echo "Starting Sentry (first boot can take 20-30 minutes)..." | log
-# Limit concurrent container startup so a small box doesn't get starved while
-# dozens of services boot at once (helps web reach 'healthy' sooner).
-COMPOSE_PARALLEL_LIMIT=1 docker compose up -d 2>&1 | log || true
+# Bringing every service up at once overwhelms a 4-CPU / 16 GB host: ~60
+# containers boot their processes simultaneously and the machine thrashes. So we
+# start services one at a time with '--wait', which blocks until each service
+# (and its dependencies) is healthy/running before we move to the next — spreading
+# the CPU/RAM load over time. COMPOSE_PARALLEL_LIMIT=1 further serializes the
+# underlying engine operations.
+export COMPOSE_PARALLEL_LIMIT=1
 
-echo "Waiting for Sentry 'web' service to become healthy..." | log
-web_ready=0
-for i in $(seq 1 60); do   # 60 * 30s = up to 30 minutes
-    web_cid="$(docker compose ps -q web 2>/dev/null)"
-    if [ -n "$web_cid" ]; then
-        health="$(docker inspect --format '{{.State.Health.Status}}' "$web_cid" 2>/dev/null || echo unknown)"
-        if [ "$health" = "healthy" ]; then
-            web_ready=1
-            break
-        fi
-    else
-        health="not-created"
-    fi
-    echo "web health: ${health} (${i}/60)" | log
-    sleep 30
+# startService <name> <timeout-seconds>: start one service (its deps come up
+# automatically) and wait until it is healthy/running before returning. Tolerant
+# of services without a healthcheck or that are slow to report.
+startService() {
+    local svc="$1" tmo="${2:-600}"
+    docker compose config --services | grep -qx "$svc" || return 0
+    [ -n "$(docker compose ps -q "$svc" 2>/dev/null)" ] && return 0
+    echo "Starting service: $svc" | log
+    docker compose up -d --wait --wait-timeout "$tmo" "$svc" 2>&1 | log \
+        || echo "Service $svc not healthy within ${tmo}s, continuing..." | log
+}
+
+echo "Starting Sentry services one at a time (first boot can take 20-30 minutes)..." | log
+
+# Stateful backing services first, in dependency order, each waited until ready.
+for svc in postgres redis memcached kafka clickhouse symbolicator vroom snuba-api relay smtp; do
+    startService "$svc" 900
 done
-[ "$web_ready" = "1" ]
-waitOrStop 0 "Sentry 'web' service did not become healthy after 30 minutes"
 
-echo "Bringing up all Sentry services (including nginx)..." | log
-docker compose up -d 2>&1 | log
-waitOrStop 0 "Failed to start Sentry containers"
+# web runs DB migrations on first boot and is the slowest to turn healthy; give
+# it a generous timeout and require it before starting the rest.
+echo "Starting Sentry 'web' (runs migrations, can take 20+ minutes)..." | log
+docker compose up -d --wait --wait-timeout 1800 web 2>&1 | log
+waitOrStop 0 "Sentry 'web' service did not become healthy in time"
+
+# Everything else (consumers, workers, nginx) one at a time.
+for svc in $(docker compose config --services); do
+    startService "$svc" 600
+done
 
 echo "Verifying Sentry is reachable on 127.0.0.1:${SENTRY_BIND_PORT}..." | log
 sentry_up=0
