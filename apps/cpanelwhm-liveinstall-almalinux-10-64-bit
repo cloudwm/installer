@@ -89,13 +89,17 @@ install_cpanel() {
     waitOrStop 0 "Failed to download cPanel installer"
 
     # Run directly (not through '| log') so the 30+ min installer streams to the
-    # console and cannot die from SIGPIPE on hosts without /dev/ttyS0. cPanel
+    # console and cannot die from SIGPIPE on hosts without /dev/ttyS0. We tee the
+    # output to a wrapper log (tee writes to a real file, so no SIGPIPE) so that a
+    # fast preflight failure leaves its reason on disk for diagnosis. cPanel also
     # keeps its own log at /var/log/cpanel-install.log.
-    sh latest
-    waitOrStop 0 "cPanel installation failed"
+    sh latest 2>&1 | tee /var/log/cpanel-install-wrapper.log
+    local rc=${PIPESTATUS[0]}
 
-    if [[ ! -d /usr/local/cpanel ]]; then
-        echo "cPanel installation did not complete (/usr/local/cpanel missing), exiting (1)." | log 1
+    if [[ $rc -ne 0 || ! -d /usr/local/cpanel ]]; then
+        echo "cPanel installation failed (exit ${rc}). Last lines of the installer log:" | log 1
+        tail -n 40 /var/log/cpanel-install-wrapper.log 2>/dev/null | log 1
+        echo "Full logs: /var/log/cpanel-install-wrapper.log and /var/log/cpanel-install.log" | log 1
         exit 1
     fi
     echo "cPanel & WHM installed successfully." | log
