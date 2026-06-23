@@ -1,0 +1,17 @@
+[Unit]
+Description=CWM first-boot installer (runs the product installer once)
+After=network-online.target
+Wants=network-online.target
+# Skip once it has completed successfully (guard file written by ExecStartPost).
+ConditionPathExists=!/var/lib/cwm-firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cwm-firstboot.sh
+# Marks completion only if ExecStart succeeded, so a failed run retries next boot.
+ExecStartPost=/bin/touch /var/lib/cwm-firstboot.done
+RemainAfterExit=yes
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
