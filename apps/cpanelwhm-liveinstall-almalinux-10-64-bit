@@ -101,6 +101,85 @@ install_cpanel() {
     echo "cPanel & WHM installed successfully." | log
 }
 
+install_engintron() {
+    # cPanel serves sites via Apache; Engintron puts nginx in front of it as a
+    # reverse proxy + cache (nginx on 80/443, Apache moved to backend 8080/8443).
+    # This is the standard way to run a cPanel server "through nginx". Must run
+    # AFTER cPanel/Apache are installed. Run directly (not '| log') to avoid the
+    # SIGPIPE issue on hosts without /dev/ttyS0.
+    echo "Installing Engintron (nginx reverse-proxy in front of Apache)..." | log
+
+    cd /
+    rm -f engintron.sh
+    curl -fsSL https://raw.githubusercontent.com/engintron/engintron/master/engintron.sh -o engintron.sh
+    waitOrStop 0 "Failed to download Engintron"
+
+    bash engintron.sh install
+    waitOrStop 0 "Engintron installation failed"
+
+    echo "Engintron installed: nginx now fronts Apache on ports 80/443." | log
+}
+
+configure_ssl() {
+    # Provide a TLS cert for port 443, like the other installs: try Let's Encrypt
+    # for the server FQDN, and if that fails (e.g. a private-IP / non-public box)
+    # fall back to a self-signed cert so 443 always has a certificate. The cert is
+    # installed as cPanel's service certificate, which secures the hostname on 443
+    # and the WHM/cPanel/Webmail interfaces (2087/2083/2096).
+    # All external commands run directly (not '| log') to avoid SIGPIPE on hosts
+    # without /dev/ttyS0.
+    local fqdn
+    fqdn="$(hostname -f 2>/dev/null || hostname)"
+    [ -n "${CWM_DOMAIN}" ] && fqdn="cpanel.${CWM_DOMAIN}"
+    echo "Configuring SSL for ${fqdn} (port 443)..." | log
+
+    echo "Installing certbot..." | log
+    dnf -y install epel-release || true
+    dnf -y install certbot || true
+
+    local le_dir="/etc/letsencrypt/live/${fqdn}"
+    local cert key
+
+    # certbot --standalone needs port 80; free it (Engintron nginx) during issuance.
+    systemctl stop nginx 2>/dev/null || true
+
+    if command -v certbot >/dev/null 2>&1; then
+        echo "Requesting Let's Encrypt certificate for ${fqdn}..." | log
+        certbot certonly --standalone --non-interactive --agree-tos \
+            --register-unsafely-without-email --preferred-challenges http \
+            -d "${fqdn}" || true
+    fi
+
+    if [ -f "${le_dir}/fullchain.pem" ] && [ -f "${le_dir}/privkey.pem" ]; then
+        echo "Let's Encrypt certificate obtained for ${fqdn}." | log
+        cert="${le_dir}/fullchain.pem"
+        key="${le_dir}/privkey.pem"
+    else
+        echo "Let's Encrypt unavailable; generating a self-signed certificate for ${fqdn}." | log
+        mkdir -p /etc/ssl/cpanel-selfsigned
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+            -keyout /etc/ssl/cpanel-selfsigned/privkey.pem \
+            -out /etc/ssl/cpanel-selfsigned/fullchain.pem \
+            -subj "/CN=${fqdn}"
+        cert="/etc/ssl/cpanel-selfsigned/fullchain.pem"
+        key="/etc/ssl/cpanel-selfsigned/privkey.pem"
+    fi
+
+    # Install as the cPanel service certificate (cpsrvd: hostname on 443 + 2087/2083/2096).
+    echo "Installing certificate as cPanel service SSL..." | log
+    cp -f /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
+    cat "${cert}" "${key}" > /var/cpanel/ssl/cpanel/cpanel.pem
+    chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
+    chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
+    rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
+    /usr/local/cpanel/scripts/restartsrv_cpsrvd || true
+
+    # Bring nginx back up to serve 443.
+    systemctl start nginx 2>/dev/null || true
+
+    echo "SSL configured for ${fqdn}; served on port 443." | log
+}
+
 print_summary() {
     local ip fqdn whm_fqdn webmail_fqdn
     ip=$(hostname -I | awk '{print $1}')
@@ -147,6 +226,7 @@ EOF
     descriptionAppend "Username: root"
     descriptionAppend "Password: ${PASSWORD}"
     descriptionAppend ""
+    descriptionAppend "Web traffic is served through nginx (Engintron) in front of Apache."
     descriptionAppend "Log in to WHM to complete the initial setup wizard."
 }
 
@@ -157,6 +237,8 @@ main() {
     set_hostname
     prepare_system
     install_cpanel
+    install_engintron
+    configure_ssl
     print_summary
 
     echo "Install script completed successfully!" | log
