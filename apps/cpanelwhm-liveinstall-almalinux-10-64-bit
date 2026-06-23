@@ -36,10 +36,24 @@ validate_environment() {
 }
 
 set_hostname() {
-    # cPanel requires a fully-qualified hostname.
-    local fqdn="cpanel.${CWM_DOMAIN}"
-    hostnamectl set-hostname "$fqdn"
-    echo "Hostname set to: $fqdn" | log
+    # cPanel requires a fully-qualified hostname. When CWM_DOMAIN is set (normal
+    # CWM provisioning) use cpanel.<domain>; otherwise keep the current hostname
+    # if it is already an FQDN, so cPanel doesn't reject an invalid name like
+    # "cpanel." (e.g. on a manual test box without /root/guest.conf).
+    if [ -n "${CWM_DOMAIN}" ]; then
+        local fqdn="cpanel.${CWM_DOMAIN}"
+        hostnamectl set-hostname "$fqdn"
+        echo "Hostname set to: $fqdn" | log
+    else
+        local current
+        current="$(hostname -f 2>/dev/null || hostname)"
+        if [[ "$current" == *.*.* || "$current" == *.* ]]; then
+            echo "CWM_DOMAIN empty; keeping current FQDN hostname: ${current}" | log
+        else
+            hostnamectl set-hostname "cpanel.localdomain.local"
+            echo "CWM_DOMAIN empty and current hostname '${current}' is not an FQDN; set to cpanel.localdomain.local" | log
+        fi
+    fi
 }
 
 prepare_system() {
@@ -56,9 +70,14 @@ prepare_system() {
     systemctl disable firewalld 2>/dev/null || true
 
     # NetworkManager must stay; cPanel supports it on AlmaLinux 10.
+    # NOTE: do NOT pipe these verbose commands through '| log'. The framework's
+    # log() ends in 'cat >/dev/ttyS0'; on hosts without a serial console that
+    # reader dies immediately and the producer gets SIGPIPE (exit 141). Run them
+    # directly so output goes to the console / their own logs. curl is omitted —
+    # AlmaLinux ships curl-minimal, and pulling full curl can cause a conflict.
     echo "Updating system and installing prerequisites..." | log
-    dnf -y update 2>&1 | log
-    dnf -y install perl curl wget 2>&1 | log
+    dnf -y update
+    dnf -y install perl wget
     waitOrStop 0 "Failed to install prerequisites"
 }
 
@@ -69,7 +88,10 @@ install_cpanel() {
     curl -so latest -L https://securedownloads.cpanel.net/latest
     waitOrStop 0 "Failed to download cPanel installer"
 
-    sh latest 2>&1 | log
+    # Run directly (not through '| log') so the 30+ min installer streams to the
+    # console and cannot die from SIGPIPE on hosts without /dev/ttyS0. cPanel
+    # keeps its own log at /var/log/cpanel-install.log.
+    sh latest
     waitOrStop 0 "cPanel installation failed"
 
     if [[ ! -d /usr/local/cpanel ]]; then
