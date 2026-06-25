@@ -6,14 +6,16 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-appVersion=5:20.10.\*
-
-echo "Downloading docker repository and key" | log
-curlDownload https://download.docker.com/linux/ubuntu/gpg
+echo "Setting up Docker repository and key" | log
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg > /tmp/docker.gpg
 waitOrStop 0 "Key not downloaded from official source"
-apt-key add gpg
+cat /tmp/docker.gpg | gpg --dearmor > /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+rm -f /tmp/docker.gpg
 
-add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update
 waitOrStop 0 "Repository not added"
 
 echo "Install docker-ce" | log
@@ -23,7 +25,7 @@ exit 101
 EOF
 chmod a+x /usr/sbin/policy-rc.d
 
-apt-get install -y docker-ce=$appVersion
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 checkPackageInstalled docker-ce
 
 rm -f /usr/sbin/policy-rc.d
