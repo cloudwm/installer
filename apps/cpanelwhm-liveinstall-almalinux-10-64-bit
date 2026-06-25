@@ -1,0 +1,253 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# Root password / datacenter come from the CWM provisioning config.
+PASSWORD=$(grep -m1 '^password=' /root/guest.conf 2>/dev/null | cut -d= -f2-)
+
+PRODUCTION="false"
+DATACENTER=$(grep -m1 '^zone=' /root/guest.conf 2>/dev/null | cut -d= -f2-)
+if [[ ! "$DATACENTER" =~ [Dd][Ee][Vv] ]]; then
+    PRODUCTION="true"
+fi
+
+validate_environment() {
+    echo "Validating environment..." | log
+
+    [[ $EUID -eq 0 ]] || { echo "Must run as root, exiting (1)." | log 1; exit 1; }
+
+    if [[ -d /usr/local/cpanel ]]; then
+        echo "cPanel already installed, nothing to do." | log
+        tagScript success
+        exit 0
+    fi
+
+    [[ -f /etc/os-release ]] || { echo "Cannot detect OS, exiting (1)." | log 1; exit 1; }
+    . /etc/os-release
+    if [[ "$ID" != "almalinux" || ! "$VERSION_ID" =~ ^10 ]]; then
+        echo "This installer requires AlmaLinux 10 (found ${ID} ${VERSION_ID}), exiting (1)." | log 1
+        exit 1
+    fi
+    echo "Found supported OS: ${PRETTY_NAME}" | log
+}
+
+set_hostname() {
+    # cPanel requires a fully-qualified hostname. When CWM_DOMAIN is set (normal
+    # CWM provisioning) use cpanel.<domain>; otherwise keep the current hostname
+    # if it is already an FQDN, so cPanel doesn't reject an invalid name like
+    # "cpanel." (e.g. on a manual test box without /root/guest.conf).
+    if [ -n "${CWM_DOMAIN}" ]; then
+        local fqdn="cpanel.${CWM_DOMAIN}"
+        hostnamectl set-hostname "$fqdn"
+        echo "Hostname set to: $fqdn" | log
+    else
+        local current
+        current="$(hostname -f 2>/dev/null || hostname)"
+        if [[ "$current" == *.*.* || "$current" == *.* ]]; then
+            echo "CWM_DOMAIN empty; keeping current FQDN hostname: ${current}" | log
+        else
+            hostnamectl set-hostname "cpanel.localdomain.local"
+            echo "CWM_DOMAIN empty and current hostname '${current}' is not an FQDN; set to cpanel.localdomain.local" | log
+        fi
+    fi
+}
+
+prepare_system() {
+    echo "Preparing AlmaLinux 10 for cPanel..." | log
+
+    # cPanel & WHM does not support SELinux or firewalld — it manages its own
+    # firewall. Disable both before installing so the installer doesn't abort.
+    echo "Disabling SELinux..." | log
+    setenforce 0 2>/dev/null || true
+    sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config 2>/dev/null || true
+
+    echo "Disabling firewalld (cPanel manages its own firewall)..." | log
+    systemctl stop firewalld 2>/dev/null || true
+    systemctl disable firewalld 2>/dev/null || true
+
+    # NetworkManager must stay; cPanel supports it on AlmaLinux 10.
+    # NOTE: do NOT pipe these verbose commands through '| log'. The framework's
+    # log() ends in 'cat >/dev/ttyS0'; on hosts without a serial console that
+    # reader dies immediately and the producer gets SIGPIPE (exit 141). Run them
+    # directly so output goes to the console / their own logs. curl is omitted —
+    # AlmaLinux ships curl-minimal, and pulling full curl can cause a conflict.
+    echo "Updating system and installing prerequisites..." | log
+    dnf -y update
+    dnf -y install perl wget
+    waitOrStop 0 "Failed to install prerequisites"
+}
+
+install_cpanel() {
+    echo "Installing cPanel & WHM (this can take 30+ minutes)..." | log
+
+    cd /home
+    curl -so latest -L https://securedownloads.cpanel.net/latest
+    waitOrStop 0 "Failed to download cPanel installer"
+
+    # Run directly (not through '| log') so the 30+ min installer streams to the
+    # console and cannot die from SIGPIPE on hosts without /dev/ttyS0. We tee the
+    # output to a wrapper log (tee writes to a real file, so no SIGPIPE) so that a
+    # fast preflight failure leaves its reason on disk for diagnosis. cPanel also
+    # keeps its own log at /var/log/cpanel-install.log.
+    sh latest 2>&1 | tee /var/log/cpanel-install-wrapper.log
+    local rc=${PIPESTATUS[0]}
+
+    if [[ $rc -ne 0 || ! -d /usr/local/cpanel ]]; then
+        echo "cPanel installation failed (exit ${rc}). Last lines of the installer log:" | log 1
+        tail -n 40 /var/log/cpanel-install-wrapper.log 2>/dev/null | log 1
+        echo "Full logs: /var/log/cpanel-install-wrapper.log and /var/log/cpanel-install.log" | log 1
+        exit 1
+    fi
+    echo "cPanel & WHM installed successfully." | log
+}
+
+install_engintron() {
+    # cPanel serves sites via Apache; Engintron puts nginx in front of it as a
+    # reverse proxy + cache (nginx on 80/443, Apache moved to backend 8080/8443).
+    # This is the standard way to run a cPanel server "through nginx". Must run
+    # AFTER cPanel/Apache are installed. Run directly (not '| log') to avoid the
+    # SIGPIPE issue on hosts without /dev/ttyS0.
+    echo "Installing Engintron (nginx reverse-proxy in front of Apache)..." | log
+
+    cd /
+    rm -f engintron.sh
+    curl -fsSL https://raw.githubusercontent.com/engintron/engintron/master/engintron.sh -o engintron.sh
+    waitOrStop 0 "Failed to download Engintron"
+
+    bash engintron.sh install
+    waitOrStop 0 "Engintron installation failed"
+
+    echo "Engintron installed: nginx now fronts Apache on ports 80/443." | log
+}
+
+configure_ssl() {
+    # Provide a TLS cert for port 443, like the other installs: try Let's Encrypt
+    # for the server FQDN, and if that fails (e.g. a private-IP / non-public box)
+    # fall back to a self-signed cert so 443 always has a certificate. The cert is
+    # installed as cPanel's service certificate, which secures the hostname on 443
+    # and the WHM/cPanel/Webmail interfaces (2087/2083/2096).
+    # All external commands run directly (not '| log') to avoid SIGPIPE on hosts
+    # without /dev/ttyS0.
+    local fqdn
+    fqdn="$(hostname -f 2>/dev/null || hostname)"
+    [ -n "${CWM_DOMAIN}" ] && fqdn="cpanel.${CWM_DOMAIN}"
+    echo "Configuring SSL for ${fqdn} (port 443)..." | log
+
+    echo "Installing certbot..." | log
+    dnf -y install epel-release || true
+    dnf -y install certbot || true
+
+    local le_dir="/etc/letsencrypt/live/${fqdn}"
+    local cert key
+
+    # certbot --standalone needs port 80; free it (Engintron nginx) during issuance.
+    systemctl stop nginx 2>/dev/null || true
+
+    if command -v certbot >/dev/null 2>&1; then
+        echo "Requesting Let's Encrypt certificate for ${fqdn}..." | log
+        certbot certonly --standalone --non-interactive --agree-tos \
+            --register-unsafely-without-email --preferred-challenges http \
+            -d "${fqdn}" || true
+    fi
+
+    if [ -f "${le_dir}/fullchain.pem" ] && [ -f "${le_dir}/privkey.pem" ]; then
+        echo "Let's Encrypt certificate obtained for ${fqdn}." | log
+        cert="${le_dir}/fullchain.pem"
+        key="${le_dir}/privkey.pem"
+    else
+        echo "Let's Encrypt unavailable; generating a self-signed certificate for ${fqdn}." | log
+        mkdir -p /etc/ssl/cpanel-selfsigned
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+            -keyout /etc/ssl/cpanel-selfsigned/privkey.pem \
+            -out /etc/ssl/cpanel-selfsigned/fullchain.pem \
+            -subj "/CN=${fqdn}"
+        cert="/etc/ssl/cpanel-selfsigned/fullchain.pem"
+        key="/etc/ssl/cpanel-selfsigned/privkey.pem"
+    fi
+
+    # Install as the cPanel service certificate (cpsrvd: hostname on 443 + 2087/2083/2096).
+    echo "Installing certificate as cPanel service SSL..." | log
+    cp -f /var/cpanel/ssl/cpanel/cpanel.pem /var/cpanel/ssl/cpanel/cpanel.pem.bak 2>/dev/null || true
+    cat "${cert}" "${key}" > /var/cpanel/ssl/cpanel/cpanel.pem
+    chown cpanel:cpanel /var/cpanel/ssl/cpanel/cpanel.pem
+    chmod 600 /var/cpanel/ssl/cpanel/cpanel.pem
+    rm -f /var/cpanel/ssl/cpanel/cpanel.pem.cache
+    /usr/local/cpanel/scripts/restartsrv_cpsrvd || true
+
+    # Bring nginx back up to serve 443.
+    systemctl start nginx 2>/dev/null || true
+
+    echo "SSL configured for ${fqdn}; served on port 443." | log
+}
+
+print_summary() {
+    local ip fqdn whm_fqdn webmail_fqdn
+    ip=$(hostname -I | awk '{print $1}')
+    fqdn="cpanel.${CWM_DOMAIN}"
+    whm_fqdn="whm.${CWM_DOMAIN}"
+    webmail_fqdn="webmail.${CWM_DOMAIN}"
+
+    cat > /etc/motd << EOF
+================================================================================
+                    cPanel Server - Installation Complete
+================================================================================
+
+WHM (Server Administration):
+  https://${whm_fqdn}:2087   (or https://${ip}:2087)
+
+  Username: root
+  Password: ${PASSWORD}
+
+--------------------------------------------------------------------------------
+
+cPanel (User Control Panel):
+  https://${fqdn}:2083
+
+Webmail:
+  https://${webmail_fqdn}:2096
+
+--------------------------------------------------------------------------------
+
+SERVER DETAILS:
+  Hostname:   ${fqdn}
+  IP Address: ${ip}
+  OS:         AlmaLinux 10
+
+================================================================================
+EOF
+    cat /etc/motd | log
+
+    descriptionAppend "cPanel & WHM Installation Complete!"
+    descriptionAppend ""
+    descriptionAppend "WHM (admin): https://${whm_fqdn}:2087"
+    descriptionAppend "cPanel:      https://${fqdn}:2083"
+    descriptionAppend "Webmail:     https://${webmail_fqdn}:2096"
+    descriptionAppend ""
+    descriptionAppend "Username: root"
+    descriptionAppend "Password: ${PASSWORD}"
+    descriptionAppend ""
+    descriptionAppend "Web traffic is served through nginx (Engintron) in front of Apache."
+    descriptionAppend "Log in to WHM to complete the initial setup wizard."
+}
+
+main() {
+    echo "Starting AlmaLinux 10 cPanel & WHM installer..." | log
+
+    validate_environment
+    set_hostname
+    prepare_system
+    install_cpanel
+    install_engintron
+    configure_ssl
+    print_summary
+
+    echo "Install script completed successfully!" | log
+    tagScript success
+    exit 0
+}
+
+main

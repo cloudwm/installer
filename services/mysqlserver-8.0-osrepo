@@ -33,8 +33,27 @@ debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password password
 debconf-set-selections <<< "mysql-server-8.0 mysql-server/root_password_again password ${ADMINPASSWORD}"
 echo "ADMINPASS: ${ADMINPASSWORD}" | log
 
-installPackage mysql-server
-waitOrStop 0 "Failed apt install: mysql-server-8.0"
+# On a freshly booted CWM machine, boot-time unattended-upgrades / apt.systemd.daily
+# holds the dpkg lock. installPackage's 3 quick retries then all fail in seconds
+# before anything downloads (the "Failed apt install" we saw). Wait for the lock
+# to free, recover any interrupted dpkg state, and refresh the lists first.
+echo "Waiting for apt/dpkg locks to be released..." | log
+for i in $(seq 1 60); do
+    if ! fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; then
+        break
+    fi
+    sleep 5
+done
+dpkg --configure -a 2>&1 | tee /var/log/mysql-apt.log
+apt-get update 2>&1 | tee -a /var/log/mysql-apt.log
+
+apt-get install -y mysql-server 2>&1 | tee -a /var/log/mysql-apt.log
+mysqlRc=${PIPESTATUS[0]}
+if [[ $mysqlRc -ne 0 ]] || ! dpkg-query -W mysql-server >/dev/null 2>&1; then
+    echo "Failed apt install: mysql-server (exit ${mysqlRc}). Last lines of the apt log:" | log 1
+    tail -n 30 /var/log/mysql-apt.log 2>/dev/null | log 1
+    exit 1
+fi
 
 echo "Set ~/.my.cnf root password for quick cli work" | log
 if [ ! -f /root/.my.cnf ]; then
