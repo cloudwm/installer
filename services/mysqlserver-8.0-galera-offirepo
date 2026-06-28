@@ -9,10 +9,14 @@ fi
 checkTagExist ubuntu-updateos.success
 
 echo "Adding Galera Repository" | log
-apt-key adv --keyserver keyserver.ubuntu.com --recv BC19DDBA
+export GNUPGHOME=$(mktemp -d)
+gpg --no-default-keyring --keyring /usr/share/keyrings/galera.gpg --keyserver keyserver.ubuntu.com --recv-keys BC19DDBA
+unset GNUPGHOME
+test -s /usr/share/keyrings/galera.gpg
+waitOrStop 0 "Galera signing key fetch failed"
 cat << EOF > /etc/apt/sources.list.d/galera.list
-deb https://releases.galeracluster.com/galera-4/ubuntu focal main
-deb https://releases.galeracluster.com/mysql-wsrep-8.0/ubuntu focal main
+deb [signed-by=/usr/share/keyrings/galera.gpg] https://releases.galeracluster.com/galera-4/ubuntu focal main
+deb [signed-by=/usr/share/keyrings/galera.gpg] https://releases.galeracluster.com/mysql-wsrep-8.0/ubuntu focal main
 EOF
 cat << EOF > /etc/apt/preferences.d/galera.pref
 # Prefer Codership repository

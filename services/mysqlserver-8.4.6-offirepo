@@ -30,11 +30,19 @@ fi
 
 echo "Adding MySQL 8.4 APT repository manually" | log
 # Download and import the MySQL GPG key
-wget -O /tmp/mysql-keyring.gpg https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-sudo apt-key add /tmp/mysql-keyring.gpg
-rm -f /tmp/mysql-keyring.gpg
+for i in 1 2 3; do
+    curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 -o /tmp/mysql.key && break
+    echo "MySQL key download attempt $i failed, retrying..." | log
+    sleep 15
+done
+test -s /tmp/mysql.key
+waitOrStop 0 "MySQL GPG key download failed"
+sudo gpg --dearmor -o /usr/share/keyrings/mysql.gpg < /tmp/mysql.key
+rm -f /tmp/mysql.key
+test -s /usr/share/keyrings/mysql.gpg
+waitOrStop 0 "MySQL keyring is empty (key import failed)"
 # Add the repository
-echo "deb http://repo.mysql.com/apt/ubuntu/ noble mysql-8.4-lts" | sudo tee /etc/apt/sources.list.d/mysql.list
+echo "deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/ubuntu/ $(lsb_release -cs) mysql-8.4-lts" | sudo tee /etc/apt/sources.list.d/mysql.list
 sudo apt update
 
 echo "Installing mysql from apt" | log
