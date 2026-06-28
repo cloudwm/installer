@@ -25,8 +25,19 @@ test -s /etc/apt/keyrings/docker.gpg
 waitOrStop 0 "Docker keyring is empty (key import failed)"
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-waitOrStop 0 "Repository not added"
+
+# apt-get update fetches the docker InRelease over HTTPS too, so the same
+# intermittent TLS interception can make apt silently skip the docker repo while
+# still exiting 0. Don't trust the exit code — loop until docker-ce actually has
+# an install candidate.
+for i in 1 2 3 4 5; do
+    apt-get update
+    if apt-cache policy docker-ce | grep -qE 'Candidate: [0-9]'; then break; fi
+    echo "docker-ce has no candidate yet (transient TLS on repo fetch?), retrying update..." | log
+    sleep 15
+done
+apt-cache policy docker-ce | grep -qE 'Candidate: [0-9]'
+waitOrStop 0 "Docker repo metadata not available (docker-ce has no install candidate)"
 
 echo "Install docker-ce" | log
 cat > /usr/sbin/policy-rc.d <<EOF
