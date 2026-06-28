@@ -27,38 +27,38 @@ bash cyberpanel.sh -v ols -a -p ${ADMINPASSWORD} > /root/cyberpanel.txt
 olspass=$(cat /etc/cyberpanel/webadmin_passwd)
 
 HTTPD_CONF=/usr/local/lsws/conf/httpd_config.conf
+EX_VHCONF=/usr/local/lsws/conf/vhosts/Example/vhconf.conf
 ACME=/root/.acme.sh/acme.sh
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 WEBROOT=/usr/local/lsws/Example/html
+SSL_RETRY=/usr/local/bin/cwm-hostname-ssl-retry.sh
 
-# Map the OLS :80 listener to the Example docroot so the ACME HTTP-01
-#    webroot challenge is served (OLS ships :80 with no vhost mapped → 404).
-echo "Mapping OLS :80 listener to ACME webroot" | log
-if ! grep -q "map  *Example  *${CWM_DOMAIN}" "$HTTPD_CONF"; then
-    python3 - "$HTTPD_CONF" "${CWM_DOMAIN}" <<'PYEOF'
+# Map the OLS :80 listener to the Example docroot (OLS ships :80 with no vhost
+# mapped → 404, which would break the ACME HTTP-01 webroot challenge), and enable
+# .htaccess rewrite on the Example vhost so the http→https redirect below applies.
+# Both edits are simple block replacements; the `if old in ...` guards make them
+# idempotent (the original block no longer matches after the first run).
+echo "Mapping OLS :80 to ACME webroot and enabling http→https redirect" | log
+python3 - "$HTTPD_CONF" "${CWM_DOMAIN}" "$EX_VHCONF" <<'PYEOF'
 import sys
-conf, domain = sys.argv[1], sys.argv[2]
-s = open(conf).read()
+httpd, domain, vhconf = sys.argv[1], sys.argv[2], sys.argv[3]
+
+s = open(httpd).read()
 old = "listener Default{\n    address                  *:80\n    secure                   0\n}"
 new = "listener Default{\n    address                  *:80\n    secure                   0\n    map                      Example %s\n}" % domain
 if old in s:
-    open(conf, "w").write(s.replace(old, new, 1))
+    open(httpd, "w").write(s.replace(old, new, 1))
+
+v = open(vhconf).read()
+old = "rewrite {\n  enable 0\n  logLevel 0\n}"
+new = "rewrite {\n  enable 1\n  autoLoadHtaccess 1\n  logLevel 0\n}"
+if old in v:
+    open(vhconf, "w").write(v.replace(old, new, 1))
 PYEOF
-fi
 
 # A bare-domain browser hits http:// first, and the :80 Example vhost would
 # otherwise serve the OLS "Welcome" placeholder. Redirect everything on :80 to
 # https://CWM_DOMAIN/ (the panel), while still serving the ACME challenge path.
-EX_VHCONF=/usr/local/lsws/conf/vhosts/Example/vhconf.conf
-python3 - "$EX_VHCONF" <<'PYEOF'
-import sys
-f = sys.argv[1]
-s = open(f).read()
-old = "rewrite {\n  enable 0\n  logLevel 0\n}"
-new = "rewrite {\n  enable 1\n  autoLoadHtaccess 1\n  logLevel 0\n}"
-if old in s:
-    open(f, "w").write(s.replace(old, new, 1))
-PYEOF
 cat <<EOF > ${WEBROOT}/.htaccess
 RewriteEngine On
 RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
@@ -68,47 +68,24 @@ EOF
 systemctl restart lshttpd
 
 # Obtain a Let's Encrypt cert for the hostname via webroot (no downtime).
-#    Retry: the xip-style DNS used for CWM_DOMAIN is occasionally unresolvable
-#    by LE's multi-perspective validators. Fall back to self-signed so OLS can
-#    still bring up :443, and install a self-healing cron that upgrades to a
-#    real cert once DNS cooperates.
+#    The xip-style DNS used for CWM_DOMAIN is occasionally unresolvable by LE's
+#    multi-perspective validators, so issuance can fail transiently. We keep the
+#    issue→install logic in ONE place — the self-heal script below — and run it
+#    once inline now. If it can't get a cert we fall back to self-signed (so OLS
+#    can still bring up :443) and install a */20 cron that re-runs the same
+#    script until DNS cooperates and a real cert lands.
 mkdir -p "$LE_DIR"
 "$ACME" --register-account -m "admin@${CWM_DOMAIN}" --server letsencrypt 2>&1 | log
 "$ACME" --set-default-ca --server letsencrypt 2>&1 | log
 
-le_ok=0
-for attempt in 1 2 3; do
-    echo "Let's Encrypt attempt ${attempt}/3 for ${CWM_DOMAIN}" | log
-    if "$ACME" --issue -d "${CWM_DOMAIN}" -w "$WEBROOT" -k ec-256 --server letsencrypt --force; then
-        le_ok=1
-        break
-    fi
-    [ "$attempt" -lt 3 ] && sleep 30
-done
-
-if [ "$le_ok" = "1" ]; then
-    "$ACME" --install-cert -d "${CWM_DOMAIN}" --ecc \
-        --key-file       "${LE_DIR}/privkey.pem" \
-        --fullchain-file "${LE_DIR}/fullchain.pem" \
-        --cert-file      "${LE_DIR}/cert.pem" \
-        --reloadcmd      "systemctl restart lscpd; systemctl restart lshttpd"
-    echo "LetsEncrypt certificate issued for ${CWM_DOMAIN}" | log
-else
-    echo "LetsEncrypt failed (DNS); using self-signed and scheduling retry" | log
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout "${LE_DIR}/privkey.pem" -out "${LE_DIR}/fullchain.pem" \
-        -subj "/CN=${CWM_DOMAIN}" 2>/dev/null
-    cp "${LE_DIR}/fullchain.pem" "${LE_DIR}/cert.pem"
-
-    # Self-healing: retry issuance every 20 min; on success install the cert,
-    # reload services, and remove this cron. Survives the flaky-DNS window.
-    cat <<EOF > /usr/local/bin/cwm-hostname-ssl-retry.sh
+cat <<EOF > "$SSL_RETRY"
 #!/bin/bash
 D="${CWM_DOMAIN}"
 A="${ACME}"
 LIVE="${LE_DIR}"
 WR="${WEBROOT}"
 remove_cron() { crontab -l 2>/dev/null | grep -v 'cwm-hostname-ssl-retry' | crontab - ; }
+# Already holding a real cert? remove the cron and stop.
 if openssl x509 -in "\$LIVE/fullchain.pem" -noout -issuer 2>/dev/null | grep -q "Let's Encrypt"; then
     remove_cron; exit 0
 fi
@@ -121,20 +98,36 @@ if "\$A" --issue -d "\$D" -w "\$WR" -k ec-256 --server letsencrypt --force; then
     openssl x509 -in "\$LIVE/fullchain.pem" -noout -issuer 2>/dev/null | grep -q "Let's Encrypt" && remove_cron
 fi
 EOF
-    chmod +x /usr/local/bin/cwm-hostname-ssl-retry.sh
+chmod +x "$SSL_RETRY"
+
+# Self-signed placeholder up front so the OLS :443 listener always has a cert to
+# start with; the retry script overwrites it with the real cert on success.
+if [ ! -f "${LE_DIR}/fullchain.pem" ]; then
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${LE_DIR}/privkey.pem" -out "${LE_DIR}/fullchain.pem" \
+        -subj "/CN=${CWM_DOMAIN}" 2>/dev/null
+    cp "${LE_DIR}/fullchain.pem" "${LE_DIR}/cert.pem"
+fi
+
+# First attempt now; schedule the self-heal cron only if it didn't land a real cert.
+"$SSL_RETRY" 2>&1 | log
+if openssl x509 -in "${LE_DIR}/fullchain.pem" -noout -issuer 2>/dev/null | grep -q "Let's Encrypt"; then
+    echo "LetsEncrypt certificate issued for ${CWM_DOMAIN}" | log
+else
+    echo "LetsEncrypt failed (flaky xip DNS); using self-signed and scheduling */20 retry" | log
     ( crontab -l 2>/dev/null | grep -v cwm-hostname-ssl-retry; \
-      echo '*/20 * * * * /usr/local/bin/cwm-hostname-ssl-retry.sh >> /var/log/cwm-ssl-retry.log 2>&1' ) | crontab -
+      echo "*/20 * * * * $SSL_RETRY >> /var/log/cwm-ssl-retry.log 2>&1" ) | crontab -
 fi
 chmod 644 "${LE_DIR}/fullchain.pem" "${LE_DIR}/cert.pem"
 chmod 600 "${LE_DIR}/privkey.pem"
 
-# 3) Point the lscpd (:8090) and OLS WebAdmin (:7080) certs at the hostname cert.
+# Point the lscpd (:8090) and OLS WebAdmin (:7080) certs at the hostname cert.
 ln -sf "${LE_DIR}/fullchain.pem" /usr/local/lscp/conf/cert.pem
 ln -sf "${LE_DIR}/privkey.pem"   /usr/local/lscp/conf/key.pem
 ln -sf "${LE_DIR}/fullchain.pem" /usr/local/lsws/admin/conf/webadmin.crt
 ln -sf "${LE_DIR}/privkey.pem"   /usr/local/lsws/admin/conf/webadmin.key
 
-# 4) Write the proxy vhost and the :443 listener (cert now exists).
+# Write the proxy vhost and the :443 listener (cert now exists).
 echo "Configuring OpenLiteSpeed :443 reverse proxy for the panel" | log
 mkdir -p /usr/local/lsws/conf/vhosts/cwmpanel
 cat <<EOF > /usr/local/lsws/conf/vhosts/cwmpanel/vhconf.conf
@@ -186,9 +179,8 @@ listener cwmSSL {
 EOF
 fi
 
-# 5) Make sure firewalld (now the active firewall) allows 80/443 on IPv4.
-firewall-cmd --permanent --add-port=80/tcp  2>&1 | log
-firewall-cmd --permanent --add-port=443/tcp 2>&1 | log
+# Make sure firewalld (now the active firewall) allows 80/443 on IPv4.
+firewall-cmd --permanent --add-port=80/tcp --add-port=443/tcp 2>&1 | log
 firewall-cmd --reload 2>&1 | log
 
 systemctl restart lscpd
