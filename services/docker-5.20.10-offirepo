@@ -36,8 +36,10 @@ for i in 1 2 3 4 5; do
     echo "docker-ce has no candidate yet (transient TLS on repo fetch?), retrying update..." | log
     sleep 15
 done
-apt-cache policy docker-ce | grep -qE 'Candidate: [0-9]'
-waitOrStop 0 "Docker repo metadata not available (docker-ce has no install candidate)"
+if ! apt-cache policy docker-ce | grep -qE 'Candidate: [0-9]'; then
+    echo "Docker repo metadata not available (docker-ce has no install candidate)" | log 1
+    exit 1
+fi
 
 echo "Install docker-ce" | log
 cat > /usr/sbin/policy-rc.d <<EOF
