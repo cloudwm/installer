@@ -7,8 +7,6 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-checkTagExist ubuntu-updateos.success
-
 echo "Create temp swap for composer processes" | log
 #increase vm swappiness to allow swap to dominate process
 sudo fallocate -l 2G /swapfile

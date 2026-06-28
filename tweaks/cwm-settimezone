@@ -41,6 +41,7 @@ timezones[US-LA]="America/Los_Angeles"
 timezones[US-SE]="America/Seattle"
 timezones[AS-SG]="Asia/Singapore"
 timezones[AS-TY]="Asia/Tokyo"
+timezones[EU-BU]="Europe/Bucharest"
 timezones[AU-SY]="Australia/Sydney"
 
 

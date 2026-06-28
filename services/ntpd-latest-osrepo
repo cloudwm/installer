@@ -6,20 +6,27 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "install NTP from apt" | log
-installPackage ntp ntpdate
-waitOrStop 0 "Failed apt install: ntp ntpdate"
+# Ubuntu 24.04 (noble) dropped the legacy 'ntp' and 'ntpdate' packages — 'ntpdate'
+# was removed outright and 'ntp' is now a transitional package pulling ntpsec.
+# chrony is Ubuntu's default NTP daemon: it installs cleanly, ships a working
+# /etc/chrony/chrony.conf (pool ntp.ubuntu.com ...) out of the box, and the
+# package automatically takes over from systemd-timesyncd. Tag stays 'ntpd.success'
+# so the 11 consumers and tweaks/dbserver-check-ntpd keep working unchanged.
+echo "install chrony (NTP) from apt" | log
+installPackage chrony
+waitOrStop 0 "Failed apt install: chrony"
 
-echo "Enable NTP Service" | log
-systemctl enable ntp
-systemctl start ntp
+echo "Enable and start chrony service" | log
+systemctl enable chrony
+systemctl restart chrony
+waitOrStop 0 "Failed to start chrony service"
 
-echo "Update the time via local daemon" | log
-timedatectl set-ntp off
-echo "server localhost iburst prefer" >> /etc/ntp.conf
-systemctl restart ntp
-sleep 5 # Waiting for daemon to start
-ntpdate  -u localhost
+echo "Forcing immediate time sync" | log
+# Let the daemon reach its sources, then step the clock to the correct time
+# immediately instead of slewing slowly. Non-fatal: a transient pool hiccup
+# shouldn't fail the install — chrony will converge on its own.
+sleep 3
+chronyc makestep || echo "chronyc makestep skipped (chrony will sync on its own)" | log
 
 tag ntpd.success
 tagScript success

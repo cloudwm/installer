@@ -71,10 +71,10 @@ function checkOs() {
 
     if [[ ! "$OS" =~ *"Ubuntu" && ! " ${SupportedOS[*]} " =~ "$OSVersion" ]]; then
 
-            echo "$OS $OSVersion is not supported, exiting. (1)"
+            echo "$OS $OSVersion is not supported, exiting. (1)" | log 1
             exit 1
     fi
-            echo "Found supported OS: $OS $OSVersion"
+            echo "Found supported OS: $OS $OSVersion" | log
 
 }
 
@@ -177,7 +177,7 @@ function backupFile() {
     if [ -f "$1" ]; then
 
         rootDir=$(rootDir)
-        echo "Backing up file $1 to $rootDir/temp/backup/"
+        echo "Backing up file $1 to $rootDir/temp/backup/" | log
 
         fileDirectory=$(dirname $1)
 
@@ -192,7 +192,7 @@ function backupFile() {
 
     else
 
-        echo "Backing up file $1 Failed. file doesn't exist."
+        echo "Backing up file $1 Failed. file doesn't exist." | log
 
     fi
 
@@ -217,7 +217,7 @@ function CheckDiskSpace() {
         checkdisk=$(df -h $PWD | awk '/[0-9]%/{print $(NF-2)-0}')
 
         if [ $checkdisk -lt 1 ]; then
-                echo "Not enough disk space to recreate new key and log"
+                echo "Not enough disk space to recreate new key and log" | log 1
                 exit 1
         fi
 
@@ -373,26 +373,26 @@ function createSwapFile() {
     # generate swap file and mount it
     dd if=/dev/zero of=$swapFile bs=1M count=$2
     mkswap $swapFile >/dev/null || {
-        echo 'mkswap failed'
+        echo 'mkswap failed' | log 1
         return 1
     }
     swapon $swapFile >/dev/null || {
-        echo 'swapon failed'
+        echo 'swapon failed' | log 1
         return 1
     }
     chmod 600 $swapFile >/dev/null || {
-        echo 'chmod swapfile failed'
+        echo 'chmod swapfile failed' | log 1
         return 1
     }
 
     if [ ! -e $swapFile ]; then
 
-        echo "error: did not complete swap creation properly"
+        echo "error: did not complete swap creation properly" | log 1
         return 1
 
     fi
 
-    echo "$swapFile"
+    echo "$swapFile" | log
     return 0
 
 }
