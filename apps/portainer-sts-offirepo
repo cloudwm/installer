@@ -29,7 +29,7 @@ echo "Creating Docker Compose file for Portainer (without initial password)" | l
 cat << 'EOF' > /opt/portainer/docker-compose.yml
 services:
   portainer:
-    image: portainer/portainer-ee:sts
+    image: portainer/portainer-ce:sts
     container_name: portainer
     restart: always
     ports:
@@ -83,7 +83,7 @@ JSONEOF
     cat << 'EOFCOMPOSE' > /opt/portainer/docker-compose.yml
 services:
   portainer:
-    image: portainer/portainer-ce:2.33.2
+    image: portainer/portainer-ce:sts
     container_name: portainer
     restart: always
     ports:

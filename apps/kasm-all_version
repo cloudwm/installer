@@ -1,0 +1,174 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# ============================================================
+#  Kasm version — change here. 1.19+ has NO build hash in the
+#  tarball name (older releases like 1.17.0.7f020d did).
+# ============================================================
+KASM_VERSION="${KASM_VERSION:-1.19.0}"   # overridable from the .conf via: export KASM_VERSION=...
+# ============================================================
+
+KASM_TARBALL="kasm_release_${KASM_VERSION}.tar.gz"
+KASM_URL="https://kasm-static-content.s3.amazonaws.com/${KASM_TARBALL}"
+
+# Resilient HTTPS download: this network intermittently TLS-intercepts, so a
+# failed attempt often succeeds on a later try. The framework's curlDownload
+# (and curl --retry) do NOT retry cert errors (exit 60), so we loop explicitly.
+dl() {  # dl <url> <output-file>
+    local url=$1 out=$2 i
+    for i in 1 2 3 4 5; do
+        curl -fsSL "$url" -o "$out" && return 0
+        echo "Download attempt $i failed for $url, retrying..." | log
+        sleep 15
+    done
+    return 1
+}
+
+# Set base params
+cd /opt
+rm -Rf /opt/installer
+mkdir -p /opt/installer          # original cd'd into a just-deleted dir
+cd /opt/installer
+
+# Set the time zone to America/Chicago
+timedatectl set-timezone America/Chicago
+
+echo "Starting the installation process" | log
+
+# Update the package list and install required dependencies
+echo "Installing required dependencies" | log
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y \
+    wget \
+    apt-transport-https \
+    ca-certificates \
+    gnupg2 \
+    lsb-release \
+    software-properties-common \
+    curl \
+    libsasl2-modules
+waitOrStop 0 "Failed to install base dependencies"
+
+# Install Docker from Docker's official repository.
+# (Dropped docker.io — it conflicts with docker-ce; use a signed-by keyring.)
+echo "Installing Docker from official repository" | log
+install -m 0755 -d /etc/apt/keyrings
+dl https://download.docker.com/linux/ubuntu/gpg /tmp/docker.gpg
+waitOrStop 0 "Docker GPG key download failed"
+gpg --dearmor -o /etc/apt/keyrings/docker.gpg < /tmp/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+rm -f /tmp/docker.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+     > /etc/apt/sources.list.d/docker.list
+
+# apt-get update fetches the docker InRelease over HTTPS; under interception apt
+# silently skips the repo but still exits 0. Loop until docker-ce has a candidate.
+for i in 1 2 3 4 5; do
+    apt-get update -y
+    if apt-cache policy docker-ce | grep -E 'Candidate: [0-9]' >/dev/null; then break; fi
+    echo "docker-ce has no candidate yet (transient TLS on repo fetch?), retrying..." | log
+    sleep 15
+done
+
+# Install Docker CE + the compose plugin (replaces the old standalone 1.29.2)
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+waitOrStop 0 "Failed to install Docker CE"
+
+# Start Docker and enable it to start on boot
+systemctl enable docker
+systemctl start docker
+usermod -aG docker "$(whoami)"
+
+# Setup 8GB Swap Memory
+echo "Setting up 8GB Swap Memory" | log
+swapoff -a
+rm -f /swapfile
+fallocate -l 8G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+waitOrStop 0 "Failed to enable swap"
+if ! grep -q '/swapfile' /etc/fstab; then
+    echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+fi
+swapon --summary | log
+free -h | log
+echo "8GB Swap Memory successfully configured" | log
+
+# Download Kasm release (retry + verify — a silent failure must not fall through
+# to tar/install on an empty file)
+echo "Downloading Kasm release ${KASM_VERSION}" | log
+dl "$KASM_URL" "/tmp/${KASM_TARBALL}"
+waitOrStop 0 "Kasm download failed"
+test -s "/tmp/${KASM_TARBALL}"
+waitOrStop 0 "Kasm download is empty"
+if ! file "/tmp/${KASM_TARBALL}" | grep -q gzip; then
+    echo "Kasm download is not a gzip tarball (bad URL?). exiting (1)." | log 1
+    exit 1
+fi
+
+# Extract the Kasm release
+echo "Extracting Kasm release" | log
+tar -xzf "/tmp/${KASM_TARBALL}" -C /tmp/
+waitOrStop 0 "Failed to extract Kasm release"
+test -f /tmp/kasm_release/install.sh
+waitOrStop 0 "install.sh not found after extract"
+
+# Accept the EULA and run Kasm install.sh. Feed the y/y/y via a heredoc redirect
+# (NOT a pipe) so install.sh is the sole command and waitOrStop checks ITS exit.
+echo "Accepting the EULA and running Kasm installation script" | log
+bash /tmp/kasm_release/install.sh > /root/kasm_install_output.log 2>&1 <<'ANSWERS'
+y
+y
+y
+ANSWERS
+waitOrStop 0 "Kasm install.sh failed — see /root/kasm_install_output.log"
+
+# Extract the last 37 lines (which contain the credentials)
+echo "Capturing credentials from Kasm installation output" | log
+tail -n 37 /root/kasm_install_output.log > /root/kasm_credentials.log
+
+# Define the MOTD script path and insert the credentials content.
+MOTD_SCRIPT="/etc/update-motd.d/99-kasm-credentials"
+cat << 'EOF' > "$MOTD_SCRIPT"
+#!/bin/sh
+CONTACT="info@fortifieddesk.com"
+
+# Get the first non-loopback IP address
+IP=$(ip a | awk '/inet / { if ($2 !~ /^127/) { split($2, a, "/"); print a[1]; exit } }')
+
+# Convert the IP address to URL format (replace dots with hyphens)
+URL=$(echo "$IP" | tr '.' '-')".cloud-xip.com"
+
+# Append the credentials if the file exists
+if [ -f /root/kasm_credentials.log ]; then
+    cat /root/kasm_credentials.log
+fi
+
+# Print the URL in the MOTD
+echo "Access URL: https://$URL"
+echo ""
+echo "For Support and Licensing information please contact $CONTACT"
+echo ""
+echo ""
+EOF
+
+chmod +x "$MOTD_SCRIPT"
+echo "MOTD has been updated to display /root/kasm_credentials.log." | log
+
+# Clean up downloaded files
+rm -rf "/tmp/${KASM_TARBALL}" /tmp/kasm_release
+
+# Log the successful installation
+echo "Kasm installation completed successfully" | log
+
+tagScript success
+
+exit 0
