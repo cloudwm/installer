@@ -39,6 +39,12 @@ LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 FC_FILE="${LE_DIR}/fullchain.pem"
 PK_FILE="${LE_DIR}/privkey.pem"
 chmod 755 /etc/letsencrypt/live "${LE_DIR}"
+# Let's Encrypt symlinks point into /etc/letsencrypt/archive, which certbot creates as 700.
+# The unprivileged caddy user must be able to traverse it to follow the symlinks, otherwise
+# TLS provisioning fails with "permission denied" and Caddy never binds 80/443.
+if [ -d "/etc/letsencrypt/archive/${CWM_DOMAIN}" ]; then
+    chmod 755 /etc/letsencrypt/archive "/etc/letsencrypt/archive/${CWM_DOMAIN}"
+fi
 chmod 644 "${FC_FILE}"
 chmod 640 "${PK_FILE}"
 chown root:caddy "${PK_FILE}"
