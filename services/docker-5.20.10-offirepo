@@ -8,11 +8,21 @@ fi
 
 echo "Setting up Docker repository and key" | log
 mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg > /tmp/docker.gpg
+# Retry the key download: TLS interception on this network is intermittent, so a
+# failed attempt (curl exit 60) often succeeds on a later try via a clean path.
+# Note: curl's own --retry does NOT cover cert errors (60), so we loop explicitly.
+for i in 1 2 3 4 5; do
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/docker.gpg && break
+    echo "Docker key download attempt $i failed (transient TLS?), retrying..." | log
+    sleep 15
+done
+test -s /tmp/docker.gpg
 waitOrStop 0 "Key not downloaded from official source"
-cat /tmp/docker.gpg | gpg --dearmor > /etc/apt/keyrings/docker.gpg
+gpg --dearmor -o /etc/apt/keyrings/docker.gpg < /tmp/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 rm -f /tmp/docker.gpg
+test -s /etc/apt/keyrings/docker.gpg
+waitOrStop 0 "Docker keyring is empty (key import failed)"
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 apt-get update
