@@ -18,17 +18,39 @@ echo "Downloading Jitsi and adding key" | log
 apt update | log
 installPackage apt-transport-https
 waitOrStop 0 "Failed to install apt-transport-https"
-echo 'deb https://download.jitsi.org stable/' | tee /etc/apt/sources.list.d/jitsi-stable.list
-curlDownload https://download.jitsi.org/jitsi-key.gpg.key
-waitOrStop 0 "File not downloaded from official source"
-apt-key add jitsi-key.gpg.key
+# Modern keyring (signed-by) instead of the deprecated apt-key, which is removed on Ubuntu 24.04+.
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.jitsi.org/jitsi-key.gpg.key | gpg --dearmor -o /etc/apt/keyrings/jitsi.gpg
+waitOrStop 0 "Jitsi signing key not downloaded from official source"
+echo "deb [signed-by=/etc/apt/keyrings/jitsi.gpg] https://download.jitsi.org stable/" > /etc/apt/sources.list.d/jitsi-stable.list
 apt update | log
+
+# jitsi-meet-prosody needs prosody >= 0.12, but Ubuntu 22.04 universe only has 0.11.13, which makes
+# the whole jitsi-meet apt transaction fail with "held broken packages". On those releases add the
+# official Prosody repo and pin the 0.12 LTS series explicitly. We deliberately install prosody-0.12
+# and NOT the generic "prosody" (now 13.x): prosody 13 dropped Lua 5.1 support, and on 22.04 (whose
+# default lua is 5.1) that makes the jitsi-meet-prosody post-install fail, leaving the meeting backend
+# broken even though the web UI loads. Installing prosody-0.12 first also satisfies jitsi-meet-prosody's
+# "| prosody-0.12 |" dependency alternative, so apt never pulls 13.x. 24.04/26.04 already ship
+# prosody >= 0.12 built for a supported Lua, so they keep the OS package and skip this block.
+echo "Ensuring prosody >= 0.12 (jitsi-meet-prosody requirement)" | log
+prosodyCand=$(apt-cache policy prosody 2>/dev/null | awk '/Candidate:/{print $2}')
+if ! dpkg --compare-versions "$prosodyCand" ge 0.12.0; then
+    echo "OS prosody ($prosodyCand) too old; adding official Prosody repo and pinning prosody-0.12" | log
+    curl -fsSL https://prosody.im/files/prosody-debian-packages.key | gpg --dearmor -o /etc/apt/keyrings/prosody.gpg
+    waitOrStop 0 "Prosody signing key not downloaded from official source"
+    echo "deb [signed-by=/etc/apt/keyrings/prosody.gpg] https://packages.prosody.im/debian $(lsb_release -sc) main" > /etc/apt/sources.list.d/prosody.list
+    apt update | log
+    installPackage prosody-0.12 | log
+    waitOrStop 0 "Failed to install prosody-0.12"
+fi
 
 echo "Installing Jitsi" | log
 export DEBIAN_FRONTEND="noninteractive"
 echo "jitsi-videobridge jitsi-videobridge/jvb-hostname string jitsi.${CWM_DOMAIN}" | debconf-set-selections
 echo "jitsi-meet jitsi-meet/cert-choice select Self-signed certificate will be generated" | debconf-set-selections
-installPackage jitsi-meet
+installPackage jitsi-meet | log
+waitOrStop 0 "Failed to install jitsi-meet"
 # Reload nginx only if the config tests clean, so a bad vhost can never take nginx down.
 reloadNginx() {
     nginx -t 2>&1 | log

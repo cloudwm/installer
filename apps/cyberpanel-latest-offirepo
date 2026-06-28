@@ -15,10 +15,6 @@ curlDownload https://raw.githubusercontent.com/acmesh-official/acme.sh/master/ac
 waitOrStop 0 "File not downloaded from official source"
 chmod +x acme.sh
 
-echo "Adding firewall fules" | log
-ufw allow 8090
-ufw allow 7090
-
 echo "Downloading and installing CyberPanel & OpenLiteSpeed" | log
 mkdir -p /var/www/
 cd /var/www/
@@ -30,56 +26,185 @@ bash cyberpanel.sh -v ols -a -p ${ADMINPASSWORD} > /root/cyberpanel.txt
 
 olspass=$(cat /etc/cyberpanel/webadmin_passwd)
 
-# nginx terminates TLS on :443 for ${CWM_DOMAIN} and proxies to lscpd's :8090.
-# (OLS keeps :80 for tenant websites the admin creates from the panel.)
-echo "Installing nginx reverse-proxy vhost for CyberPanel admin" | log
-chgrp -R nogroup /etc/letsencrypt/live /etc/letsencrypt/archive 2>/dev/null || true
-chmod -R g+rX    /etc/letsencrypt/live /etc/letsencrypt/archive
+HTTPD_CONF=/usr/local/lsws/conf/httpd_config.conf
+ACME=/root/.acme.sh/acme.sh
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+WEBROOT=/usr/local/lsws/Example/html
 
-rm -f /etc/nginx/sites-enabled/default
-cat <<EOF > /etc/nginx/sites-available/cyberpanel
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    server_name ${CWM_DOMAIN};
+# Map the OLS :80 listener to the Example docroot so the ACME HTTP-01
+#    webroot challenge is served (OLS ships :80 with no vhost mapped → 404).
+echo "Mapping OLS :80 listener to ACME webroot" | log
+if ! grep -q "map  *Example  *${CWM_DOMAIN}" "$HTTPD_CONF"; then
+    python3 - "$HTTPD_CONF" "${CWM_DOMAIN}" <<'PYEOF'
+import sys
+conf, domain = sys.argv[1], sys.argv[2]
+s = open(conf).read()
+old = "listener Default{\n    address                  *:80\n    secure                   0\n}"
+new = "listener Default{\n    address                  *:80\n    secure                   0\n    map                      Example %s\n}" % domain
+if old in s:
+    open(conf, "w").write(s.replace(old, new, 1))
+PYEOF
+fi
 
-    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
-    ssl_protocols       TLSv1.2 TLSv1.3;
+# A bare-domain browser hits http:// first, and the :80 Example vhost would
+# otherwise serve the OLS "Welcome" placeholder. Redirect everything on :80 to
+# https://CWM_DOMAIN/ (the panel), while still serving the ACME challenge path.
+EX_VHCONF=/usr/local/lsws/conf/vhosts/Example/vhconf.conf
+python3 - "$EX_VHCONF" <<'PYEOF'
+import sys
+f = sys.argv[1]
+s = open(f).read()
+old = "rewrite {\n  enable 0\n  logLevel 0\n}"
+new = "rewrite {\n  enable 1\n  autoLoadHtaccess 1\n  logLevel 0\n}"
+if old in s:
+    open(f, "w").write(s.replace(old, new, 1))
+PYEOF
+cat <<EOF > ${WEBROOT}/.htaccess
+RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
+RewriteRule ^(.*)\$ https://${CWM_DOMAIN}/\$1 [R=301,L]
+EOF
 
-    client_max_body_size 256m;
+systemctl restart lshttpd
 
-    location / {
-        proxy_pass                  https://127.0.0.1:8090;
-        proxy_ssl_verify            off;
-        proxy_ssl_server_name       on;
-        proxy_http_version          1.1;
-        proxy_set_header Host              \$host;
-        proxy_set_header X-Real-IP         \$remote_addr;
-        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header Upgrade           \$http_upgrade;
-        proxy_set_header Connection        "upgrade";
-        proxy_read_timeout                 600s;
-        proxy_send_timeout                 600s;
-    }
+# Obtain a Let's Encrypt cert for the hostname via webroot (no downtime).
+#    Retry: the xip-style DNS used for CWM_DOMAIN is occasionally unresolvable
+#    by LE's multi-perspective validators. Fall back to self-signed so OLS can
+#    still bring up :443, and install a self-healing cron that upgrades to a
+#    real cert once DNS cooperates.
+mkdir -p "$LE_DIR"
+"$ACME" --register-account -m "admin@${CWM_DOMAIN}" --server letsencrypt 2>&1 | log
+"$ACME" --set-default-ca --server letsencrypt 2>&1 | log
+
+le_ok=0
+for attempt in 1 2 3; do
+    echo "Let's Encrypt attempt ${attempt}/3 for ${CWM_DOMAIN}" | log
+    if "$ACME" --issue -d "${CWM_DOMAIN}" -w "$WEBROOT" -k ec-256 --server letsencrypt --force; then
+        le_ok=1
+        break
+    fi
+    [ "$attempt" -lt 3 ] && sleep 30
+done
+
+if [ "$le_ok" = "1" ]; then
+    "$ACME" --install-cert -d "${CWM_DOMAIN}" --ecc \
+        --key-file       "${LE_DIR}/privkey.pem" \
+        --fullchain-file "${LE_DIR}/fullchain.pem" \
+        --cert-file      "${LE_DIR}/cert.pem" \
+        --reloadcmd      "systemctl restart lscpd; systemctl restart lshttpd"
+    echo "LetsEncrypt certificate issued for ${CWM_DOMAIN}" | log
+else
+    echo "LetsEncrypt failed (DNS); using self-signed and scheduling retry" | log
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${LE_DIR}/privkey.pem" -out "${LE_DIR}/fullchain.pem" \
+        -subj "/CN=${CWM_DOMAIN}" 2>/dev/null
+    cp "${LE_DIR}/fullchain.pem" "${LE_DIR}/cert.pem"
+
+    # Self-healing: retry issuance every 20 min; on success install the cert,
+    # reload services, and remove this cron. Survives the flaky-DNS window.
+    cat <<EOF > /usr/local/bin/cwm-hostname-ssl-retry.sh
+#!/bin/bash
+D="${CWM_DOMAIN}"
+A="${ACME}"
+LIVE="${LE_DIR}"
+WR="${WEBROOT}"
+remove_cron() { crontab -l 2>/dev/null | grep -v 'cwm-hostname-ssl-retry' | crontab - ; }
+if openssl x509 -in "\$LIVE/fullchain.pem" -noout -issuer 2>/dev/null | grep -q "Let's Encrypt"; then
+    remove_cron; exit 0
+fi
+if "\$A" --issue -d "\$D" -w "\$WR" -k ec-256 --server letsencrypt --force; then
+    "\$A" --install-cert -d "\$D" --ecc \\
+        --key-file "\$LIVE/privkey.pem" \\
+        --fullchain-file "\$LIVE/fullchain.pem" \\
+        --cert-file "\$LIVE/cert.pem" \\
+        --reloadcmd "systemctl restart lscpd; systemctl restart lshttpd"
+    openssl x509 -in "\$LIVE/fullchain.pem" -noout -issuer 2>/dev/null | grep -q "Let's Encrypt" && remove_cron
+fi
+EOF
+    chmod +x /usr/local/bin/cwm-hostname-ssl-retry.sh
+    ( crontab -l 2>/dev/null | grep -v cwm-hostname-ssl-retry; \
+      echo '*/20 * * * * /usr/local/bin/cwm-hostname-ssl-retry.sh >> /var/log/cwm-ssl-retry.log 2>&1' ) | crontab -
+fi
+chmod 644 "${LE_DIR}/fullchain.pem" "${LE_DIR}/cert.pem"
+chmod 600 "${LE_DIR}/privkey.pem"
+
+# 3) Point the lscpd (:8090) and OLS WebAdmin (:7080) certs at the hostname cert.
+ln -sf "${LE_DIR}/fullchain.pem" /usr/local/lscp/conf/cert.pem
+ln -sf "${LE_DIR}/privkey.pem"   /usr/local/lscp/conf/key.pem
+ln -sf "${LE_DIR}/fullchain.pem" /usr/local/lsws/admin/conf/webadmin.crt
+ln -sf "${LE_DIR}/privkey.pem"   /usr/local/lsws/admin/conf/webadmin.key
+
+# 4) Write the proxy vhost and the :443 listener (cert now exists).
+echo "Configuring OpenLiteSpeed :443 reverse proxy for the panel" | log
+mkdir -p /usr/local/lsws/conf/vhosts/cwmpanel
+cat <<EOF > /usr/local/lsws/conf/vhosts/cwmpanel/vhconf.conf
+docRoot                   ${WEBROOT}/
+enableScript              1
+
+extprocessor cyberpanel {
+  type                    proxy
+  address                 HTTPS://127.0.0.1:8090
+  maxConns                100
+  initTimeout             60
+  retryTimeout            0
+  respBuffer              0
+  pcKeepAliveTimeout      60
+}
+
+context / {
+  type                    proxy
+  handler                 cyberpanel
+  addDefaultCharset       off
+}
+
+vhssl  {
+  keyFile                 ${LE_DIR}/privkey.pem
+  certFile                ${LE_DIR}/fullchain.pem
+  sslProtocol             24
 }
 EOF
-ln -sf /etc/nginx/sites-available/cyberpanel /etc/nginx/sites-enabled/cyberpanel
-nginx -t | log
-waitOrStop 0 "nginx config test failed"
-systemctl enable nginx | log
-systemctl restart nginx | log
-waitOrStop 0 "Failed to start nginx"
+chown -R lsadm:nogroup /usr/local/lsws/conf/vhosts/cwmpanel
+
+if ! grep -q "virtualHost cwmpanel" "$HTTPD_CONF"; then
+cat <<EOF >> "$HTTPD_CONF"
+
+virtualHost cwmpanel {
+  vhRoot                  /usr/local/lsws/Example/
+  allowSymbolLink         1
+  enableScript            1
+  restrained              0
+  configFile              conf/vhosts/cwmpanel/vhconf.conf
+}
+
+listener cwmSSL {
+  address                 *:443
+  secure                  1
+  keyFile                 ${LE_DIR}/privkey.pem
+  certFile                ${LE_DIR}/fullchain.pem
+  map                     cwmpanel ${CWM_DOMAIN}
+}
+EOF
+fi
+
+# 5) Make sure firewalld (now the active firewall) allows 80/443 on IPv4.
+firewall-cmd --permanent --add-port=80/tcp  2>&1 | log
+firewall-cmd --permanent --add-port=443/tcp 2>&1 | log
+firewall-cmd --reload 2>&1 | log
+
+systemctl restart lscpd
+systemctl restart lshttpd
+sleep 3
+[ "$(systemctl is-active lshttpd)" = "active" ]
+waitOrStop 0 "OpenLiteSpeed failed to start after :443 proxy config"
 
 echo "Adding descriptions" | log
 descriptionAppend "CyberPanel UI: https://${CWM_DOMAIN}/"
 descriptionAppend "CyberPanel User: admin"
 descriptionAppend "CyberPanel Password: ${ADMINPASSWORD}"
 descriptionAppend " "
-descriptionAppend "OpenLiteSpeed UI: https://${CWM_DOMAIN}:7080"
-descriptionAppend "OpenLiteSpeed User: admin"
-descriptionAppend "OpenLiteSpeed Password: ${olspass}"
+# OLS WebAdmin (:7080) is blocked at the network edge like :8090 — reachable
+# only via an SSH tunnel, so we don't advertise it as a public URL.
+descriptionAppend "OpenLiteSpeed WebAdmin (SSH tunnel to :7080): admin / ${olspass}"
 
 tagScript success
 
