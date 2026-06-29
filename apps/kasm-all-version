@@ -7,13 +7,19 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 # ============================================================
-#  Kasm version — change here. 1.19+ has NO build hash in the
-#  tarball name (older releases like 1.17.0.7f020d did).
+#  Kasm version — change here. 1.18.1 and 1.19+ publish a BARE
+#  tarball (kasm_release_<ver>.tar.gz). Older releases (e.g.
+#  1.16.1, 1.17.0) only exist under a build-hash filename, e.g.
+#  kasm_release_1.17.0.7f020d.tar.gz — the bare URL is HTTP 403.
+#  For those, set KASM_BUILD to the hash from the .conf:
+#      export KASM_BUILD="7f020d"
 # ============================================================
 KASM_VERSION="${KASM_VERSION:-1.19.0}"   # overridable from the .conf via: export KASM_VERSION=...
+KASM_BUILD="${KASM_BUILD:-}"             # optional build hash for pre-1.18.1 releases
 # ============================================================
 
-KASM_TARBALL="kasm_release_${KASM_VERSION}.tar.gz"
+# Append the build hash only when one is set (1.18.1/1.19+ have none).
+KASM_TARBALL="kasm_release_${KASM_VERSION}${KASM_BUILD:+.${KASM_BUILD}}.tar.gz"
 KASM_URL="https://kasm-static-content.s3.amazonaws.com/${KASM_TARBALL}"
 
 # Resilient HTTPS download: this network intermittently TLS-intercepts, so a
