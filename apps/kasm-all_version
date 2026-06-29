@@ -29,11 +29,11 @@ dl() {  # dl <url> <output-file>
     return 1
 }
 
-# Set base params
-cd /opt
-rm -Rf /opt/installer
-mkdir -p /opt/installer          # original cd'd into a just-deleted dir
-cd /opt/installer
+# Set base params. Use a dedicated work dir — do NOT touch /opt/installer, which
+# is the installer's own tree (deleting it wipes tweaks/ and kills later steps).
+rm -Rf /opt/kasm-install
+mkdir -p /opt/kasm-install
+cd /opt/kasm-install
 
 # Set the time zone to America/Chicago
 timedatectl set-timezone America/Chicago
@@ -135,33 +135,23 @@ waitOrStop 0 "Kasm install.sh failed — see /root/kasm_install_output.log"
 echo "Capturing credentials from Kasm installation output" | log
 tail -n 37 /root/kasm_install_output.log > /root/kasm_credentials.log
 
-# Define the MOTD script path and insert the credentials content.
-MOTD_SCRIPT="/etc/update-motd.d/99-kasm-credentials"
-cat << 'EOF' > "$MOTD_SCRIPT"
-#!/bin/sh
-CONTACT="info@fortifieddesk.com"
-
-# Get the first non-loopback IP address
-IP=$(ip a | awk '/inet / { if ($2 !~ /^127/) { split($2, a, "/"); print a[1]; exit } }')
-
-# Convert the IP address to URL format (replace dots with hyphens)
-URL=$(echo "$IP" | tr '.' '-')".cloud-xip.com"
-
-# Append the credentials if the file exists
-if [ -f /root/kasm_credentials.log ]; then
-    cat /root/kasm_credentials.log
+# Derive the access URL (matches the CWM_DOMAIN convention used by the other apps)
+if [ -z "${CWM_DOMAIN}" ]; then
+    PRIMARY_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+    [ -z "${PRIMARY_IP}" ] && PRIMARY_IP=$(hostname -I | awk '{print $1}')
+    export CWM_DOMAIN="${PRIMARY_IP//./-}.cloud-xip.com"
+    echo "CWM_DOMAIN was empty; derived ${CWM_DOMAIN} from ${PRIMARY_IP}" | log
 fi
 
-# Print the URL in the MOTD
-echo "Access URL: https://$URL"
-echo ""
-echo "For Support and Licensing information please contact $CONTACT"
-echo ""
-echo ""
-EOF
-
-chmod +x "$MOTD_SCRIPT"
-echo "MOTD has been updated to display /root/kasm_credentials.log." | log
+# Publish the access URL and captured credentials via the system description file
+echo "Adding descriptions" | log
+descriptionAppend "Kasm Web Interface: https://${CWM_DOMAIN}"
+descriptionAppend " "
+while IFS= read -r line; do
+    descriptionAppend "${line}"
+done < /root/kasm_credentials.log
+descriptionAppend " "
+descriptionAppend "For Support and Licensing information please contact info@fortifieddesk.com"
 
 # Clean up downloaded files
 rm -rf "/tmp/${KASM_TARBALL}" /tmp/kasm_release
