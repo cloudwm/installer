@@ -67,13 +67,17 @@ EOF
 ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
 # Provide the fastcgi-php.conf snippet that Debian ships but nginx.org omits.
+# Debian's version does `include fastcgi.conf;` (which carries SCRIPT_FILENAME);
+# nginx.org may only ship fastcgi_params, so set SCRIPT_FILENAME explicitly here
+# to keep the snippet self-contained and avoid a missing-include restart failure.
 cat > /etc/nginx/snippets/fastcgi-php.conf <<'EOF'
 fastcgi_split_path_info ^(.+?\.php)(/.*)$;
 try_files $fastcgi_script_name =404;
 set $path_info $fastcgi_path_info;
 fastcgi_param PATH_INFO $path_info;
 fastcgi_index index.php;
-include fastcgi.conf;
+include fastcgi_params;
+fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
 EOF
 
 mkdir -p "$appPath"
