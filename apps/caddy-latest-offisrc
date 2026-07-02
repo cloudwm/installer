@@ -38,10 +38,23 @@ chown -R caddy:caddy /var/log/caddy
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
 FC_FILE="${LE_DIR}/fullchain.pem"
 PK_FILE="${LE_DIR}/privkey.pem"
-chmod 755 /etc/letsencrypt/live "${LE_DIR}"
-chmod 644 "${FC_FILE}"
-chmod 640 "${PK_FILE}"
-chown root:caddy "${PK_FILE}"
+
+# Caddy runs as the unprivileged `caddy` user and must be able to traverse the
+# ENTIRE path to the cert. With a real Let's Encrypt cert the files under live/
+# are symlinks into archive/, and certbot creates both live/ and archive/ as
+# 0700 (root only) — so caddy gets "permission denied" unless we open traversal
+# on both trees, not just live/.
+chmod 755 /etc/letsencrypt /etc/letsencrypt/live /etc/letsencrypt/archive 2>/dev/null
+chmod 755 "${LE_DIR}" 2>/dev/null
+[ -d "/etc/letsencrypt/archive/${CWM_DOMAIN}" ] && chmod 755 "/etc/letsencrypt/archive/${CWM_DOMAIN}"
+
+# Resolve symlinks so the mode/ownership lands on the real files (in archive/
+# for LE certs, or on the files themselves for the self-signed fallback).
+REAL_FC="$(readlink -f "${FC_FILE}")"
+REAL_PK="$(readlink -f "${PK_FILE}")"
+chmod 644 "${REAL_FC}"
+chmod 640 "${REAL_PK}"
+chown root:caddy "${REAL_PK}"
 
 echo "Creating the Caddy configuration file" | log
 cat /dev/null > /etc/caddy/Caddyfile

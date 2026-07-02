@@ -77,6 +77,20 @@ include fastcgi.conf;
 EOF
 
 mkdir -p "$appPath"
+
+# nginx.org serves its welcome page from /usr/share/nginx/html, but our
+# Debian-style vhosts root at /var/www/html. Left empty, "root /var/www/html"
+# with an index directive but no matching file returns 403 -> seed the stock
+# nginx welcome page so the default vhost shows the welcome page instead.
+if [ ! -f "$appPath/index.html" ]; then
+    if [ -f /usr/share/nginx/html/index.html ]; then
+        cp /usr/share/nginx/html/index.html "$appPath/index.html"
+        [ -f /usr/share/nginx/html/50x.html ] && cp /usr/share/nginx/html/50x.html "$appPath/50x.html"
+    else
+        echo '<!DOCTYPE html><html><head><title>Welcome to nginx!</title></head><body><h1>Welcome to nginx!</h1></body></html>' > "$appPath/index.html"
+    fi
+fi
+
 chown -R www-data:www-data "$appPath"
 chmod -R 755 "$appPath"
 
