@@ -33,6 +33,49 @@ apt update
 installPackage nginx
 waitOrStop 0 "Failed to install NGINX"
 
+# The nginx.org official package uses a conf.d/ layout and does NOT ship the
+# Debian/Ubuntu sites-available / sites-enabled / snippets structure that the
+# shared certbot, SSL and php-fpm tweaks rely on. Recreate that layout here so
+# those tweaks (and the 443 SSL vhost they generate) actually get loaded.
+echo "Setting up Debian-style vhost layout for nginx.org package" | log
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/nginx/snippets
+
+# nginx.org's nginx.conf only includes conf.d/*.conf; also pull in sites-enabled.
+if ! grep -q "sites-enabled" /etc/nginx/nginx.conf; then
+    sed -i '/include \/etc\/nginx\/conf.d\/\*.conf;/a\    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
+fi
+
+# Drop nginx.org's default vhost (also listens on :80 default_server) to avoid a
+# duplicate default_server, and provide a Debian-style default site instead.
+rm -f /etc/nginx/conf.d/default.conf
+
+cat > /etc/nginx/sites-available/default <<'EOF'
+server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
+
+	root /var/www/html;
+	index index.html index.htm index.nginx-debian.html;
+
+	server_name _;
+
+	location / {
+		try_files $uri $uri/ =404;
+	}
+}
+EOF
+ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# Provide the fastcgi-php.conf snippet that Debian ships but nginx.org omits.
+cat > /etc/nginx/snippets/fastcgi-php.conf <<'EOF'
+fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+try_files $fastcgi_script_name =404;
+set $path_info $fastcgi_path_info;
+fastcgi_param PATH_INFO $path_info;
+fastcgi_index index.php;
+include fastcgi.conf;
+EOF
+
 mkdir -p "$appPath"
 chown -R www-data:www-data "$appPath"
 chmod -R 755 "$appPath"
