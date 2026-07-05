@@ -17,15 +17,29 @@ fi
 
 echo "Adding repo to OS" | log
 
-curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
-   sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg \
-   --dearmor
+# Download the signing key to a file first (with retry) so a transient TLS/clock
+# failure at boot can't leave us with an empty keyring and an unsigned repo.
+for i in 1 2 3; do
+    curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc -o /tmp/mongodb-server-8.0.asc && break
+    echo "MongoDB key download attempt $i failed, retrying..." | log
+    sleep 15
+done
+test -s /tmp/mongodb-server-8.0.asc
+waitOrStop 0 "MongoDB GPG key download failed"
+gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg < /tmp/mongodb-server-8.0.asc
+rm -f /tmp/mongodb-server-8.0.asc
+test -s /usr/share/keyrings/mongodb-server-8.0.gpg
+waitOrStop 0 "MongoDB keyring is empty (key import failed)"
+
 echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
 apt-get update
+waitOrStop 0 "Failed to update apt after adding MongoDB repo"
 
 echo "Install mongodb from apt" | log
 
-apt-get install -y glibc-source mongodb-org-server=8.0.11 | log
+# Install the metapackage (no exact patch pin — old patches get pruned from the
+# repo). This also pulls mongosh, used below for createUser.
+apt-get install -y glibc-source mongodb-org | log
 checkPackageInstalled glibc-source mongodb-org-server
 
 echo "Enabling authorization" | log
