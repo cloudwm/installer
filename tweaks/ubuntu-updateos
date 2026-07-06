@@ -7,9 +7,23 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Updating and upgrading OS to latest kernel and packages" | log
+echo "Updating and upgrading OS packages (kernel held back)" | log
 export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
+
+# Hold the kernel meta-packages before upgrading. Pulling a new kernel here is
+# the root cause of two whole classes of install failures:
+#   1. Disk: ~180MB+ of kernel packages, doubled during extraction, overflows
+#      small root disks (seen on a 4.84GB disk) -> "No space left on device"
+#      mid-unpack -> broken apt (half-installed linux-headers) -> EVERY later
+#      app install fails on unmet dependencies (pure-ftpd, minecraft, ...).
+#   2. Reboot: a staged new kernel raises a "pending reboot" that the provisioning
+#      layer acts on (guest-shutdown), interrupting long installs (cPanel).
+# Kernel updates are left for deliberate maintenance: `apt-mark unhold linux-generic
+# linux-image-generic linux-headers-generic && apt upgrade` when disk+reboot are managed.
+KERNEL_METAS="linux-generic linux-image-generic linux-headers-generic"
+apt-mark hold $KERNEL_METAS | log
+
 apt update -qy | log
 apt upgrade -qy -o "Dpkg::Options::=--force-confdef" -o "Dpkg::Options::=--force-confold" | log
 apt autoclean -qy | log
