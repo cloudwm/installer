@@ -127,6 +127,24 @@ waitOrStop 0 "Failed to extract Kasm release"
 test -f /tmp/kasm_release/install.sh
 waitOrStop 0 "install.sh not found after extract"
 
+# Pre-install the kasmweb/sidecar docker plugin with retries. Kasm's install.sh
+# pulls it from Docker Hub with a single, non-retried `docker plugin install`;
+# on this network the intermittent TLS interception makes that pull time out
+# ("TLS handshake timeout" to registry-1.docker.io), which aborts the whole
+# install — and Kasm surfaces it as a misleading "incorrect privileges". By
+# installing it here first (same ref/name install.sh looks for:
+# kasmweb/sidecar:<ver>, no alias), install.sh finds it present and skips the pull.
+echo "Pre-installing kasmweb/sidecar docker plugin (with retries)" | log
+if ! docker plugin ls --format '{{.Name}}' | grep -q "^kasmweb/sidecar:${KASM_VERSION}"; then
+    for i in 1 2 3 4 5 6 7 8; do
+        docker plugin install --grant-all-permissions "kasmweb/sidecar:${KASM_VERSION}" && break
+        echo "sidecar plugin install attempt $i failed (transient TLS on Docker Hub?), retrying..." | log
+        sleep 15
+    done
+fi
+docker plugin ls --format '{{.Name}}' | grep -q "^kasmweb/sidecar:${KASM_VERSION}"
+waitOrStop 0 "Failed to install kasmweb/sidecar docker plugin"
+
 # Accept the EULA and run Kasm install.sh. Feed the y/y/y via a heredoc redirect
 # (NOT a pipe) so install.sh is the sole command and waitOrStop checks ITS exit.
 echo "Accepting the EULA and running Kasm installation script" | log
