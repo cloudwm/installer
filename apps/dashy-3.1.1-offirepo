@@ -109,7 +109,27 @@ waitOrStop 0 "Failed to restart Nginx"
 
 echo "Starting Dashy" | log
 cd ${appInstallDir}
-docker compose up -d
+
+# Docker was just installed; wait until the daemon actually accepts connections
+# before using it (on a freshly provisioned box it may not be ready after sleep 5).
+for i in $(seq 1 12); do
+    docker info >/dev/null 2>&1 && break
+    sleep 5
+done
+
+# Pull + start with retries. On the dev network the self-signed CA intermittently
+# intercepts HTTPS to Docker Hub (x509 errors), so a single transient pull failure
+# must not fail the whole install — retry a few times before giving up.
+started=0
+for attempt in 1 2 3 4 5; do
+    if docker compose up -d; then
+        started=1
+        break
+    fi
+    echo "docker compose up attempt ${attempt} failed; retrying in 15s" | log
+    sleep 15
+done
+[ "$started" = "1" ]
 waitOrStop 0 "Failed to start Dashy"
 
 

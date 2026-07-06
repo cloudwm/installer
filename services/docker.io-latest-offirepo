@@ -34,7 +34,28 @@ systemctl enable docker
 systemctl start docker
 
 echo "Verifying Docker installation" | log
-docker run hello-world | log
+# Wait for the daemon to actually accept connections before using it (it was just
+# started and may not be ready immediately on a freshly provisioned box).
+for i in $(seq 1 12); do
+    docker info >/dev/null 2>&1 && break
+    sleep 5
+done
+
+# Retry the smoke test: it pulls hello-world from Docker Hub, and on the dev
+# network the self-signed CA intermittently intercepts that HTTPS pull (x509),
+# so a single transient failure must not fail the whole install. Check docker's
+# real exit via PIPESTATUS (the `| log` pipe would otherwise mask it).
+verified=0
+for attempt in 1 2 3 4 5; do
+    docker run --rm hello-world | log
+    if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+        verified=1
+        break
+    fi
+    echo "Docker verification attempt ${attempt} failed; retrying in 15s" | log
+    sleep 15
+done
+[ "$verified" = "1" ]
 waitOrStop 0 "Docker verification failed"
 
 tagScript success
