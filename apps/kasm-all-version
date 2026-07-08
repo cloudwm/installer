@@ -157,6 +157,45 @@ if [ -z "${CWM_DOMAIN}" ]; then
     echo "CWM_DOMAIN was empty; derived ${CWM_DOMAIN} from ${PRIMARY_IP}" | log
 fi
 
+# Replace Kasm's self-signed cert (created by its own install.sh in
+# /opt/kasm/<ver>/certs/kasm_nginx.{crt,key}) with the Let's Encrypt cert obtained
+# earlier in the .conf by tweaks/nginx-letsencrypt-cert, so Kasm serves a trusted
+# cert on 443. Soft-fail: Kasm already has a working self-signed cert, so a missing
+# LE cert must not abort the whole install.
+echo "Installing Let's Encrypt certificate into Kasm" | log
+leDir=$(dirname "$(find /etc/letsencrypt/live -name fullchain.pem 2>/dev/null | head -n1)")
+[[ -z "${leDir}" || "${leDir}" == "." ]] && leDir="/etc/letsencrypt/live/${CWM_DOMAIN}"
+leCert="${leDir}/fullchain.pem"
+leKey="${leDir}/privkey.pem"
+kasmCrt=$(find /opt/kasm -name kasm_nginx.crt 2>/dev/null | head -n1)
+if [ -f "${leCert}" ] && [ -f "${leKey}" ] && [ -n "${kasmCrt}" ]; then
+    kasmCertDir=$(dirname "${kasmCrt}")
+    cp -f "${kasmCertDir}/kasm_nginx.crt" "${kasmCertDir}/kasm_nginx.crt.self-signed.bak" 2>/dev/null
+    cp -f "${kasmCertDir}/kasm_nginx.key" "${kasmCertDir}/kasm_nginx.key.self-signed.bak" 2>/dev/null
+    cp -f "${leCert}" "${kasmCertDir}/kasm_nginx.crt"
+    cp -f "${leKey}"  "${kasmCertDir}/kasm_nginx.key"
+
+    # LE certs renew every ~60 days; keep Kasm serving the fresh cert after renewal.
+    mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+    cat > /etc/letsencrypt/renewal-hooks/deploy/kasm-cert.sh <<EOF
+#!/bin/bash
+cp -f "${leCert}" "${kasmCertDir}/kasm_nginx.crt"
+cp -f "${leKey}"  "${kasmCertDir}/kasm_nginx.key"
+docker restart kasm_proxy 2>/dev/null
+EOF
+    chmod +x /etc/letsencrypt/renewal-hooks/deploy/kasm-cert.sh
+
+    # nginx (pulled in only for the certbot --standalone challenge) must not fight
+    # Kasm for :80/:443 on reboot.
+    systemctl disable --now nginx 2>/dev/null || true
+
+    echo "Restarting Kasm proxy to load the Let's Encrypt certificate" | log
+    docker restart kasm_proxy 2>/dev/null \
+        || { kasmBin="$(dirname "${kasmCertDir}")/bin"; [ -x "${kasmBin}/stop" ] && "${kasmBin}/stop"; [ -x "${kasmBin}/start" ] && "${kasmBin}/start"; }
+else
+    echo "No Let's Encrypt cert at ${leDir} (or Kasm cert dir missing); keeping Kasm's self-signed cert" | log 1
+fi
+
 # Publish the access URL and captured credentials via the system description file
 echo "Adding descriptions" | log
 descriptionAppend "Kasm Web Interface: https://${CWM_DOMAIN}"
