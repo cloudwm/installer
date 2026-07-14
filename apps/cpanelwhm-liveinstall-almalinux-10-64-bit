@@ -20,10 +20,14 @@ validate_environment() {
 
     [[ $EUID -eq 0 ]] || { echo "Must run as root, exiting (1)." | log 1; exit 1; }
 
+    # On a clean provision /usr/local/cpanel must NOT exist. If it does, a prior
+    # (typically reboot-interrupted) run left a dirty server: cPanel refuses to
+    # reinstall and cannot be repaired in place ("You must install cPanel & WHM
+    # on a clean server"). Fail loudly so the box is reprovisioned from a clean
+    # image, instead of reporting false success on a broken half-install.
     if [[ -d /usr/local/cpanel ]]; then
-        echo "cPanel already installed, nothing to do." | log
-        tagScript success
-        exit 0
+        echo "Found an existing cPanel install on a server that should be clean; cPanel cannot be reinstalled or repaired in place. Reprovision from a clean image. Exiting (1)." | log 1
+        exit 1
     fi
 
     [[ -f /etc/os-release ]] || { echo "Cannot detect OS, exiting (1)." | log 1; exit 1; }
@@ -75,8 +79,14 @@ prepare_system() {
     # reader dies immediately and the producer gets SIGPIPE (exit 141). Run them
     # directly so output goes to the console / their own logs. curl is omitted —
     # AlmaLinux ships curl-minimal, and pulling full curl can cause a conflict.
-    echo "Updating system and installing prerequisites..." | log
-    dnf -y update
+    # Do NOT upgrade the kernel here. cPanel's install runs uninterrupted for
+    # 30-50 min, but staging a new kernel raises a "pending reboot" that the
+    # provisioning layer then acts on (hypervisor guest-shutdown mid-install),
+    # which leaves cPanel half-installed and unrecoverable. Excluding kernel*
+    # removes that reboot trigger; cPanel does not need a newer kernel, and its
+    # own installer pulls whatever else it requires.
+    echo "Updating system and installing prerequisites (kernel held back to avoid a mid-install reboot)..." | log
+    dnf -y update --exclude=kernel*
     dnf -y install perl wget
     waitOrStop 0 "Failed to install prerequisites"
 }

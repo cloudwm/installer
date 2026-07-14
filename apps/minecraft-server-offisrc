@@ -12,11 +12,20 @@ echo "Creating directory and installing dependencies" | log
 mkdir -p $appPath
 ubuntu_version=$(lsb_release -rs)
 
+# Refresh package lists and clear any pre-existing broken/half-configured state
+# before installing. Provisioning often leaves an interrupted kernel-headers
+# upgrade ("linux-headers-* not going to be installed"), and stale lists make
+# version-pinned deps unresolvable — either one makes every apt install fail on
+# unmet dependencies. nmap is dropped: it was never used by this script and its
+# universe deps were the other half of that failure.
+apt-get update -q
+apt-get --fix-broken install -y
+
 if [[ "$ubuntu_version" == "24.04" ]]; then
-	installPackage openjdk-17-jre-headless screen default-jdk nmap | log	
+	installPackage openjdk-17-jre-headless screen default-jdk | log
 	waitOrStop 0 "Failed to install dependencies"
 else
-	installPackage openjdk-16-jre-headless screen default-jdk nmap | log
+	installPackage openjdk-16-jre-headless screen default-jdk | log
 	waitOrStop 0 "Failed to install dependencies"
 fi
 

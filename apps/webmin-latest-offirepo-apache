@@ -73,8 +73,23 @@ if openssl x509 -in "${LE_DIR}/fullchain.pem" -noout -issuer 2>/dev/null | grep 
     echo "WARNING: serving a self-signed certificate for ${CWM_DOMAIN} (Let's Encrypt fell back)" | log 1
 fi
 
+# Wait for Webmin's miniserv to actually be listening on 10000 before proxying to
+# it. A fresh `systemctl restart webmin` takes several seconds to bind, and the
+# check below otherwise races it — Apache can't reach the backend and returns 503.
+for i in $(seq 1 30); do
+    curl -sk -o /dev/null -m 5 https://localhost:10000/ && break
+    sleep 2
+done
+
 # End-to-end: the proxy must actually serve Webmin's login over 443 for this vhost.
-code=$(curl -sk -o /dev/null -w '%{http_code}' -m 10 -H "Host: ${CWM_DOMAIN}" https://localhost/)
+# Retry a few times so a slow-to-warm backend doesn't fail the whole install.
+code=000
+for attempt in 1 2 3 4 5; do
+    code=$(curl -sk -o /dev/null -w '%{http_code}' -m 10 -H "Host: ${CWM_DOMAIN}" https://localhost/)
+    case "$code" in 200|302|401) break ;; esac
+    echo "Webmin proxy not ready (HTTP $code), attempt ${attempt}/5; retrying in 5s" | log
+    sleep 5
+done
 case "$code" in
     200|302|401) echo "Webmin proxy reachable on https://${CWM_DOMAIN}/ (HTTP $code)" | log ;;
     *) echo "Webmin proxy check failed on https://${CWM_DOMAIN}/ (HTTP $code)" | log 1; exit 1 ;;

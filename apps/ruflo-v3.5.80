@@ -13,8 +13,20 @@ apt install -y curl ca-certificates gnupg
 waitOrStop 0 "Failed to install basic dependencies"
 
 echo "Configuring Node.js 20 repository" | log
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+# Download the setup script to a file first, then run it. Piping `curl | bash`
+# hides curl's exit code (bash sees only empty stdin and exits 0), so a failed
+# fetch — e.g. the dev network's intermittent TLS interception on
+# deb.nodesource.com — silently no-ops the repo. apt then installs Ubuntu's
+# distro nodejs, which does NOT ship npm, and "npm --version" later dies with 127.
+curlDownload https://deb.nodesource.com/setup_20.x
+waitOrStop 0 "Node.js 20 setup script not downloaded from official source"
+bash setup_20.x | log
 waitOrStop 0 "Failed to configure Node.js 20 repository"
+
+# Fail loudly if the NodeSource repo still isn't present, instead of silently
+# falling back to Ubuntu's npm-less distro nodejs.
+grep -rqs "deb.nodesource.com" /etc/apt/sources.list.d/ \
+    || { echo "NodeSource repo not configured; aborting to avoid npm-less distro nodejs" | log 1; exit 1; }
 
 echo "Installing Node.js and npm" | log
 apt update
