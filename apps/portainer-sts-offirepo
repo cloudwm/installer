@@ -23,20 +23,30 @@ sudo mkdir -p /opt/portainer/data
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
+# DB fix: Remove any BE-flagged database.
+echo "Ensuring clean Portainer database (removing any BE flag)..." | log
+rm -f /opt/portainer/data/portainer.db
+rm -rf /opt/portainer/data/backups
+
+echo "Writing admin password file" | log
+printf '%s' "$ADMINPASSWORD" > /opt/portainer/admin_password   # printf, not echo: no trailing newline
+chmod 600 /opt/portainer/admin_password
 
 # TLS is terminated by nginx (see reverse proxy below); Portainer serves plain HTTP on localhost only.
-echo "Creating Docker Compose file for Portainer (without initial password)" | log
+echo "Creating Docker Compose file for Portainer" | log
 cat << 'EOF' > /opt/portainer/docker-compose.yml
 services:
   portainer:
     image: portainer/portainer-ce:sts
     container_name: portainer
     restart: always
+    command: --admin-password-file /run/secrets/portainer_admin
     ports:
       - "127.0.0.1:9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
+      - /opt/portainer/admin_password:/run/secrets/portainer_admin:ro
 EOF
 
 echo "Generated docker-compose.yml:" | log
@@ -47,60 +57,31 @@ cd /opt/portainer
 docker compose up -d
 waitOrStop 0 "Failed to start Portainer services"
 
-echo "Waiting for Portainer to initialize (60 seconds)..." | log
-sleep 60
-
-echo "Setting up admin user via API..." | log
-# Initialize admin user through the API
-INIT_RESPONSE=$(curl -s -X POST http://127.0.0.1:9000/api/users/admin/init \
-  -H "Content-Type: application/json" \
-  -d "{\"Username\":\"admin\",\"Password\":\"${ADMINPASSWORD}\"}")
-
-if echo "$INIT_RESPONSE" | grep -q "admin"; then
-    echo "✅ Admin user initialized successfully via API" | log
-    ADMIN_CREATED=true
-else
-    echo "⚠️  API initialization response: $INIT_RESPONSE" | log
-    echo "Attempting alternative initialization method..." | log
-
-    # Alternative: Stop container, use helper, restart
-    docker compose down
+# ---- CHANGED: real verification loop instead of grep -q "admin" (which matched error bodies) ----
+echo "Waiting for Portainer and verifying admin login..." | log
+AUTH_BODY=$(jq -nc --arg u admin --arg p "$ADMINPASSWORD" '{Username:$u,Password:$p}')
+ADMIN_CREATED=false
+CODE=""
+for i in $(seq 1 36); do   # up to ~3 minutes
+    CODE=$(curl -s -o /tmp/auth.json -w '%{http_code}' \
+        -X POST http://127.0.0.1:9000/api/auth \
+        -H "Content-Type: application/json" -d "$AUTH_BODY" 2>/dev/null)
+    if [ "$CODE" = "200" ]; then
+        echo "✅ Admin login verified after $((i * 5))s" | log
+        ADMIN_CREATED=true
+        break
+    fi
     sleep 5
+done
 
-    # Generate bcrypt hash
-    ADMINPASSWORD_HASH=$(htpasswd -nbB admin "$ADMINPASSWORD" | cut -d: -f2)
-    echo "Generated password hash (length: ${#ADMINPASSWORD_HASH})" | log
-
-    # Create admin user file manually
-    cat > /tmp/init_admin.json << JSONEOF
-{
-  "Username": "admin",
-  "Password": "${ADMINPASSWORD_HASH}"
-}
-JSONEOF
-
-    # Use docker run with the hash as command argument
-    cat << 'EOFCOMPOSE' > /opt/portainer/docker-compose.yml
-services:
-  portainer:
-    image: portainer/portainer-ce:sts
-    container_name: portainer
-    restart: always
-    ports:
-      - "127.0.0.1:9000:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/portainer/data:/data
-EOFCOMPOSE
-
-    # Add the hashed password to the command
-    echo "    command: --admin-password '$ADMINPASSWORD_HASH'" >> /opt/portainer/docker-compose.yml
-
-    docker compose up -d
-    sleep 30
-    ADMIN_CREATED=true
+if [ "$ADMIN_CREATED" != true ]; then
+    echo "❌ Admin login failed (last HTTP ${CODE:-none})" | log
+    echo "Response body: $(cat /tmp/auth.json 2>/dev/null)" | log
+    echo "--- portainer container logs ---" | log
+    docker logs portainer 2>&1 | tail -n 40 | log
+    exit 1
 fi
-
+rm -f /tmp/auth.json
 
 echo "Configuring nginx reverse proxy for Portainer" | log
 NGINX_CONF="/etc/nginx/sites-available/portainer.conf"
@@ -153,4 +134,3 @@ descriptionAppend "Portainer data location: /opt/portainer/data"
 tagScript success
 
 exit 0
-
