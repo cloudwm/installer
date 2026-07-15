@@ -14,29 +14,50 @@ echo "Modifying hostname to fit max 64 chars requirement" | log
 savedHostname=$(hostname)
 hostnamectl set-hostname ${savedHostname::32}
 
-echo "Installing generic kernel packages (required by Zentyal)" | log
-# Zentyal's install pulls modules that need the running/generic kernel headers;
-# without these the install aborts. Do it quietly and non-interactively so it
-# never prompts (e.g. grub/menu.lst, restart-services) during the automated run.
+echo "Preparing system for the Zentyal installer" | log
+# The upstream zentyal_installer_8.0.sh runs under `set -e` and enforces a set of
+# pre-checks that each abort the whole run (installing NOTHING) on a headless CWM
+# host. All three below were observed to break the install on a real box:
+#
+#   1. TERM — the installer does `BOLD=$(tput bold)` at the very top. With no
+#      TERM, tput exits non-zero and `set -e` kills the installer immediately,
+#      before it does anything. Export a real TERM so tput succeeds.
+#   2. Held packages — CWM images ship the kernel on apt-hold. The installer's
+#      broken-package check flags EVERY non-"ii" package (a held package is
+#      "hi") as broken and exits. Un-hold everything first.
+#   3. Not up-to-date — the installer refuses to run while any package is
+#      upgradable. A plain dist-upgrade leaves phased updates (the kernel) held
+#      back, so force them in with Always-Include-Phased-Updates.
 export DEBIAN_FRONTEND=noninteractive
+export TERM=${TERM:-xterm}
+
+apt-mark showhold 2>/dev/null | xargs -r apt-mark unhold 2>&1 | log || true
 apt-get update -q 2>&1 | log || true
-apt-get install -y -q \
+apt-get -y -q \
+    -o APT::Get::Always-Include-Phased-Updates=true \
     -o Dpkg::Options::="--force-confdef" \
     -o Dpkg::Options::="--force-confold" \
-    linux-generic linux-image-generic linux-headers-generic 2>&1 | log || true
+    dist-upgrade 2>&1 | log || true
 
-echo "Installing Zentyal 8.0 with graphical environment" | log
-
-# Download and patch the installer to auto-confirm graphical environment
+echo "Installing Zentyal 8.0 (headless, no graphical environment)" | log
 wget https://raw.githubusercontent.com/zentyal/zentyal/master/extra/ubuntu_installers/zentyal_installer_8.0.sh
 chmod u+x zentyal_installer_8.0.sh
 
-# Patch the script: replace the prompt with default 'y'
-sed -i '/read ZEN_GUI/i\ZEN_GUI="n"' zentyal_installer_8.0.sh
-sed -i '/read ZEN_GUI/d' zentyal_installer_8.0.sh
+# Drive the installer non-interactively instead of sed-patching it. Its only
+# prompt is `read ZEN_GUI` ("install the Zentyal Graphical environment? (n|y)").
+# The old sed patch was fragile: any upstream layout shift left the `read` in
+# place and the whole provisioning run hung FOREVER on that prompt (the failure
+# we actually hit). Feeding "n" on stdin is layout-independent, and `yes` keeps
+# answering so a newly added prompt can never hang the run either.
+yes n | ./zentyal_installer_8.0.sh 2>&1 | log
 
-# Run the modified installer
-./zentyal_installer_8.0.sh
+# The installer masks its own exit through `| log`, so verify Zentyal really
+# installed and fail loudly rather than falling through to the webadmin/nginx
+# steps with nothing installed.
+zentyalInstalled=1
+dpkg-query -W -f='${db:Status-Abbrev}' zentyal-core 2>/dev/null | grep -q '^ii' && zentyalInstalled=0
+[ "${zentyalInstalled}" -eq 0 ]
+waitOrStop 0 "Zentyal failed to install (installer aborted a pre-check or hung on a prompt)"
 
 echo "Ensuring Zentyal webadmin is enabled and listening on 8443" | log
 # The webadmin (8443) is served by Zentyal's own nginx service,
