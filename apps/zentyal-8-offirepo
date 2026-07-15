@@ -27,6 +27,32 @@ sed -i '/read ZEN_GUI/d' zentyal_installer_8.0.sh
 # Run the modified installer
 ./zentyal_installer_8.0.sh
 
+echo "Ensuring Zentyal webadmin is enabled and listening on 8443" | log
+# The webadmin (8443) is served by Zentyal's own nginx service,
+# zentyal.webadmin-nginx, whose systemd unit has NO [Install] section — it is
+# never enabled to start on its own. The only thing that brings it up is the
+# oneshot zentyal.service (`zs start`), which starts the enabled modules with
+# webadmin last. If that boot service isn't enabled, the CWM provisioning reboot
+# comes up with nothing on 8443 and the reverse proxy below returns a bare
+# "502 Bad Gateway". Enable the boot service (so it survives the reboot) and
+# start webadmin now, then block until 8443 is really listening before we rely
+# on it — a fresh apt install often only exposes the webadmin after this start.
+systemctl enable zentyal.service 2>/dev/null || true
+zs start 2>&1 | log || true
+zs webadmin restart 2>&1 | log || systemctl restart zentyal.webadmin-nginx 2>&1 | log || true
+
+webadminUp=1
+for attempt in $(seq 1 30); do
+    echo "Waiting for Zentyal webadmin on 8443 (attempt ${attempt}/30)" | log
+    if ss -tln 2>/dev/null | grep -q ':8443'; then
+        webadminUp=0
+        break
+    fi
+    sleep 5
+done
+[ "${webadminUp}" -eq 0 ]
+waitOrStop 0 "Zentyal webadmin never came up on 8443 (reverse proxy would return 502)"
+
 echo "Creating admin user and disabling ssh login to admin" | log
 useradd admin -s /bin/bash -m -g users -G sudo
 chpasswd <<< "admin:${ADMINPASSWORD}"
