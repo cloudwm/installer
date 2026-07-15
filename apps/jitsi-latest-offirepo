@@ -22,13 +22,41 @@ echo 'deb https://download.jitsi.org stable/' | tee /etc/apt/sources.list.d/jits
 curlDownload https://download.jitsi.org/jitsi-key.gpg.key
 waitOrStop 0 "File not downloaded from official source"
 apt-key add jitsi-key.gpg.key
+
+# Prosody official repo. jitsi-meet-prosody depends on prosody >= 0.12, but
+# Ubuntu 22.04's universe only ships 0.11. Without this repo the dependency is
+# unsatisfiable, so `apt install jitsi-meet` aborts and NOTHING gets installed
+# (not even nginx) — the script then dies later trying to write vhosts into a
+# missing /etc/nginx. This repo provides prosody 13.x for jammy.
+echo "Adding Prosody repository" | log
+mkdir -p /etc/apt/keyrings
+curlDownload https://prosody.im/files/prosody-debian-packages.key
+waitOrStop 0 "Prosody signing key not downloaded from official source"
+install -m 0644 prosody-debian-packages.key /etc/apt/keyrings/prosody-debian-packages.key
+echo "deb [signed-by=/etc/apt/keyrings/prosody-debian-packages.key] http://packages.prosody.im/debian $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
+    | tee /etc/apt/sources.list.d/prosody.list
 apt update | log
+
+# Prosody 13 dropped Lua 5.1 support, and its /usr/bin/{prosody,prosodyctl}
+# run under `#!/usr/bin/env lua`. If lua5.1 is present it wins the `lua`
+# alternative (priority 110 vs lua5.4's 20), so prosody aborts with "no longer
+# compatible with Lua 5.1" and jitsi-meet-prosody's postinst fails mid-install.
+# Install lua5.4 and pin the interpreter to it (manual mode survives a later
+# lua5.1 pull-in) BEFORE installing jitsi-meet.
+echo "Pinning lua interpreter to 5.4 for Prosody" | log
+installPackage lua5.4
+update-alternatives --set lua-interpreter /usr/bin/lua5.4 2>&1 | log || true
 
 echo "Installing Jitsi" | log
 export DEBIAN_FRONTEND="noninteractive"
 echo "jitsi-videobridge jitsi-videobridge/jvb-hostname string jitsi.${CWM_DOMAIN}" | debconf-set-selections
 echo "jitsi-meet jitsi-meet/cert-choice select Self-signed certificate will be generated" | debconf-set-selections
 installPackage jitsi-meet
+
+# installPackage retries then continues silently; fail loudly here so we never
+# fall through to writing nginx vhosts into a non-existent /etc/nginx.
+dpkg-query -W -f='${Status}' jitsi-meet 2>/dev/null | grep -q "install ok installed"
+waitOrStop 0 "jitsi-meet failed to install (check apt/dpkg logs)"
 # Reload nginx only if the config tests clean, so a bad vhost can never take nginx down.
 reloadNginx() {
     nginx -t 2>&1 | log

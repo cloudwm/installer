@@ -46,7 +46,16 @@ npx --version
 waitOrStop 0 "npx command is not working"
 
 echo "Installing Ruflo ${RUFLO_VERSION}" | log
-curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=v${RUFLO_VERSION}
+# Two things the upstream install.sh gets wrong for our use:
+#   1. Version: npm has "3.5.80", not "v3.5.80". Passing the "v" prefix means npm
+#      can't match it and silently falls back to "latest" (currently 3.30.2), so
+#      the pin is ignored. Pass the bare version, matching the wrapper below.
+#   2. Init hang: by default the script finishes with `ruflo init --yes`, which
+#      scaffolds a project in the current dir and then never returns (the pipe
+#      never sees EOF), so `curl | bash` hangs forever and the install fails.
+#      We only need the CLI reachable via npx (the wrapper below does that), so
+#      --no-init skips the project scaffolding entirely.
+curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=${RUFLO_VERSION} --no-init
 waitOrStop 0 "Ruflo was not installed"
 
 echo "Creating Ruflo wrapper command" | log
