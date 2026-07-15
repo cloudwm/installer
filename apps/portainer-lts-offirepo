@@ -23,6 +23,10 @@ sudo mkdir -p /opt/portainer/data
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
+# DB fix: Remove any BE-flagged database 
+echo "Ensuring clean Portainer database (removing any BE flag)..." | log
+rm -f /opt/portainer/data/portainer.db
+rm -rf /opt/portainer/data/backups
 
 # TLS is terminated by nginx (see reverse proxy below); Portainer serves plain HTTP on localhost only.
 echo "Creating Docker Compose file for Portainer (without initial password)" | log
