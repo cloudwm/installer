@@ -9,7 +9,8 @@ fi
 kafkaVersion="4.0.1"
 scalaVersion="2.13"
 kafkaPackage="kafka_${scalaVersion}-${kafkaVersion}.tgz"
-kafkaDownloadUrl="https://downloads.apache.org/kafka/${kafkaVersion}/${kafkaPackage}"
+kafkaMirrorUrl="https://downloads.apache.org/kafka/${kafkaVersion}/${kafkaPackage}"
+kafkaArchiveUrl="https://archive.apache.org/dist/kafka/${kafkaVersion}/${kafkaPackage}"
 kafkaInstallDir="/opt/kafka"
 kafkaUser="kafka"
 kafkaGroup="kafka"
@@ -26,6 +27,14 @@ echo "Downloading Kafka ${kafkaVersion} binary" | log
 cd "${rootDir}/temp"
 installPackage curl tar openjdk-17-jre-headless
 waitOrStop 0 "Failed apt install: curl tar openjdk-17-jre-headless"
+# downloads.apache.org only carries current releases; once 4.0.1 is rotated out it
+# 404s there and lives on archive.apache.org instead. Prefer the mirror, fall back.
+if curl -sfI --max-redirs 5 --retry 3 --retry-connrefused -o /dev/null "${kafkaMirrorUrl}"; then
+    kafkaDownloadUrl="${kafkaMirrorUrl}"
+else
+    echo "Kafka ${kafkaVersion} not on downloads.apache.org, using archive" | log
+    kafkaDownloadUrl="${kafkaArchiveUrl}"
+fi
 curlDownload "${kafkaDownloadUrl}"
 waitOrStop 0 "Kafka tarball not downloaded"
 
