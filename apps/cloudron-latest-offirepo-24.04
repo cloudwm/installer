@@ -1,101 +1,164 @@
 #!/bin/bash
 
-
 if [ -f "include/startup.sh" ]; then
     . include/startup.sh
 elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+set -o pipefail
 
-updateAndFinalize() {
-    local rootDir="$1"
-    local CWM_DOMAIN="$2"
+if [ -z "$CWM_DOMAIN" ]; then
+    echo "Error: CWM_DOMAIN is empty. Cloudron's setup wizard needs a real hostname pointing at this VM." | log 1
+    exit 1
+fi
 
-    # Target directories and files
-    local html_target="/home/yellowtent/box/dashboard/dist/setupdns.html"
-	local setup_target="/home/yellowtent/box/dashboard/dist/setup.html"
-    local js_target_dir="/home/yellowtent/box/dashboard/dist/js"
-    local js_target="${js_target_dir}/setupdns.js"
+CLOUDRON_NGINX_CERT="/home/yellowtent/platformdata/nginx/cert/default.cert"
+CLOUDRON_NGINX_KEY="/home/yellowtent/platformdata/nginx/cert/default.key"
+LE_LIVE="/etc/letsencrypt/live/${CWM_DOMAIN}"
+LE_DEPLOY_HOOK="/etc/letsencrypt/renewal-hooks/deploy/cloudron-nginx.sh"
 
-    # Check every if the directories and files exist
-    while [[ ! -d "/home/yellowtent/box/dashboard/dist" || ! -d "$js_target_dir" ]]; do
-        sleep 2
-    done
+LE_OK=0
+if [ -f "${LE_LIVE}/fullchain.pem" ] && [ -f "${LE_LIVE}/privkey.pem" ]; then
+    if openssl x509 -in "${LE_LIVE}/fullchain.pem" -noout -issuer 2>/dev/null \
+            | grep -qi "Let's Encrypt"; then
+        LE_OK=1
+        echo "Real LE cert from tweak detected for ${CWM_DOMAIN}" | log
+    else
+        echo "Tweak produced a self-signed fallback at ${LE_LIVE}; keeping Cloudron's own default cert" | log
+    fi
+else
+    echo "Tweak did not produce cert files at ${LE_LIVE}; continuing without pre-staged TLS" | log
+fi
 
-    # Perform operations once the directories exist
-    echo "Cloud-Ron Directories found. Performing operations..." | log
+# The apache-letsencrypt-cert tweak installs and `systemctl enable`s apache2 (only
+# to obtain the cert via certbot --standalone). Cloudron ships its OWN nginx that
+# must own ports 80/443; an enabled apache2 squats port 80 on the next boot and
+# Cloudron's nginx can then never bind → no HTTPS. The cert files are already on
+# disk by now, so apache has done its job — stop and disable it for good.
+if systemctl list-unit-files apache2.service >/dev/null 2>&1; then
+    echo "Disabling apache2 so Cloudron's nginx can own ports 80/443" | log
+    systemctl disable --now apache2 2>&1 | log || true
+fi
 
-    # Replace placeholders in HTML and JS files
-	sed -i "s/example.com/${CWM_DOMAIN}/g" "$setup_target"
-    sed -i "s/example.com/${CWM_DOMAIN}/g" "$html_target"
-    sed -i "s/example.com/${CWM_DOMAIN}/g" "$js_target"
+# Ubuntu's unattended-upgrades + apt-daily{,-upgrade}.timer fire on first boot and
+# grab the dpkg lock, racing cloudron-setup's apt. cloudron-setup retries with
+# `pgrep -x "apt-get|apt|dpkg"`, which never matches the "unattended-upgr" process,
+# so it bails instantly and the install dies at "installing script dependencies".
+# Mask the timers/service for the duration, then wait out any run already holding
+# the lock. Re-enabled at the end of this script once Cloudron is up.
+echo "Disabling unattended-upgrades and apt-daily timers to free the dpkg lock" | log
+systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>&1 | log || true
+systemctl disable apt-daily.timer apt-daily-upgrade.timer 2>&1 | log || true
+systemctl mask apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>&1 | log || true
+systemctl stop unattended-upgrades.service 2>&1 | log || true
+# mask doesn't kill an already-running instance — wait (max 5 min) for the lock.
+for i in $(seq 1 60); do
+    fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || break
+    echo "Waiting for dpkg lock to be released (${i})..." | log
+    sleep 5
+done
 
-    echo "Setup DNS files have been updated." | log
-	
-	# Touchups
-	bash tweaks/motd-description-append
-	bash tweaks/cwm-description-autoconfig
-	
-	echo "Adding descriptions" | log
-	descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
-	descriptionAppend "SSL will be configured after the first step."
-	
-	# Cleanup
-	echo "Cleaning up..." | log
-	apt-get autoremove -y
-	apt-get autoclean -y
-	
-	tagScript success
-	exit 0
-}
-
-#clear
 echo "Downloading and installing CloudRon" | log
 curlDownload https://cloudron.io/cloudron-setup
 chmod u+x cloudron-setup
-
-# Run the Cloudron setup and tee the output to both stdout and the log file
-if [ ! -f "$LOG_PATH" ]; then
-	touch "$LOG_PATH"
-fi
 
 echo "Enabling and starting cron service..." | log
 systemctl enable cron
 systemctl start cron
 
-ubuntu_version=$(lsb_release -rs)
-if [[ "$ubuntu_version" == "24.04" ]]; then
-    echo "Adding shutdown cron job to root's crontab for Ubuntu 24..." | log
-    CRON_JOB="@reboot ( /sbin/shutdown now; crontab -l | grep -v '@reboot /sbin/shutdown now' | crontab - )"
-    (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
-    echo "Shutdown cron job added successfully. The system will shut down on next reboot." | log
-
-else
-    echo "This is not Ubuntu 24. Shutdown cron job will not be added." | log
+# If this VM has no public IPv6, reject outbound TCP/IPv6 so the wizard's
+# IPv6-first connection attempts fail in ms instead of timing out. Done via ufw
+# (already active here) so the rule persists across the provisioning reboot and
+# we never pull in iptables-persistent — which would interactively hang apt AND
+# remove ufw (ufw declares Breaks: iptables-persistent). Skipped on dual-stack.
+if ! ip -6 route show default 2>/dev/null | grep -q .; then
+    echo "No default IPv6 route detected; rejecting outbound TCP/IPv6 to speed up Cloudron setup wizard" | log
+    if command -v ufw >/dev/null 2>&1; then
+        ufw reject out proto tcp to ::/0 2>&1 | log
+    else
+        # ufw absent (unexpected) — runtime-only fallback, no package install.
+        ip6tables -C OUTPUT -p tcp -j REJECT --reject-with adm-prohibited 2>/dev/null \
+            || ip6tables -I OUTPUT -p tcp -j REJECT --reject-with adm-prohibited
+    fi
 fi
 
-# Wait for App dir and replace files
-echo "Starting listener for Cloud-Ron app dirs & DNS update..." | log
-updateAndFinalize "$rootDir" "${CWM_DOMAIN}" &
+echo "Running CloudRon setup (with --skip-reboot)..." | log
+# --skip-reboot is critical: without it, cloudron-setup runs `systemctl reboot`
+# at the end, which kills the cloudinit before it reaches its final `poweroff`.
+#
+# Do NOT pipe cloudron-setup straight into `log`: log mirrors every line to
+# /dev/ttyS0, and on a VM whose serial console errors (EIO on write) that `cat`
+# dies and SIGPIPEs back up the pipe — killing cloudron-setup (it runs
+# `set -o pipefail`) ~3s in, right after the apt step, so the install dies
+# silently. Redirect to a plain file (SIGPIPE-proof), then fold the captured
+# output into the dated log afterwards (best-effort, never fatal).
+CLOUDRON_STDOUT="${CWM_LOGDIR:-/root}/cloudron-setup.stdout.log"
+bash cloudron-setup --skip-reboot > "${CLOUDRON_STDOUT}" 2>&1
+rc=$?
+cat "${CLOUDRON_STDOUT}" 2>/dev/null | log || true
+if [ "$rc" -ne 0 ]; then
+    echo "cloudron-setup failed with exit $rc. Last 40 lines of /var/log/cloudron-setup.log:" | log 1
+    tail -n 40 /var/log/cloudron-setup.log 2>&1 | log 1
+    exit 1
+fi
 
-echo "Running CloudRon setup..." | log
-declare -a pre_display_list=()
-echo Y | bash cloudron-setup | while IFS= read -r line; do
-    # Check if the line contains "=>"
-    if [[ "$line" == *"=>"* ]]; then
-        # Process each line that contains "=>"
-        line=$(echo "$line" | sed -e 's/installer://g' -e 's/start://g' -e 's/"$//' -e 's/  \+.*//')
-        pre_display_list+=("$line")
-        #"$updateStatus" "$HTML_PATH" -cp
-        
-        for stage in "${pre_display_list[@]}"; do
-            # Clean and append dots to the output
-            cleaned_stage=$(echo "$stage" | sed 's/\.*$//')
-            final_stage="${cleaned_stage}..."
-            
-            # Update the installation landing page
-         #   "$updateStatus" "$HTML_PATH" -ap "${final_stage}"
-        done
+if [ "$LE_OK" = "1" ]; then
+    echo "Installing LE cert as Cloudron's default nginx cert" | log
+    cp -f "${LE_LIVE}/fullchain.pem" "${CLOUDRON_NGINX_CERT}"
+    cp -f "${LE_LIVE}/privkey.pem"   "${CLOUDRON_NGINX_KEY}"
+    chmod 644 "${CLOUDRON_NGINX_CERT}"
+    chmod 600 "${CLOUDRON_NGINX_KEY}"
+
+    # Switch certbot's renewal config from standalone (needed port 80 free,
+    # only true during install) to webroot, using the directory Cloudron's
+    # nginx default vhost serves /.well-known/acme-challenge/ from (see
+    # /etc/nginx/applications/default.conf in Cloudron). Without this, the
+    # twice-daily certbot.timer would fail because port 80 is bound by
+    # Cloudron's nginx.
+    RENEWAL_CONF="/etc/letsencrypt/renewal/${CWM_DOMAIN}.conf"
+    if [ -f "${RENEWAL_CONF}" ]; then
+        sed -i \
+            -e 's|^authenticator = standalone|authenticator = webroot|' \
+            -e '/^\[\[webroot_map\]\]/,$d' \
+            "${RENEWAL_CONF}"
+        printf '\n[[webroot_map]]\n%s = /home/yellowtent/platformdata/acme\n' "${CWM_DOMAIN}" >> "${RENEWAL_CONF}"
     fi
-done
+    # Certbot's systemd timer renews certs every ~60 days. This deploy hook
+    # fires after a successful renewal and copies the new cert into Cloudron's
+    # nginx cert path, then reloads nginx so the new bytes are served.
+    mkdir -p "$(dirname "${LE_DEPLOY_HOOK}")"
+    cat > "${LE_DEPLOY_HOOK}" <<HOOK
+#!/bin/bash
+set -e
+if [[ ":\${RENEWED_LINEAGE}:" != *":/etc/letsencrypt/live/${CWM_DOMAIN}:"* ]]; then
+    exit 0
+fi
+cp -f "\${RENEWED_LINEAGE}/fullchain.pem" "${CLOUDRON_NGINX_CERT}"
+cp -f "\${RENEWED_LINEAGE}/privkey.pem"   "${CLOUDRON_NGINX_KEY}"
+chmod 644 "${CLOUDRON_NGINX_CERT}"
+chmod 600 "${CLOUDRON_NGINX_KEY}"
+nginx -s reload
+HOOK
+    chmod +x "${LE_DEPLOY_HOOK}"
+    nginx -s reload 2>&1 | log || systemctl reload nginx 2>&1 | log
+fi
+
+echo "Adding descriptions" | log
+descriptionAppend "CloudRon Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Open the URL in your browser and complete the setup wizard."
+if [ "$LE_OK" = "1" ]; then
+    descriptionAppend "TLS: Let's Encrypt cert installed at install time (auto-renews via certbot.timer)."
+else
+    descriptionAppend "TLS: self-signed during install. Cloudron will issue an LE cert after you complete the wizard."
+fi
+
+# Restore Ubuntu's automatic security upgrades now that Cloudron is installed
+# (disabled earlier to keep the dpkg lock free during cloudron-setup).
+echo "Re-enabling unattended-upgrades and apt-daily timers" | log
+systemctl unmask apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>&1 | log || true
+systemctl enable --now apt-daily.timer apt-daily-upgrade.timer 2>&1 | log || true
+systemctl enable unattended-upgrades.service 2>&1 | log || true
+
+tagScript success
+exit 0

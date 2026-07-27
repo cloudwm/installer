@@ -6,15 +6,40 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-appVersion=5:20.10.\*
-
-echo "Downloading docker repository and key" | log
-curlDownload https://download.docker.com/linux/ubuntu/gpg
+echo "Setting up Docker repository and key" | log
+mkdir -p /etc/apt/keyrings
+# Retry the key download: TLS interception on this network is intermittent, so a
+# failed attempt (curl exit 60) often succeeds on a later try via a clean path.
+# Note: curl's own --retry does NOT cover cert errors (60), so we loop explicitly.
+for i in 1 2 3 4 5; do
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/docker.gpg && break
+    echo "Docker key download attempt $i failed (transient TLS?), retrying..." | log
+    sleep 15
+done
+test -s /tmp/docker.gpg
 waitOrStop 0 "Key not downloaded from official source"
-apt-key add gpg
+gpg --dearmor -o /etc/apt/keyrings/docker.gpg < /tmp/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+rm -f /tmp/docker.gpg
+test -s /etc/apt/keyrings/docker.gpg
+waitOrStop 0 "Docker keyring is empty (key import failed)"
 
-add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable edge"
-waitOrStop 0 "Repository not added"
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# apt-get update fetches the docker InRelease over HTTPS too, so the same
+# intermittent TLS interception can make apt silently skip the docker repo while
+# still exiting 0. Don't trust the exit code — loop until docker-ce actually has
+# an install candidate.
+for i in 1 2 3 4 5; do
+    apt-get update
+    if apt-cache policy docker-ce | grep -qE 'Candidate: [0-9]'; then break; fi
+    echo "docker-ce has no candidate yet (transient TLS on repo fetch?), retrying update..." | log
+    sleep 15
+done
+if ! apt-cache policy docker-ce | grep -qE 'Candidate: [0-9]'; then
+    echo "Docker repo metadata not available (docker-ce has no install candidate)" | log 1
+    exit 1
+fi
 
 echo "Install docker-ce" | log
 cat > /usr/sbin/policy-rc.d <<EOF
@@ -23,7 +48,7 @@ exit 101
 EOF
 chmod a+x /usr/sbin/policy-rc.d
 
-apt-get install -y docker-ce=$appVersion
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 checkPackageInstalled docker-ce
 
 rm -f /usr/sbin/policy-rc.d

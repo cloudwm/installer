@@ -10,7 +10,77 @@ echo "Downloading and installing EasyPanel" | log
 curl -sSL https://get.easypanel.io | sh
 waitOrStop 0 "Failed to install EasyPanel"
 
-descriptionAppend "EasyPanel Web UI: http://${CWM_DISPLAYED_ADDRESS}:3000"
+# The curl|sh installer returns as soon as `docker stack deploy` accepts the
+# spec, but EasyPanel's containers take 30-60s to finish initializing — and
+# during that window EasyPanel writes its own Traefik config, overwriting
+# anything we put there too early. Wait until the easypanel container has
+# been serving HTTP for at least 10s before patching.
+echo "Waiting for EasyPanel to finish initializing..." | log
+for i in $(seq 1 60); do
+    if curl -sf http://127.0.0.1:3000/ >/dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+sleep 15  # let EasyPanel finish writing its own Traefik config
 
-exit 0 
+# Scale EasyPanel's Traefik to 0 so nginx can own host 80/443.
+# Service publishes 80/443 in mode=host, so --publish-rm is unreliable;
+# scaling to 0 is idempotent and Raft-persisted (survives reboots).
+# Service name is "easypanel-traefik" (hyphen) — EasyPanel deploys services
+# directly, not via docker stack, so there's no "<stack>_<service>" prefix.
+echo "Scaling easypanel-traefik to 0 replicas" | log
+for i in $(seq 1 30); do
+    docker service inspect easypanel-traefik >/dev/null 2>&1 && break
+    sleep 2
+done
+docker service scale easypanel-traefik=0 2>&1 | log
+waitOrStop 0 "Failed to scale easypanel-traefik to 0"
 
+# Belt-and-suspenders: confirm the host ports are actually free before
+# nginx tries to bind them. `service scale` returns after Swarm converges,
+# but the kernel can take an extra moment to release the listening socket.
+for i in $(seq 1 30); do
+    ss -tlnp 2>/dev/null | grep -qE ':(80|443)\s' || break
+    sleep 1
+done
+
+# Nginx vhost: terminate SSL on 443, proxy to EasyPanel on :3000.
+# WebSocket upgrade headers are mandatory — EasyPanel uses WS for live logs / terminal.
+cat << EOF > /etc/nginx/sites-available/easypanel
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/easypanel /etc/nginx/sites-enabled/easypanel
+rm -f /etc/nginx/sites-enabled/default
+nginx -t 2>&1 | log
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx for EasyPanel"
+
+descriptionAppend "EasyPanel WebUI: https://${CWM_DOMAIN}/"
+descriptionAppend "On first visit you'll be asked to create an admin account."
+descriptionAppend " "
+
+exit 0

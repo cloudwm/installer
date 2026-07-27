@@ -50,10 +50,12 @@ if [[ "$ubuntu_version" == "24.04" ]]; then
 	sed -i 's/image: passbolt\/passbolt:3.0.1-ce/image: passbolt\/passbolt:latest-ce/' docker-compose.yml
 	sed -i 's/env\/mysql.env/dev\/env\/mysql.env/' docker-compose.yml
 	sed -i 's/env\/passbolt.env/dev\/env\/passbolt.env/' docker-compose.yml
-	if [[ ! -f /etc/letsencrypt/live/${CWM_DISPLAYED_ADDRESS}/cert.pem ]]; then
-		sed -i 's/cert\.pem/fullchain\.pem/g' conf/passbolt.conf
-		sed -i 's/cert\.pem/fullchain\.pem/g' docker-compose.yml
-	fi
+	# Always reference fullchain.pem: it exists for both a real LE cert and the
+	# self-signed fallback (enable-ssl only ever creates fullchain.pem/privkey.pem),
+	# whereas cert.pem exists only on certbot success. A missing cert.pem source
+	# makes Docker create a stray directory at the mount target and nginx dies.
+	sed -i 's/cert\.pem/fullchain\.pem/g' /opt/passbolt/conf/passbolt.conf
+	sed -i 's/cert\.pem/fullchain\.pem/g' /opt/passbolt/docker-compose.yml
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
 	docker-compose up -d
@@ -75,6 +77,11 @@ else
 	cp $rootDir/tweaks/extras/passbolt/docker-compose.yml /opt/passbolt/
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/conf/passbolt.conf
 	sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /opt/passbolt/docker-compose.yml
+	# Always reference fullchain.pem (see 24.04 branch above): cert.pem is absent
+	# on the self-signed fallback, which makes Docker mount a stray directory and
+	# kills the container's nginx.
+	sed -i 's/cert\.pem/fullchain\.pem/g' /opt/passbolt/conf/passbolt.conf
+	sed -i 's/cert\.pem/fullchain\.pem/g' /opt/passbolt/docker-compose.yml
 	docker-compose up -d
 	waitOrStop 0 "Failed docker-compose"
 fi
@@ -111,6 +118,22 @@ echo "adding descriptions" | log
 descriptionAppend "PassBolt initial configuration link: ${initialurl}"
 descriptionAppend "PassBolt UI: https://${CWM_DOMAIN}"
 descriptionAppend "PassBolt configuration files: /var/www/passbolt/"
+
+# Verify the container web server actually serves HTTPS before declaring success.
+# The PHP register_user step above succeeds independently of nginx, so without
+# this check a dead in-container nginx (e.g. a bad cert mount) would false-positive.
+echo "Verifying Passbolt HTTPS is responding" | log
+ok=0
+for i in $(seq 1 30); do
+	code=$(curl -k -s -o /dev/null -w '%{http_code}' https://127.0.0.1/ 2>/dev/null)
+	if [[ "$code" =~ ^(200|302)$ ]]; then ok=1; break; fi
+	sleep 5
+done
+if [[ $ok -ne 1 ]]; then
+	echo "Passbolt HTTPS not serving on 443 (last code: ${code:-none})" | log 1
+	docker logs --tail 30 ${containerName} 2>&1 | log 1
+	exit 1
+fi
 
 tagScript success
 

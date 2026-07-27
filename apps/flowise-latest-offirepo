@@ -8,6 +8,17 @@ fi
 
 appPath=/var/flowise
 rootDir=$(rootDir)
+MIN_FREE_GB=10
+
+echo "Checking free disk on /var/lib/docker volume" | log
+mkdir -p /var/lib/docker
+freeGB=$(df -BG --output=avail /var/lib/docker | tail -1 | tr -dc '0-9')
+if [ -z "$freeGB" ] || [ "$freeGB" -lt "$MIN_FREE_GB" ]; then
+    df -h /var/lib/docker | log
+    echo "ERROR: Less than ${MIN_FREE_GB} GB free on the volume hosting /var/lib/docker. Flowise's Docker image (~1 GB compressed, ~3 GB on disk) cannot be pulled. Provision a VM with at least 20 GB root disk." | log 1
+    exit 1
+fi
+echo "Free disk OK (${freeGB} GB)" | log
 
 echo "Installing Docker dependencies" | log
 installPackage curl git
@@ -18,10 +29,6 @@ curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
 waitOrStop 0 "Failed to install Docker"
 
-echo "Installing Docker Compose" | log
-apt-get install docker-compose -y
-waitOrStop 0 "Failed to install Docker Compose"
-
 echo "Cloning Flowise repository" | log
 git clone https://github.com/FlowiseAI/Flowise.git $appPath
 waitOrStop 0 "Failed to clone Flowise repository"
@@ -30,6 +37,12 @@ cd $appPath/docker
 cp .env.example .env
 sed -i "s|^FLOWISE_USERNAME=.*|FLOWISE_USERNAME=${ADMINEMAIL}|" .env
 sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
+# Flowise's docker-compose.yml forwards LOG_PATH unconditionally; with no value
+# the container does mkdirSync('') and crash-loops. Mount /var/log/flowise so
+# logs land on the host and survive container recreation.
+mkdir -p /var/log/flowise
+sed -i "s|^# LOG_PATH=.*|LOG_PATH=/var/log/flowise|" .env
+sed -i "/- ~\/.flowise:\/root\/.flowise/a\            - /var/log/flowise:/var/log/flowise" docker-compose.yml
 chown -R root:root $appPath
 chmod -R 755 $appPath
 
@@ -40,36 +53,52 @@ waitOrStop 0 "Failed to start Flowise with Docker Compose"
 echo "Adding Flowise port to ufw" | log
 ufw allow 3000
 
-echo "Installing Nginx for reverse proxy" | log
-installPackage nginx
-waitOrStop 0 "Failed to install Nginx"
-
-echo "Configuring Nginx for Flowise" | log
+echo "Configuring Nginx for Flowise (HTTPS)" | log
+# nginx + LE cert provided by tweaks/nginx-letsencrypt-cert (run earlier in
+# the contrib). Certs at /etc/letsencrypt/live/${CWM_DOMAIN}/{fullchain,privkey}.pem.
 cat << EOF > /etc/nginx/sites-available/flowise
 server {
     listen 80;
+    listen [::]:80;
     server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
     }
 }
 EOF
 ln -sf /etc/nginx/sites-available/flowise /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
 nginx -t
 waitOrStop 0 "Nginx configuration test failed"
+systemctl enable nginx
 systemctl restart nginx
 waitOrStop 0 "Failed to restart Nginx"
-echo "Adding Nginx port to ufw" | log
+echo "Adding Nginx ports to ufw" | log
 ufw allow 80
+ufw allow 443
 
 echo "Adding descriptions" | log
 descriptionAppend "Flowise is installed and running with Docker."
 descriptionAppend "Flowise repository directory: $appPath"
-descriptionAppend "Flowise Web UI: http://${CWM_DOMAIN}/"
+descriptionAppend "Flowise Web UI: https://${CWM_DOMAIN}/"
 descriptionAppend "To stop Flowise: cd $appPath/docker && docker compose down"
 descriptionAppend "To start Flowise: cd $appPath/docker && docker compose up -d"
 descriptionAppend "Flowise logs: cd $appPath/docker && docker compose logs -f"

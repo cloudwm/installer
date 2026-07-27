@@ -6,10 +6,12 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+checkTagExist ubuntu-updateos.success
+
 rootDir=$(rootDir)
 
 echo "Installing php8.5 modules for laravel" | log
-packages=(zip unzip php8.5-pear libapache2-mod-php8.5 php8.5-ctype php8.5-curl php8.5-dom php8.5-fileinfo php8.5-mbstring php8.5-openssl php8.5-pdo php8.5-tokenizer php8.5-xml)
+packages=(zip unzip php8.5-pear php8.5-ctype php8.5-curl php8.5-dom php8.5-fileinfo php8.5-mbstring php8.5-mysql php8.5-openssl php8.5-pdo php8.5-tokenizer php8.5-xml)
 installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
@@ -17,7 +19,7 @@ echo "Installing composer" | log
 cd /var/www/
 curlDownload https://getcomposer.org/installer
 waitOrStop 0 "File not downloaded from official source"
-export COMPOSER_HOME="$HOME/.config/composer";
+export COMPOSER_HOME="$HOME/.config/composer"
 /usr/bin/php /var/www/installer >> /var/www/phpinstaller.txt
 mv composer.phar /usr/local/bin/composer
 chmod +x /usr/local/bin/composer
@@ -30,7 +32,7 @@ export DEBIAN_FRONTEND=noninteractive
 composer install
 sleep 5
 
-echo "adding SQL port to UFW" | log
+echo "Adding SQL port to UFW" | log
 ufw allow 3306
 
 echo "Granting Permissions" | log
@@ -40,8 +42,43 @@ chown -R www-data.www-data /var/www/laravel
 chmod -R 755 /var/www/laravel
 chmod -R 777 /var/www/laravel/storage
 
-echo "Generating ecryption key" | log
+echo "Generating encryption key" | log
 php artisan key:generate
+
+echo "Installing MySQL server (Ubuntu native package — stable on 24.04)" | log
+# Install MySQL from Ubuntu's own repo, NOT the mysql.com APT repo: that repo is
+# pinned to 'bionic' and pulls libs that don't exist on 24.04 (noble), so
+# `apt install mysql-server` fails with unmet dependencies. Ubuntu's own
+# mysql-server (8.0) needs no third-party repo and installs cleanly.
+# Defensive: if an earlier step left the broken mysql.com repo behind, drop it
+# first so it can't poison dependency resolution here.
+if [ -f /etc/apt/sources.list.d/mysql.list ]; then
+    rm -f /etc/apt/sources.list.d/mysql.list
+    apt update
+fi
+installPackage mysql-server
+waitOrStop 0 "Failed apt install: mysql-server"
+systemctl enable --now mysql
+waitOrStop 0 "Failed to start mysql service"
+
+# Fresh Ubuntu mysql-server authenticates root via the unix socket (no password).
+# We run as root, so connect over the socket to set a password, then write a
+# ~/.my.cnf so the DB-creation step below (and later CLI work) can authenticate.
+# Skip if ~/.my.cnf already exists (a separate mysql service already configured it).
+if [ ! -f /root/.my.cnf ]; then
+    echo "Setting MySQL root password" | log
+    mysql <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINPASSWORD}';
+FLUSH PRIVILEGES;
+EOF
+    waitOrStop 0 "Failed to set MySQL root password"
+    cat << MYCNF > /root/.my.cnf
+[client]
+user=root
+password='${ADMINPASSWORD}'
+MYCNF
+    chmod 600 /root/.my.cnf
+fi
 
 echo "Creating Laravel Database and User" | log
 mysql --defaults-file=/root/.my.cnf -h localhost <<EOF
@@ -51,19 +88,56 @@ GRANT all privileges on laraveldb.* to laraveluser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
-echo "Setting enviroment and VirtualHost" | log
+echo "Setting environment and VirtualHost" | log
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /var/www/laravel/.env
 sed -i "s/ADMINPASS/${ADMINPASSWORD}/g" /var/www/laravel/.env
-unlink /etc/apache2/sites-enabled/000-default.conf
-unlink /etc/apache2/sites-enabled/default-ssl.conf
-cp $rootDir/tweaks/extras/laravel/laravel.conf /etc/apache2/sites-available/laravel.conf
-sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/laravel.conf
-ln -s /etc/apache2/sites-available/laravel.conf /etc/apache2/sites-enabled/
 
-echo "Enabling Laravel VirtualHost & Restarting Apache" | log
+cat << EOF > /etc/apache2/sites-available/laravel.conf
+<VirtualHost *:80>
+    ServerName ${CWM_DOMAIN}
+    Redirect permanent / https://${CWM_DOMAIN}/
+</VirtualHost>
+
+<IfModule mod_ssl.c>
+    <VirtualHost *:443>
+        ServerName ${CWM_DOMAIN}
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/laravel/public
+
+        SSLEngine on
+        SSLCertificateFile    /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem
+        SSLCertificateKeyFile /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem
+
+        <Directory /var/www/laravel/public>
+            Options FollowSymLinks
+            AllowOverride All
+            Require all granted
+        </Directory>
+
+        <FilesMatch \.php\$>
+            SetHandler "proxy:fcgi://127.0.0.1:9000"
+        </FilesMatch>
+
+        ErrorLog \${APACHE_LOG_DIR}/laravel-error.log
+        CustomLog \${APACHE_LOG_DIR}/laravel-access.log combined
+    </VirtualHost>
+</IfModule>
+EOF
+
+rm -f /etc/apache2/sites-enabled/000-default.conf
+rm -f /etc/apache2/sites-enabled/default-ssl.conf
+# 24.04 has no mod_fastcgi package; proxy_fcgi is the modern handler and needs
+# mod_proxy enabled explicitly. (Dropped the non-existent 'fastcgi' module, which
+# made a2enmod error out.)
+a2enmod ssl rewrite proxy proxy_fcgi
 a2ensite laravel.conf
-a2enmod ssl
-service apache2 restart
+
+echo "Starting and enabling Apache" | log
+systemctl enable apache2
+systemctl start apache2
+apache2ctl configtest
+waitOrStop 0 "Apache config test failed"
+systemctl restart apache2
 waitOrStop 0 "Failed to restart Apache"
 
 echo "Adding descriptions" | log
@@ -73,6 +147,14 @@ descriptionAppend "Laravel Database User: laraveluser"
 descriptionAppend "Laravel Database Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 
+# Return to the installer dir before tagging: tag()/tagScript() recompute rootDir
+# from the current dir, and we are still in /var/www/laravel from the steps above,
+# where that lookup fails and the tags would be written to the wrong place (the
+# log still prints "Tagging ..." regardless, which hides the problem).
+cd "$rootDir"
+tag apache2.success
+tag httpd.success
+tag laravel.success
 tagScript success
 
 exit 0

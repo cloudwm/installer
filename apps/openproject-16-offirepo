@@ -9,9 +9,6 @@ fi
 
 rootDir=$(rootDir)
 
-mv /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem /etc/letsencrypt/live/${CWM_DOMAIN}/cert.pem
-sed -i "s|SSLCACertificateFile|#SSLCACertificateFile|" /etc/openproject/addons/apache2/includes/vhost/ssl_ca.conf
-
 # Install dependencies for repository access
 echo "Installing dependencies for repository access" | log
 installPackage apt-transport-https ca-certificates wget gpg
@@ -35,6 +32,14 @@ echo "Updating and installing OpenProject" | log
 apt-get update
 installPackage openproject
 waitOrStop 0 "Failed to install OpenProject"
+
+# Ensure the cert files referenced by installer.dat exist.
+# Let's Encrypt produces cert.pem/chain.pem/fullchain.pem/privkey.pem, but the
+# self-signed fallback only produces fullchain.pem + privkey.pem. Synthesize the
+# missing files so `openproject configure` doesn't fail on a missing ssl_ca/ssl_cert.
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+[ -f "${LE_DIR}/cert.pem" ]  || cp "${LE_DIR}/fullchain.pem" "${LE_DIR}/cert.pem"
+[ -f "${LE_DIR}/chain.pem" ] || cp "${LE_DIR}/cert.pem" "${LE_DIR}/chain.pem"
 
 # Configure OpenProject
 echo "Setting installation variables and configuring OpenProject" | log

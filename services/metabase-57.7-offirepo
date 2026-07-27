@@ -11,7 +11,17 @@ echo "Installing Docker and dependencies" | log
 export DEBIAN_FRONTEND="noninteractive"
 sudo apt update
 sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release openssl net-tools apache2-utils jq
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+for i in 1 2 3 4 5; do
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/docker.gpg && break
+    echo "Docker key download attempt $i failed (transient TLS?), retrying..." | log
+    sleep 15
+done
+test -s /tmp/docker.gpg
+waitOrStop 0 "Docker key not downloaded"
+sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg < /tmp/docker.gpg
+rm -f /tmp/docker.gpg
+test -s /usr/share/keyrings/docker-archive-keyring.gpg
+waitOrStop 0 "Docker keyring is empty (key download failed)"
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
@@ -43,7 +53,7 @@ echo "Creating Docker Compose file for Metabase" | log
 cat << EOF > ${appInstallDir}/docker-compose.yml
 services:
   metabase:
-    image: metabase/metabase:v0.57.7.x
+    image: metabase/metabase:v0.57.7
     container_name: metabase
     restart: always
     ports:
@@ -102,8 +112,18 @@ waitOrStop 0 "Failed to configure Nginx proxy"
 
 echo "Starting Metabase services" | log
 cd ${appInstallDir}
-docker compose up -d
-waitOrStop 0 "Failed to start Metabase services"
+# Pull first so an image/tag problem fails here with a clear reason instead of a
+# bare exit 1 from 'up'. tee writes to a real file (no SIGPIPE on hosts without
+# /dev/ttyS0), so the error is preserved for diagnosis.
+docker compose pull 2>&1 | tee /var/log/metabase-compose.log
+pullRc=${PIPESTATUS[0]}
+docker compose up -d 2>&1 | tee -a /var/log/metabase-compose.log
+upRc=${PIPESTATUS[0]}
+if [[ $pullRc -ne 0 || $upRc -ne 0 ]]; then
+    echo "Failed to start Metabase services. Last lines of the compose log:" | log 1
+    tail -n 30 /var/log/metabase-compose.log 2>/dev/null | log 1
+    exit 1
+fi
 
 echo "Adding descriptions" | log
 descriptionAppend "Metabase Web Interface: https://${CWM_DOMAIN}/"

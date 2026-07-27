@@ -56,6 +56,10 @@ fi
 echo "Creating nginx configurations" | log
 cp -f $rootDir/tweaks/extras/moodle-nginx/moodle.conf /etc/nginx/sites-available/
 sed -i "s#DOMAIN#${CWM_DOMAIN}#g" /etc/nginx/sites-available/moodle.conf
+# This contrib uses tweaks/nginx-letsencrypt-cert, which writes real
+# fullchain.pem/privkey.pem under /etc/letsencrypt/live/${CWM_DOMAIN}/ (LE or
+# self-signed). Those are exactly the paths the moodle.conf template already
+# references, so no cert-path rewriting is needed here.
 ln -s /etc/nginx/sites-available/moodle.conf /etc/nginx/sites-enabled/
 unlink /etc/nginx/sites-enabled/default
 unlink /etc/nginx/sites-enabled/default-ssl

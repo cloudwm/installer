@@ -7,12 +7,26 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 echo "Adding official repository packages to apt" | log
+# Fetch the current MySQL signing key (the 2023 key; the old 8C71... key expired)
+# into a keyring file, with retry + verification so a silent download failure
+# can't leave an unsigned repo.
+for i in 1 2 3; do
+    curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 -o /tmp/mysql.key && break
+    echo "MySQL key download attempt $i failed, retrying..." | log
+    sleep 15
+done
+test -s /tmp/mysql.key
+waitOrStop 0 "MySQL GPG key download failed"
+gpg --dearmor -o /usr/share/keyrings/mysql.gpg < /tmp/mysql.key
+rm -f /tmp/mysql.key
+test -s /usr/share/keyrings/mysql.gpg
+waitOrStop 0 "MySQL keyring is empty (key import failed)"
+
+distro=$(lsb_release -cs)
 cat << EOF > /etc/apt/sources.list.d/mysql.list
-deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-apt-config
-deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-8.0
-deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-tools
+deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/ubuntu/ ${distro} mysql-8.0
+deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/ubuntu/ ${distro} mysql-tools
 EOF
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8C718D3B5072E1F5
 
 echo "Installing mysql from apt" | log
 export DEBIAN_FRONTEND="noninteractive"

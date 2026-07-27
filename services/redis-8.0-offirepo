@@ -51,6 +51,63 @@ descriptionAppend "Redis Port: 6379"
 descriptionAppend "Redis Configuration: /etc/redis/redis.conf"
 descriptionAppend " "
 
+# Install a dynamic MOTD fragment that prints Redis connection details on login.
+# Reading the config at login time (not install time) means it reflects the
+# final state after later tweaks (bind-on-all, password) and any post-install
+# password rotation.
+echo "Installing Redis MOTD fragment" | log
+cat > /etc/update-motd.d/99-redis <<'MOTD_EOF'
+#!/bin/sh
+CONF=/etc/redis/redis.conf
+[ -r "$CONF" ] || exit 0
+
+REDIS_VERSION=$(redis-server --version 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i ~ /^v=/){sub("v=","",$i); print $i; exit}}')
+REDIS_BIND=$(awk '/^bind / {$1=""; sub(/^ /,""); print; exit}' "$CONF")
+REDIS_PORT=$(awk '/^port / {print $2; exit}' "$CONF")
+REDIS_PASS=$(awk '/^requirepass / {print $2; exit}' "$CONF")
+ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
+PORT=${REDIS_PORT:-6379}
+
+if [ -n "$REDIS_PASS" ]; then
+    AUTH_LINE="    Password:   $REDIS_PASS"
+    CLI_LINE="    redis-cli -h $ADDR -p $PORT -a '$REDIS_PASS'"
+else
+    AUTH_LINE="    Password:   (none)"
+    CLI_LINE="    redis-cli -h $ADDR -p $PORT"
+fi
+
+cat <<EOM
+
+──────────────────────────────────────────────
+  Redis Server
+──────────────────────────────────────────────
+
+    Version:    ${REDIS_VERSION:-unknown}
+    Bind:       ${REDIS_BIND:-unknown}
+    Port:       $PORT
+    Address:    $ADDR
+$AUTH_LINE
+
+    Config:     /etc/redis/redis.conf
+    Log:        /var/log/redis/redis-server.log
+    Data dir:   /var/lib/redis
+
+  Connect:
+$CLI_LINE
+
+  Manage:
+    systemctl status  redis-server
+    systemctl restart redis-server
+    journalctl -u redis-server -f
+
+  Remove this banner:
+    chmod -x /etc/update-motd.d/99-redis
+──────────────────────────────────────────────
+
+EOM
+MOTD_EOF
+chmod +x /etc/update-motd.d/99-redis
+
 tag redis.success
 tagScript success
 

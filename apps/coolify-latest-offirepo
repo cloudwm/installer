@@ -10,6 +10,40 @@ echo "Downloading and installing Coolify" | log
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 waitOrStop 0 "Failed to install Coolify"
 
-descriptionAppend "Coolify Web UI: http://${CWM_DISPLAYED_ADDRESS}:8000"
+# Wait for the coolify container to report healthy before invoking artisan inside it.
+echo "Waiting for Coolify to be healthy" | log
+for i in {1..60}; do
+    health=$(docker inspect -f '{{.State.Health.Status}}' coolify 2>/dev/null || echo "missing")
+    if [ "$health" = "healthy" ]; then
+        break
+    fi
+    sleep 5
+done
+[ "$health" = "healthy" ]
+waitOrStop 0 "Coolify container did not become healthy"
 
-exit 0 
+# Bring the dashboard online on ${CWM_DOMAIN}. Coolify routes its own UI through the
+# coolify-proxy (Traefik) container on 80/443. A fresh install leaves the built-in
+# "localhost" server (id 0) with an empty user field, so Coolify's self-SSH
+# (ssh @host.docker.internal) fails, the server stays unreachable, and the proxy never
+# starts. We repair the user, validate the server, set the FQDN, then start the proxy.
+# Mirrors the Settings Save button + the "Start Proxy" navbar action (ServerCheckJob).
+echo "Setting Coolify FQDN to https://${CWM_DOMAIN} and starting proxy" | log
+docker exec coolify php artisan tinker --execute="\$s = \App\Models\Server::findOrFail(0); \$s->user = 'root'; \$s->save(); \App\Actions\Server\ValidateServer::run(\$s); \$s->refresh(); \$is = \App\Models\InstanceSettings::get(); \$is->fqdn = 'https://${CWM_DOMAIN}'; \$is->save(); \$s->setupDynamicProxyConfiguration(); \App\Actions\Proxy\StartProxy::run(\$s, async: false, force: true); echo 'fqdn=' . \$is->fqdn;" | log
+waitOrStop 0 "Failed to configure Coolify FQDN / start proxy"
+
+# Wait for the Traefik proxy to come up and bind 80/443 before declaring success.
+echo "Waiting for coolify-proxy to be healthy" | log
+for i in {1..60}; do
+    proxyhealth=$(docker inspect -f '{{.State.Health.Status}}' coolify-proxy 2>/dev/null || echo "missing")
+    if [ "$proxyhealth" = "healthy" ]; then
+        break
+    fi
+    sleep 5
+done
+[ "$proxyhealth" = "healthy" ]
+waitOrStop 0 "coolify-proxy did not become healthy"
+
+descriptionAppend "Coolify Web UI: https://${CWM_DOMAIN}/"
+
+exit 0

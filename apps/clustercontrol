@@ -1,0 +1,256 @@
+#!/bin/bash
+MAX_RETRIES=${MAX_RETRIES:-10}
+SLEEP_TIME=${SLEEP_TIME:-5}
+UPDATE_JSON=/tmp/cmon-update-user.json
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+echo "Get ansible Role" | log
+ansible-galaxy install severalnines.clustercontrol | log
+waitOrStop 0 "Failed Get ansible Role"
+
+apt update
+
+echo "Create ansible playbook" | log
+cd /root
+cat <<EOF > cc.playbook
+- hosts: localhost
+  roles:
+    - { role: severalnines.clustercontrol }
+EOF
+
+ubuntu_version=$(lsb_release -rs)
+if [[ "$ubuntu_version" == "24.04" ]]; then
+    sed -i 's/include:/include_tasks:/g' /root/.ansible/roles/severalnines.clustercontrol/tasks/*.yml
+    sed -i 's/python-apt/python3-apt/g' /root/.ansible/roles/severalnines.clustercontrol/vars/*.yml
+fi
+
+echo "Running playbook" | log
+ansible-playbook cc.playbook | log
+waitOrStop 0 "Failed to run ansible playbook"
+
+export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+tag global-domain-set.success
+
+# ccmgr runs as user s9s_cc:severalnines and needs to read the LE cert/key.
+# Grant the severalnines group read on the LE dirs and traverse on subdirs.
+chgrp -R severalnines /etc/letsencrypt/live /etc/letsencrypt/archive
+chmod -R g+rX         /etc/letsencrypt/live /etc/letsencrypt/archive
+
+# Move ccmgr off the public ports so nginx can take :80/:443.
+# http_port: 8081 avoids the conflict with kuber-proxy which hardcodes :8080.
+# (nginx vhost is written and started later, after ccmgr is healthy.)
+echo "Configuring ccmgr to listen on loopback ports" | log
+sed -i "s|^port:.*|port: 8443|"             /usr/share/ccmgr/ccmgr.yaml
+sed -i "s|^http_port:.*|http_port: 8081|"   /usr/share/ccmgr/ccmgr.yaml
+# ccmgr still needs a cert/key to start (it serves TLS on :8443); use the same files
+sed -i "s|tls_cert:.*|tls_cert: /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem|" /usr/share/ccmgr/ccmgr.yaml
+sed -i "s|tls_key:.*|tls_key: /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem|"     /usr/share/ccmgr/ccmgr.yaml
+waitOrStop 0 "Failed to configure ccmgr"
+
+# Restart the packaged cmon-proxy.service so it picks up the new ccmgr.yaml.
+# (The clustercontrol-proxy .deb installs /etc/systemd/system/cmon-proxy.service
+#  which runs /usr/bin/ccmgr --basedir=/usr/share/ccmgr/ as s9s_cc.)
+echo "Restarting cmon-proxy with new config" | log
+systemctl restart cmon-proxy | log
+waitOrStop 0 "Failed to restart cmon-proxy"
+
+# Wait for cmon-proxy to be ready on the new ports
+sleep 5
+
+echo "Checking cmon-proxy service status" | log
+
+success=false
+
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    if systemctl is-active --quiet cmon-proxy; then
+        success=true
+        break
+    fi
+
+    cmon_proxy_status=$(systemctl is-active cmon-proxy 2>/dev/null || echo "unknown")
+
+    echo "cmon-proxy service status: $cmon_proxy_status (attempt $i/$MAX_RETRIES)" | log
+    systemctl status cmon-proxy --no-pager 2>&1 | log
+
+    sleep "$SLEEP_TIME"
+done
+
+[ "$success" = true ]
+waitOrStop 0 "cmon-proxy service is not running"
+
+# nginx vhost: :80 redirects to :443; :443 terminates TLS and proxies to ccmgr on :8443
+echo "Installing nginx reverse-proxy vhost for ClusterControl" | log
+rm -f /etc/nginx/sites-enabled/default
+cat <<EOF > /etc/nginx/sites-available/clustercontrol
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass                  https://127.0.0.1:8443;
+        proxy_ssl_verify            off;
+        proxy_ssl_server_name       on;
+        proxy_http_version          1.1;
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Upgrade           \$http_upgrade;
+        proxy_set_header Connection        "upgrade";
+        proxy_read_timeout                 300s;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/clustercontrol /etc/nginx/sites-enabled/clustercontrol
+nginx -t | log
+waitOrStop 0 "nginx config test failed"
+systemctl enable nginx | log
+systemctl restart nginx | log
+waitOrStop 0 "Failed to start nginx"
+
+echo "Creating admin user" | log
+
+COOKIE=${COOKIE:-/tmp/cmon-cookie.txt}
+AUTH_JSON=${AUTH_JSON:-/tmp/cmon-auth.json}
+UPDATE_JSON=${UPDATE_JSON:-/tmp/cmon-update-user.json}
+UPDATE_RESPONSE=${UPDATE_RESPONSE:-/tmp/cmon-update-response.json}
+
+ADMINUSER="clusteradmin"
+
+[ -n "$ADMINEMAIL" ]
+waitOrStop 0 "ADMINEMAIL is empty"
+
+[ -n "$ADMINPASSWORD" ]
+waitOrStop 0 "ADMINPASSWORD is empty"
+
+rm -f "$COOKIE" "$AUTH_JSON" "$UPDATE_JSON" "$UPDATE_RESPONSE"
+
+echo "Authenticating with initial ccsetup user" | log
+
+curl -k -s -c "$COOKIE" -b "$COOKIE" \
+  -X POST "https://127.0.0.1:9501/v2/auth" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operation": "authenticateWithPassword",
+    "user_name": "ccsetup",
+    "password": "admin"
+  }' | tee "$AUTH_JSON" | jq
+
+auth_status=$(jq -r '.request_status // empty' "$AUTH_JSON")
+auth_error=$(jq -r '.error_string // empty' "$AUTH_JSON")
+
+echo "Auth status: $auth_status" | log
+echo "Auth error: $auth_error" | log
+
+[ "$auth_status" = "Ok" ]
+waitOrStop 0 "Failed to authenticate with ccsetup/admin"
+
+echo "Building update user JSON" | log
+
+jq -n \
+  --arg admin_password "${ADMINPASSWORD}" \
+  --arg admin_user "$ADMINUSER" \
+  --arg admin_email "${ADMINEMAIL}" \
+  '{
+    operation: "updateUser",
+    new_password: $admin_password,
+    user: {
+      class_name: "CmonUser",
+      user_id: 4,
+      user_name: $admin_user,
+      email_address: $admin_email,
+      first_name: "Cluster",
+      last_name: "Admin",
+      disabled: false,
+      suspended: false,
+      password_expired: false,
+      groups: [
+        {
+          class_name: "CmonGroup",
+          group_id: 1,
+          group_name: "admins"
+        }
+      ],
+      timezone: {
+        class_name: "CmonTimeZone",
+        name: "Israel Daylight Time",
+        abbreviation: "IDT",
+        has_dst_rules: false,
+        offset: -10800
+      }
+    }
+  }' > "$UPDATE_JSON"
+
+cat "$UPDATE_JSON" | jq
+
+echo "Updating initial admin user" | log
+
+curl -k -s -c "$COOKIE" -b "$COOKIE" \
+  -X POST "https://127.0.0.1:9501/v2/users" \
+  -H "Content-Type: application/json" \
+  --data-binary @"$UPDATE_JSON" | tee "$UPDATE_RESPONSE" | jq
+
+update_status=$(jq -r '.request_status // empty' "$UPDATE_RESPONSE")
+update_error=$(jq -r '.error_string // empty' "$UPDATE_RESPONSE")
+
+echo "Update status: $update_status" | log
+echo "Update error: $update_error" | log
+
+[ "$update_status" = "Ok" ]
+waitOrStop 0 "Failed to update admin user"
+
+
+echo "Restarting ClusterControl services" | log
+
+systemctl restart cmon
+waitOrStop 0 "Failed to restart cmon"
+
+sleep 5
+
+systemctl restart cmon-proxy
+waitOrStop 0 "Failed to restart cmon-proxy"
+
+echo "Admin user created successfully" | log
+
+## Remove Ansible ##
+apt-get remove -y ansible
+
+## Create new rpc-key ##
+random_rpc=$(date +%s | sha256sum | base64 | head -c 32 ; echo)
+sed -i '/^rpc_key=/d' /etc/cmon.cnf
+echo "rpc_key=${random_rpc}" >> /etc/cmon.cnf
+
+echo "Adding descriptions" | log
+descriptionAppend "ClusterControl web page: https://${CWM_DOMAIN}/"
+descriptionAppend "ClusterControl admin user: clusteradmin"
+descriptionAppend "ClusterControl admin password: ${ADMINPASSWORD}"
+descriptionAppend "cmon config: /etc/cmon.cnf"
+descriptionAppend "ccmgr config: /usr/share/ccmgr/ccmgr.yaml"
+descriptionAppend "MySQL password: ${ADMINPASSWORD}"
+descriptionAppend "rpc-key: ${random_rpc}"
+descriptionAppend " "
+
+tag ssl-ready.success
+tag apache2.success
+tag certbot-apache2.success
+tagScript success
+exit 0

@@ -19,35 +19,34 @@ sleep 5
 
 echo "Creating and cleaning Portainer directories" | log
 sudo rm -rf /opt/portainer/data
-sudo mkdir -p /opt/portainer/{certs,data}
+sudo mkdir -p /opt/portainer/data
 sudo chown -R root:root /opt/portainer/data
 sudo chmod -R 755 /opt/portainer/data
 
+# DB fix: Remove any BE-flagged database.
+echo "Ensuring clean Portainer database (removing any BE flag)..." | log
+rm -f /opt/portainer/data/portainer.db
+rm -rf /opt/portainer/data/backups
 
-# Copy certificates for Portainer
-sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem /opt/portainer/certs/portainer.crt
-sudo cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem /opt/portainer/certs/portainer.key
+echo "Writing admin password file" | log
+printf '%s' "$ADMINPASSWORD" > /opt/portainer/admin_password   # printf, not echo: no trailing newline
+chmod 600 /opt/portainer/admin_password
 
-
-echo "Creating Docker Compose file for Portainer (without initial password)" | log
+# TLS is terminated by nginx (see reverse proxy below); Portainer serves plain HTTP on localhost only.
+echo "Creating Docker Compose file for Portainer" | log
 cat << 'EOF' > /opt/portainer/docker-compose.yml
 services:
   portainer:
-    image: portainer/portainer-ee:sts
+    image: portainer/portainer-ce:sts
     container_name: portainer
     restart: always
+    command: --admin-password-file /run/secrets/portainer_admin
     ports:
-      - "8080:9000"
-      - "9443:9443"
+      - "127.0.0.1:9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/portainer/data:/data
-      - /opt/portainer/certs:/certs
-    command:
-      - --sslcert 
-      - /certs/portainer.crt
-      - --sslkey
-      - /certs/portainer.key
+      - /opt/portainer/admin_password:/run/secrets/portainer_admin:ro
 EOF
 
 echo "Generated docker-compose.yml:" | log
@@ -58,82 +57,80 @@ cd /opt/portainer
 docker compose up -d
 waitOrStop 0 "Failed to start Portainer services"
 
-echo "Waiting for Portainer to initialize (60 seconds)..." | log
-sleep 60
-
-echo "Setting up admin user via API..." | log
-# Initialize admin user through the API
-INIT_RESPONSE=$(curl -k -s -X POST https://localhost:9443/api/users/admin/init \
-  -H "Content-Type: application/json" \
-  -d "{\"Username\":\"admin\",\"Password\":\"${ADMINPASSWORD}\"}")
-
-if echo "$INIT_RESPONSE" | grep -q "admin"; then
-    echo "✅ Admin user initialized successfully via API" | log
-    ADMIN_CREATED=true
-else
-    echo "⚠️  API initialization response: $INIT_RESPONSE" | log
-    echo "Attempting alternative initialization method..." | log
-
-    # Alternative: Stop container, use helper, restart
-    docker compose down
+# ---- CHANGED: real verification loop instead of grep -q "admin" (which matched error bodies) ----
+echo "Waiting for Portainer and verifying admin login..." | log
+AUTH_BODY=$(jq -nc --arg u admin --arg p "$ADMINPASSWORD" '{Username:$u,Password:$p}')
+ADMIN_CREATED=false
+CODE=""
+for i in $(seq 1 36); do   # up to ~3 minutes
+    CODE=$(curl -s -o /tmp/auth.json -w '%{http_code}' \
+        -X POST http://127.0.0.1:9000/api/auth \
+        -H "Content-Type: application/json" -d "$AUTH_BODY" 2>/dev/null)
+    if [ "$CODE" = "200" ]; then
+        echo "✅ Admin login verified after $((i * 5))s" | log
+        ADMIN_CREATED=true
+        break
+    fi
     sleep 5
+done
 
-    # Generate bcrypt hash
-    ADMINPASSWORD_HASH=$(htpasswd -nbB admin "$ADMINPASSWORD" | cut -d: -f2)
-    echo "Generated password hash (length: ${#ADMINPASSWORD_HASH})" | log
-
-    # Create admin user file manually
-    cat > /tmp/init_admin.json << JSONEOF
-{
-  "Username": "admin",
-  "Password": "${ADMINPASSWORD_HASH}"
-}
-JSONEOF
-
-    # Use docker run with the hash as command argument
-    cat << 'EOFCOMPOSE' > /opt/portainer/docker-compose.yml
-services:
-  portainer:
-    image: portainer/portainer-ce:2.33.2
-    container_name: portainer
-    restart: always
-    ports:
-      - "8080:9000"
-      - "9443:9443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/portainer/data:/data
-      - /opt/portainer/certs:/certs
-    command:
-      - --sslcert 
-      - /certs/portainer.crt
-      - --sslkey
-      - /certs/portainer.key
-EOFCOMPOSE
-
-    # Add the hashed password to the command
-    echo "    command: --admin-password '$ADMINPASSWORD_HASH'" >> /opt/portainer/docker-compose.yml
-
-    docker compose up -d
-    sleep 30
-    ADMIN_CREATED=true
+if [ "$ADMIN_CREATED" != true ]; then
+    echo "❌ Admin login failed (last HTTP ${CODE:-none})" | log
+    echo "Response body: $(cat /tmp/auth.json 2>/dev/null)" | log
+    echo "--- portainer container logs ---" | log
+    docker logs portainer 2>&1 | tail -n 40 | log
+    exit 1
 fi
+rm -f /tmp/auth.json
 
+echo "Configuring nginx reverse proxy for Portainer" | log
+NGINX_CONF="/etc/nginx/sites-available/portainer.conf"
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+
+cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${LE_DIR}/fullchain.pem;
+    ssl_certificate_key ${LE_DIR}/privkey.pem;
+
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+    }
+}
+EOF
+
+ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/portainer.conf
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl enable nginx && systemctl restart nginx
+waitOrStop 0 "Failed to start nginx reverse proxy"
 
 echo "Adding descriptions" | log
-descriptionAppend "Portainer Web Interface: https://$CWM_DOMAIN:9443"
+descriptionAppend "Portainer Web Interface: https://$CWM_DOMAIN"
 descriptionAppend " "
 descriptionAppend "Portainer Admin Username: admin"
 descriptionAppend "Portainer Admin Password: $ADMINPASSWORD"
 descriptionAppend " "
-descriptionAppend "⚠️  IMPORTANT: On first access, your browser may show a certificate warning."
-descriptionAppend "This is normal for Let's Encrypt certificates. Click 'Advanced' and 'Proceed'."
-descriptionAppend " "
 descriptionAppend "Portainer config location: /opt/portainer/docker-compose.yml"
 descriptionAppend "Portainer data location: /opt/portainer/data"
-descriptionAppend "Portainer certificates location: /opt/portainer/certs"
 
 tagScript success
 
 exit 0
-

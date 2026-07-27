@@ -66,10 +66,12 @@ ufw reload
 rm -rf /usr/share/zabbix/ui/conf/zabbix.conf.php
 cp $rootDir/tweaks/extras/zabbix/zabbix.conf.php /usr/share/zabbix/ui/conf/
 sed -i "s/PASSWORDVAR/${ADMINPASSWORD}/g" /usr/share/zabbix/ui/conf/zabbix.conf.php
-unlink /etc/apache2/sites-enabled/default-ssl.conf
+a2dissite 000-default.conf
+rm -f /etc/apache2/sites-enabled/default-ssl.conf
 cp $rootDir/tweaks/extras/zabbix/zabbix.conf /etc/apache2/sites-available/
 sed -i "s/CWMDOMAIN/${CWM_DOMAIN}/g" /etc/apache2/sites-available/zabbix.conf
-ln -s /etc/apache2/sites-available/zabbix.conf /etc/apache2/sites-enabled/
+sed -i "s#ZABBIXDOCROOT#/usr/share/zabbix/ui#g" /etc/apache2/sites-available/zabbix.conf
+a2ensite zabbix.conf
 
 echo "Extracting database content and Importing zabbix database" | log
 gunzip /usr/share/zabbix/sql-scripts/mysql/server.sql.gz 
@@ -101,7 +103,7 @@ echo "Adding descriptions" | log
 descriptionAppend " "
 descriptionAppend "Database = zabbix"
 descriptionAppend "DBUser = zabbixuser"
-descriptionAppend "Zabbix Admin Web UI: http://${CWM_DOMAIN}/zabbix"
+descriptionAppend "Zabbix Admin Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Zabbix default credentials: User=Admin | Pass=zabbix"
 descriptionAppend " "
 

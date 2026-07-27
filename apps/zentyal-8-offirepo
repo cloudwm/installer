@@ -14,18 +14,88 @@ echo "Modifying hostname to fit max 64 chars requirement" | log
 savedHostname=$(hostname)
 hostnamectl set-hostname ${savedHostname::32}
 
-echo "Installing Zentyal 8.0 with graphical environment" | log
+echo "Preparing system for the Zentyal installer" | log
+# The upstream zentyal_installer_8.0.sh runs under `set -e` and enforces a set of
+# pre-checks that each abort the whole run (installing NOTHING) on a headless CWM
+# host. All three below were observed to break the install on a real box:
+#
+#   1. TERM — the installer does `BOLD=$(tput bold)` at the very top. With no
+#      TERM, tput exits non-zero and `set -e` kills the installer immediately,
+#      before it does anything. Export a real TERM so tput succeeds.
+#   2. Held packages — CWM images ship the kernel on apt-hold. The installer's
+#      broken-package check flags EVERY non-"ii" package (a held package is
+#      "hi") as broken and exits. Un-hold everything first.
+#   3. Not up-to-date — the installer refuses to run while any package is
+#      upgradable. A plain dist-upgrade leaves phased updates (the kernel) held
+#      back, so force them in with Always-Include-Phased-Updates.
+export DEBIAN_FRONTEND=noninteractive
+export TERM=${TERM:-xterm}
 
-# Download and patch the installer to auto-confirm graphical environment
+apt-mark showhold 2>/dev/null | xargs -r apt-mark unhold 2>&1 | log || true
+apt-get update -q 2>&1 | log || true
+apt-get -y -q \
+    -o APT::Get::Always-Include-Phased-Updates=true \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" \
+    dist-upgrade 2>&1 | log || true
+
+echo "Installing Zentyal 8.0 (headless, no graphical environment)" | log
 wget https://raw.githubusercontent.com/zentyal/zentyal/master/extra/ubuntu_installers/zentyal_installer_8.0.sh
 chmod u+x zentyal_installer_8.0.sh
 
-# Patch the script: replace the prompt with default 'y'
-sed -i '/read ZEN_GUI/i\ZEN_GUI="n"' zentyal_installer_8.0.sh
-sed -i '/read ZEN_GUI/d' zentyal_installer_8.0.sh
+# Skip the installer's "network interface naming" pre-check. It hardcodes
+# OLD_NIC_NAMING=true and aborts (exit 1, installing NOTHING) on any host whose
+# NICs use predictable names (ens*/enp*) instead of legacy eth* — which every
+# CWM cloud image does. Its own suggested fix is net.ifnames=0 + a reboot, which
+# renames interfaces and would break networking/provisioning; setting the flag
+# false just skips the legacy-naming enforcement and Zentyal 8 runs fine as-is.
+# Anchored to the top-level `OLD_NIC_NAMING=true` assignment so the patch is
+# unambiguous; verify it applied and fail loudly if upstream renames it.
+sed -i 's/^OLD_NIC_NAMING=true/OLD_NIC_NAMING=false/' zentyal_installer_8.0.sh
+grep -q '^OLD_NIC_NAMING=false' zentyal_installer_8.0.sh
+waitOrStop 0 "Could not disable OLD_NIC_NAMING in the Zentyal installer (upstream layout changed)"
 
-# Run the modified installer
-./zentyal_installer_8.0.sh
+# Drive the installer non-interactively instead of sed-patching it. Its only
+# prompt is `read ZEN_GUI` ("install the Zentyal Graphical environment? (n|y)").
+# The old sed patch was fragile: any upstream layout shift left the `read` in
+# place and the whole provisioning run hung FOREVER on that prompt (the failure
+# we actually hit). Feeding "n" on stdin is layout-independent, and `yes` keeps
+# answering so a newly added prompt can never hang the run either.
+yes n | ./zentyal_installer_8.0.sh 2>&1 | log
+
+# The installer masks its own exit through `| log`, so verify Zentyal really
+# installed and fail loudly rather than falling through to the webadmin/nginx
+# steps with nothing installed.
+zentyalInstalled=1
+dpkg-query -W -f='${db:Status-Abbrev}' zentyal-core 2>/dev/null | grep -q '^ii' && zentyalInstalled=0
+[ "${zentyalInstalled}" -eq 0 ]
+waitOrStop 0 "Zentyal failed to install (installer aborted a pre-check or hung on a prompt)"
+
+echo "Ensuring Zentyal webadmin is enabled and listening on 8443" | log
+# The webadmin (8443) is served by Zentyal's own nginx service,
+# zentyal.webadmin-nginx, whose systemd unit has NO [Install] section — it is
+# never enabled to start on its own. The only thing that brings it up is the
+# oneshot zentyal.service (`zs start`), which starts the enabled modules with
+# webadmin last. If that boot service isn't enabled, the CWM provisioning reboot
+# comes up with nothing on 8443 and the reverse proxy below returns a bare
+# "502 Bad Gateway". Enable the boot service (so it survives the reboot) and
+# start webadmin now, then block until 8443 is really listening before we rely
+# on it — a fresh apt install often only exposes the webadmin after this start.
+systemctl enable zentyal.service 2>/dev/null || true
+zs start 2>&1 | log || true
+zs webadmin restart 2>&1 | log || systemctl restart zentyal.webadmin-nginx 2>&1 | log || true
+
+webadminUp=1
+for attempt in $(seq 1 30); do
+    echo "Waiting for Zentyal webadmin on 8443 (attempt ${attempt}/30)" | log
+    if ss -tln 2>/dev/null | grep -q ':8443'; then
+        webadminUp=0
+        break
+    fi
+    sleep 5
+done
+[ "${webadminUp}" -eq 0 ]
+waitOrStop 0 "Zentyal webadmin never came up on 8443 (reverse proxy would return 502)"
 
 echo "Creating admin user and disabling ssh login to admin" | log
 useradd admin -s /bin/bash -m -g users -G sudo
@@ -33,8 +103,48 @@ chpasswd <<< "admin:${ADMINPASSWORD}"
 echo "DenyUsers admin" | sudo tee -a /etc/ssh/sshd_config
 systemctl restart sshd
 
+echo "Configuring nginx reverse proxy in front of Zentyal admin (8443)" | log
+cat << EOF > /etc/nginx/sites-available/zentyal
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 0;
+
+    location / {
+        proxy_pass https://127.0.0.1:8443;
+        proxy_ssl_verify off;                       # Zentyal serves a self-signed cert on 8443
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
+        proxy_buffering off;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/zentyal /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+# Zentyal's install disables the stock nginx (it manages its own on 8443); re-enable here,
+# after the Zentyal install, so the proxy survives the CWM provisioning reboot.
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart nginx after Zentyal proxy config"
+
 echo "Adding descriptions" | log
-descriptionAppend "Zentyal Admin URI: https://${CWM_SERVERIP}:8443"
+descriptionAppend "Zentyal Admin URI: https://${CWM_DOMAIN}"
 descriptionAppend "Zentyal Admin User: admin"
 descriptionAppend "Zentyal Admin Password: ${ADMINPASSWORD}"
 descriptionAppend " "

@@ -12,17 +12,152 @@ fi
 echo "Downloading and installing FastPanel" | log
 installPackage ca-certificates wget
 LOG_FILE="/tmp/fastpanel_install.log"
-wget https://repo.fastpanel.direct/install_fastpanel.sh -O - | bash - 2>&1 | tee "$LOG_FILE"
-waitOrStop 0 "Failed to install FastPanel"
+INSTALLER="/tmp/install_fastpanel.sh"
+
+# FASTPANEL's installer does a panel-only ("minimal") install -- skipping nginx, apache,
+# MySQL and PHP -- whenever a `minimal` variable is set in the environment. CWM
+# provisioning leaks one, which silently cripples the server (panel works on :8888 but
+# can't host anything and nothing answers on 80/443). Strip it from the env so the full
+# server stack is installed. `env -u` is a no-op when the var is absent.
+curlDownload https://repo.fastpanel.direct/install_fastpanel.sh "$INSTALLER"
+env -u minimal bash "$INSTALLER" 2>&1 | tee "$LOG_FILE"
+rm -f "$INSTALLER" "$LOG_FILE"
+
+# The installer wrapper ends with `rm` and swallows its own exit code, so verify the
+# outcome directly rather than trusting a return status.
+if [ ! -x /usr/local/fastpanel2/fastpanel ]; then
+    echo "FastPanel install failed: panel binary missing" | log 1
+    exit 1
+fi
+if ! command -v nginx >/dev/null 2>&1; then
+    echo "WARNING: full install did not provide nginx; bare-domain redirect will be skipped" | log 1
+fi
 
 ufw allow 8888
 ufw allow 7777
 ufw reload
 
-FASTPASSWORD=$(grep -oP "Password:\s*\K.*" "$LOG_FILE")
-rm -f $LOG_FILE
+# 'fastpanel panel add' shells out to a bare 'nginx -t' to validate the address
+# vhost, but FASTPANEL ships its web server as 'fastpanel2-nginx' and never puts an
+# 'nginx' on PATH -- so panel add fails with "executable file not found in $PATH"
+# and the address is never registered. Provide an 'nginx' alias unless a real one
+# already exists (installing the stock nginx package would clash on ports 80/443).
+if ! command -v nginx >/dev/null 2>&1 && [ -x /usr/local/sbin/fastpanel2-nginx ]; then
+    ln -sf /usr/local/sbin/fastpanel2-nginx /usr/local/sbin/nginx
+fi
 
-descriptionAppend "FastPanel Web UI: http://${CWM_DISPLAYED_ADDRESS}:8888"
+# Wait for the fastpanel2 daemon to be up before issuing any CLI commands.
+# The install script returns before the service is fully ready; running
+# panel/password commands too early silently leaves the panel DB untouched.
+systemctl start fastpanel2 2>&1 | log
+echo "Waiting for fastpanel2 to listen on :8888" | log
+for i in $(seq 1 30); do
+    ss -tln | grep -q ':8888' && break
+    sleep 2
+done
+if ! ss -tln | grep -q ':8888'; then
+    echo "fastpanel2 did not become ready on port 8888" | log 1
+    exit 1
+fi
+
+# Set a known password for the default fastuser instead of scraping it from the
+# installer output (the install log format is unreliable and yielded an empty
+# password). The fastuser account is created by the installer with ROLE_SUPER_ADMIN.
+FASTPASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
+/usr/local/fastpanel2/fastpanel chpasswd --username=fastuser --password="${FASTPASSWORD}" 2>&1 | log
+waitOrStop 0 "Failed to set FastPanel password for fastuser"
+
+if [ -n "${CWM_DOMAIN}" ]; then
+    /usr/local/fastpanel2/fastpanel panel add --server-name="${CWM_DOMAIN}" 2>&1 | log
+    waitOrStop 0 "Failed to register FastPanel address ${CWM_DOMAIN}"
+
+    # Let's Encrypt (HTTP-01) needs the domain publicly reachable on port 80;
+    # keep it best-effort so a cert failure does not abort the whole run -- the
+    # panel stays usable on its self-signed certificate.
+    /usr/local/fastpanel2/fastpanel panel change-certificate \
+        --server-name="${CWM_DOMAIN}" \
+        --certificate-type=letsencrypt 2>&1 | log
+    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+        echo "Issued Let's Encrypt certificate for ${CWM_DOMAIN}" | log
+    else
+        echo "WARNING: Let's Encrypt certificate for ${CWM_DOMAIN} failed; panel remains on self-signed cert" | log 1
+    fi
+
+    # When the full website stack is installed, stock nginx owns 80/443 and otherwise
+    # serves the FastPanel parking/"troubleshoot" placeholder for the bare domain (the
+    # panel itself only listens on :8888 with its own cert). Reverse-proxy the bare domain
+    # onto the panel so it opens at https://CWM_DOMAIN with no port and a single cert --
+    # avoiding the double cert warning a :8888 redirect produces. Skip cleanly on
+    # panel-only installs (no website nginx). The drop-in goes in sites-enabled/ -- included
+    # by nginx.conf but not managed by FastPanel -- and nginx -t gates the reload.
+    if command -v nginx >/dev/null 2>&1 && [ -f /etc/nginx/ssl-certs/parking.crt ]; then
+        # Prefer the domain's real (Let's Encrypt) panel cert once issued, so the proxy is
+        # warning-free in production; fall back to the parking self-signed cert.
+        SSL_CRT="/var/www/httpd-cert/${CWM_DOMAIN}_panel.crt"
+        SSL_KEY="/var/www/httpd-cert/${CWM_DOMAIN}_panel.key"
+        if [ ! -f "$SSL_CRT" ] || [ ! -f "$SSL_KEY" ]; then
+            SSL_CRT="/etc/nginx/ssl-certs/parking.crt"
+            SSL_KEY="/etc/nginx/ssl-certs/parking.key"
+        fi
+
+        # FastPanel's nginx has no $connection_upgrade map; define one (http{} context) for
+        # websocket upgrades, unless one already exists.
+        if ! grep -rqs 'connection_upgrade' /etc/nginx/; then
+            cat > /etc/nginx/conf.d/cwm-proxy-upgrade.conf <<'EOF'
+map $http_upgrade $connection_upgrade { default upgrade; '' close; }
+EOF
+        fi
+
+        mkdir -p /etc/nginx/sites-enabled
+        rm -f /etc/nginx/sites-enabled/cwm-fastpanel-redirect.conf   # remove any prior redirect drop-in
+        cat > /etc/nginx/sites-enabled/cwm-fastpanel-proxy.conf <<EOF
+server {
+    listen ${CWM_SERVERIP}:80;
+    server_name ${CWM_DOMAIN};
+    include /etc/nginx/fastpanel2-includes/letsencrypt.conf;
+    location / { return 301 https://${CWM_DOMAIN}\$request_uri; }
+}
+server {
+    listen ${CWM_SERVERIP}:443 ssl;
+    http2 on;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate ${SSL_CRT};
+    ssl_certificate_key ${SSL_KEY};
+    include /etc/nginx/fastpanel2-includes/letsencrypt.conf;
+    location / {
+        proxy_pass https://127.0.0.1:8888;
+        proxy_ssl_verify off;
+        proxy_ssl_server_name on;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_read_timeout 120s;
+    }
+}
+EOF
+        nginx -t 2>&1 | log
+        if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            systemctl reload nginx 2>&1 | log
+            echo "Configured ${CWM_DOMAIN} -> :8888 panel reverse proxy" | log
+            # Proxy is live: the panel is reachable at the bare domain (no port).
+            PANEL_URL="https://${CWM_DOMAIN}"
+        else
+            echo "WARNING: proxy vhost failed nginx -t; removing it" | log 1
+            rm -f /etc/nginx/sites-enabled/cwm-fastpanel-proxy.conf
+        fi
+    fi
+
+    export CWM_DISPLAYED_ADDRESS="${CWM_DOMAIN}"
+    tag global-domain-set.success
+fi
+
+# Advertise the reverse-proxied bare domain when it's set up, else the native :8888.
+PANEL_URL="${PANEL_URL:-https://${CWM_DISPLAYED_ADDRESS}:8888}"
+descriptionAppend "FastPanel Web UI: ${PANEL_URL}"
 descriptionAppend "FastPanel Web User: fastuser"
 descriptionAppend "FastPanel Web Password: ${FASTPASSWORD}"
 

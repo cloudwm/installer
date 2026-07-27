@@ -27,9 +27,21 @@ DATABASE_ROOT_PASSWORD="${ADMINPASSWORD}"
 DATABASE_PASSWORD="${ADMINPASSWORD}"
 EOF
 
-# Copy and configure Caddyfile
-cp caddy/Caddyfile.example caddy/Caddyfile
-sed -i "s/CHANGE_ME/$DOMAIN/g" caddy/Caddyfile
+# Front Ghost with the host nginx + cert from tweaks/nginx-letsencrypt-cert (run
+# earlier in the contrib), the same pattern as apps/n8n-latest-offirepo. The Ghost
+# image bundles a Caddy container that does its own public ACME for ${DOMAIN}; in the
+# CWM environment the domain only resolves internally (private IP) so that ACME never
+# validates and the site is unreachable. Disable that Caddy and publish Ghost on
+# localhost so host nginx can reverse-proxy to it.
+echo "Writing compose override (disable bundled Caddy, expose Ghost on localhost)" | log
+cat << 'EOF' > compose.override.yml
+services:
+  caddy:
+    profiles: ["disabled"]        # never started by a plain `docker compose up -d`
+  ghost:
+    ports:
+      - "127.0.0.1:2368:2368"
+EOF
 
 echo "Pulling and starting Ghost services" | log
 docker compose pull
@@ -39,13 +51,59 @@ waitOrStop 0 "Failed to start Ghost services"
 echo "Waiting for Ghost to initialize" | log
 sleep 120  # Wait 2 minutes for initialization (adjust if needed)
 
+echo "Configuring Nginx for Ghost (HTTPS)" | log
+# nginx + LE cert provided by tweaks/nginx-letsencrypt-cert (run earlier in the
+# contrib). Certs at /etc/letsencrypt/live/${CWM_DOMAIN}/{fullchain,privkey}.pem.
+cat << EOF > /etc/nginx/sites-available/ghost
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    client_max_body_size 50m;
+
+    location / {
+        proxy_pass http://127.0.0.1:2368;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/ghost /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+waitOrStop 0 "Nginx configuration test failed"
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart Nginx"
+
+echo "Adding Nginx ports to ufw" | log
+ufw allow 80
+ufw allow 443
+
 echo "Adding descriptions" | log
 descriptionAppend "Ghost Server Address: https://${CWM_DOMAIN}"
 descriptionAppend "Ghost Admin Address: https://${CWM_DOMAIN}/ghost"
 descriptionAppend "Ghost Database Root Password: ${ADMINPASSWORD}"
 descriptionAppend " "
 descriptionAppend "Ghost config location: /opt/ghost/.env"
-descriptionAppend "Ghost Caddy config: /opt/ghost/caddy/Caddyfile"
+descriptionAppend "Ghost compose override: /opt/ghost/compose.override.yml"
+descriptionAppend "Ghost Nginx vhost: /etc/nginx/sites-available/ghost"
 
 tagScript success
 

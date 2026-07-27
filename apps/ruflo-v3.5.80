@@ -13,8 +13,20 @@ apt install -y curl ca-certificates gnupg
 waitOrStop 0 "Failed to install basic dependencies"
 
 echo "Configuring Node.js 20 repository" | log
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+# Download the setup script to a file first, then run it. Piping `curl | bash`
+# hides curl's exit code (bash sees only empty stdin and exits 0), so a failed
+# fetch — e.g. the dev network's intermittent TLS interception on
+# deb.nodesource.com — silently no-ops the repo. apt then installs Ubuntu's
+# distro nodejs, which does NOT ship npm, and "npm --version" later dies with 127.
+curlDownload https://deb.nodesource.com/setup_20.x
+waitOrStop 0 "Node.js 20 setup script not downloaded from official source"
+bash setup_20.x | log
 waitOrStop 0 "Failed to configure Node.js 20 repository"
+
+# Fail loudly if the NodeSource repo still isn't present, instead of silently
+# falling back to Ubuntu's npm-less distro nodejs.
+grep -rqs "deb.nodesource.com" /etc/apt/sources.list.d/ \
+    || { echo "NodeSource repo not configured; aborting to avoid npm-less distro nodejs" | log 1; exit 1; }
 
 echo "Installing Node.js and npm" | log
 apt update
@@ -34,7 +46,16 @@ npx --version
 waitOrStop 0 "npx command is not working"
 
 echo "Installing Ruflo ${RUFLO_VERSION}" | log
-curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=v${RUFLO_VERSION}
+# Two things the upstream install.sh gets wrong for our use:
+#   1. Version: npm has "3.5.80", not "v3.5.80". Passing the "v" prefix means npm
+#      can't match it and silently falls back to "latest" (currently 3.30.2), so
+#      the pin is ignored. Pass the bare version, matching the wrapper below.
+#   2. Init hang: by default the script finishes with `ruflo init --yes`, which
+#      scaffolds a project in the current dir and then never returns (the pipe
+#      never sees EOF), so `curl | bash` hangs forever and the install fails.
+#      We only need the CLI reachable via npx (the wrapper below does that), so
+#      --no-init skips the project scaffolding entirely.
+curl -fsSL https://cdn.jsdelivr.net/gh/ruvnet/ruflo@main/scripts/install.sh | bash -s -- --version=${RUFLO_VERSION} --no-init
 waitOrStop 0 "Ruflo was not installed"
 
 echo "Creating Ruflo wrapper command" | log
@@ -52,7 +73,20 @@ echo "Refreshing shell command cache" | log
 hash -r
 
 echo "Checking Ruflo version" | log
-/usr/local/bin/ruflo --version
+# Retry a few times: on slower machines the first invocation can fail while
+# npx is still resolving/warming up, so give it up to 3 attempts with a pause
+# between them before giving up.
+rufloCheck=1
+for attempt in 1 2 3; do
+  echo "Ruflo version check attempt ${attempt}/3" | log
+  if /usr/local/bin/ruflo --version; then
+    rufloCheck=0
+    break
+  fi
+  echo "Ruflo version check failed (attempt ${attempt}/3)" | log
+  sleep 10
+done
+[ "${rufloCheck}" -eq 0 ]
 waitOrStop 0 "Ruflo command is not working"
 
 descriptionAppend "Successfully installed."
@@ -69,3 +103,4 @@ descriptionAppend "MCP command: ruflo mcp start"
 descriptionAppend "Configuration: Ruflo configuration is created when running ruflo init/start in the target project directory."
 descriptionAppend "Notes: Ruflo is installed as a CLI wrapper that runs npx -y ruflo@${RUFLO_VERSION}."
 descriptionAppend "Logs: Check the terminal output or the process logs depending on how Ruflo is started."
+

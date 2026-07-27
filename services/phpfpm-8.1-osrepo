@@ -6,15 +6,53 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
-echo "Adding php8.1 repo" | log
+echo "Adding php8.1 repo (mechanical PPA add — no launchpad.net API, no dirmngr)" | log
 installPackage software-properties-common | log
 waitOrStop 0 "Failed apt install: software-properties-common"
-add-apt-repository -y ppa:ondrej/php | log
-apt update
+
+# Mechanical ondrej/php PPA add. Replaces `add-apt-repository ppa:ondrej/php`,
+# which (a) depends on launchpad.net's REST API (times out from some hosts and
+# the `| log` pipe used to silently swallow the failure) and (b) when invoked
+# via gpg --recv-keys needs a /root/.gnupg homedir + dirmngr daemon that don't
+# exist on a fresh root account.
+install -d -m 0755 /etc/apt/keyrings
+ondrejFpr=14AA40EC0831756756D7F66C4F4EA0AAE5267A6C
+ondrejKeyring=/etc/apt/keyrings/ondrej-php.gpg
+keyringOk=0
+if [ -s "$ondrejKeyring" ]; then
+    gpg --no-default-keyring --keyring "$ondrejKeyring" --list-keys "$ondrejFpr" >/dev/null 2>&1 \
+        && keyringOk=1
+fi
+if [ "$keyringOk" -ne 1 ]; then
+    rm -f "$ondrejKeyring"
+    rootDir=$(rootDir)
+    cd "$rootDir/temp"
+    curlDownload \
+        "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x${ondrejFpr}&options=mr" \
+        ondrej-php.asc
+    waitOrStop 0 "Failed to fetch ondrej/php signing key from keyserver.ubuntu.com"
+    gpg --dearmor --yes -o "$ondrejKeyring" "$rootDir/temp/ondrej-php.asc"
+    waitOrStop 0 "Failed to dearmor ondrej/php signing key"
+    chmod 0644 "$ondrejKeyring"
+    rm -f "$rootDir/temp/ondrej-php.asc"
+    gpg --no-default-keyring --keyring "$ondrejKeyring" --list-keys "$ondrejFpr" >/dev/null 2>&1
+    waitOrStop 0 "ondrej/php keyring missing expected fingerprint $ondrejFpr"
+    cd - >/dev/null
+fi
+if [ ! -f /etc/apt/sources.list.d/ondrej-php.sources ]; then
+    cat > /etc/apt/sources.list.d/ondrej-php.sources <<EOF
+Types: deb
+URIs: https://ppa.launchpadcontent.net/ondrej/php/ubuntu/
+Suites: $(lsb_release -cs)
+Components: main
+Signed-By: $ondrejKeyring
+EOF
+fi
+apt-get update 2>&1 | log
 
 echo "Installing php8.1-fpm" | log
 installPackage php8.1-fpm
-waitOrStop 0 "Failed apt install: php8.4-fpm"
+waitOrStop 0 "Failed apt install: php8.1-fpm"
 
 echo "Installing php8.1 modules" | log
 packages=(php8.1-cli php8.1-bz2 php8.1-common php8.1-curl php8.1-gd php8.1-json php8.1-mbstring php8.1-mysql php8.1-readline php8.1-xml php8.1-zip php8.1-bcmath php8.1-intl php8.1-soap)

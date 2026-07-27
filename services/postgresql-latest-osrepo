@@ -16,8 +16,18 @@ echo "Updating and installing PostGreSQL" | log
 postgres_ver=$(psql -V | cut -c 19,20)
 
 installPackage wget ca-certificates | log
-wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - | log
-sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' | log
+for i in 1 2 3; do
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /tmp/pgdg.asc && break
+    echo "PostgreSQL key download attempt $i failed, retrying..." | log
+    sleep 15
+done
+test -s /tmp/pgdg.asc
+waitOrStop 0 "PostgreSQL GPG key download failed"
+gpg --dearmor -o /usr/share/keyrings/pgdg.gpg < /tmp/pgdg.asc
+rm -f /tmp/pgdg.asc
+test -s /usr/share/keyrings/pgdg.gpg
+waitOrStop 0 "PostgreSQL keyring is empty (key import failed)"
+echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 
 apt-get update
 installPackage postgresql postgresql-contrib

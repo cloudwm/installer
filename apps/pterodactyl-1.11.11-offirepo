@@ -157,6 +157,13 @@ EOF
 
 
 
+# Verify the TLS cert exists before writing the vhost — nginx -t fails on a
+# missing ssl_certificate, so this must be checked before the config test.
+if [ ! -f "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" ]; then
+    echo "TLS cert missing for ${CWM_DOMAIN} at /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem" | log 1
+    waitOrStop 0 "TLS cert missing for ${CWM_DOMAIN}"
+fi
+
 # Create NGINX configuration
 echo "Creating NGINX configuration" | log
 tee /etc/nginx/sites-available/pterodactyl > /dev/null <<EOF
@@ -204,8 +211,12 @@ echo "Testing NGINX configuration" | log
 nginx -t
 waitOrStop 0 "Nginx configuration check failed"
 
-echo "Restarting NGINX" | log
-
+# The host nginx IS the reverse proxy for this stack: the panel container only
+# publishes 127.0.0.1:8080, so nothing reaches the outside without it. Make sure
+# it is unmasked and enabled — an earlier install may have masked it.
+echo "Enabling and restarting NGINX" | log
+systemctl unmask nginx 2>/dev/null || true
+systemctl enable nginx
 systemctl restart nginx
 waitOrStop 0 "Failed to restart nginx service"
 
@@ -272,8 +283,7 @@ sudo docker exec pterodactyl_panel php artisan p:user:make \
     --name-first=Admin \
     --name-last=User \
     --password="${ADMINPASSWORD}" \
-    --admin=1 2>&1 | grep -v "pkg_resources\|UserWarning\|CRIT Server" || truepassword="${ADMINPASSWORD}" \
-    --admin=1
+    --admin=1 2>&1 | grep -v "pkg_resources\|UserWarning\|CRIT Server" || true
 
 # Create location
 echo "Creating default location" | log

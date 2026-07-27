@@ -20,6 +20,11 @@ GRANT all privileges on caddydb.* to caddyuser@localhost;
 FLUSH PRIVILEGES;
 EOF
 
+echo "Removing nginx installed by letsencrypt tweak" | log
+systemctl disable --now nginx 2>/dev/null
+apt-get purge -y nginx nginx-common 2>&1 | log
+apt-get autoremove -y 2>&1 | log
+
 echo "Adding caddy to source list" | log
 echo "deb [trusted=yes] https://apt.fury.io/caddy/ /" | tee -a /etc/apt/sources.list.d/caddy-fury.list
 apt update | log
@@ -29,6 +34,27 @@ installPackage caddy | log
 waitOrStop 0 "Failed apt install: Caddy"
 mkdir -p $appPath
 chown -R caddy:caddy /var/log/caddy
+
+LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
+
+# Caddy runs as the unprivileged `caddy` user and must be able to traverse the
+# ENTIRE path to the cert. With a real Let's Encrypt cert the files under live/
+# are symlinks into archive/, and certbot creates both live/ and archive/ as
+# 0700 (root only) — so caddy gets "permission denied" unless we open traversal
+# on both trees, not just live/.
+chmod 755 /etc/letsencrypt /etc/letsencrypt/live /etc/letsencrypt/archive 2>/dev/null
+chmod 755 "${LE_DIR}" 2>/dev/null
+[ -d "/etc/letsencrypt/archive/${CWM_DOMAIN}" ] && chmod 755 "/etc/letsencrypt/archive/${CWM_DOMAIN}"
+
+# Resolve symlinks so the mode/ownership lands on the real files (in archive/
+# for LE certs, or on the files themselves for the self-signed fallback).
+REAL_FC="$(readlink -f "${FC_FILE}")"
+REAL_PK="$(readlink -f "${PK_FILE}")"
+chmod 644 "${REAL_FC}"
+chmod 640 "${REAL_PK}"
+chown root:caddy "${REAL_PK}"
 
 echo "Creating the Caddy configuration file" | log
 cat /dev/null > /etc/caddy/Caddyfile
@@ -46,7 +72,7 @@ ${CWM_DOMAIN} {
     encode gzip zstd
     php_fastcgi unix//run/php/php7.4-fpm.sock
 
-    tls ${ADMINEMAIL} {
+    tls ${FC_FILE} ${PK_FILE} {
         protocols tls1.2 tls1.3
     }
 }

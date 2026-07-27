@@ -28,9 +28,9 @@ fi
 
 appDir="/opt/netbox"
 rm -rf $appDir
-mkdir -p $appDir/config/netbox $appDir/config/postgres $appDir/config/redis \
-         $appDir/config/reports $appDir/config/scripts $appDir/config/startup_scripts \
-         $appDir/media $appDir/config/netbox/static
+mkdir -p $appDir/config/postgres $appDir/config/redis \
+         $appDir/config/reports $appDir/config/scripts \
+         $appDir/media
 chown -R $USER:$USER $appDir
 
 DB_PASSWORD=$(openssl rand -hex 16)
@@ -38,7 +38,7 @@ SECRET_KEY=$(openssl rand -base64 48 | tr -d /=+ | cut -c1-50)
 ADMIN_PASS=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-20)
 
 cat > $appDir/.env << EOF
-ALLOWED_HOSTS=*
+ALLOWED_HOST=$CWM_DOMAIN
 DB_NAME=netbox
 DB_USER=netbox
 DB_PASSWORD=$DB_PASSWORD
@@ -47,52 +47,8 @@ DB_PORT=5432
 REDIS_HOST=netbox-redis
 REDIS_PORT=6379
 REDIS_DB_CACHE=1
-REDIS_DB_TASKS=0
+REDIS_DB_TASK=0
 SECRET_KEY=$SECRET_KEY
-SUPERUSER_NAME=admin
-SUPERUSER_EMAIL=admin@$CWM_DOMAIN
-SUPERUSER_PASSWORD=$ADMIN_PASS
-SKIP_SUPERUSER=false
-STATIC_ROOT=/opt/netbox/config/netbox/static
-EOF
-
-cat > $appDir/config/netbox/configuration.py << 'EOF'
-from os import environ
-
-ALLOWED_HOSTS = ['*']
-
-DATABASE = {
-    "ENGINE": "django.db.backends.postgresql",
-    "NAME": environ.get("DB_NAME", "netbox"),
-    "USER": environ.get("DB_USER", "netbox"),
-    "PASSWORD": environ.get("DB_PASSWORD", ""),
-    "HOST": environ.get("DB_HOST", "netbox-postgres"),
-    "PORT": environ.get("DB_PORT", "5432"),
-    "CONN_MAX_AGE": 300,
-}
-
-REDIS = {
-    "tasks": {
-        "HOST": environ.get("REDIS_HOST", "netbox-redis"),
-        "PORT": int(environ.get("REDIS_PORT", 6379)),
-        "DATABASE": int(environ.get("REDIS_DB_TASKS", 0)),
-        "SSL": False,
-    },
-    "caching": {
-        "HOST": environ.get("REDIS_HOST", "netbox-redis"),
-        "PORT": int(environ.get("REDIS_PORT", 6379)),
-        "DATABASE": int(environ.get("REDIS_DB_CACHE", 1)),
-        "SSL": False,
-    },
-}
-
-SECRET_KEY = environ.get("SECRET_KEY", "")
-DEBUG = False
-PLUGINS = []
-
-STATIC_URL = "/static/"
-STATIC_ROOT = environ.get("STATIC_ROOT", "/opt/netbox/config/netbox/static")
-STATICFILES_DIRS = []
 EOF
 
 cat > $appDir/docker-compose.yml << 'EOF'
@@ -137,40 +93,25 @@ services:
         condition: service_healthy
     env_file: .env
     ports:
-      - "8000:8080"
+      - "8000:8000"
     volumes:
-      - ./config/netbox:/etc/netbox/config:z
       - ./config/reports:/etc/netbox/reports:z
       - ./config/scripts:/etc/netbox/scripts:z
       - ./media:/opt/netbox/netbox/media:z
-      - ./config/netbox/static:/opt/netbox/netbox/static:z
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/login/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f -H 'Host: __CWM_DOMAIN__' http://localhost:8000/login/ || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 120s
-
-  netbox-worker:
-    image: netboxcommunity/netbox:latest-3.4.1
-    container_name: netbox-worker
-    restart: unless-stopped
-    depends_on:
-      netbox:
-        condition: service_healthy
-    env_file: .env
-    volumes:
-      - ./config/netbox:/etc/netbox/config:z
-      - ./config/reports:/etc/netbox/reports:z
-      - ./config/scripts:/etc/netbox/scripts:z
-      - ./media:/opt/netbox/netbox/media:z
-    command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "rqworker"]
 
   # netbox-housekeeping:
   #   image: netboxcommunity/netbox:latest
   #   restart: unless-stopped
   #   command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "housekeeping"]
 EOF
+
+sed -i "s|__CWM_DOMAIN__|$CWM_DOMAIN|g" $appDir/docker-compose.yml
 
 cp /etc/letsencrypt/live/$CWM_DOMAIN/fullchain.pem $appDir/config/https-cert.pem
 cp /etc/letsencrypt/live/$CWM_DOMAIN/privkey.pem $appDir/config/https-key.pem
@@ -229,17 +170,39 @@ done
 
 echo "Starting NetBox..." | log
 docker compose up -d netbox
-sleep 60
 
-echo "Running migrations..." | log
-docker compose exec netbox ./manage.py migrate --noinput
+echo "Waiting for NetBox to become healthy (up to 10 min)..." | log
+for i in {1..120}; do
+    health=$(docker inspect --format '{{.State.Health.Status}}' netbox 2>/dev/null)
+    if [ "$health" = "healthy" ]; then
+        echo "NetBox is healthy after $((i*5))s" | log
+        break
+    fi
+    sleep 5
+done
 
-echo "Collecting static files..." | log
-docker compose exec netbox ./manage.py collectstatic --noinput --clear
+if [ "$health" != "healthy" ]; then
+    echo "NetBox failed to become healthy; aborting" | log 1
+    docker logs netbox --tail 50 2>&1 | log 1
+    exit 1
+fi
 
-echo "Starting worker..." | log
-docker compose up -d netbox-worker
-
+echo "Creating admin superuser..." | log
+docker exec -e DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS" netbox \
+    /app/netbox/venv/bin/python /app/netbox/netbox/manage.py shell -c "
+from django.contrib.auth import get_user_model
+U = get_user_model()
+if not U.objects.filter(username='admin').exists():
+    U.objects.create_superuser('admin', 'admin@$CWM_DOMAIN', '$ADMIN_PASS')
+    print('Superuser admin created')
+else:
+    u = U.objects.get(username='admin')
+    u.set_password('$ADMIN_PASS')
+    u.is_superuser = True
+    u.is_staff = True
+    u.save()
+    print('Superuser admin password reset')
+" 2>&1 | log
 
 systemctl restart nginx
 

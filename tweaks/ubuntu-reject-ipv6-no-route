@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# On VMs that advertise IPv6 but have no working default IPv6 route, every tool
+# that resolves AAAA records (apt, curl, dockerd pulling from registries) tries
+# IPv6 first and HANGS on the connect until a long TCP timeout before falling
+# back to IPv4. Observed all over the dev network:
+#   - apt update stalls for minutes on archive.ubuntu.com (Ign: ... InRelease)
+#   - docker plugin/image pulls fail with "net/http: TLS handshake timeout"
+#     to registry-1.docker.io (kasm sidecar plugin, dashy, docker.io verify)
+# Rejecting outbound TCP/IPv6 makes those attempts fail in milliseconds so the
+# tool immediately retries over IPv4. MUST run early — before ubuntu-updateos
+# and before any app pulls images — so dockerd never caches an IPv6 route.
+#
+# Uses ufw (already enabled by the ufw tweaks) so the rule persists and we never
+# pull in iptables-persistent (its apt install hangs interactively and it Breaks
+# ufw). Skipped on real dual-stack hosts that have an IPv6 default route.
+
+if ip -6 route show default 2>/dev/null | grep -q .; then
+    echo "IPv6 default route present (dual-stack); leaving outbound IPv6 enabled" | log
+    tagScript success
+    exit 0
+fi
+
+echo "No default IPv6 route detected; rejecting outbound TCP/IPv6 so apt/docker fall back to IPv4 instead of timing out" | log
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    ufw reject out proto tcp to ::/0 2>&1 | log
+else
+    # ufw absent/inactive — runtime-only fallback, no package install.
+    ip6tables -C OUTPUT -p tcp -j REJECT --reject-with adm-prohibited 2>/dev/null \
+        || ip6tables -I OUTPUT -p tcp -j REJECT --reject-with adm-prohibited
+fi
+
+tagScript success
+exit 0

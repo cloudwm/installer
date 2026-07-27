@@ -73,7 +73,9 @@ free_web_ports() {
 install_gitlab_package() {
     echo "Installing GitLab from apt" | log
     apt update >>"${LOG_FILE}" 2>&1
-    EXTERNAL_URL="http://${CWM_DOMAIN}" installPackage gitlab-ce
+    # EXTERNAL_URL deliberately not set: the postinst would run gitlab-ctl
+    # reconfigure before our gitlab.rb settings exist; we reconfigure once later
+    installPackage gitlab-ce
     waitOrStop 0 "Failed to install gitlab-ce"
 }
 
@@ -87,6 +89,9 @@ letsencrypt['enable'] = false
 nginx['redirect_http_to_https'] = true
 nginx['ssl_certificate']     = "/etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem"
 nginx['ssl_certificate_key'] = "/etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem"
+
+# Alertmanager's cluster gossip requires a private IP; VMs may be public-only
+alertmanager['enable'] = false
 EOF
 }
 
