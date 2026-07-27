@@ -7,6 +7,10 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 assignedPort="9090"
+# Pin the Jenkins LTS version so installs are reproducible. debian-stable rotates
+# older releases out of its index, so bump this to a version currently in
+# https://pkg.jenkins.io/debian-stable/binary/Packages when it 404s.
+jenkinsVersion="2.568.1"
 
 echo "Setting jenkins repository and key" | log
 install -m 0755 -d /etc/apt/keyrings
@@ -20,10 +24,10 @@ apt update
 installPackage fontconfig openjdk-21-jre | log
 waitOrStop 0 "Failed apt install: openjdk-21-jre"
 
-echo "Installing jenkins" | log
+echo "Installing jenkins ${jenkinsVersion}" | log
 apt update
-installPackage jenkins | log
-waitOrStop 0 "Failed apt install: jenkins"
+installPackage "jenkins=${jenkinsVersion}" | log
+waitOrStop 0 "Failed apt install: jenkins=${jenkinsVersion}"
 
 echo "Tweaking server settings" | log
 sed -i 's/HTTP_PORT=8080/HTTP_PORT='"${assignedPort}"'/g' /etc/default/jenkins

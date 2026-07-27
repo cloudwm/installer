@@ -43,6 +43,18 @@ echo "Installing Zentyal 8.0 (headless, no graphical environment)" | log
 wget https://raw.githubusercontent.com/zentyal/zentyal/master/extra/ubuntu_installers/zentyal_installer_8.0.sh
 chmod u+x zentyal_installer_8.0.sh
 
+# Skip the installer's "network interface naming" pre-check. It hardcodes
+# OLD_NIC_NAMING=true and aborts (exit 1, installing NOTHING) on any host whose
+# NICs use predictable names (ens*/enp*) instead of legacy eth* — which every
+# CWM cloud image does. Its own suggested fix is net.ifnames=0 + a reboot, which
+# renames interfaces and would break networking/provisioning; setting the flag
+# false just skips the legacy-naming enforcement and Zentyal 8 runs fine as-is.
+# Anchored to the top-level `OLD_NIC_NAMING=true` assignment so the patch is
+# unambiguous; verify it applied and fail loudly if upstream renames it.
+sed -i 's/^OLD_NIC_NAMING=true/OLD_NIC_NAMING=false/' zentyal_installer_8.0.sh
+grep -q '^OLD_NIC_NAMING=false' zentyal_installer_8.0.sh
+waitOrStop 0 "Could not disable OLD_NIC_NAMING in the Zentyal installer (upstream layout changed)"
+
 # Drive the installer non-interactively instead of sed-patching it. Its only
 # prompt is `read ZEN_GUI` ("install the Zentyal Graphical environment? (n|y)").
 # The old sed patch was fragile: any upstream layout shift left the `read` in

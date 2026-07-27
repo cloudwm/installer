@@ -60,11 +60,17 @@ DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@hoppscotch-db:5432/hopps
 
 # Application
 NODE_ENV=production
-PORT=3170
+# The backend node process listens on PORT; inside the image Caddy fronts it on
+# 3170 and reverse-proxies to localhost:8080, so the node app MUST use 8080 or it
+# collides with Caddy (EADDRINUSE on 3170). Do not set this back to 3170.
+PORT=8080
 PRODUCTION=true
 
 # URLs
 APP_URL=https://${CWM_DOMAIN}
+# VITE_BASE_URL is required: the backend reads it unguarded at startup
+# (determineAllowSecureCookies) and crashes with "reading 'startsWith'" if unset.
+VITE_BASE_URL=https://${CWM_DOMAIN}
 VITE_BACKEND_API_URL=https://${CWM_DOMAIN}/api
 VITE_BACKEND_WS_URL=wss://${CWM_DOMAIN}/api
 VITE_APP_TOS_LINK=https://${CWM_DOMAIN}/terms
@@ -132,7 +138,15 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hoppscotch-db:5432/${POSTGRES_DB}
       NODE_ENV: production
-      PORT: 3170
+      # Backend listens here; Caddy inside the image fronts it on 3170. Must not be 3170.
+      PORT: 8080
+    # Run DB migrations, then hand off to the image's own production runner.
+    # Do NOT call `pnpm run start:prod` here: that package.json script is
+    # `node dist/main`, but this build's entrypoint is dist/src/main.js, so it
+    # crash-loops with "Cannot find module '/dist/backend/dist/main'". The
+    # image's default CMD (node prod_run.mjs) launches dist/src/main.js
+    # correctly (plus the admin-dashboard Caddy); prod_run.mjs itself does not
+    # run migrations, which is why the migrate step stays.
     command: >
       sh -c "
         echo 'Waiting for database...' &&
@@ -140,7 +154,7 @@ services:
         echo 'Running migrations...' &&
         pnpm exec prisma migrate deploy &&
         echo 'Starting backend...' &&
-        pnpm run start:prod
+        exec node prod_run.mjs
       "
     networks:
       - hoppscotch-net
