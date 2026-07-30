@@ -9,6 +9,7 @@ fi
 appPath=/var/flowise
 rootDir=$(rootDir)
 MIN_FREE_GB=12
+flowiseImage="flowiseai/flowise:3.0.13"
 
 echo "Checking free disk on /var/lib/docker volume" | log
 mkdir -p /var/lib/docker
@@ -37,25 +38,31 @@ cd $appPath/docker
 cp .env.example .env
 sed -i "s|^FLOWISE_USERNAME=.*|FLOWISE_USERNAME=${ADMINEMAIL}|" .env
 sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
-# Pin a known-good Flowise image. The floating `latest` (3.1.x line) ships a
-# broken @langchain/core: it crash-loops at node load with
-# ERR_PACKAGE_PATH_NOT_EXPORTED ("./utils/uuid"). 3.0.13 is verified working.
-# Bump this once a newer tag boots cleanly (test before shipping).
-sed -i -E "s|image:[[:space:]]*flowiseai/flowise(:[^[:space:]]*)?|image: flowiseai/flowise:3.0.13|" docker-compose.yml
+# Pin a known-good Flowise image. The 3.1.x line (3.1.2, 3.1.4, ...) crash-loops
+# at startup: its enterprise session store uses connect-sqlite3, which is broken
+# in those images (TypeError: this.db.exec is not a function), so the process
+# dies every boot right after "initialization completed". 3.0.13 is the newest
+# release that actually serves (verified healthy). Bump ${flowiseImage} only
+# after confirming a newer tag boots cleanly on a real box.
+sed -i -E "s|image:[[:space:]]*flowiseai/flowise(:[^[:space:]]*)?|image: ${flowiseImage}|" docker-compose.yml
 
-# The image runs as the non-root `node` user (uid 1000) and bind-mounts
-# ~/.flowise -> /home/node/.flowise. Two things break a fresh start:
-#   1. Docker auto-creates the missing host dir root-owned, so `node` gets EACCES
-#      doing mkdir('/home/node/.flowise/storage'). Pre-create it and chown to 1000.
-#   2. docker-compose.yml forwards DATABASE_PATH/SECRETKEY_PATH/LOG_PATH/etc.
-#      unconditionally; commented out in .env they reach the container EMPTY, so
-#      it opens an empty DB path (SQLITE_CANTOPEN) and mkdirSync('') for logs.
-#      Pin them all inside the mounted volume so every writable path is one the
-#      `node` user owns. (This replaces the old fragile /var/log/flowise mount,
-#      whose sed matched an upstream mount target that no longer exists.)
-flowiseHome="${HOME:-/root}/.flowise"
-mkdir -p "${flowiseHome}"
-chown -R 1000:1000 "${flowiseHome}"
+# The image runs as the non-root `node` user (uid 1000). Two things break a
+# fresh start, both fixed here:
+#   1. Volume path: the upstream compose bind-mounts `~/.flowise` ->
+#      /home/node/.flowise, but docker compose does NOT expand `~` — it creates a
+#      literal ./~ directory (under the compose dir) owned by root, so `node`
+#      gets EACCES doing mkdir('/home/node/.flowise/storage'). Repoint the bind
+#      at a real absolute host path and chown it to uid 1000.
+#   2. Empty path vars: docker-compose.yml forwards DATABASE_PATH/SECRETKEY_PATH/
+#      LOG_PATH/etc. unconditionally; commented out in .env they reach the
+#      container EMPTY, so it opens an empty DB path (SQLITE_CANTOPEN) and
+#      mkdirSync('') for logs. Pin them all inside the mounted volume below.
+#      (This also replaces the old fragile /var/log/flowise mount, whose sed
+#      matched an upstream mount target that no longer exists.)
+flowiseData=/var/lib/flowise
+sed -i "s|~/.flowise:/home/node/.flowise|${flowiseData}:/home/node/.flowise|" docker-compose.yml
+mkdir -p "${flowiseData}"
+chown -R 1000:1000 "${flowiseData}"
 cat >> .env <<'ENVEOF'
 
 # Writable paths pinned into the mounted /home/node/.flowise volume (install script)
