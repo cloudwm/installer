@@ -9,7 +9,7 @@ fi
 appPath=/var/flowise
 rootDir=$(rootDir)
 MIN_FREE_GB=12
-flowiseImage="flowiseai/flowise:3.1.4"
+flowiseImage="flowiseai/flowise:3.0.13"
 
 echo "Checking free disk on /var/lib/docker volume" | log
 mkdir -p /var/lib/docker
@@ -38,12 +38,12 @@ cd $appPath/docker
 cp .env.example .env
 sed -i "s|^FLOWISE_USERNAME=.*|FLOWISE_USERNAME=${ADMINEMAIL}|" .env
 sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
-# Pin the Flowise image to the version this file is named for.
-# WARNING: 3.1.4 (the newest release at time of writing) is known to crash-loop
-# at node load with ERR_PACKAGE_PATH_NOT_EXPORTED ("./utils/uuid") due to a
-# broken @langchain/core in the image. This file exists to pin the current
-# latest on request; if the container does not come up, the last version
-# verified healthy is 3.0.13 (see apps/flowise-latest-offirepo).
+# Pin a known-good Flowise image. The 3.1.x line (3.1.2, 3.1.4, ...) crash-loops
+# at startup: its enterprise session store uses connect-sqlite3, which is broken
+# in those images (TypeError: this.db.exec is not a function), so the process
+# dies every boot right after "initialization completed". 3.0.13 is the newest
+# release that actually serves (verified healthy). Bump ${flowiseImage} only
+# after confirming a newer tag boots cleanly on a real box.
 sed -i -E "s|image:[[:space:]]*flowiseai/flowise(:[^[:space:]]*)?|image: ${flowiseImage}|" docker-compose.yml
 
 # The image runs as the non-root `node` user (uid 1000). Two things break a
