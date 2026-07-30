@@ -8,14 +8,14 @@ fi
 
 appPath=/var/flowise
 rootDir=$(rootDir)
-MIN_FREE_GB=10
+MIN_FREE_GB=12
 
 echo "Checking free disk on /var/lib/docker volume" | log
 mkdir -p /var/lib/docker
 freeGB=$(df -BG --output=avail /var/lib/docker | tail -1 | tr -dc '0-9')
 if [ -z "$freeGB" ] || [ "$freeGB" -lt "$MIN_FREE_GB" ]; then
     df -h /var/lib/docker | log
-    echo "ERROR: Less than ${MIN_FREE_GB} GB free on the volume hosting /var/lib/docker. Flowise's Docker image (~1 GB compressed, ~3 GB on disk) cannot be pulled. Provision a VM with at least 20 GB root disk." | log 1
+    echo "ERROR: Less than ${MIN_FREE_GB} GB free on the volume hosting /var/lib/docker. Flowise's Docker image is ~9-10 GB on disk and cannot be pulled. Provision a VM with at least 20 GB root disk." | log 1
     exit 1
 fi
 echo "Free disk OK (${freeGB} GB)" | log
@@ -37,13 +37,34 @@ cd $appPath/docker
 cp .env.example .env
 sed -i "s|^FLOWISE_USERNAME=.*|FLOWISE_USERNAME=${ADMINEMAIL}|" .env
 sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
-# Flowise's docker-compose.yml forwards LOG_PATH unconditionally; with no value
-# the container does mkdirSync('') and crash-loops. Mount /var/log/flowise so
-# logs land on the host and survive container recreation.
-mkdir -p /var/log/flowise
-sed -i "s|^# LOG_PATH=.*|LOG_PATH=/var/log/flowise|" .env
-sed -i "/- ~\/.flowise:\/root\/.flowise/a\            - /var/log/flowise:/var/log/flowise" docker-compose.yml
-chown -R root:root $appPath
+# Pin a known-good Flowise image. The floating `latest` (3.1.x line) ships a
+# broken @langchain/core: it crash-loops at node load with
+# ERR_PACKAGE_PATH_NOT_EXPORTED ("./utils/uuid"). 3.0.13 is verified working.
+# Bump this once a newer tag boots cleanly (test before shipping).
+sed -i -E "s|image:[[:space:]]*flowiseai/flowise(:[^[:space:]]*)?|image: flowiseai/flowise:3.0.13|" docker-compose.yml
+
+# The image runs as the non-root `node` user (uid 1000) and bind-mounts
+# ~/.flowise -> /home/node/.flowise. Two things break a fresh start:
+#   1. Docker auto-creates the missing host dir root-owned, so `node` gets EACCES
+#      doing mkdir('/home/node/.flowise/storage'). Pre-create it and chown to 1000.
+#   2. docker-compose.yml forwards DATABASE_PATH/SECRETKEY_PATH/LOG_PATH/etc.
+#      unconditionally; commented out in .env they reach the container EMPTY, so
+#      it opens an empty DB path (SQLITE_CANTOPEN) and mkdirSync('') for logs.
+#      Pin them all inside the mounted volume so every writable path is one the
+#      `node` user owns. (This replaces the old fragile /var/log/flowise mount,
+#      whose sed matched an upstream mount target that no longer exists.)
+flowiseHome="${HOME:-/root}/.flowise"
+mkdir -p "${flowiseHome}"
+chown -R 1000:1000 "${flowiseHome}"
+cat >> .env <<'ENVEOF'
+
+# Writable paths pinned into the mounted /home/node/.flowise volume (install script)
+DATABASE_PATH=/home/node/.flowise
+SECRETKEY_PATH=/home/node/.flowise
+APIKEY_PATH=/home/node/.flowise
+BLOB_STORAGE_PATH=/home/node/.flowise/storage
+LOG_PATH=/home/node/.flowise/logs
+ENVEOF
 chmod -R 755 $appPath
 
 echo "Starting Flowise with Docker Compose" | log
