@@ -46,19 +46,23 @@ sed -i "s|^FLOWISE_PASSWORD=.*|FLOWISE_PASSWORD=${ADMINPASSWORD}|" .env
 # verified healthy is 3.0.13 (see apps/flowise-latest-offirepo).
 sed -i -E "s|image:[[:space:]]*flowiseai/flowise(:[^[:space:]]*)?|image: ${flowiseImage}|" docker-compose.yml
 
-# The image runs as the non-root `node` user (uid 1000) and bind-mounts
-# ~/.flowise -> /home/node/.flowise. Two things break a fresh start:
-#   1. Docker auto-creates the missing host dir root-owned, so `node` gets EACCES
-#      doing mkdir('/home/node/.flowise/storage'). Pre-create it and chown to 1000.
-#   2. docker-compose.yml forwards DATABASE_PATH/SECRETKEY_PATH/LOG_PATH/etc.
-#      unconditionally; commented out in .env they reach the container EMPTY, so
-#      it opens an empty DB path (SQLITE_CANTOPEN) and mkdirSync('') for logs.
-#      Pin them all inside the mounted volume so every writable path is one the
-#      `node` user owns. (This replaces the old fragile /var/log/flowise mount,
-#      whose sed matched an upstream mount target that no longer exists.)
-flowiseHome="${HOME:-/root}/.flowise"
-mkdir -p "${flowiseHome}"
-chown -R 1000:1000 "${flowiseHome}"
+# The image runs as the non-root `node` user (uid 1000). Two things break a
+# fresh start, both fixed here:
+#   1. Volume path: the upstream compose bind-mounts `~/.flowise` ->
+#      /home/node/.flowise, but docker compose does NOT expand `~` — it creates a
+#      literal ./~ directory (under the compose dir) owned by root, so `node`
+#      gets EACCES doing mkdir('/home/node/.flowise/storage'). Repoint the bind
+#      at a real absolute host path and chown it to uid 1000.
+#   2. Empty path vars: docker-compose.yml forwards DATABASE_PATH/SECRETKEY_PATH/
+#      LOG_PATH/etc. unconditionally; commented out in .env they reach the
+#      container EMPTY, so it opens an empty DB path (SQLITE_CANTOPEN) and
+#      mkdirSync('') for logs. Pin them all inside the mounted volume below.
+#      (This also replaces the old fragile /var/log/flowise mount, whose sed
+#      matched an upstream mount target that no longer exists.)
+flowiseData=/var/lib/flowise
+sed -i "s|~/.flowise:/home/node/.flowise|${flowiseData}:/home/node/.flowise|" docker-compose.yml
+mkdir -p "${flowiseData}"
+chown -R 1000:1000 "${flowiseData}"
 cat >> .env <<'ENVEOF'
 
 # Writable paths pinned into the mounted /home/node/.flowise volume (install script)
