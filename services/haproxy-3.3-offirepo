@@ -55,19 +55,28 @@ waitOrStop 0 "Reload haproxy service failed"
 # This script runs as certbot's own --post-hook (see the sed below), so it must NOT
 # invoke "certbot renew" itself: the outer certbot still holds
 # /var/lib/letsencrypt/.certbot.lock and the nested call dies with "Another
-# instance of Certbot is already running". It only has to rebuild the combined PEM
-# from the certificate certbot just renewed and reload HAProxy.
+# instance of Certbot is already running". It rebuilds the combined PEM from the
+# certificate certbot just renewed and brings HAProxy back up after the pre-hook
+# stopped it. certbot runs the post-hook whether the renewal succeeded or failed,
+# so HAProxy is restarted either way; on failure the PEM is simply rebuilt
+# unchanged, which is harmless.
 cat << EOF > ${certsUpdateService}
 #!/bin/bash
 cd ${certsPath} || exit 1
 cat fullchain.pem privkey.pem > ${certGeneratedName}
-service haproxy reload
+systemctl start haproxy
 EOF
 chmod +x ${certsUpdateService}
 
 backupFile /lib/systemd/system/certbot.service
+# The cert is issued with "certbot certonly --standalone", so renewal needs to bind
+# :80 for the HTTP-01 challenge. HAProxy owns :80 from here on, which makes every
+# later renewal die with "Could not bind TCP port 80 because it is already in use"
+# and the certificate silently expires. Free the port for the renewal with a
+# pre-hook and let the post-hook above put HAProxy back. Both hooks only fire when
+# a certificate is actually due, so there is no downtime on the no-op timer runs.
 # sed -i '\|ExecStart|s|=.*|=/bin/bash '"${certsUpdateService}"'|' /lib/systemd/system/certbot.service
-sed -i '\|ExecStart|s|-q renew|-q renew --post-hook "/bin/bash '${certsUpdateService}'"|' /lib/systemd/system/certbot.service
+sed -i '\|ExecStart|s|-q renew|-q renew --pre-hook "systemctl stop haproxy" --post-hook "/bin/bash '${certsUpdateService}'"|' /lib/systemd/system/certbot.service
 systemctl daemon-reload
 service haproxy reload
 waitOrStop 0 "Reload haproxy service failed"
@@ -89,14 +98,16 @@ sed -i "s/apiSecret/secret/g" /etc/default/haproxy
 echo "Registering DataPlane API as a systemd service" | log
 # HAProxy 3.3 removed the "program" section, so the binary can no longer be launched
 # from haproxy.cfg the way earlier versions did ("unknown keyword 'program'" -> fatal
-# config error). Run it as its own unit instead, tied to haproxy so it follows the
-# load balancer's lifecycle.
+# config error). Run it as its own unit instead. Deliberately NOT PartOf=haproxy.service:
+# the certbot pre-hook stops HAProxy to free :80, and PartOf would drag the API down
+# with it while the matching "systemctl start haproxy" would not bring it back
+# (PartOf propagates stop/restart, never start). The API edits haproxy.cfg and reloads
+# HAProxy, so it should outlive a HAProxy restart anyway.
 cat << 'EOF' > /etc/systemd/system/dataplaneapi.service
 [Unit]
 Description=HAProxy Data Plane API
 After=network-online.target haproxy.service
 Wants=network-online.target
-PartOf=haproxy.service
 
 [Service]
 Type=simple
