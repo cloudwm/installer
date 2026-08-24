@@ -47,8 +47,6 @@ cp "${liveDir}/fullchain.pem" "${liveDir}/chain.pem"
 chmod 600 "${liveDir}/privkey.pem"
 ls -l "${liveDir}" | log
 
-# Sending log to log server - 45-93-93-142.cloud-xip.com
-curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
 
 else
 export certbot_failed=0
