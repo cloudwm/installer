@@ -27,8 +27,11 @@ reserveMb=20480
 archivalMb=921600
 
 echo "Installing dependencies" | log
-installPackage ca-certificates curl
-waitOrStop 0 "Failed apt install: ca-certificates curl"
+# openssl is only priority:optional on Ubuntu and arrives as someone else's
+# dependency, so ask for it explicitly rather than trusting it to be there - the
+# RPC password below is generated with it.
+installPackage ca-certificates curl openssl
+waitOrStop 0 "Failed apt install: ca-certificates curl openssl"
 
 # Sized before anything is downloaded or installed: a box that cannot hold the
 # chain should fail here, not after an 86MB download and a half-installed node.
@@ -67,7 +70,7 @@ esac
 tarBall="bitcoin-${bitcoinVersion}-${bitcoinArch}.tar.gz"
 
 echo "Downloading Bitcoin Core ${bitcoinVersion} (${bitcoinArch})" | log
-cd $rootDir/temp
+cd $rootDir/temp || exit 1
 rm -f ${tarBall} SHA256SUMS
 curlDownload ${baseUrl}/${tarBall}
 curlDownload ${baseUrl}/SHA256SUMS
@@ -109,6 +112,12 @@ waitOrStop 0 "Failed to create ${bitcoinUser} user"
 echo "Writing ${confFile}" | log
 mkdir -p ${confDir}
 rpcPassword=$(openssl rand -hex 24)
+# An empty value here would write "rpcpassword=" and leave the RPC socket
+# reachable with no password at all, so refuse rather than generate that file.
+if [ -z "${rpcPassword}" ]; then
+	echo "Failed to generate an RPC password. exiting (1)." | log 1
+	exit 1
+fi
 
 # dbcache is the UTXO cache held in RAM. A quarter of the box is a safe share on
 # the small plans these images run on; capping at 2GB stops it from crowding out
@@ -182,9 +191,11 @@ waitOrStop 0 "bitcoind service did not start"
 # bitcoind binds its RPC socket only after the block index is loaded, and answers
 # every call with an error until then. Poll rather than sleep so a daemon that
 # dies on a bad config is reported here instead of looking like a clean install.
+# 300s, not 150s: on a fresh datadir this answers in seconds, but a re-run over an
+# existing chain has to load the block index first, which takes minutes.
 echo "Waiting for RPC to answer" | log
 rpcOk=0
-for i in $(seq 1 30); do
+for _ in $(seq 1 60); do
 	if bitcoin-cli -conf=${confFile} -datadir=${dataDir} getblockchaininfo >/dev/null 2>&1; then
 		rpcOk=1
 		break
@@ -192,7 +203,7 @@ for i in $(seq 1 30); do
 	sleep 5
 done
 if [ ${rpcOk} -ne 1 ]; then
-	echo "bitcoind RPC did not respond within 150s" | log 1
+	echo "bitcoind RPC did not respond within 300s" | log 1
 	journalctl -u bitcoind --no-pager -n 30 2>&1 | log 1
 	exit 1
 fi
