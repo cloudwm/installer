@@ -24,10 +24,15 @@ vhost="/etc/nginx/sites-available/calcom"
 # images run on there is no headroom and no swap, so add some before starting -
 # without it the seed gets OOM-killed and cal.com restart-loops.
 ramMb=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo)
+swapFile="/calcom-swap"
 if [ "${ramMb}" -lt 4096 ] && [ -z "$(swapon --show=NAME --noheadings)" ]; then
 	echo "Only ${ramMb}MB RAM and no swap; creating a 2GB swapfile" | log
 	createSwapFile calcom-swap 2048 /
 	waitOrStop 0 "Failed to create swap file"
+	# createSwapFile only runs mkswap/swapon - it never writes fstab, so without
+	# this the swap disappears on the first reboot and cal.com is OOM-killed.
+	grep -q "^${swapFile} " /etc/fstab || echo "${swapFile} none swap sw 0 0" >>/etc/fstab
+	swapon --show | log
 fi
 
 echo "Preparing cal.com directory" | log
