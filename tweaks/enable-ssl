@@ -12,14 +12,41 @@ execSpecial 3 '(fail|error)' certbot certonly -n --standalone --preferred-challe
 if [[ $? == 1 ]]
 then
 export certbot_failed=1
-echo "Generating self-signed certificate" | log
-mkdir /etc/letsencrypt/live
-mkdir /etc/letsencrypt/live/${CWM_DOMAIN}
-openssl req -x509 -sha256 -newkey rsa:2048 -keyout /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem -out /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem -days 1024 -nodes -subj '/CN=localhost'
-waitOrStop 0 "Certificate creation failed"
+echo "Certbot failed. Generating self-signed certificate for ${CWM_DOMAIN}" | log
 
-# Sending log to log server - 45-93-93-142.cloud-xip.com
-curl -v -X POST -D -H "Content-Type: application/x-www-form-urlencoded" -d "vm_name='$CWM_NAME'&image_name='$CWM_OS'&vm_owner='$ADMINEMAIL'" http://45-93-93-142.cloud-xip.com
+liveDir="/etc/letsencrypt/live/${CWM_DOMAIN}"
+mkdir -p "${liveDir}"
+
+# A bare CN is ignored by every modern TLS client - the domain has to appear in a
+# subjectAltName extension. Passing it via a config file instead of -addext keeps
+# this working on OpenSSL 1.0.x, where -addext does not exist.
+sanConf=$(mktemp)
+cat > "${sanConf}" <<EOF
+[req]
+prompt             = no
+distinguished_name = dn
+x509_extensions    = v3_req
+[dn]
+CN = ${CWM_DOMAIN}
+[v3_req]
+subjectAltName   = DNS:${CWM_DOMAIN}
+basicConstraints = CA:FALSE
+keyUsage         = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+EOF
+
+openssl req -x509 -sha256 -newkey rsa:2048 -nodes -days 1024 -config "${sanConf}" -keyout "${liveDir}/privkey.pem" -out "${liveDir}/fullchain.pem"
+waitOrStop 0 "Certificate creation failed"
+rm -f "${sanConf}"
+
+# Mirror the file set certbot produces. Consumers that reference cert.pem or
+# chain.pem then find a real file; a missing one makes Docker create a directory
+# at the mount target, which silently kills the web server that reads it.
+cp "${liveDir}/fullchain.pem" "${liveDir}/cert.pem"
+cp "${liveDir}/fullchain.pem" "${liveDir}/chain.pem"
+chmod 600 "${liveDir}/privkey.pem"
+ls -l "${liveDir}" | log
+
 
 else
 export certbot_failed=0
