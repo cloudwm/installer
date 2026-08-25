@@ -7,7 +7,14 @@ elif [ -f "../include/startup.sh" ]; then
 fi
 
 checkTagExist nginx.success
-checkTagExist ssl-ready.success
+
+# tweaks/nginx-letsencrypt-cert produces the certificate but sets no tag of its
+# own, so check for the file it leaves behind rather than for ssl-ready.success.
+certsPath="/etc/letsencrypt/live/${CWM_DOMAIN}"
+[ -f "${certsPath}/fullchain.pem" ] || {
+	echo "Certificate missing at ${certsPath}/fullchain.pem. exiting (1)." | log 1
+	exit 1
+}
 
 # influxdb2 recommends influxdata-archive-keyring, which ships the same
 # /etc/apt/sources.list.d/influxdata.list this script writes below. ucf sees a

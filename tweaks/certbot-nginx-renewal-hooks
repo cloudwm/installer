@@ -1,0 +1,77 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+# tweaks/nginx-letsencrypt-cert issues the certificate with "certbot certonly
+# --standalone", which needs port 80 to itself. It stops nginx to get it. Nothing
+# repeats that at renewal time, so once nginx owns :80 every later renewal dies
+# with "Could not bind TCP port 80 because it is already in use" and the
+# certificate silently expires 90 days in.
+#
+# The hooks go in the per-certificate renewal file rather than in
+# certbot.service: that file is packaged, so an apt upgrade of certbot replaces
+# it and would take any hooks edited there with it.
+
+renewConf="/etc/letsencrypt/renewal/${CWM_DOMAIN}.conf"
+
+if [ ! -f "${renewConf}" ]; then
+
+    # No renewal file means certbot never issued anything - the install fell back
+    # to the self-signed certificate, which has nothing to renew.
+    echo "No certbot renewal config at ${renewConf} (self-signed certificate). Skipping." | log
+    tagScript skipped
+    exit 99
+
+fi
+
+backupFile "${renewConf}"
+
+if grep -q "^pre_hook" "${renewConf}"; then
+
+    echo "Renewal hooks already present in ${renewConf}" | log
+
+else
+
+    echo "Adding nginx stop/start hooks to ${renewConf}" | log
+    # Appended under [renewalparams], which certbot writes as the final section.
+    # post_hook runs whether the renewal succeeded or failed, so nginx comes back
+    # either way.
+    printf 'pre_hook = systemctl stop nginx\npost_hook = systemctl start nginx\n' >>"${renewConf}"
+    waitOrStop 0 "Failed to write renewal hooks to ${renewConf}"
+
+fi
+
+grep -qE "^(pre|post)_hook" "${renewConf}"
+waitOrStop 0 "Renewal hooks missing from ${renewConf} after write"
+
+# Exercise the real path once: this runs the hooks and a full staging issuance,
+# so a broken hook or a port conflict surfaces now instead of in 60 days. It
+# needs the domain to resolve publicly, which is not true on every network, so a
+# failure here is reported and not fatal.
+echo "Testing renewal with certbot --dry-run" | log
+if certbot renew --cert-name "${CWM_DOMAIN}" --dry-run 2>&1 | log; then
+
+    echo "Renewal dry-run completed" | log
+
+else
+
+    echo "WARNING: renewal dry-run did not succeed - verify DNS resolves to this host and that port 80 is reachable" | log 1
+
+fi
+
+# The dry-run leaves nginx running via post_hook, but make sure of it: a stopped
+# nginx here would take the site down until the next boot.
+systemctl is-active --quiet nginx || systemctl start nginx
+systemctl is-active --quiet nginx
+waitOrStop 0 "nginx is not running after the renewal dry-run"
+
+descriptionAppend "Certificate renewal: automatic (certbot timer, nginx stopped briefly during renewal)"
+descriptionAppend " "
+
+tagScript success
+
+exit 0
