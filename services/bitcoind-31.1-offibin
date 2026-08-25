@@ -15,16 +15,46 @@ confDir="/etc/bitcoin"
 confFile="${confDir}/bitcoin.conf"
 baseUrl="https://bitcoincore.org/bin/bitcoin-core-${bitcoinVersion}"
 
-# Chainstate (the UTXO set) is never pruned and keeps growing, so a pruned node
-# still needs tens of GB on top of whatever block data it keeps. Refuse to build
-# a node that cannot finish its initial sync instead of filling the disk.
-minFreeMb=51200
-reserveMb=30720
+# Pruning only discards block files - the UTXO chainstate is never pruned, and at
+# ~11GB (about 170M UTXOs, mid-2026) growing 2-3GB a year it is the real storage
+# floor. reserveMb covers it plus roughly three years of that growth; minFreeMb
+# leaves ~10GB of block data on top. Refuse to build a node that cannot finish
+# its initial sync instead of one that fills the disk months later.
+minFreeMb=30720
+reserveMb=20480
+# Block data measured 764GB at height 963,967 (Aug 2026); go archival only with
+# room for it plus the txindex.
 archivalMb=921600
 
 echo "Installing dependencies" | log
 installPackage ca-certificates curl
 waitOrStop 0 "Failed apt install: ca-certificates curl"
+
+# Sized before anything is downloaded or installed: a box that cannot hold the
+# chain should fail here, not after an 86MB download and a half-installed node.
+echo "Sizing block storage against available disk" | log
+mkdir -p ${dataDir}
+availMb=$(df -Pm ${dataDir} | awk 'NR==2{print $4}')
+if ! [[ "${availMb}" =~ ^[0-9]+$ ]]; then
+	echo "Could not read free space for ${dataDir}. exiting (1)." | log 1
+	exit 1
+fi
+if [ "${availMb}" -lt "${minFreeMb}" ]; then
+	echo "Only ${availMb}MB free on ${dataDir}; Bitcoin Core needs at least ${minFreeMb}MB even when pruned (the UTXO chainstate alone is ~11GB and is never pruned). exiting (1)." | log 1
+	exit 1
+fi
+budgetMb=$((availMb - reserveMb))
+if [ "${budgetMb}" -ge "${archivalMb}" ]; then
+	# Room for the whole chain: keep every block and build the tx index.
+	pruneSetting="prune=0"
+	indexSetting="txindex=1"
+	nodeMode="archival (full history, txindex enabled)"
+else
+	pruneSetting="prune=${budgetMb}"
+	indexSetting="txindex=0"
+	nodeMode="pruned to ${budgetMb}MB of block data"
+fi
+echo "Node mode: ${nodeMode}" | log
 
 case "$(uname -m)" in
 x86_64) bitcoinArch="x86_64-linux-gnu" ;;
@@ -71,32 +101,10 @@ installedVersion=$(echo "${versionOutput}" | head -n1)
 echo "Installed: ${installedVersion}" | log
 
 echo "Creating ${bitcoinUser} system user" | log
-id -u ${bitcoinUser} >/dev/null 2>&1 || useradd --system --home ${dataDir} --create-home --shell /usr/sbin/nologin ${bitcoinUser}
+# No --create-home: the sizing step above already made ${dataDir}, and useradd
+# only warns and skips when the home directory exists. It is chowned below.
+id -u ${bitcoinUser} >/dev/null 2>&1 || useradd --system --home ${dataDir} --shell /usr/sbin/nologin ${bitcoinUser}
 waitOrStop 0 "Failed to create ${bitcoinUser} user"
-mkdir -p ${dataDir}
-
-echo "Sizing block storage against available disk" | log
-availMb=$(df -Pm ${dataDir} | awk 'NR==2{print $4}')
-if ! [[ "${availMb}" =~ ^[0-9]+$ ]]; then
-	echo "Could not read free space for ${dataDir}. exiting (1)." | log 1
-	exit 1
-fi
-if [ "${availMb}" -lt "${minFreeMb}" ]; then
-	echo "Only ${availMb}MB free on ${dataDir}; Bitcoin Core needs at least ${minFreeMb}MB even when pruned. exiting (1)." | log 1
-	exit 1
-fi
-budgetMb=$((availMb - reserveMb))
-if [ "${budgetMb}" -ge "${archivalMb}" ]; then
-	# Room for the whole chain: keep every block and build the tx index.
-	pruneSetting="prune=0"
-	indexSetting="txindex=1"
-	nodeMode="archival (full history, txindex enabled)"
-else
-	pruneSetting="prune=${budgetMb}"
-	indexSetting="txindex=0"
-	nodeMode="pruned to ${budgetMb}MB of block data"
-fi
-echo "Node mode: ${nodeMode}" | log
 
 echo "Writing ${confFile}" | log
 mkdir -p ${confDir}
