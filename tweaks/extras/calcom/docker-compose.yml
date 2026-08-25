@@ -1,0 +1,55 @@
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: calcom-database
+    restart: always
+    environment:
+      - POSTGRES_USER=calcom
+      - POSTGRES_PASSWORD=__POSTGRES_PASSWORD__
+      - POSTGRES_DB=calcom
+    volumes:
+      - calcom_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calcom -d calcom"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: calcom-redis
+    restart: always
+    volumes:
+      - calcom_redis:/data
+
+  calcom:
+    image: calcom/cal.com:v6.2.0
+    container_name: calcom
+    restart: always
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      # Loopback only: nginx terminates TLS and proxies to this port.
+      - "127.0.0.1:3000:3000"
+    environment:
+      # start.sh rewrites the URL baked into the built assets
+      # (BUILT_NEXT_PUBLIC_WEBAPP_URL=http://localhost:3000 in the published
+      # image) to this value at container start, which is what lets a prebuilt
+      # image serve a custom domain.
+      - NEXT_PUBLIC_WEBAPP_URL=https://__CWM_DOMAIN__
+      - NEXTAUTH_URL=https://__CWM_DOMAIN__/api/auth
+      - NEXTAUTH_SECRET=__NEXTAUTH_SECRET__
+      - CALENDSO_ENCRYPTION_KEY=__CALENDSO_ENCRYPTION_KEY__
+      # DATABASE_HOST is read on its own by scripts/wait-for-it.sh, so it has to
+      # be host:port and cannot be folded into DATABASE_URL.
+      - DATABASE_HOST=database:5432
+      - DATABASE_URL=postgresql://calcom:__POSTGRES_PASSWORD__@database:5432/calcom
+      - DATABASE_DIRECT_URL=postgresql://calcom:__POSTGRES_PASSWORD__@database:5432/calcom
+      - REDIS_URL=redis://redis:6379
+      - CALCOM_TELEMETRY_DISABLED=1
+      - NODE_ENV=production
+
+volumes:
+  calcom_database:
+  calcom_redis:

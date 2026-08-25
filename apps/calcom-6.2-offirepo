@@ -1,0 +1,176 @@
+#!/bin/bash
+
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+rootDir=$(rootDir)
+appDir="/opt/calcom"
+certsPath="/etc/letsencrypt/live/${CWM_DOMAIN}"
+vhost="/etc/nginx/sites-available/calcom"
+
+[ -f "${certsPath}/fullchain.pem" ] || {
+	echo "Certificate missing at ${certsPath}/fullchain.pem. exiting (1)." | log 1
+	exit 1
+}
+
+# Cal.com is a Next.js monorepo: the container alone settles around 1GB, and its
+# first start also runs prisma migrate plus the app-store seed, both of which
+# spike on top of that. Postgres and Redis sit alongside. On the 2GB plans these
+# images run on there is no headroom and no swap, so add some before starting -
+# without it the seed gets OOM-killed and cal.com restart-loops.
+ramMb=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo)
+if [ "${ramMb}" -lt 4096 ] && [ -z "$(swapon --show=NAME --noheadings)" ]; then
+	echo "Only ${ramMb}MB RAM and no swap; creating a 2GB swapfile" | log
+	createSwapFile calcom-swap 2048 /
+	waitOrStop 0 "Failed to create swap file"
+fi
+
+echo "Preparing cal.com directory" | log
+mkdir -p ${appDir}
+
+echo "Generating application secrets" | log
+postgresPassword=$(openssl rand -hex 24)
+nextauthSecret=$(openssl rand -base64 32 | tr -d '\n')
+encryptionKey=$(openssl rand -base64 24 | tr -d '\n')
+if [ -z "${postgresPassword}" ] || [ -z "${nextauthSecret}" ] || [ -z "${encryptionKey}" ]; then
+	echo "Failed to generate cal.com secrets. exiting (1)." | log 1
+	exit 1
+fi
+
+echo "Installing cal.com docker-compose.yml for ${CWM_DOMAIN}" | log
+cp -f ${rootDir}/tweaks/extras/calcom/docker-compose.yml ${appDir}/docker-compose.yml
+waitOrStop 0 "Failed to place the cal.com compose file"
+# The secrets are base64 and can contain '/' and '+', so use a separator that
+# cannot appear in them and escape nothing else.
+sed -i "s|__CWM_DOMAIN__|${CWM_DOMAIN}|g" ${appDir}/docker-compose.yml
+sed -i "s|__POSTGRES_PASSWORD__|${postgresPassword}|g" ${appDir}/docker-compose.yml
+sed -i "s|__NEXTAUTH_SECRET__|${nextauthSecret}|g" ${appDir}/docker-compose.yml
+sed -i "s|__CALENDSO_ENCRYPTION_KEY__|${encryptionKey}|g" ${appDir}/docker-compose.yml
+chmod 600 ${appDir}/docker-compose.yml
+
+grep -q "__" ${appDir}/docker-compose.yml && {
+	echo "Unsubstituted placeholder left in the compose file. exiting (1)." | log 1
+	exit 1
+}
+
+echo "Starting cal.com with Docker Compose" | log
+cd ${appDir} || exit 1
+docker compose up -d
+waitOrStop 0 "Failed to start cal.com with Docker Compose"
+
+# First boot runs prisma migrate deploy and seeds the app store before the HTTP
+# server binds. That is minutes, not seconds, on a small box - poll rather than
+# sleep so a crash-looping container is reported here instead of looking healthy.
+echo "Waiting for cal.com to finish migrations and answer" | log
+appOk=0
+for _ in $(seq 1 90); do
+	code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/auth/login 2>/dev/null)
+	if [[ "${code}" =~ ^(200|302|307)$ ]]; then
+		appOk=1
+		break
+	fi
+	sleep 10
+done
+if [ ${appOk} -ne 1 ]; then
+	echo "cal.com did not answer on 127.0.0.1:3000 within 15 minutes (last code: ${code:-none})" | log 1
+	docker compose logs --tail 40 calcom 2>&1 | log 1
+	exit 1
+fi
+echo "cal.com is answering on loopback" | log
+
+echo "Configuring Nginx for cal.com (HTTPS)" | log
+cat <<EOF >${vhost}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     ${certsPath}/fullchain.pem;
+    ssl_certificate_key ${certsPath}/privkey.pem;
+
+    # Booking pages embed avatars and attachments; the 1m default is too small.
+    client_max_body_size 20M;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Upgrade           \$http_upgrade;
+        proxy_set_header Connection        "upgrade";
+
+        # Cal.com holds long requests open when syncing external calendars.
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+EOF
+
+ln -sf ${vhost} /etc/nginx/sites-enabled/calcom
+rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default-ssl
+
+nginx -t
+waitOrStop 0 "nginx config test failed"
+systemctl restart nginx
+waitOrStop 0 "Restart nginx service failed"
+
+echo "Verifying cal.com through nginx" | log
+proxyCode=$(curl -k -s -o /dev/null -w '%{http_code}' https://127.0.0.1/auth/login 2>/dev/null)
+if [[ ! "${proxyCode}" =~ ^(200|302|307)$ ]]; then
+	echo "cal.com not reachable through nginx (code: ${proxyCode:-none})" | log 1
+	nginx -T 2>&1 | tail -30 | log 1
+	exit 1
+fi
+echo "cal.com is served through nginx over TLS" | log
+
+cat <<EOF >/etc/systemd/system/calcom.service
+[Unit]
+Description=cal.com scheduling
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=${appDir}
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable calcom.service
+waitOrStop 0 "Failed to enable calcom service"
+
+echo "Adding descriptions" | log
+descriptionAppend "Cal.com Web UI: https://${CWM_DOMAIN}"
+descriptionAppend "Create the first admin account at: https://${CWM_DOMAIN}/auth/setup"
+descriptionAppend " "
+descriptionAppend "Cal.com compose file: ${appDir}/docker-compose.yml"
+descriptionAppend "Cal.com nginx vhost: ${vhost}"
+descriptionAppend "Cal.com service: systemctl {start,stop,status} calcom"
+descriptionAppend " "
+descriptionAppend "Email sending is not configured. Set EMAIL_SERVER_* in"
+descriptionAppend "${appDir}/docker-compose.yml to enable invitations and reminders."
+descriptionAppend " "
+
+tagScript success
+
+exit 0
