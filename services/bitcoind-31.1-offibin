@@ -6,6 +6,10 @@ elif [ -f "../include/startup.sh" ]; then
     . ../include/startup.sh
 fi
 
+# No apt step here prompts today, but an unattended install must never be able to
+# open one - a conffile prompt blocks the image build forever.
+export DEBIAN_FRONTEND=noninteractive
+
 rootDir=$(rootDir)
 
 bitcoinVersion="31.1"

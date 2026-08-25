@@ -8,6 +8,12 @@ fi
 
 checkTagExist ssl-ready.success
 
+# influxdb2 recommends influxdata-archive-keyring, which ships the same
+# /etc/apt/sources.list.d/influxdata.list this script writes below. ucf sees a
+# locally modified conffile and opens a whiptail prompt that nothing can answer,
+# hanging the whole install. Noninteractive keeps the local version and moves on.
+export DEBIAN_FRONTEND=noninteractive
+
 rootDir=$(rootDir)
 
 certsPath=/etc/letsencrypt/live/${CWM_DOMAIN}
