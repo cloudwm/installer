@@ -15,6 +15,12 @@ if [[ ! "$DATACENTER" =~ [Dd][Ee][Vv] ]]; then
     PRODUCTION="true"
 fi
 
+# CWM publishes wildcard DNS for every server it hosts as *.<ip-with-dashes>.<zone>
+# (e.g. cpanel.63-250-56-242.eu-cloud-xip.com), so even a server without a
+# customer domain has a real, publicly resolvable address. Which zone a server
+# belongs to depends on its datacenter, so they are tried in order.
+CWM_DNS_ZONES=(eu-cloud-xip.com il-cloud-xip.com cloud-xip.com dev-cloud-xip.com)
+
 validate_environment() {
     echo "Validating environment..." | log
 
@@ -37,6 +43,34 @@ validate_environment() {
         exit 1
     fi
     echo "Found supported OS: ${PRETTY_NAME}" | log
+}
+
+resolve_domain() {
+    # Under CWM provisioning startup-cwm.sh exports CWM_DOMAIN from
+    # /root/guest.conf. When that file is absent the variable is empty and every
+    # address we print collapses to "cpanel." — so derive the server's wildcard
+    # name from its own IP instead, and only keep a zone that really resolves
+    # back to this server, rather than trusting a hardcoded suffix.
+    if [ -n "${CWM_DOMAIN}" ]; then
+        echo "Using provisioned domain: ${CWM_DOMAIN}" | log
+        return 0
+    fi
+
+    local ip dashed zone resolved
+    ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") print $(i+1)}' | head -n1)
+    [ -z "${ip}" ] && ip=$(hostname -I | awk '{print $1}')
+    dashed="${ip//./-}"
+
+    for zone in "${CWM_DNS_ZONES[@]}"; do
+        resolved=$(getent ahostsv4 "${dashed}.${zone}" 2>/dev/null | awk '{print $1; exit}')
+        if [ "${resolved}" = "${ip}" ]; then
+            export CWM_DOMAIN="${dashed}.${zone}"
+            echo "No provisioned domain; derived ${CWM_DOMAIN} from ${ip}." | log
+            return 0
+        fi
+    done
+
+    echo "No provisioned domain and no CWM wildcard zone resolves to ${ip}; falling back to this server's own hostname." | log
 }
 
 server_fqdn() {
@@ -273,6 +307,7 @@ main() {
     echo "Starting AlmaLinux 10 cPanel & WHM installer..." | log
 
     validate_environment
+    resolve_domain
     set_hostname
     prepare_system
     install_cpanel
