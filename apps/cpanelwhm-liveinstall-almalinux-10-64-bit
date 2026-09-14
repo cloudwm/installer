@@ -15,6 +15,12 @@ if [[ ! "$DATACENTER" =~ [Dd][Ee][Vv] ]]; then
     PRODUCTION="true"
 fi
 
+# CWM publishes wildcard DNS for every server it hosts as *.<ip-with-dashes>.<zone>
+# (e.g. cpanel.63-250-56-242.eu-cloud-xip.com), so even a server without a
+# customer domain has a real, publicly resolvable address. Which zone a server
+# belongs to depends on its datacenter, so they are tried in order.
+CWM_DNS_ZONES=(eu-cloud-xip.com il-cloud-xip.com cloud-xip.com dev-cloud-xip.com)
+
 validate_environment() {
     echo "Validating environment..." | log
 
@@ -37,6 +43,46 @@ validate_environment() {
         exit 1
     fi
     echo "Found supported OS: ${PRETTY_NAME}" | log
+}
+
+resolve_domain() {
+    # Under CWM provisioning startup-cwm.sh exports CWM_DOMAIN from
+    # /root/guest.conf. When that file is absent the variable is empty and every
+    # address we print collapses to "cpanel." — so derive the server's wildcard
+    # name from its own IP instead, and only keep a zone that really resolves
+    # back to this server, rather than trusting a hardcoded suffix.
+    if [ -n "${CWM_DOMAIN}" ]; then
+        echo "Using provisioned domain: ${CWM_DOMAIN}" | log
+        return 0
+    fi
+
+    local ip dashed zone resolved
+    ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") print $(i+1)}' | head -n1)
+    [ -z "${ip}" ] && ip=$(hostname -I | awk '{print $1}')
+    dashed="${ip//./-}"
+
+    for zone in "${CWM_DNS_ZONES[@]}"; do
+        resolved=$(getent ahostsv4 "${dashed}.${zone}" 2>/dev/null | awk '{print $1; exit}')
+        if [ "${resolved}" = "${ip}" ]; then
+            export CWM_DOMAIN="${dashed}.${zone}"
+            echo "No provisioned domain; derived ${CWM_DOMAIN} from ${ip}." | log
+            return 0
+        fi
+    done
+
+    echo "No provisioned domain and no CWM wildcard zone resolves to ${ip}; falling back to this server's own hostname." | log
+}
+
+server_fqdn() {
+    # The name the panel is actually reachable at. Under CWM provisioning
+    # CWM_DOMAIN gives cpanel.<domain>; without it (no /root/guest.conf, e.g. a
+    # manual run) fall back to the live hostname, so we never build an invalid
+    # name like "cpanel." out of an empty variable.
+    if [ -n "${CWM_DOMAIN}" ]; then
+        echo "cpanel.${CWM_DOMAIN}"
+    else
+        hostname -f 2>/dev/null || hostname
+    fi
 }
 
 set_hostname() {
@@ -143,8 +189,7 @@ configure_ssl() {
     # All external commands run directly (not '| log') to avoid SIGPIPE on hosts
     # without /dev/ttyS0.
     local fqdn
-    fqdn="$(hostname -f 2>/dev/null || hostname)"
-    [ -n "${CWM_DOMAIN}" ] && fqdn="cpanel.${CWM_DOMAIN}"
+    fqdn="$(server_fqdn)"
     echo "Configuring SSL for ${fqdn} (port 443)..." | log
 
     echo "Installing certbot..." | log
@@ -195,11 +240,25 @@ configure_ssl() {
 }
 
 print_summary() {
-    local ip fqdn whm_fqdn webmail_fqdn
+    local ip fqdn whm_fqdn webmail_fqdn password
     ip=$(hostname -I | awk '{print $1}')
-    fqdn="cpanel.${CWM_DOMAIN}"
-    whm_fqdn="whm.${CWM_DOMAIN}"
-    webmail_fqdn="webmail.${CWM_DOMAIN}"
+    fqdn="$(server_fqdn)"
+    if [ -n "${CWM_DOMAIN}" ]; then
+        whm_fqdn="whm.${CWM_DOMAIN}"
+        webmail_fqdn="webmail.${CWM_DOMAIN}"
+    else
+        # No provisioning domain, so the whm./webmail. service subdomains do not
+        # exist: point every interface at the server's own hostname instead.
+        whm_fqdn="${fqdn}"
+        webmail_fqdn="${fqdn}"
+    fi
+
+    # PASSWORD comes from /root/guest.conf; ADMINPASSWORD is what the framework
+    # exports (including the random one it generates for key-only servers). If
+    # neither is set there is no password to print, so say where it comes from
+    # rather than printing an empty "Password:" line.
+    password="${PASSWORD:-$ADMINPASSWORD}"
+    [ -n "${password}" ] || password="(the root password set when the server was created)"
 
     cat > /etc/motd << EOF
 ================================================================================
@@ -210,7 +269,7 @@ WHM (Server Administration):
   https://${whm_fqdn}:2087   (or https://${ip}:2087)
 
   Username: root
-  Password: ${PASSWORD}
+  Password: ${password}
 
 --------------------------------------------------------------------------------
 
@@ -233,12 +292,12 @@ EOF
 
     descriptionAppend "cPanel & WHM Installation Complete!"
     descriptionAppend ""
-    descriptionAppend "WHM (admin): https://${whm_fqdn}:2087"
-    descriptionAppend "cPanel:      https://${fqdn}:2083"
-    descriptionAppend "Webmail:     https://${webmail_fqdn}:2096"
+    descriptionAppend "WHM (admin): https://${whm_fqdn}"
+    descriptionAppend "cPanel:      https://${fqdn}"
+    descriptionAppend "Webmail:     https://${webmail_fqdn}"
     descriptionAppend ""
     descriptionAppend "Username: root"
-    descriptionAppend "Password: ${PASSWORD}"
+    descriptionAppend "Password: ${password}"
     descriptionAppend ""
     descriptionAppend "Web traffic is served through nginx (Engintron) in front of Apache."
     descriptionAppend "Log in to WHM to complete the initial setup wizard."
@@ -248,6 +307,7 @@ main() {
     echo "Starting AlmaLinux 10 cPanel & WHM installer..." | log
 
     validate_environment
+    resolve_domain
     set_hostname
     prepare_system
     install_cpanel
