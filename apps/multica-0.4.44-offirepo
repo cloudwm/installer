@@ -45,13 +45,11 @@ JWT_SECRET=$(openssl rand -hex 32)
 POSTGRES_PASSWORD=$(openssl rand -hex 16)
 VCS_SECRET_KEY=$(openssl rand -hex 32)
 
-# Multica has no password login at all - authentication is a 6-digit code that
-# is normally emailed. Pinning the code and allowlisting a single address gives
-# the same effect as an email/password pair without ever sending mail: only
-# ADMIN_EMAIL may hold an account, and that account always logs in with
-# LOGIN_CODE.
+# Multica has no password login at all - authentication is a 6-digit code. With
+# no mail provider configured the backend prints the code to its own log instead
+# of sending it, so logins never involve email. Only this address is allowed to
+# hold an account.
 ADMIN_EMAIL="${ADMINEMAIL:-admin@${CWM_DOMAIN}}"
-LOGIN_CODE=$(( ( $(od -An -N4 -tu4 < /dev/urandom | tr -d ' ') % 900000 ) + 100000 ))
 
 echo "Creating .env file" | log
 cat << EOF > "${APP_DIR}/.env"
@@ -64,12 +62,7 @@ POSTGRES_USER=multica
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
 # Server
-# APP_ENV must not be "production" or MULTICA_DEV_VERIFICATION_CODE below is
-# ignored. That gate is the only thing APP_ENV changes on the auth path -
-# session cookies stay Secure/SameSite=Strict because that is derived from the
-# https FRONTEND_ORIGIN, not from APP_ENV.
-APP_ENV=development
-MULTICA_DEV_VERIFICATION_CODE=${LOGIN_CODE}
+APP_ENV=production
 PORT=8080
 FRONTEND_PORT=3000
 JWT_SECRET=${JWT_SECRET}
@@ -155,16 +148,29 @@ echo "Creating the admin account and its workspace" | log
 apiUrl="http://127.0.0.1:8080"
 bootstrapOk=0
 
-# verify-code only accepts the fixed code when a code row already exists for the
-# address, so send-code still has to run first. Nothing is emailed - no mail
-# provider is configured, the generated code just goes to the backend log.
+# No mail provider is configured, so the backend prints the code to its log
+# rather than emailing it. Ask for one, then read it back.
 curl -fsS -X POST "${apiUrl}/auth/send-code" \
     -H "Content-Type: application/json" \
     -d "{\"email\":\"${ADMIN_EMAIL}\"}" > /dev/null 2>&1
 
-loginToken=$(curl -fsS -X POST "${apiUrl}/auth/verify-code" \
-    -H "Content-Type: application/json" \
-    -d "{\"email\":\"${ADMIN_EMAIL}\",\"code\":\"${LOGIN_CODE}\"}" 2>/dev/null | jq -r '.token // empty')
+loginCode=""
+for attempt in $(seq 1 15); do
+    loginCode=$(docker compose -f docker-compose.selfhost.yml logs backend 2>/dev/null \
+        | grep -F "[DEV] Verification code for ${ADMIN_EMAIL}:" \
+        | tail -n1 | awk '{print $NF}' | tr -d '\r')
+    if [ -n "$loginCode" ]; then
+        break
+    fi
+    sleep 2
+done
+
+loginToken=""
+if [ -n "$loginCode" ]; then
+    loginToken=$(curl -fsS -X POST "${apiUrl}/auth/verify-code" \
+        -H "Content-Type: application/json" \
+        -d "{\"email\":\"${ADMIN_EMAIL}\",\"code\":\"${loginCode}\"}" 2>/dev/null | jq -r '.token // empty')
+fi
 
 if [ -n "$loginToken" ]; then
 
@@ -189,6 +195,48 @@ fi
 if [ $bootstrapOk -ne 1 ]; then
     echo "Could not pre-create the admin account. Multica is installed and running, but the Get Started screen will appear on first login." | log
 fi
+
+echo "Installing the multica-login-code helper" | log
+cat << 'HELPEOF' > /usr/local/bin/multica-login-code
+#!/bin/bash
+# Prints a fresh Multica login code. No email is involved: with no mail provider
+# configured the backend writes the code to its own container log, and this just
+# requests one and reads it back.
+#
+# Usage: multica-login-code [email]
+
+APP_DIR="/opt/multica"
+COMPOSE="docker compose -f ${APP_DIR}/docker-compose.selfhost.yml"
+EMAIL="${1:-MULTICA_ADMIN_EMAIL}"
+MARKER="[DEV] Verification code for ${EMAIL}:"
+
+cd "$APP_DIR" || { echo "Cannot cd to $APP_DIR" >&2; exit 1; }
+
+# Count the codes already in the log so we return the NEW one, not the last one.
+before=$($COMPOSE logs backend 2>/dev/null | grep -cF "$MARKER")
+
+if ! curl -fsS -X POST http://127.0.0.1:8080/auth/send-code \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"${EMAIL}\"}" > /dev/null; then
+    echo "Failed to request a code. Multica allows one code per 60s per address - wait and retry." >&2
+    exit 1
+fi
+
+for attempt in $(seq 1 15); do
+    after=$($COMPOSE logs backend 2>/dev/null | grep -cF "$MARKER")
+    if [ "$after" -gt "$before" ]; then
+        $COMPOSE logs backend 2>/dev/null | grep -F "$MARKER" | tail -n1 | awk '{print $NF}' | tr -d '\r'
+        exit 0
+    fi
+    sleep 1
+done
+
+echo "No new code appeared in the backend log." >&2
+exit 1
+HELPEOF
+
+sed -i "s|MULTICA_ADMIN_EMAIL|${ADMIN_EMAIL}|" /usr/local/bin/multica-login-code
+chmod 755 /usr/local/bin/multica-login-code
 
 echo "Configuring Nginx reverse proxy for HTTPS" | log
 cat << EOF > /etc/nginx/sites-available/multica
@@ -260,21 +308,22 @@ descriptionAppend " "
 descriptionAppend "Web UI: https://${CWM_DOMAIN}"
 descriptionAppend "Multica version: ${version}"
 descriptionAppend " "
-descriptionAppend "LOGIN CREDENTIALS (SAVE THESE!):"
+descriptionAppend "LOGIN:"
 descriptionAppend "   Email: ${ADMIN_EMAIL}"
-descriptionAppend "   Code:  ${LOGIN_CODE}"
 descriptionAppend " "
-descriptionAppend "Multica has no password - it authenticates with a 6-digit code."
-descriptionAppend "This instance uses the fixed code above instead of emailing one,"
-descriptionAppend "so no mail provider is needed. Enter the email, then the code."
+descriptionAppend "Multica has no password - it signs in with a 6-digit code. No mail"
+descriptionAppend "provider is configured, so nothing is emailed: the backend writes the"
+descriptionAppend "code to its log. To get one, run this on the server:"
+descriptionAppend "   multica-login-code"
 descriptionAppend " "
-descriptionAppend "The account and its workspace are already created, so there is no"
-descriptionAppend "Get Started step. Only ${ADMIN_EMAIL} can sign in;"
-descriptionAppend "every other address is refused (ALLOW_SIGNUP=false + ALLOWED_EMAILS)."
+descriptionAppend "Enter the email above, then the code it prints."
 descriptionAppend " "
-descriptionAppend "To switch to real emailed codes instead of the fixed one: set"
-descriptionAppend "RESEND_API_KEY and APP_ENV=production in ${APP_DIR}/.env, remove"
-descriptionAppend "MULTICA_DEV_VERIFICATION_CODE, then run:"
+descriptionAppend "The account and its workspace already exist and onboarding is marked"
+descriptionAppend "complete, so there is no Get Started step. Only ${ADMIN_EMAIL}"
+descriptionAppend "can sign in - every other address is refused."
+descriptionAppend " "
+descriptionAppend "To have codes emailed instead, set RESEND_API_KEY in ${APP_DIR}/.env"
+descriptionAppend "and run:"
 descriptionAppend "   cd ${APP_DIR} && docker compose -f docker-compose.selfhost.yml up -d backend"
 descriptionAppend " "
 descriptionAppend "CLI / daemon (run on each team member's own machine):"
