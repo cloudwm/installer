@@ -196,6 +196,30 @@ MOTD
 
 chmod 644 /etc/motd
 
+# Alpine has no /etc/update-motd.d and its OpenSSH is built without PAM, so the
+# CWM banner mechanism does not apply. sshd must print /etc/motd itself.
+echo "Enabling MOTD display on SSH login" | log
+
+if [ -f /etc/ssh/sshd_config ]; then
+    sed -i '/^[#[:space:]]*PrintMotd/d' /etc/ssh/sshd_config
+    echo "PrintMotd yes" >> /etc/ssh/sshd_config
+    rc-service sshd reload 2>/dev/null || rc-service sshd restart 2>/dev/null || true
+else
+    # No OpenSSH config (e.g. dropbear, which has no PrintMotd). Print from the
+    # login-shell profile instead. Mutually exclusive with the sshd path above,
+    # so the banner never shows twice.
+    echo "No sshd_config found - printing MOTD from /etc/profile.d instead" | log
+    mkdir -p /etc/profile.d
+    cat > /etc/profile.d/motd.sh << 'PROFILE'
+#!/bin/sh
+[ -f /etc/motd ] && cat /etc/motd
+PROFILE
+    chmod 644 /etc/profile.d/motd.sh
+fi
+
+# A leftover .hushlogin silently suppresses the banner.
+rm -f /root/.hushlogin
+
 echo "Adding descriptions" | log
 descriptionAppend "Android Farm Web Panel: ${panelUrl}"
 descriptionAppend " "
