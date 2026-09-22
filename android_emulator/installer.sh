@@ -67,15 +67,16 @@ with open('${appDir}/black-bg.png', 'wb') as f:
 
 echo "Configuring application settings" | log
 
-# The CWM globals block only exports ADMINPASSWORD/CWM_SERVERIP once per
-# checkout, so they can arrive empty here. An empty password would produce a
-# panel that rejects every login, so fall back rather than ship one.
 if [ -z "${ADMINPASSWORD}" ]; then
-    echo "WARNING: ADMINPASSWORD is empty - generating a random panel password" | log
-    ADMINPASSWORD=$(head -c 512 /dev/urandom | tr -dc A-Za-z0-9 | cut -c1-20)
+    echo "ERROR: ADMINPASSWORD is empty - the panel would reject every login" | log 1
+    exit 1
 fi
 
-panelAddress="${CWM_SERVERIP:-${CWM_DISPLAYED_ADDRESS}}"
+# Panel is reached by domain; emulator noVNC ports are hit directly by IP, so
+# those must not depend on DNS. This stack terminates no TLS (nginx listens on
+# 80 only), so the panel URL is http, not the https other apps advertise.
+panelHost="${CWM_DOMAIN:-${CWM_SERVERIP}}"
+panelUrl="http://${panelHost}"
 
 FARM_SECRET_KEY=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-32)
 
@@ -89,7 +90,7 @@ if [ -z "${FARM_SECRET_KEY}" ]; then
 fi
 
 cat > ${appDir}/.env << EOF
-PUBLIC_IP=${panelAddress}
+PUBLIC_IP=${CWM_SERVERIP:-${panelHost}}
 SECRET_KEY=${FARM_SECRET_KEY}
 EOF
 
@@ -159,16 +160,44 @@ rc-update add android-farm default
 
 echo "Writing login banner" | log
 
-cat > /etc/motd << MOTD
-  Android Farm - Emulator Management
+rm -f /etc/motd 2>/dev/null
 
-  Web Panel: http://${panelAddress}
-  Username:  admin
-  Password:  ${ADMINPASSWORD}
+dockerStatus="$(rc-service docker status 2>/dev/null | sed -n 's/.*status: *//p' | head -1)"
+[ -z "${dockerStatus}" ] && dockerStatus="unknown"
+
+cat > /etc/motd << MOTD
+──────────────────────────────────────────────
+Android Farm - Installation Complete
+──────────────────────────────────────────────
+
+         Web Panel: ${panelUrl}
+            Domain: ${panelHost}
+        Machine IP: ${CWM_SERVERIP}
+
+          Username: admin
+          Password: ${ADMINPASSWORD}
+
+     Docker Status: ${dockerStatus}
+
+      Install Path: ${appDir}
+      Compose File: ${appDir}/docker-compose.yml
+          Env File: ${appDir}/.env
+     Emulator Data: ${appDir}/emulators
+
+──────────────────────────────────────────────
+Android Farm management:
+   rc-service android-farm restart
+   cd ${appDir} && docker compose ps
+
+Remove this message:
+   rm -f /etc/motd
+──────────────────────────────────────────────
 MOTD
 
+chmod 644 /etc/motd
+
 echo "Adding descriptions" | log
-descriptionAppend "Android Farm Web Panel: http://${panelAddress}"
+descriptionAppend "Android Farm Web Panel: ${panelUrl}"
 descriptionAppend " "
 descriptionAppend "Android Farm Admin Username: admin"
 descriptionAppend "Android Farm Admin Password: ${ADMINPASSWORD}"
