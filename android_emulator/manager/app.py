@@ -5,6 +5,8 @@ import threading
 import time
 import uuid
 import base64
+import hmac
+import secrets
 import functools
 import collections
 from pathlib import Path
@@ -15,15 +17,55 @@ from flask import (
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
-app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-env")
 
 EMULATOR_DATA = os.environ.get("EMULATOR_DATA", "/opt/android-emulator/emulators")
 FARM_DIR = os.environ.get("FARM_DIR", "/opt/android-emulator")
 PUBLIC_IP = os.environ.get("PUBLIC_IP", "0.0.0.0")
 UPLOAD_DIR = "/app/uploads"
-AUTH_USER = os.environ.get("AUTH_USER", "admin")
-AUTH_PASS = os.environ.get("AUTH_PASS", "admin")
+AUTH_USER = os.environ.get("AUTH_USER") or "admin"
 EMU_RAM_MB = 2048
+
+
+def load_secret_key():
+    """A blank SECRET_KEY makes every login raise 'session is unavailable'.
+
+    Fall back to a generated key persisted under FARM_DIR so that all gunicorn
+    workers sign cookies identically -- a per-worker key would bounce logins.
+    """
+    key = os.environ.get("SECRET_KEY", "").strip()
+    if key:
+        return key
+    path = os.path.join(FARM_DIR, "secret_key")
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(secrets.token_hex(32))
+    except FileExistsError:
+        pass
+    except OSError:
+        return secrets.token_hex(32)
+    with open(path) as fh:
+        return fh.read().strip()
+
+
+def load_auth_pass():
+    """Read the admin password from AUTH_PASS_FILE, falling back to AUTH_PASS.
+
+    The file avoids docker compose .env interpolation, which corrupts
+    passwords containing '$' or '#'.
+    """
+    path = os.environ.get("AUTH_PASS_FILE")
+    if path:
+        try:
+            with open(path) as fh:
+                return fh.read().rstrip("\r\n")
+        except OSError:
+            pass
+    return os.environ.get("AUTH_PASS", "")
+
+
+app.secret_key = load_secret_key()
+AUTH_PASS = load_auth_pass()
 
 tasks = {}
 tasks_lock = threading.Lock()
@@ -83,11 +125,25 @@ def login_required(f):
     return wrapper
 
 
+def check_credentials(user, password):
+    if not AUTH_PASS:
+        app.logger.error(
+            "No admin password configured (AUTH_PASS_FILE/AUTH_PASS is empty); refusing login."
+        )
+        return False
+    if not isinstance(user, str) or not isinstance(password, str):
+        return False
+    return (
+        hmac.compare_digest(user, AUTH_USER)
+        and hmac.compare_digest(password, AUTH_PASS)
+    )
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         data = request.form if request.form else (request.json or {})
-        if data.get("username") == AUTH_USER and data.get("password") == AUTH_PASS:
+        if check_credentials(data.get("username"), data.get("password")):
             session["logged_in"] = True
             return redirect("/")
         return render_template("login.html", error="Invalid credentials", public_ip=PUBLIC_IP)

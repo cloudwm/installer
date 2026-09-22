@@ -10,10 +10,13 @@ echo "Installing Android Farm - Android Emulator Management Platform" | log
 appDir="/opt/android-emulator"
 installerDir="/opt/installer/android_emulator"
 
+echo "Installing installer prerequisites" | log
+apk update
+apk add curl openssl
+
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker and Docker Compose" | log
-    apk update
-    apk add docker docker-compose docker-cli-compose curl openssl jq
+    apk add docker docker-compose docker-cli-compose
 
     rc-update add cgroups boot
     rc-service cgroups start
@@ -53,7 +56,6 @@ echo "Deploying Android Farm to ${appDir}" | log
 
 cp -a ${installerDir} ${appDir}
 mkdir -p ${appDir}/emulators
-chmod +x ${appDir}/android-farm.sh
 
 rm -rf ${appDir}/black-bg.png
 python3 -c "
@@ -67,11 +69,24 @@ echo "Configuring application settings" | log
 
 FARM_SECRET_KEY=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-32)
 
+if [ -z "${FARM_SECRET_KEY}" ]; then
+    FARM_SECRET_KEY=$(head -c 128 /dev/urandom | tr -dc A-Za-z0-9 | cut -c1-32)
+fi
+
+if [ -z "${FARM_SECRET_KEY}" ]; then
+    echo "ERROR: could not generate SECRET_KEY - the manager cannot create login sessions" | log 1
+    exit 1
+fi
+
 cat > ${appDir}/.env << EOF
 PUBLIC_IP=${CWM_SERVERIP}
-AUTH_PASS=${ADMINPASSWORD}
 SECRET_KEY=${FARM_SECRET_KEY}
 EOF
+
+# The admin password is passed by file, not through .env: docker compose
+# interpolates .env values, which mangles passwords containing $ or #.
+printf '%s' "${ADMINPASSWORD}" > ${appDir}/auth_pass
+chmod 600 ${appDir}/auth_pass
 
 echo "Building and starting Android Farm services" | log
 

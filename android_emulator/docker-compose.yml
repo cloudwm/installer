@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       - PUBLIC_IP=${PUBLIC_IP}
-      - AUTH_PASS=${AUTH_PASS}
+      - AUTH_PASS_FILE=/opt/android-emulator/auth_pass
       - SECRET_KEY=${SECRET_KEY}
       - EMULATOR_DATA=/opt/android-emulator/emulators
       - FARM_DIR=/opt/android-emulator
