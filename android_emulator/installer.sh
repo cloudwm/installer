@@ -12,7 +12,7 @@ installerDir="/opt/installer/android_emulator"
 
 echo "Installing installer prerequisites" | log
 apk update
-apk add curl openssl
+apk add curl openssl certbot
 
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker and Docker Compose" | log
@@ -76,7 +76,7 @@ fi
 # those must not depend on DNS. This stack terminates no TLS (nginx listens on
 # 80 only), so the panel URL is http, not the https other apps advertise.
 panelHost="${CWM_DOMAIN:-${CWM_SERVERIP}}"
-panelUrl="http://${panelHost}"
+panelUrl="https://${panelHost}"
 
 FARM_SECRET_KEY=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-32)
 
@@ -103,6 +103,57 @@ if [ ! -s ${appDir}/auth_pass ]; then
     echo "ERROR: ${appDir}/auth_pass is empty - the panel would reject every login" | log 1
     exit 1
 fi
+
+echo "Obtaining TLS certificate for ${panelHost}" | log
+
+LE_DIR="/etc/letsencrypt/live/${panelHost}"
+FC_FILE="${LE_DIR}/fullchain.pem"
+PK_FILE="${LE_DIR}/privkey.pem"
+
+mkdir -p ${appDir}/certbot-webroot
+
+# Must run before the stack starts: --standalone binds port 80, which nginx
+# takes once it is up. Retry shape matches tweaks/nginx-letsencrypt-cert - ACME
+# DNS/CAA lookups time out occasionally and one failure should not drop us
+# straight to a self-signed cert.
+LE_ATTEMPTS=3
+LE_SLEEP=30
+le_ok=0
+
+for attempt in $(seq 1 ${LE_ATTEMPTS}); do
+    echo "Let's Encrypt attempt ${attempt}/${LE_ATTEMPTS}" | log
+    if certbot certonly --standalone -d "${panelHost}" \
+        --non-interactive --agree-tos \
+        -m "admin@${panelHost}" -v; then
+        le_ok=1
+        break
+    fi
+    if [ "${attempt}" -lt "${LE_ATTEMPTS}" ]; then
+        echo "Let's Encrypt attempt ${attempt} failed; retrying in ${LE_SLEEP}s" | log
+        sleep "${LE_SLEEP}"
+    fi
+done
+
+if [ "${le_ok}" = "1" ]; then
+    echo "LetsEncrypt Certificate Issued for server ${panelHost}" | log
+else
+    mkdir -p "${LE_DIR}"
+    chmod 755 /etc/letsencrypt/live
+    chmod 755 "${LE_DIR}"
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "${PK_FILE}" \
+        -out    "${FC_FILE}" \
+        -subj   "/C=IL/ST=Self-Signed/L=Self-Signed/O=Self-Signed/CN=${panelHost}" \
+        2>/dev/null
+    echo "Self signed certificate has been issued for server ${panelHost}" | log
+fi
+
+if [ ! -s "${FC_FILE}" ] || [ ! -s "${PK_FILE}" ]; then
+    echo "ERROR: no certificate at ${LE_DIR} - nginx would fail to start" | log 1
+    exit 1
+fi
+
+sed -i "s|__CWM_DOMAIN__|${panelHost}|g" ${appDir}/nginx.conf
 
 echo "Building and starting Android Farm services" | log
 
@@ -228,6 +279,21 @@ if [ ${motdShown} -eq 0 ]; then
 PROFILE
     chmod 644 /etc/profile.d/motd.sh
 fi
+
+echo "Scheduling certificate renewal" | log
+
+# Renewal goes through webroot rather than --standalone so nginx keeps serving;
+# the deploy hook only fires when a cert actually changed. Harmless no-op when
+# the cert is self-signed (certbot has no renewal config for it).
+cat > /etc/periodic/daily/android-farm-cert << RENEW
+#!/bin/sh
+certbot renew --quiet --webroot -w ${appDir}/certbot-webroot \
+    --deploy-hook "docker exec nginx-proxy nginx -s reload"
+RENEW
+
+chmod +x /etc/periodic/daily/android-farm-cert
+rc-update add crond default
+rc-service crond start 2>/dev/null || true
 
 # The MOTD carries the credentials; the CWM description file is not used here.
 rm -f "${CWM_DESCFILE:-/root/description.txt}"

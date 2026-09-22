@@ -219,7 +219,10 @@ def get_emulators():
                 emu["health"] = "stopped"
 
             emu["boot_completed"] = emu["health"] == "ready"
-            emu["novnc_url"] = f"http://{PUBLIC_IP}:{emu['novnc_port']}"
+            # Same-origin path proxied by nginx to android-<name>:6080. A
+            # direct http://ip:port URL is blocked as mixed content once the
+            # panel is served over TLS.
+            emu["novnc_url"] = f"/vnc/{emu['name']}/"
             emulators.append(emu)
         except (json.JSONDecodeError, KeyError):
             continue

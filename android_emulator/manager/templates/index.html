@@ -432,7 +432,7 @@ function openPanel(name, vncPort) {
     document.getElementById("panelVncLink").href=`http://${PUBLIC_IP}:${vncPort}`;
     document.getElementById("panelOverlay").classList.add("open");
     document.getElementById("devicePanel").classList.add("open");
-    document.getElementById("vncContainer").innerHTML=`<iframe src="http://${PUBLIC_IP}:${vncPort}/?autoconnect=true&resize=scale" allow="clipboard-read;clipboard-write"></iframe>`;
+    document.getElementById("vncContainer").innerHTML=`<iframe src="/vnc/${name}/?autoconnect=true&resize=scale&path=${encodeURIComponent(`vnc/${name}/websockify`)}" allow="clipboard-read;clipboard-write"></iframe>`;
     document.getElementById("shellOutput").textContent="$ _";
     document.getElementById("logOutput").textContent='Click "Refresh Logs" to load.';
     switchTab(document.querySelector('[data-tab="tab-shell"]'));
