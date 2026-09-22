@@ -67,10 +67,20 @@ with open('${appDir}/black-bg.png', 'wb') as f:
 
 echo "Configuring application settings" | log
 
+# The CWM globals block only exports ADMINPASSWORD/CWM_SERVERIP once per
+# checkout, so they can arrive empty here. An empty password would produce a
+# panel that rejects every login, so fall back rather than ship one.
+if [ -z "${ADMINPASSWORD}" ]; then
+    echo "WARNING: ADMINPASSWORD is empty - generating a random panel password" | log
+    ADMINPASSWORD=$(head -c 512 /dev/urandom | tr -dc A-Za-z0-9 | cut -c1-20)
+fi
+
+panelAddress="${CWM_SERVERIP:-${CWM_DISPLAYED_ADDRESS}}"
+
 FARM_SECRET_KEY=$(openssl rand -base64 32 | tr -d /=+ | cut -c1-32)
 
 if [ -z "${FARM_SECRET_KEY}" ]; then
-    FARM_SECRET_KEY=$(head -c 128 /dev/urandom | tr -dc A-Za-z0-9 | cut -c1-32)
+    FARM_SECRET_KEY=$(head -c 512 /dev/urandom | tr -dc A-Za-z0-9 | cut -c1-32)
 fi
 
 if [ -z "${FARM_SECRET_KEY}" ]; then
@@ -79,7 +89,7 @@ if [ -z "${FARM_SECRET_KEY}" ]; then
 fi
 
 cat > ${appDir}/.env << EOF
-PUBLIC_IP=${CWM_SERVERIP}
+PUBLIC_IP=${panelAddress}
 SECRET_KEY=${FARM_SECRET_KEY}
 EOF
 
@@ -87,6 +97,11 @@ EOF
 # interpolates .env values, which mangles passwords containing $ or #.
 printf '%s' "${ADMINPASSWORD}" > ${appDir}/auth_pass
 chmod 600 ${appDir}/auth_pass
+
+if [ ! -s ${appDir}/auth_pass ]; then
+    echo "ERROR: ${appDir}/auth_pass is empty - the panel would reject every login" | log 1
+    exit 1
+fi
 
 echo "Building and starting Android Farm services" | log
 
@@ -147,10 +162,21 @@ echo "Writing login banner" | log
 cat > /etc/motd << MOTD
   Android Farm - Emulator Management
 
-  Web Panel: http://${CWM_SERVERIP}
+  Web Panel: http://${panelAddress}
   Username:  admin
   Password:  ${ADMINPASSWORD}
 MOTD
+
+echo "Adding descriptions" | log
+descriptionAppend "Android Farm Web Panel: http://${panelAddress}"
+descriptionAppend " "
+descriptionAppend "Android Farm Admin Username: admin"
+descriptionAppend "Android Farm Admin Password: ${ADMINPASSWORD}"
+descriptionAppend " "
+descriptionAppend "Android Farm config location: ${appDir}/docker-compose.yml"
+descriptionAppend "Android Farm emulator data: ${appDir}/emulators"
+
+tagScript success
 
 echo "Installation complete" | log
 exit 0
