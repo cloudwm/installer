@@ -200,15 +200,27 @@ chmod 644 /etc/motd
 # CWM banner mechanism does not apply. sshd must print /etc/motd itself.
 echo "Enabling MOTD display on SSH login" | log
 
+# A leftover .hushlogin silently suppresses the banner.
+rm -f /root/.hushlogin
+
+motdShown=0
+
 if [ -f /etc/ssh/sshd_config ]; then
     sed -i '/^[#[:space:]]*PrintMotd/d' /etc/ssh/sshd_config
     echo "PrintMotd yes" >> /etc/ssh/sshd_config
     rc-service sshd reload 2>/dev/null || rc-service sshd restart 2>/dev/null || true
-else
-    # No OpenSSH config (e.g. dropbear, which has no PrintMotd). Print from the
-    # login-shell profile instead. Mutually exclusive with the sshd path above,
-    # so the banner never shows twice.
-    echo "No sshd_config found - printing MOTD from /etc/profile.d instead" | log
+
+    if sshd -T 2>/dev/null | grep -qi '^printmotd yes'; then
+        motdShown=1
+        echo "sshd confirmed: /etc/motd will print on login" | log
+    fi
+fi
+
+if [ ${motdShown} -eq 0 ]; then
+    # Either no OpenSSH (dropbear has no PrintMotd) or it could not be
+    # confirmed. Print from the login shell instead. Only reached when sshd is
+    # not printing, so the banner never shows twice.
+    echo "sshd not confirmed - printing MOTD from /etc/profile.d instead" | log
     mkdir -p /etc/profile.d
     cat > /etc/profile.d/motd.sh << 'PROFILE'
 #!/bin/sh
@@ -217,17 +229,8 @@ PROFILE
     chmod 644 /etc/profile.d/motd.sh
 fi
 
-# A leftover .hushlogin silently suppresses the banner.
-rm -f /root/.hushlogin
-
-echo "Adding descriptions" | log
-descriptionAppend "Android Farm Web Panel: ${panelUrl}"
-descriptionAppend " "
-descriptionAppend "Android Farm Admin Username: admin"
-descriptionAppend "Android Farm Admin Password: ${ADMINPASSWORD}"
-descriptionAppend " "
-descriptionAppend "Android Farm config location: ${appDir}/docker-compose.yml"
-descriptionAppend "Android Farm emulator data: ${appDir}/emulators"
+# The MOTD carries the credentials; the CWM description file is not used here.
+rm -f "${CWM_DESCFILE:-/root/description.txt}"
 
 tagScript success
 
