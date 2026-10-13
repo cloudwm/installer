@@ -52,6 +52,35 @@ waitOrStop 0 "Restart php${phpVersion}-fpm service failed"
 systemctl restart nginx
 waitOrStop 0 "Restart nginx service failed"
 
+echo "Seeding Matomo trusted hosts" | log
+# Matomo stores whichever host finished the web installer in trusted_hosts[], and
+# nothing here seeded it -- so a setup completed over the IP left nginx's
+# server_name and Matomo's trusted host disagreeing. Matomo then serves its "not
+# configured for this host" page, and that page's own remedy text tells the admin
+# to set enable_trusted_host_check=0 (core/Plugin/Controller.php), which is how
+# the check ends up disabled in the field. Seeding both names before first run
+# removes the trigger and leaves the check at its global.ini.php default of 1.
+# A config.ini.php holding only [General] does not read as "already installed":
+# the web installer still runs, it just inherits these hosts.
+matomoConf=/var/www/matomo/config/config.ini.php
+serverIp=${CWM_SERVERIP:-$(hostname -I | awk '{print $1}')}
+if [ -f "$matomoConf" ]; then
+    echo "Matomo config.ini.php already exists; leaving trusted_hosts untouched" | log
+else
+    # The guard line is what Matomo itself puts at the top of this file: should
+    # the config directory ever become web-readable, PHP exits instead of serving
+    # the settings as text. Matomo adds it on first access anyway -- writing it
+    # here means the file is never on disk without it.
+    cat > "$matomoConf" <<EOF
+; <?php exit; ?> DO NOT REMOVE THIS LINE
+[General]
+trusted_hosts[] = "${CWM_DISPLAYED_ADDRESS}"
+trusted_hosts[] = "${serverIp}"
+EOF
+    chown www-data:www-data "$matomoConf"
+    chmod 640 "$matomoConf"
+fi
+
 echo "Adding descriptions" | log
 descriptionAppend "Database = matomo | DBUser = matomouser"
 descriptionAppend "To finalize the installation visit the Web UI"
