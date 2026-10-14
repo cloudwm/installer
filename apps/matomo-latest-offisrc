@@ -14,8 +14,9 @@ appPath=/var/www/
 rootDir=$(rootDir)
 
 echo "Downloading Matomo" | log
+# No waitOrStop here: curlDownload exits 1 itself on a failed download
+# (include/startup.sh), so a check on its return value can only ever see success.
 curlDownload https://builds.matomo.org/matomo-latest.zip
-waitOrStop 0 "File not downloaded from official source"
 
 echo "Extracting Matomo" | log
 installPackage unzip | log

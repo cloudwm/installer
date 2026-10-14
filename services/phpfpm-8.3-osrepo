@@ -14,10 +14,14 @@ apt update
 
 echo "Installing php8.3-fpm" | log
 installPackage php8.3-fpm
-waitOrStop 0 "Failed apt install: php8.4-fpm"
+waitOrStop 0 "Failed apt install: php8.3-fpm"
 
 echo "Installing php8.3 modules" | log
-packages=(php8.3-cli php8.3-bz2 php8.3-common php8.3-curl php8.3-gd php8.3-json php8.3-mbstring php8.3-mysql php8.3-readline php8.3-xml php8.3-zip php8.3-bcmath php8.3-intl php8.3-soap)
+# No php8.3-json: JSON is compiled into PHP core from 8.0 on and sury.org ships
+# no transitional package, so apt reports "no installation candidate". Listing it
+# cost three failed apt attempts and an error in every build log; nothing broke
+# only because installPackage reports the status of the LAST package it was given.
+packages=(php8.3-cli php8.3-bz2 php8.3-common php8.3-curl php8.3-gd php8.3-mbstring php8.3-mysql php8.3-readline php8.3-xml php8.3-zip php8.3-bcmath php8.3-intl php8.3-soap)
 installPackage "${packages[@]}"
 waitOrStop 0 "Failed apt install: ${packages[@]}"
 
