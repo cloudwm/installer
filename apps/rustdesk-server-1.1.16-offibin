@@ -1,0 +1,206 @@
+#!/bin/bash
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+version="1.1.16"
+
+echo "Installing RustDesk Server ${version} (official hbbs/hbbr .deb + systemd + Nginx landing page)" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+apt-get update
+installPackage curl openssl jq ufw
+
+RUSTDESK_DATA_DIR="/var/lib/rustdesk-server"
+RUSTDESK_LOG_DIR="/var/log/rustdesk-server"
+RELAY_PORT="21117"
+
+echo "Detecting architecture" | log
+case "$(dpkg --print-architecture)" in
+    amd64)
+        rustdeskArch="amd64"
+        ;;
+    arm64)
+        rustdeskArch="arm64"
+        ;;
+    *)
+        echo "Unsupported CPU architecture: $(dpkg --print-architecture). exiting (1)." | log 1
+        exit 1
+        ;;
+esac
+
+echo "Downloading hbbs/hbbr ${version} (${rustdeskArch}) from the official GitHub release" | log
+cd $rootDir/temp
+waitOrStop 0 "Cannot cd to $rootDir/temp"
+curlDownload "https://github.com/rustdesk/rustdesk-server/releases/download/${version}/rustdesk-server-hbbs_${version}_${rustdeskArch}.deb" "$rootDir/temp/rustdesk-hbbs.deb"
+curlDownload "https://github.com/rustdesk/rustdesk-server/releases/download/${version}/rustdesk-server-hbbr_${version}_${rustdeskArch}.deb" "$rootDir/temp/rustdesk-hbbr.deb"
+
+echo "Installing hbbs/hbbr packages" | log
+mkdir -p "$RUSTDESK_DATA_DIR" "$RUSTDESK_LOG_DIR"
+dpkg -i "$rootDir/temp/rustdesk-hbbs.deb" "$rootDir/temp/rustdesk-hbbr.deb"
+waitOrStop 0 "Failed to install the RustDesk Server packages"
+rm -f "$rootDir/temp/rustdesk-hbbs.deb" "$rootDir/temp/rustdesk-hbbr.deb"
+
+echo "Starting hbbs once to generate its keypair" | log
+systemctl enable rustdesk-hbbs
+systemctl start rustdesk-hbbs
+waitOrStop 0 "hbbs service failed to start"
+
+echo "Waiting for the id_ed25519 keypair" | log
+keyReady=1
+for attempt in $(seq 1 30); do
+    if [ -s "${RUSTDESK_DATA_DIR}/id_ed25519.pub" ]; then
+        keyReady=0
+        break
+    fi
+    sleep 2
+done
+
+if [ $keyReady -ne 0 ]; then
+    journalctl -u rustdesk-hbbs --no-pager -n 50 | log 1
+    echo "hbbs did not generate a keypair in time. exiting (1)." | log 1
+    exit 1
+fi
+pubKey=$(cat "${RUSTDESK_DATA_DIR}/id_ed25519.pub")
+echo "RustDesk server public key: ${pubKey}" | log
+
+echo "Pointing hbbs at this server's relay (hbbr) and locking hbbr to the matching key" | log
+mkdir -p /etc/systemd/system/rustdesk-hbbs.service.d /etc/systemd/system/rustdesk-hbbr.service.d
+
+cat << EOF > /etc/systemd/system/rustdesk-hbbs.service.d/override.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/hbbs -r ${CWM_DOMAIN}:${RELAY_PORT}
+EOF
+
+cat << EOF > /etc/systemd/system/rustdesk-hbbr.service.d/override.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/hbbr -k ${pubKey}
+EOF
+
+systemctl daemon-reload
+systemctl enable rustdesk-hbbr
+systemctl restart rustdesk-hbbs
+waitOrStop 0 "Failed to restart hbbs with the relay address"
+systemctl restart rustdesk-hbbr
+waitOrStop 0 "Failed to start hbbr"
+
+sleep 3
+if ! systemctl is-active --quiet rustdesk-hbbs || ! systemctl is-active --quiet rustdesk-hbbr; then
+    journalctl -u rustdesk-hbbs -u rustdesk-hbbr --no-pager -n 80 | log 1
+    echo "hbbs/hbbr are not both active. exiting (1)." | log 1
+    exit 1
+fi
+echo "hbbs and hbbr are running" | log
+
+echo "Adding FW rules for the RustDesk ID/relay ports" | log
+ufw allow 21115/tcp
+ufw allow 21116/tcp
+ufw allow 21116/udp
+ufw allow ${RELAY_PORT}/tcp
+ufw allow 21118/tcp
+ufw allow 21119/tcp
+ufw reload
+
+echo "Creating landing page" | log
+mkdir -p /var/www/rustdesk
+
+cat << 'EOF' > /var/www/rustdesk/index.html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>RustDesk Server</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ body{margin:0;font-family:system-ui,sans-serif;background:#0f1419;color:#e6e6e6;
+      min-height:100vh;display:flex;align-items:center;justify-content:center}
+ .card{background:#1b2330;border:1px solid #2a3446;border-radius:12px;
+       padding:2.5rem;max-width:560px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+ h1{margin:0 0 .25rem;color:#4ade80;font-size:1.8rem}
+ .note{color:#9aa4b2;font-size:.9rem;margin:0 0 1.5rem}
+ .row{margin-bottom:1rem}
+ .label{color:#9aa4b2;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;margin:0 0 .35rem}
+ .addr{background:#0b1018;border:1px solid #2a3446;border-radius:8px;
+       padding:1rem;font-family:ui-monospace,monospace;font-size:1.1rem;
+       display:flex;align-items:center;justify-content:space-between;gap:.75rem;
+       overflow-wrap:anywhere}
+ .addr code{color:#4ade80}
+ button{background:#4ade80;color:#0f1419;border:0;border-radius:6px;flex:0 0 auto;
+        padding:.4rem .8rem;font-weight:600;cursor:pointer}
+ .howto{margin-top:1.5rem;color:#cbd5e1;font-size:.95rem;line-height:1.5}
+</style></head><body>
+<div class="card">
+  <h1>RustDesk Server</h1>
+  <p class="note">This host has no web UI. Open the RustDesk client, go to
+  ID/Relay Server settings, and enter the values below.</p>
+  <div class="row">
+    <p class="label">ID / Relay Server</p>
+    <div class="addr">
+      <code id="a">__DOMAIN__</code>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('a').innerText)">Copy</button>
+    </div>
+  </div>
+  <div class="row">
+    <p class="label">Key</p>
+    <div class="addr">
+      <code id="k">__KEY__</code>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('k').innerText)">Copy</button>
+    </div>
+  </div>
+  <p class="howto">ID Server port: 21116 (TCP+UDP) &middot; Relay Server port: 21117 (TCP).
+  Both default when only the server address is given above.</p>
+</div></body></html>
+EOF
+
+sed -i "s/__DOMAIN__/${CWM_DOMAIN}/g" /var/www/rustdesk/index.html
+sed -i "s|__KEY__|${pubKey}|g"        /var/www/rustdesk/index.html
+
+cat << EOF > /etc/nginx/sites-available/rustdesk
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    root /var/www/rustdesk;
+    index index.html;
+    location / { try_files \$uri \$uri/ =404; }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/rustdesk /etc/nginx/sites-enabled/rustdesk
+rm -f /etc/nginx/sites-enabled/default
+nginx -t 2>&1 | log
+ufw allow 443
+systemctl enable nginx
+systemctl restart nginx
+waitOrStop 0 "Failed to restart nginx for the RustDesk landing page"
+
+echo "Adding descriptions" | log
+descriptionAppend "RustDesk ID/Relay Server: ${CWM_DOMAIN}"
+descriptionAppend "RustDesk Key: ${pubKey}"
+descriptionAppend " "
+descriptionAppend "In the RustDesk client: Settings -> Network -> ID/Relay Server,"
+descriptionAppend "paste the server address and key above."
+descriptionAppend " "
+descriptionAppend "Landing page (same info): https://${CWM_DOMAIN}/"
+descriptionAppend " "
+descriptionAppend "Data/keys directory: ${RUSTDESK_DATA_DIR}"
+descriptionAppend "Log directory: ${RUSTDESK_LOG_DIR}"
+descriptionAppend "Systemd services: rustdesk-hbbs.service, rustdesk-hbbr.service"
+descriptionAppend "Nginx vhost: /etc/nginx/sites-available/rustdesk"
+
+tagScript success
+
+exit 0
