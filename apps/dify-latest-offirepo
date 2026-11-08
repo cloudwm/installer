@@ -125,17 +125,42 @@ echo "Dify is reachable" | log
 # install finishes with a working admin login instead of leaving a manual
 # step. Talk to the loopback port directly - it's the same nginx container
 # the browser would otherwise reach through the host proxy.
+#
+# "Dify is reachable" above only proved nginx+web respond on /; nginx routes
+# /console/api/* straight to the api container instead, which has its own
+# slower startup (depends on db_postgres being healthy, runs migrations) and
+# returned a 502 here once even though / was already up. Wait on the actual
+# api-backed, unauthenticated GET /console/api/init before posting to it.
+echo "Waiting for the Dify API backend" | log
+apiUp=1
+for attempt in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:8080/console/api/init > /dev/null 2>&1; then
+        apiUp=0
+        break
+    fi
+    sleep 10
+done
+
+setupOk=0
+if [ $apiUp -ne 0 ]; then
+    echo "Dify API backend did not become ready in time; skipping automated setup" | log
+    docker compose logs --tail 80 api | log 1
+fi
+
 echo "Automating the first-run setup wizard" | log
 cookieJar="$rootDir/temp/dify-cookies.txt"
 rm -f "$cookieJar"
 
-initHttp=$(curl -sS -o "$rootDir/temp/dify-init.json" -w '%{http_code}' \
-    -c "$cookieJar" -b "$cookieJar" \
-    -H 'Content-Type: application/json' \
-    -X POST "http://127.0.0.1:8080/console/api/init" \
-    -d "{\"password\":\"${initPassword}\"}")
+if [ $apiUp -eq 0 ]; then
+    initHttp=$(curl -sS -o "$rootDir/temp/dify-init.json" -w '%{http_code}' \
+        -c "$cookieJar" -b "$cookieJar" \
+        -H 'Content-Type: application/json' \
+        -X POST "http://127.0.0.1:8080/console/api/init" \
+        -d "{\"password\":\"${initPassword}\"}")
+else
+    initHttp="skipped"
+fi
 
-setupOk=0
 if [ "$initHttp" = "201" ]; then
     setupHttp=$(curl -sS -o "$rootDir/temp/dify-setup.json" -w '%{http_code}' \
         -c "$cookieJar" -b "$cookieJar" \
