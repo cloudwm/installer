@@ -37,8 +37,26 @@ esac
 echo "Downloading hbbs/hbbr ${version} (${rustdeskArch}) from the official GitHub release" | log
 cd $rootDir/temp
 waitOrStop 0 "Cannot cd to $rootDir/temp"
-curlDownload "https://github.com/rustdesk/rustdesk-server/releases/download/${version}/rustdesk-server-hbbs_${version}_${rustdeskArch}.deb" "$rootDir/temp/rustdesk-hbbs.deb"
-curlDownload "https://github.com/rustdesk/rustdesk-server/releases/download/${version}/rustdesk-server-hbbr_${version}_${rustdeskArch}.deb" "$rootDir/temp/rustdesk-hbbr.deb"
+
+# GitHub's release CDN occasionally answers with a transient 504; curlDownload's
+# own --retry only covers a single curl invocation, and it exit(1)s the whole
+# script on the final failure, so retry the call itself a few more times here
+# (in a subshell, so curlDownload's exit doesn't kill this script early).
+function downloadWithRetries() {
+    local url=$1 out=$2 attempts=5 delay=20
+    for attempt in $(seq 1 $attempts); do
+        if ( curlDownload "$url" "$out" ); then
+            return 0
+        fi
+        echo "Download attempt ${attempt}/${attempts} failed for ${url}, retrying in ${delay}s" | log
+        sleep $delay
+    done
+    echo "Failed to download ${url} after ${attempts} attempts. exiting (1)." | log 1
+    exit 1
+}
+
+downloadWithRetries "https://github.com/rustdesk/rustdesk-server/releases/download/${version}/rustdesk-server-hbbs_${version}_${rustdeskArch}.deb" "$rootDir/temp/rustdesk-hbbs.deb"
+downloadWithRetries "https://github.com/rustdesk/rustdesk-server/releases/download/${version}/rustdesk-server-hbbr_${version}_${rustdeskArch}.deb" "$rootDir/temp/rustdesk-hbbr.deb"
 
 echo "Installing hbbs/hbbr packages" | log
 mkdir -p "$RUSTDESK_DATA_DIR" "$RUSTDESK_LOG_DIR"
