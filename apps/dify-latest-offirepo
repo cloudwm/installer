@@ -49,7 +49,11 @@ sandboxToken=$(openssl rand -hex 32)
 pluginDaemonKey=$(openssl rand -hex 32)
 innerApiKey=$(openssl rand -hex 32)
 sandboxApiKey=$(openssl rand -hex 32)
-initPassword=$(openssl rand -hex 16)
+# InitValidatePayload.password caps at 30 chars server-side; hex 16 (32 chars)
+# fails with a 422. Hex 12 (24 chars) stays under the cap.
+initPassword=$(openssl rand -hex 12)
+adminEmail="admin@${CWM_DOMAIN}"
+adminPassword=$(openssl rand -hex 16)
 
 sed -i "s|^DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN=.*|DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN=${sandboxToken}|" .env
 
@@ -116,6 +120,40 @@ if [ $difyUp -ne 0 ]; then
 fi
 echo "Dify is reachable" | log
 
+# Drive the first-run /install wizard ourselves (POST /console/api/init then
+# /console/api/setup, the same two calls the browser wizard makes) so the
+# install finishes with a working admin login instead of leaving a manual
+# step. Talk to the loopback port directly - it's the same nginx container
+# the browser would otherwise reach through the host proxy.
+echo "Automating the first-run setup wizard" | log
+cookieJar="$rootDir/temp/dify-cookies.txt"
+rm -f "$cookieJar"
+
+initHttp=$(curl -sS -o "$rootDir/temp/dify-init.json" -w '%{http_code}' \
+    -c "$cookieJar" -b "$cookieJar" \
+    -H 'Content-Type: application/json' \
+    -X POST "http://127.0.0.1:8080/console/api/init" \
+    -d "{\"password\":\"${initPassword}\"}")
+
+setupOk=0
+if [ "$initHttp" = "201" ]; then
+    setupHttp=$(curl -sS -o "$rootDir/temp/dify-setup.json" -w '%{http_code}' \
+        -c "$cookieJar" -b "$cookieJar" \
+        -H 'Content-Type: application/json' \
+        -X POST "http://127.0.0.1:8080/console/api/setup" \
+        -d "{\"email\":\"${adminEmail}\",\"name\":\"Admin\",\"password\":\"${adminPassword}\",\"language\":\"en-US\"}")
+    [ "$setupHttp" = "201" ] && setupOk=1
+fi
+
+if [ "$setupOk" -eq 1 ]; then
+    echo "Dify admin account created automatically" | log
+else
+    echo "Automated setup did not complete (init:${initHttp:-n/a}, setup:${setupHttp:-n/a})" | log
+    cat "$rootDir/temp/dify-init.json" "$rootDir/temp/dify-setup.json" 2>/dev/null | log
+    echo "Falling back to the manual /install wizard" | log
+fi
+rm -f "$cookieJar" "$rootDir/temp/dify-init.json" "$rootDir/temp/dify-setup.json"
+
 echo "Configuring Nginx reverse proxy for HTTPS" | log
 cat << EOF > /etc/nginx/sites-available/dify
 server {
@@ -170,9 +208,16 @@ systemctl start certbot.timer
 
 echo "Adding descriptions" | log
 descriptionAppend "Dify Web UI / API: https://${CWM_DOMAIN}"
-descriptionAppend "First-run setup wizard: https://${CWM_DOMAIN}/install"
-descriptionAppend "Setup password (enter once on the /install page): ${initPassword}"
-descriptionAppend "After entering it you will create the first (owner) account yourself."
+if [ "$setupOk" -eq 1 ]; then
+    descriptionAppend "Admin account was created automatically - log in with:"
+    descriptionAppend "   Email: ${adminEmail}"
+    descriptionAppend "   Password: ${adminPassword}"
+else
+    descriptionAppend "Automated setup did not finish - complete it manually:"
+    descriptionAppend "First-run setup wizard: https://${CWM_DOMAIN}/install"
+    descriptionAppend "Setup password (enter once on the /install page): ${initPassword}"
+    descriptionAppend "After entering it you will create the first (owner) account yourself."
+fi
 descriptionAppend " "
 descriptionAppend "Installation path: ${APP_DIR}/docker"
 descriptionAppend "Compose file: ${APP_DIR}/docker/docker-compose.yaml"
