@@ -1,0 +1,252 @@
+#!/bin/bash
+# Add this at the beginning of all scripts.
+if [ -f "include/startup.sh" ]; then
+    . include/startup.sh
+elif [ -f "../include/startup.sh" ]; then
+    . ../include/startup.sh
+fi
+
+rootDir=$(rootDir)
+version="1.0.0"
+
+echo "Installing RustFS ${version} (official binary + systemd + Nginx + Let's Encrypt)" | log
+
+export DEBIAN_FRONTEND="noninteractive"
+
+apt-get update
+installPackage curl unzip ca-certificates gnupg lsb-release openssl jq ufw
+
+RUSTFS_BIN_PATH="/usr/local/bin/rustfs"
+RUSTFS_CONFIG_FILE="/etc/default/rustfs"
+RUSTFS_SERVICE_FILE="/etc/systemd/system/rustfs.service"
+RUSTFS_VOLUME="/data/rustfs0"
+RUSTFS_LOG_DIR="/var/log/rustfs"
+RUSTFS_PORT="9000"
+RUSTFS_CONSOLE_PORT="9001"
+
+echo "Detecting architecture and libc" | log
+case "$(dpkg --print-architecture)" in
+    amd64)
+        rustfsArch="x86_64"
+        ;;
+    arm64)
+        rustfsArch="aarch64"
+        ;;
+    *)
+        echo "Unsupported CPU architecture: $(dpkg --print-architecture). exiting (1)." | log 1
+        exit 1
+        ;;
+esac
+
+# The GNU build needs glibc 2.31 or newer, otherwise fall back to the MUSL
+# build - same rule the vendor install script uses.
+glibcVersion=$(ldd --version 2>&1 | head -n1 | grep -oE '[0-9]+(\.[0-9]+)+' | tail -n1)
+if [ -n "$glibcVersion" ] && [ "$(printf '2.31\n%s\n' "$glibcVersion" | sort -V | head -n1)" = "2.31" ]; then
+    rustfsLibc="gnu"
+else
+    rustfsLibc="musl"
+fi
+echo "Using the ${rustfsLibc} build for ${rustfsArch} (glibc ${glibcVersion:-not detected})" | log
+
+rustfsAsset="rustfs-linux-${rustfsArch}-${rustfsLibc}-v${version}.zip"
+
+echo "Downloading ${rustfsAsset} from the official GitHub release" | log
+cd $rootDir/temp
+waitOrStop 0 "Cannot cd to $rootDir/temp"
+rm -rf $rootDir/temp/rustfs-pkg
+curlDownload "https://github.com/rustfs/rustfs/releases/download/${version}/${rustfsAsset}" "$rootDir/temp/rustfs.zip"
+
+unzip -o $rootDir/temp/rustfs.zip -d $rootDir/temp/rustfs-pkg
+waitOrStop 0 "Failed to unzip the RustFS package"
+
+rustfsBinFound=$(find $rootDir/temp/rustfs-pkg -type f -name rustfs | head -n1)
+if [ -z "$rustfsBinFound" ]; then
+    echo "rustfs binary not found inside ${rustfsAsset}. exiting (1)." | log 1
+    exit 1
+fi
+
+echo "Installing the RustFS binary to ${RUSTFS_BIN_PATH}" | log
+cp "$rustfsBinFound" "$RUSTFS_BIN_PATH"
+waitOrStop 0 "Failed to copy the RustFS binary to ${RUSTFS_BIN_PATH}"
+chmod +x "$RUSTFS_BIN_PATH"
+rm -rf $rootDir/temp/rustfs.zip $rootDir/temp/rustfs-pkg
+
+echo "Creating data and log directories" | log
+mkdir -p "$RUSTFS_VOLUME"
+mkdir -p "$RUSTFS_LOG_DIR"
+
+echo "Generating access credentials" | log
+accessKey=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20)
+secretKey=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 40)
+
+echo "Creating ${RUSTFS_CONFIG_FILE}" | log
+cat << EOF > ${RUSTFS_CONFIG_FILE}
+RUSTFS_ACCESS_KEY=${accessKey}
+RUSTFS_SECRET_KEY=${secretKey}
+RUSTFS_VOLUMES="${RUSTFS_VOLUME}"
+RUSTFS_ADDRESS="127.0.0.1:${RUSTFS_PORT}"
+RUSTFS_CONSOLE_ADDRESS="127.0.0.1:${RUSTFS_CONSOLE_PORT}"
+RUSTFS_CONSOLE_ENABLE=true
+RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS="https://${CWM_DOMAIN}"
+RUSTFS_OBS_LOGGER_LEVEL=error
+RUSTFS_OBS_LOG_DIRECTORY="${RUSTFS_LOG_DIR}/"
+EOF
+chmod 600 ${RUSTFS_CONFIG_FILE}
+waitOrStop 0 "Failed to write ${RUSTFS_CONFIG_FILE}"
+
+echo "Creating the systemd service for RustFS" | log
+cat << EOF > ${RUSTFS_SERVICE_FILE}
+[Unit]
+Description=RustFS Object Storage Server
+Documentation=https://rustfs.com/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=root
+Group=root
+WorkingDirectory=/usr/local
+EnvironmentFile=-${RUSTFS_CONFIG_FILE}
+ExecStart=${RUSTFS_BIN_PATH}
+LimitNOFILE=1048576
+LimitNPROC=32768
+TasksMax=infinity
+Restart=always
+RestartSec=10s
+OOMScoreAdjust=-1000
+SendSIGKILL=no
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable rustfs
+waitOrStop 0 "Failed to enable the rustfs service"
+
+echo "Starting the RustFS service" | log
+systemctl start rustfs
+waitOrStop 0 "RustFS service failed to start"
+
+echo "Waiting for RustFS to accept connections" | log
+rustfsUp=1
+for attempt in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:${RUSTFS_PORT}/health > /dev/null 2>&1; then
+        rustfsUp=0
+        break
+    fi
+    sleep 5
+done
+
+if [ $rustfsUp -ne 0 ]; then
+    journalctl -u rustfs --no-pager -n 50 | log 1
+    echo "RustFS did not become healthy in time. exiting (1)." | log 1
+    exit 1
+fi
+echo "RustFS service is running" | log
+
+echo "Configuring Nginx reverse proxy for HTTPS" | log
+cat << EOF > /etc/nginx/sites-available/rustfs
+server {
+    listen 80;
+    server_name ${CWM_DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${CWM_DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${CWM_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${CWM_DOMAIN}/privkey.pem;
+
+    # SSL security settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+
+    # Web console
+    location /rustfs/console {
+        proxy_pass http://127.0.0.1:${RUSTFS_CONSOLE_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+    }
+
+    # S3 API
+    location / {
+        proxy_pass http://127.0.0.1:${RUSTFS_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # S3 specific headers
+        proxy_set_header X-Amz-Date \$http_x_amz_date;
+        proxy_set_header Authorization \$http_authorization;
+
+        # Do not buffer or cap object uploads
+        proxy_request_buffering off;
+        client_max_body_size 0;
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/rustfs /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+nginx -t && systemctl restart nginx
+waitOrStop 0 "Nginx configuration or restart failed"
+
+echo "Setting up automatic SSL certificate renewal" | log
+systemctl enable certbot.timer
+systemctl start certbot.timer
+
+descriptionAppend " "
+descriptionAppend "RustFS installed successfully!"
+descriptionAppend " "
+descriptionAppend "S3 API endpoint: https://${CWM_DOMAIN}"
+descriptionAppend "Web console:     https://${CWM_DOMAIN}/rustfs/console"
+descriptionAppend "RustFS version:  ${version}"
+descriptionAppend " "
+descriptionAppend "CREDENTIALS (SAVE THESE!):"
+descriptionAppend "   Access Key: ${accessKey}"
+descriptionAppend "   Secret Key: ${secretKey}"
+descriptionAppend " "
+descriptionAppend "Installation details:"
+descriptionAppend "   Binary:          ${RUSTFS_BIN_PATH}"
+descriptionAppend "   Config file:     ${RUSTFS_CONFIG_FILE}"
+descriptionAppend "   Data directory:  ${RUSTFS_VOLUME}"
+descriptionAppend "   Log directory:   ${RUSTFS_LOG_DIR}"
+descriptionAppend "   Systemd service: rustfs.service"
+descriptionAppend "   Nginx config:    /etc/nginx/sites-available/rustfs"
+descriptionAppend " "
+descriptionAppend "To change the keys, edit ${RUSTFS_CONFIG_FILE} then run: systemctl restart rustfs"
+
+tagScript success
+
+exit 0
