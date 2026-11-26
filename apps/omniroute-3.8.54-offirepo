@@ -22,7 +22,12 @@ ENV_FILE="${ENV_DIR}/omniroute.env"
 dataDir="/root/.omniroute"
 NGINX_SITE="/etc/nginx/sites-available/omniroute"
 LE_DIR="/etc/letsencrypt/live/${CWM_DOMAIN}"
-MIN_FREE_GB=3
+# Measured on a 1 vCPU / 1 GB RAM / 10 GB disk server: the install takes 2.8 GB in node_modules
+# plus a 1.2 GB npm cache while it runs, and peaks near 1.6 GB of RAM and swap together.
+MIN_FREE_MB=4500
+MIN_INSTALL_MEM_MB=1900
+INSTALL_SWAP_FILE="/swapfile-omniroute-install"
+NPM_DONE_TAG="omniroute-npm-${OMNIROUTE_VERSION}.success"
 # The login page prints this as fixed text, so setting a password does not remove it.
 # nginx strips it from the response below.
 LOGIN_HINT='Default password: CHANGEME (unless INITIAL_PASSWORD was set)'
@@ -63,6 +68,77 @@ function envFileQuote() {
 
 }
 
+# Record why an npm attempt failed. npm prints nothing when the kernel kills it, so without
+# this the log ends on harmless peer-dependency warnings.
+function logNpmFailure() {
+
+    local attempt="$1" exitCode="$2" npmLog
+
+    echo "npm install attempt ${attempt}/3 failed with exit code ${exitCode}" | log
+    if [ "$exitCode" -gt 128 ]; then
+        echo "npm was killed by signal $((exitCode - 128)); signal 9 usually means the kernel ran out of memory" | log
+    fi
+    free -m 2>&1 | log
+    dmesg 2>/dev/null | grep -i -E 'out of memory|oom-kill|killed process' | tail -n 5 | log
+    df -h / 2>&1 | log
+
+    npmLog="$(ls -t /root/.npm/_logs/*-debug-*.log 2>/dev/null | head -n1)"
+    if [ -n "$npmLog" ]; then
+        echo "Last lines of ${npmLog}:" | log
+        tail -n 30 "$npmLog" | log
+    fi
+
+}
+
+# RAM plus swap, in MB.
+function totalMemoryMb() {
+
+    awk '/^MemTotal:/ {m=$2} /^SwapTotal:/ {s=$2} END {print int((m + s) / 1024)}' /proc/meminfo
+
+}
+
+# Add swap for the duration of the npm install when RAM plus swap is below what it needs.
+# tweaks/ubuntu-sysctl-swap covers Ubuntu 22.04/24.04 only, so a small server on another
+# release reaches this point with no swap at all.
+function addInstallSwap() {
+
+    local sizeMb="$1"
+
+    echo "Adding ${sizeMb} MB of temporary swap for the npm install" | log
+    rm -f "${INSTALL_SWAP_FILE}"
+    dd if=/dev/zero of="${INSTALL_SWAP_FILE}" bs=1M count="${sizeMb}" status=none &&
+        chmod 600 "${INSTALL_SWAP_FILE}" &&
+        mkswap "${INSTALL_SWAP_FILE}" >/dev/null &&
+        swapon "${INSTALL_SWAP_FILE}"
+    if [ $? -ne 0 ]; then
+        echo "Could not add temporary swap, continuing without it" | log
+        rm -f "${INSTALL_SWAP_FILE}"
+    fi
+
+}
+
+function removeInstallSwap() {
+
+    [ -f "${INSTALL_SWAP_FILE}" ] || return 0
+    swapoff "${INSTALL_SWAP_FILE}" 2>/dev/null
+    rm -f "${INSTALL_SWAP_FILE}"
+    echo "Removed temporary swap" | log
+
+}
+
+# Start every npm attempt from nothing. A killed attempt leaves a partial tree behind, and
+# installing from a filled npm cache unpacks everything at once: about 3.5 GB of memory
+# against 0.7 GB from an empty cache.
+function cleanNpmLeftovers() {
+
+    rm -rf "${npmRoot}/omniroute" "${npmRoot}"/.omniroute-*
+    # The command links go too: npm leaves a link that already points at the right file alone
+    # and then also skips making that file executable.
+    rm -f "${npmGlobalBin}/omniroute" "${npmGlobalBin}/omniroute-reset-password"
+    npm cache clean --force >/dev/null 2>&1
+
+}
+
 function appHttpCode() {
 
     curl -s -o /dev/null -m 5 -w '%{http_code}' "http://127.0.0.1:${APP_PORT}$1" 2>/dev/null
@@ -86,13 +162,12 @@ if [ ! -f "${LE_DIR}/fullchain.pem" ] || [ ! -f "${LE_DIR}/privkey.pem" ]; then
     exit 1
 fi
 
-freeGB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-if [ -z "$freeGB" ] || [ "$freeGB" -lt "$MIN_FREE_GB" ]; then
-    df -h / | log
-    echo "Less than ${MIN_FREE_GB} GB free on /. The omniroute npm package is ~580 MB unpacked before its dependencies. Exiting (1)." | log 1
-    exit 1
+memoryMb=$(totalMemoryMb)
+installSwapMb=0
+if [ "$memoryMb" -lt "$MIN_INSTALL_MEM_MB" ]; then
+    installSwapMb=$((MIN_INSTALL_MEM_MB - memoryMb + 256))
 fi
-echo "Free disk OK (${freeGB} GB)" | log
+echo "RAM plus swap: ${memoryMb} MB (the npm install needs about ${MIN_INSTALL_MEM_MB} MB)" | log
 
 echo "Installing dependencies" | log
 apt-get update
@@ -140,26 +215,67 @@ nodeVersion="$(node --version 2>/dev/null)"
 nodeVersionOk
 waitOrStop 0 "Node.js ${nodeVersion} is outside OmniRoute's supported range (>=22.22.2 <23 || >=24.0.0 <27)"
 
-echo "Installing omniroute@${OMNIROUTE_VERSION} from npm (this can take several minutes)" | log
-npmInstalled=1
-for attempt in 1 2 3; do
+npmRoot="$(npm root -g 2>/dev/null)"
+npmPrefix="$(npm prefix -g 2>/dev/null)"
+[ -n "$npmRoot" ] && [ -d "$npmRoot" ] && [ -n "$npmPrefix" ]
+waitOrStop 0 "Could not find npm's global directories"
+# npm's global prefix is not always on PATH, so the command is looked up there as well.
+npmGlobalBin="${npmPrefix}/bin"
 
-    echo "npm install attempt ${attempt}/3" | log
-    npm install -g "omniroute@${OMNIROUTE_VERSION}" 2>&1 | log
-    if [ "${PIPESTATUS[0]}" -eq 0 ]; then
-        npmInstalled=0
-        break
+if [ -f "${rootDir}/temp/${NPM_DONE_TAG}" ]; then
+
+    echo "omniroute@${OMNIROUTE_VERSION} was already installed by an earlier run, skipping npm install" | log
+
+else
+
+    # Checked after the cleanup, so what a failed earlier run left behind is not counted.
+    cleanNpmLeftovers
+    neededMb=$((MIN_FREE_MB + installSwapMb))
+    freeMb=$(df -BM --output=avail / | tail -1 | tr -dc '0-9')
+    if [ -z "$freeMb" ] || [ "$freeMb" -lt "$neededMb" ]; then
+        df -h / | log
+        echo "Only ${freeMb} MB free on /, the OmniRoute install needs ${neededMb} MB. Exiting (1)." | log 1
+        exit 1
     fi
-    sleep 10
+    echo "Free disk OK (${freeMb} MB)" | log
 
-done
-[ "$npmInstalled" -eq 0 ]
-waitOrStop 0 "Failed to install omniroute@${OMNIROUTE_VERSION} from npm"
+    echo "Installing omniroute@${OMNIROUTE_VERSION} from npm (this can take several minutes)" | log
+
+    # onnxruntime-node, a dependency, otherwise downloads its CUDA (GPU) libraries on Linux x64
+    # and unzips the archive in memory. That is what the kernel OOM-killed on a 1 GB server.
+    export ONNXRUNTIME_NODE_INSTALL=skip
+
+    if [ "$installSwapMb" -gt 0 ]; then
+        addInstallSwap "$installSwapMb"
+    fi
+
+    npmInstalled=1
+    for attempt in 1 2 3; do
+
+        echo "npm install attempt ${attempt}/3" | log
+        cleanNpmLeftovers
+        npm install -g "omniroute@${OMNIROUTE_VERSION}" --no-audit --no-fund 2>&1 | log
+        npmExit="${PIPESTATUS[0]}"
+        if [ "$npmExit" -eq 0 ]; then
+            npmInstalled=0
+            break
+        fi
+        logNpmFailure "$attempt" "$npmExit"
+        sleep 10
+
+    done
+
+    # The cache is about 1.2 GB and is not used again.
+    npm cache clean --force >/dev/null 2>&1
+    removeInstallSwap
+
+    [ "$npmInstalled" -eq 0 ]
+    waitOrStop 0 "Failed to install omniroute@${OMNIROUTE_VERSION} from npm"
+
+fi
 
 hash -r
 
-# npm's global prefix is not always on PATH, so look there as well.
-npmGlobalBin="$(npm prefix -g 2>/dev/null)/bin"
 omnirouteBin="$(command -v omniroute 2>/dev/null)"
 if [ ! -x "$omnirouteBin" ]; then
     omnirouteBin="${npmGlobalBin}/omniroute"
@@ -170,9 +286,10 @@ if [ ! -x "$omnirouteBin" ]; then
 fi
 echo "Using omniroute at ${omnirouteBin}" | log
 
-installedVersion="$(node -p "require('$(npm root -g)/omniroute/package.json').version" 2>/dev/null)"
+installedVersion="$(node -p "require('${npmRoot}/omniroute/package.json').version" 2>/dev/null)"
 [ "$installedVersion" = "$OMNIROUTE_VERSION" ]
 waitOrStop 0 "Installed omniroute version is '${installedVersion}', expected ${OMNIROUTE_VERSION}"
+[ -f "${rootDir}/temp/${NPM_DONE_TAG}" ] || tag "${NPM_DONE_TAG}"
 
 echo "Writing OmniRoute secrets file ${ENV_FILE}" | log
 # INITIAL_PASSWORD sets the dashboard password on first start. It lives in a 0600 file and not
